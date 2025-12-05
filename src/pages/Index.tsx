@@ -1,12 +1,47 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from 'react';
+import { Header } from '@/components/layout/Header';
+import { TabNavigation, TabType } from '@/components/layout/TabNavigation';
+import { Dashboard } from '@/components/dashboard/Dashboard';
+import { PropertiesView } from '@/components/properties/PropertiesView';
+import { UploadView } from '@/components/upload/UploadView';
+import { ComparisonView } from '@/components/comparison/ComparisonView';
+import { FileHistory } from '@/components/files/FileHistory';
 
 const Index = () => {
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    // Simulate refresh
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsRefreshing(false);
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return <Dashboard onFilterChange={() => setActiveTab('properties')} />;
+      case 'properties':
+        return <PropertiesView />;
+      case 'upload':
+        return <UploadView />;
+      case 'comparison':
+        return <ComparisonView />;
+      case 'files':
+        return <FileHistory />;
+      default:
+        return <Dashboard />;
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header onRefresh={handleRefresh} isRefreshing={isRefreshing} />
+      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <main className="container mx-auto animate-fade-in">
+        {renderContent()}
+      </main>
     </div>
   );
 };
