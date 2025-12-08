@@ -19,6 +19,7 @@ export interface Property {
   jurisdictions?: string[];
   lastPaymentDate?: string;
   lastPaymentAmount?: number;
+  lastFollowUp?: string;
   paymentHistory?: PaymentRecord[];
   cadData?: CADData;
   isNew?: boolean;
