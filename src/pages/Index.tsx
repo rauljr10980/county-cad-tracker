@@ -6,6 +6,8 @@ import { PropertiesView } from '@/components/properties/PropertiesView';
 import { UploadView } from '@/components/upload/UploadView';
 import { ComparisonView } from '@/components/comparison/ComparisonView';
 import { FileHistory } from '@/components/files/FileHistory';
+import { ForeclosedView } from '@/components/foreclosed/ForeclosedView';
+import { DeadLeadsView } from '@/components/deadLeads/DeadLeadsView';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -24,6 +26,10 @@ const Index = () => {
         return <Dashboard onFilterChange={() => setActiveTab('properties')} />;
       case 'properties':
         return <PropertiesView />;
+      case 'foreclosed':
+        return <ForeclosedView />;
+      case 'deadLeads':
+        return <DeadLeadsView />;
       case 'upload':
         return <UploadView />;
       case 'comparison':

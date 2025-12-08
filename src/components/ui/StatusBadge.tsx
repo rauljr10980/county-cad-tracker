@@ -10,6 +10,8 @@ const statusConfig = {
   J: { label: 'Judgment', className: 'status-judgment' },
   A: { label: 'Active', className: 'status-active' },
   P: { label: 'Pending', className: 'status-pending' },
+  F: { label: 'Foreclosed', className: 'bg-destructive/10 text-destructive border-destructive/20' },
+  D: { label: 'Dead Lead', className: 'bg-muted text-muted-foreground border-muted-foreground/20' },
 };
 
 export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {

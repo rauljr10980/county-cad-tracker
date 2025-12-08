@@ -1,10 +1,11 @@
 import { Property, UploadedFile, DashboardStats, ComparisonReport, ProcessingStatus, StatusTransition } from '@/types/property';
 
 export const generateMockProperties = (count: number = 100): Property[] => {
-  const statuses: ('J' | 'A' | 'P')[] = ['J', 'A', 'P'];
+  const statuses: ('J' | 'A' | 'P' | 'F' | 'D')[] = ['J', 'A', 'P', 'F', 'D'];
   const streets = ['Main St', 'Oak Ave', 'Cedar Ln', 'Pine Rd', 'Elm Dr', 'Maple Way', 'Birch Ct', 'Walnut Blvd'];
   const cities = ['San Antonio', 'Helotes', 'Leon Valley', 'Alamo Heights', 'Castle Hills'];
-  
+  const resolutionReasons = ['Paid in full', 'Sold to new owner', 'Payment plan completed', 'Tax exemption granted'];
+
   return Array.from({ length: count }, (_, i) => {
     const status = statuses[Math.floor(Math.random() * statuses.length)];
     const previousStatus = Math.random() > 0.85 ? statuses[Math.floor(Math.random() * statuses.length)] : undefined;
@@ -32,6 +33,14 @@ export const generateMockProperties = (count: number = 100): Property[] => {
       isRemoved,
       statusChanged: previousStatus !== undefined && previousStatus !== status,
       percentageChanged: Math.random() > 0.9,
+      // Foreclosure-specific fields
+      foreclosureSaleDate: status === 'F' ? `2025-${String(Math.floor(1 + Math.random() * 6)).padStart(2, '0')}-${String(Math.floor(1 + Math.random() * 28)).padStart(2, '0')}` : undefined,
+      foreclosureDocumentNumber: status === 'F' ? `FC-2024-${Math.floor(10000 + Math.random() * 90000)}` : undefined,
+      foreclosureLink: status === 'F' ? `https://bexar.org/foreclosure/details/${Math.floor(10000 + Math.random() * 90000)}` : undefined,
+      // Dead Lead-specific fields
+      resolutionDate: status === 'D' ? `2024-${String(Math.floor(10 + Math.random() * 3)).padStart(2, '0')}-${String(Math.floor(1 + Math.random() * 28)).padStart(2, '0')}` : undefined,
+      resolutionReason: status === 'D' ? resolutionReasons[Math.floor(Math.random() * resolutionReasons.length)] : undefined,
+      resolutionNotes: status === 'D' ? `Property resolved via ${resolutionReasons[Math.floor(Math.random() * resolutionReasons.length)].toLowerCase()}` : undefined,
       paymentHistory: Array.from({ length: Math.floor(3 + Math.random() * 10) }, (_, j) => ({
         date: `202${3 - Math.floor(j / 4)}-${String(12 - (j % 12)).padStart(2, '0')}-15`,
         amount: Math.floor(200 + Math.random() * 2000),
@@ -76,12 +85,15 @@ export const mockDashboardStats: DashboardStats = {
     judgment: 12456,
     active: 28943,
     pending: 17033,
+    foreclosed: 1543,
+    deadLeads: 702,
   },
   totalAmountDue: 847293847,
   avgAmountDue: 14500,
   newThisMonth: 1243,
   removedThisMonth: 702,
-  deadLeads: 702,
+  foreclosedCount: 1543,
+  deadLeadsCount: 702,
 };
 
 export const mockStatusTransitions: StatusTransition[] = [

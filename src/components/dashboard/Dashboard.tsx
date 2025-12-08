@@ -1,4 +1,4 @@
-import { Building2, DollarSign, TrendingUp, AlertTriangle, Plus, Minus, ArrowRightLeft, Gavel, CheckCircle, Clock } from 'lucide-react';
+import { Building2, DollarSign, TrendingUp, AlertTriangle, Plus, Minus, ArrowRightLeft, Gavel, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { mockDashboardStats, mockStatusTransitions, mockComparisonReport } from '@/data/mockData';
@@ -47,16 +47,16 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           trend={{ value: stats.newThisMonth, label: 'new', isPositive: true }}
         />
         <StatCard
-          title="Dead Leads"
-          value={stats.deadLeads}
-          subtitle="Foreclosed properties"
-          icon={Minus}
+          title="Foreclosed"
+          value={stats.foreclosedCount}
+          subtitle="Terminal state"
+          icon={Gavel}
           variant="danger"
         />
       </div>
 
       {/* Status Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatCard
           title="Judgment"
           value={stats.byStatus.judgment}
@@ -77,6 +77,19 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           subtitle={`${((stats.byStatus.pending / stats.totalProperties) * 100).toFixed(1)}% of total`}
           icon={Clock}
           variant="warning"
+        />
+        <StatCard
+          title="Foreclosed"
+          value={stats.byStatus.foreclosed}
+          subtitle={`${((stats.byStatus.foreclosed / stats.totalProperties) * 100).toFixed(1)}% of total`}
+          icon={Gavel}
+          variant="danger"
+        />
+        <StatCard
+          title="Dead Leads"
+          value={stats.byStatus.deadLeads}
+          subtitle={`${((stats.byStatus.deadLeads / stats.totalProperties) * 100).toFixed(1)}% of total`}
+          icon={XCircle}
         />
       </div>
 

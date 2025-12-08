@@ -1,4 +1,5 @@
-export type PropertyStatus = 'J' | 'A' | 'P';
+export type PropertyStatus = 'J' | 'A' | 'P' | 'F' | 'D';
+// J = Judgment, A = Active, P = Pending, F = Foreclosed, D = Dead Lead
 
 export interface Property {
   id: string;
@@ -26,6 +27,14 @@ export interface Property {
   isRemoved?: boolean;
   statusChanged?: boolean;
   percentageChanged?: boolean;
+  // Foreclosure-specific fields
+  foreclosureSaleDate?: string;
+  foreclosureDocumentNumber?: string;
+  foreclosureLink?: string;
+  // Dead Lead-specific fields
+  resolutionDate?: string;
+  resolutionReason?: string; // "Paid in full", "Sold to new owner", etc.
+  resolutionNotes?: string;
 }
 
 export interface PaymentRecord {
@@ -87,12 +96,15 @@ export interface DashboardStats {
     judgment: number;
     active: number;
     pending: number;
+    foreclosed: number;
+    deadLeads: number;
   };
   totalAmountDue: number;
   avgAmountDue: number;
   newThisMonth: number;
   removedThisMonth: number;
-  deadLeads: number;
+  foreclosedCount: number;
+  deadLeadsCount: number;
 }
 
 export interface ProcessingStatus {
