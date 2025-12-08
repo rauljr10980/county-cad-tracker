@@ -27,6 +27,7 @@ export const generateMockProperties = (count: number = 100): Property[] => {
       improvementValue: Math.floor(40000 + Math.random() * 400000),
       lastPaymentDate: `2024-${String(Math.floor(1 + Math.random() * 12)).padStart(2, '0')}-${String(Math.floor(1 + Math.random() * 28)).padStart(2, '0')}`,
       lastPaymentAmount: Math.floor(500 + Math.random() * 5000),
+      lastFollowUp: Math.random() > 0.5 ? `2024-${String(Math.floor(1 + Math.random() * 12)).padStart(2, '0')}-${String(Math.floor(1 + Math.random() * 28)).padStart(2, '0')}` : undefined,
       isNew,
       isRemoved,
       statusChanged: previousStatus !== undefined && previousStatus !== status,

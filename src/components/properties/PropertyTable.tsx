@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Property, PropertyStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
+import { format, formatDistanceToNow } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
 
 interface PropertyTableProps {
   properties: Property[];
   onViewProperty: (property: Property) => void;
+  onFollowUp?: (property: Property) => void;
   statusFilter?: PropertyStatus;
   onStatusFilterChange?: (status: PropertyStatus | undefined) => void;
 }
@@ -17,6 +20,7 @@ const ITEMS_PER_PAGE = 25;
 export function PropertyTable({ 
   properties, 
   onViewProperty,
+  onFollowUp,
   statusFilter,
   onStatusFilterChange 
 }: PropertyTableProps) {
@@ -58,6 +62,34 @@ export function PropertyTable({
     } else {
       setSortField(field);
       setSortDirection('desc');
+    }
+  };
+
+  const openGoogleMaps = (property: Property) => {
+    const address = encodeURIComponent(property.propertyAddress);
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, '_blank');
+    
+    // Trigger follow-up callback if provided
+    if (onFollowUp) {
+      onFollowUp(property);
+    }
+    
+    toast({
+      title: "Navigation Started",
+      description: `Opening directions to ${property.propertyAddress}`,
+    });
+  };
+
+  const formatFollowUp = (date: string | undefined) => {
+    if (!date) return null;
+    try {
+      const parsed = new Date(date);
+      return {
+        formatted: format(parsed, 'MMM d'),
+        relative: formatDistanceToNow(parsed, { addSuffix: true }),
+      };
+    } catch {
+      return null;
     }
   };
 
@@ -115,72 +147,101 @@ export function PropertyTable({
               >
                 Market Value
               </th>
-              <th>Last Payment</th>
-              <th className="w-20">Actions</th>
+              <th 
+                className="cursor-pointer hover:bg-secondary"
+                onClick={() => handleSort('lastFollowUp')}
+              >
+                Last Follow Up
+              </th>
+              <th className="w-28">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {paginatedProperties.map((property) => (
-              <tr 
-                key={property.id}
-                className={cn(
-                  'transition-colors',
-                  property.isNew && 'bg-success/5',
-                  property.statusChanged && 'bg-warning/5'
-                )}
-              >
-                <td>
-                  <div className="flex items-center gap-1">
-                    <StatusBadge status={property.status} />
-                    {property.previousStatus && (
-                      <span className="text-[10px] text-muted-foreground">
-                        ← {property.previousStatus}
-                      </span>
+            {paginatedProperties.map((property) => {
+              const followUp = formatFollowUp(property.lastFollowUp);
+              
+              return (
+                <tr 
+                  key={property.id}
+                  className={cn(
+                    'transition-colors',
+                    property.isNew && 'bg-success/5',
+                    property.statusChanged && 'bg-warning/5'
+                  )}
+                >
+                  <td>
+                    <div className="flex items-center gap-1">
+                      <StatusBadge status={property.status} />
+                      {property.previousStatus && (
+                        <span className="text-[10px] text-muted-foreground">
+                          ← {property.previousStatus}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="font-mono text-sm">{property.accountNumber}</td>
+                  <td className="max-w-[180px] truncate">{property.ownerName}</td>
+                  <td className="max-w-[250px] truncate text-muted-foreground">
+                    {property.propertyAddress}
+                  </td>
+                  <td className="text-right font-mono">
+                    {formatCurrency(property.totalAmountDue)}
+                  </td>
+                  <td className="text-right font-mono text-muted-foreground">
+                    {property.marketValue ? formatCurrency(property.marketValue) : '—'}
+                  </td>
+                  <td>
+                    {followUp ? (
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-sm" title={followUp.relative}>
+                          {followUp.formatted}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">—</span>
                     )}
-                  </div>
-                </td>
-                <td className="font-mono text-sm">{property.accountNumber}</td>
-                <td className="max-w-[200px] truncate">{property.ownerName}</td>
-                <td className="max-w-[300px] truncate text-muted-foreground">
-                  {property.propertyAddress}
-                </td>
-                <td className="text-right font-mono">
-                  {formatCurrency(property.totalAmountDue)}
-                </td>
-                <td className="text-right font-mono text-muted-foreground">
-                  {property.marketValue ? formatCurrency(property.marketValue) : '—'}
-                </td>
-                <td className="text-muted-foreground text-sm">
-                  {property.lastPaymentDate || '—'}
-                </td>
-                <td>
-                  <div className="flex items-center gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-7 w-7"
-                      onClick={() => onViewProperty(property)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-7 w-7"
-                      asChild
-                    >
-                      <a 
-                        href={`https://bexar.trueautomation.com/clientdb/Property.aspx?prop_id=${property.accountNumber}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                  </td>
+                  <td>
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7"
+                        onClick={() => onViewProperty(property)}
+                        title="View details"
                       >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
+                        onClick={() => openGoogleMaps(property)}
+                        title="Navigate with Google Maps"
+                      >
+                        <Navigation className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7"
+                        asChild
+                        title="View on Bexar County"
+                      >
+                        <a 
+                          href={`https://bexar.trueautomation.com/clientdb/Property.aspx?prop_id=${property.accountNumber}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
