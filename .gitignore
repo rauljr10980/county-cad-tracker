@@ -12,6 +12,25 @@ dist
 dist-ssr
 *.local
 
+# Environment variables
+.env
+.env.local
+# .env.production is committed (contains public API URL only)
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Google Cloud
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json
+!components.json
+!firestore.indexes.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
