@@ -1,0 +1,669 @@
+// Load environment variables from .env file (for local development)
+// Only load if .env file exists (optional for production)
+if (require('fs').existsSync('.env')) {
+  require('dotenv').config();
+}
+
+const { Storage } = require('@google-cloud/storage');
+const XLSX = require('xlsx');
+const express = require('express');
+const cors = require('cors');
+const fs = require('fs');
+const pdfParse = require('pdf-parse');
+
+// Initialize Storage with credentials
+// Supports multiple credential methods:
+// 1. Service account JSON from environment variable (for Render, Railway, etc.)
+// 2. Service account key file path (for local dev)
+// 3. Application Default Credentials (for Cloud Run, GCP)
+const storageOptions = {};
+if (process.env.GCP_PROJECT_ID) {
+  storageOptions.projectId = process.env.GCP_PROJECT_ID;
+}
+
+// Method 1: Service account JSON from environment variable (for free hosting like Render)
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+  try {
+    storageOptions.credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+    console.log('[STORAGE] Using service account credentials from environment variable');
+  } catch (error) {
+    console.error('[STORAGE] Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:', error.message);
+  }
+}
+// Method 2: Service account key file path (for local dev)
+else if (process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
+  storageOptions.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  console.log('[STORAGE] Using service account key file:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
+}
+// Method 3: Application Default Credentials (for Cloud Run, GCP)
+else {
+  console.log('[STORAGE] Using Application Default Credentials (ADC)');
+}
+
+const storage = new Storage(storageOptions);
+
+const app = express();
+app.use(cors({ origin: true }));
+app.use(express.json({ limit: '50mb' })); // Increase limit for file uploads
+
+// Start server if running directly (for local testing)
+const PORT = process.env.PORT || 8080;
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+const BUCKET_NAME = process.env.GCS_BUCKET || 'county-cad-tracker-files';
+
+// Helper functions for Cloud Storage JSON operations
+async function saveJSON(bucket, path, data) {
+  const file = bucket.file(path);
+  await file.save(JSON.stringify(data, null, 2), {
+    metadata: { contentType: 'application/json' },
+  });
+}
+
+async function loadJSON(bucket, path) {
+  try {
+    const file = bucket.file(path);
+    const [exists] = await file.exists();
+    if (!exists) return null;
+    const [data] = await file.download();
+    return JSON.parse(data.toString());
+  } catch (error) {
+    return null;
+  }
+}
+
+async function listFiles(bucket, prefix) {
+  const [files] = await bucket.getFiles({ prefix });
+  return files.map(file => file.name);
+}
+
+/**
+ * Upload file endpoint
+ */
+app.post('/api/upload', async (req, res) => {
+  try {
+    const { filename, fileData } = req.body;
+    
+    if (!filename || !fileData) {
+      return res.status(400).json({ error: 'Filename and fileData are required' });
+    }
+
+    console.log(`[UPLOAD] Starting upload for: ${filename}`);
+    console.log(`[UPLOAD] Using bucket: ${BUCKET_NAME}`);
+    console.log(`[UPLOAD] Credentials: ${process.env.GOOGLE_APPLICATION_CREDENTIALS || 'Using Application Default Credentials'}`);
+    
+    const bucket = storage.bucket(BUCKET_NAME);
+    
+    // Verify bucket exists and is accessible
+    try {
+      const [exists] = await bucket.exists();
+      if (!exists) {
+        console.error(`[UPLOAD] ERROR: Bucket ${BUCKET_NAME} does not exist!`);
+        return res.status(500).json({ 
+          error: `Bucket ${BUCKET_NAME} does not exist. Please create it in Google Cloud Console.` 
+        });
+      }
+      console.log(`[UPLOAD] Bucket exists and is accessible`);
+    } catch (bucketError) {
+      console.error(`[UPLOAD] ERROR: Cannot access bucket:`, bucketError);
+      return res.status(500).json({ 
+        error: `Cannot access bucket: ${bucketError.message}. Check your credentials and bucket permissions.` 
+      });
+    }
+    
+    const fileId = Date.now().toString();
+    const storagePath = `uploads/${fileId}_${filename}`;
+    
+    // Decode base64 file data
+    const buffer = Buffer.from(fileData, 'base64');
+    console.log(`[UPLOAD] Decoded file, size: ${buffer.length} bytes`);
+    
+    // Upload to Cloud Storage
+    const file = bucket.file(storagePath);
+    const contentType = filename.toLowerCase().endsWith('.pdf') 
+      ? 'application/pdf'
+      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    
+    console.log(`[UPLOAD] Attempting to save file to: ${storagePath}`);
+    try {
+      await file.save(buffer, {
+        metadata: {
+          contentType,
+        },
+      });
+      console.log(`[UPLOAD] File saved successfully to GCS`);
+    } catch (saveError) {
+      console.error(`[UPLOAD] ERROR saving file to GCS:`, saveError);
+      return res.status(500).json({ 
+        error: `Failed to save file to storage: ${saveError.message}` 
+      });
+    }
+
+    // Create file metadata
+    const fileDoc = {
+      id: fileId,
+      filename,
+      uploadedAt: new Date().toISOString(),
+      status: 'processing',
+      propertyCount: 0,
+      storagePath,
+    };
+
+    // Save file metadata to Cloud Storage
+    try {
+      await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
+      console.log(`[UPLOAD] Metadata saved successfully`);
+    } catch (metadataError) {
+      console.error(`[UPLOAD] ERROR saving metadata:`, metadataError);
+      // Don't fail the upload if metadata save fails, but log it
+    }
+
+    console.log(`[UPLOAD] File uploaded successfully:`, {
+      fileId,
+      filename,
+      storagePath,
+      size: buffer.length,
+      uploadedAt: fileDoc.uploadedAt,
+    });
+
+    // Trigger processing (async)
+    processFile(fileId, storagePath, filename).catch(console.error);
+
+    res.json({
+      success: true,
+      fileId,
+      message: 'File uploaded successfully',
+    });
+  } catch (error) {
+    console.error('[UPLOAD] FATAL ERROR:', error);
+    console.error('[UPLOAD] Error stack:', error.stack);
+    res.status(500).json({ 
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+  }
+});
+
+/**
+ * Process uploaded file (Excel or PDF)
+ */
+async function processFile(fileId, storagePath, filename) {
+  try {
+    console.log(`[PROCESS] Starting processing for fileId: ${fileId}, filename: ${filename}`);
+    const bucket = storage.bucket(BUCKET_NAME);
+    const file = bucket.file(storagePath);
+    
+    // Download file
+    const [fileBuffer] = await file.download();
+    console.log(`[PROCESS] Downloaded file, size: ${fileBuffer.length} bytes`);
+    
+    let data = [];
+    
+    // Check file type and parse accordingly
+    if (filename.toLowerCase().endsWith('.pdf')) {
+      console.log(`[PROCESS] Parsing PDF file`);
+      // Parse PDF
+      const pdfData = await pdfParse(fileBuffer);
+      data = parsePDFToJSON(pdfData.text);
+    } else {
+      console.log(`[PROCESS] Parsing Excel file`);
+      // Parse Excel
+      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      data = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+    }
+
+    console.log(`[PROCESS] Parsed ${data.length} rows from file`);
+
+    // Extract properties
+    const properties = extractProperties(data);
+    console.log(`[PROCESS] Extracted ${properties.length} properties`);
+    
+    // Update file status
+    const fileDoc = {
+      id: fileId,
+      filename,
+      uploadedAt: (await loadJSON(bucket, `metadata/files/${fileId}.json`))?.uploadedAt || new Date().toISOString(),
+      status: 'completed',
+      processedAt: new Date().toISOString(),
+      propertyCount: properties.length,
+      storagePath,
+    };
+    await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
+    console.log(`[PROCESS] Updated file metadata with status: completed, properties: ${properties.length}`);
+
+    // Save properties to Cloud Storage
+    await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
+
+    // Get previous file for comparison
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .filter(id => id !== fileId)
+      .sort((a, b) => parseInt(b) - parseInt(a)); // Sort by timestamp (newest first)
+
+    let previousProperties = [];
+    let previousFileId = null;
+    
+    if (fileIds.length > 0) {
+      previousFileId = fileIds[0];
+      const prevData = await loadJSON(bucket, `data/properties/${previousFileId}.json`);
+      if (prevData) {
+        previousProperties = prevData;
+      }
+    }
+
+    // Generate comparison if previous file exists
+    if (previousProperties.length > 0) {
+      const prevFileDoc = await loadJSON(bucket, `metadata/files/${previousFileId}.json`);
+      const comparison = generateComparison(
+        properties, 
+        previousProperties, 
+        filename, 
+        prevFileDoc?.filename || previousFileId
+      );
+      
+      await saveJSON(bucket, `data/comparisons/${fileId}.json`, {
+        ...comparison,
+        currentFileId: fileId,
+        previousFileId,
+        generatedAt: new Date().toISOString(),
+      });
+    }
+
+    console.log(`[PROCESS] Successfully processed ${properties.length} properties from ${filename}`);
+  } catch (error) {
+    console.error(`[PROCESS] Error processing file ${fileId} (${filename}):`, error);
+    
+    // Update file status to error
+    try {
+      const bucket = storage.bucket(BUCKET_NAME);
+      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      if (fileDoc) {
+        fileDoc.status = 'error';
+        fileDoc.errorMessage = error.message;
+        await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
+        console.log(`[PROCESS] Updated file status to error for ${fileId}`);
+      }
+    } catch (updateError) {
+      console.error(`[PROCESS] Failed to update error status:`, updateError);
+    }
+    const bucket = storage.bucket(BUCKET_NAME);
+    const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+    if (fileDoc) {
+      fileDoc.status = 'error';
+      fileDoc.errorMessage = error.message;
+      await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
+    }
+  }
+}
+
+/**
+ * Extract properties from Excel data
+ */
+function extractProperties(data) {
+  const headers = Object.keys(data[0] || {});
+  
+  const mappings = {
+    accountNumber: ['account', 'account number', 'account_number', 'acct', 'acct no'],
+    ownerName: ['owner', 'owner name', 'owner_name', 'name'],
+    propertyAddress: ['property address', 'property_address', 'address', 'property'],
+    mailingAddress: ['mailing address', 'mailing_address', 'mailing'],
+    status: ['status', 'st'],
+    totalAmountDue: ['total', 'amount due', 'amount_due', 'due', 'balance'],
+    totalPercentage: ['percentage', 'percent', 'pct', '%'],
+  };
+
+  const columnMap = {};
+  headers.forEach(header => {
+    const lowerHeader = header.toLowerCase().trim();
+    Object.entries(mappings).forEach(([key, aliases]) => {
+      if (aliases.some(alias => lowerHeader.includes(alias))) {
+        columnMap[key] = header;
+      }
+    });
+  });
+
+  return data.map((row, index) => {
+    const getValue = (key) => {
+      const col = columnMap[key];
+      return col ? (row[col] || '').toString().trim() : '';
+    };
+
+    return {
+      id: `${Date.now()}_${index}`,
+      accountNumber: getValue('accountNumber') || `UNKNOWN_${index}`,
+      ownerName: getValue('ownerName') || '',
+      propertyAddress: getValue('propertyAddress') || '',
+      mailingAddress: getValue('mailingAddress') || '',
+      status: (getValue('status') || 'A').charAt(0).toUpperCase(),
+      totalAmountDue: parseFloat(getValue('totalAmountDue') || '0') || 0,
+      totalPercentage: parseFloat(getValue('totalPercentage') || '0') || 0,
+    };
+  }).filter(p => p.accountNumber && p.accountNumber !== `UNKNOWN_${data.length}`);
+}
+
+/**
+ * Generate comparison report
+ */
+function generateComparison(currentProps, previousProps, currentFilename, previousFilename) {
+  const currentMap = new Map(currentProps.map(p => [p.accountNumber, p]));
+  const previousMap = new Map(previousProps.map(p => [p.accountNumber, p]));
+
+  const newProperties = [];
+  const removedProperties = [];
+  const changedProperties = [];
+  const statusTransitions = {};
+
+  currentMap.forEach((current, accountNumber) => {
+    const previous = previousMap.get(accountNumber);
+    if (!previous) {
+      newProperties.push({ ...current, isNew: true });
+    } else if (current.status !== previous.status || current.totalPercentage !== previous.totalPercentage) {
+      changedProperties.push({
+        ...current,
+        previousStatus: previous.status,
+        statusChanged: current.status !== previous.status,
+        percentageChanged: current.totalPercentage !== previous.totalPercentage,
+      });
+      
+      const transitionKey = `${previous.status}->${current.status}`;
+      if (!statusTransitions[transitionKey]) {
+        statusTransitions[transitionKey] = { from: previous.status, to: current.status, count: 0, properties: [] };
+      }
+      statusTransitions[transitionKey].count++;
+      statusTransitions[transitionKey].properties.push(current);
+    }
+  });
+
+  previousMap.forEach((previous, accountNumber) => {
+    if (!currentMap.has(accountNumber)) {
+      removedProperties.push({ ...previous, isRemoved: true });
+    }
+  });
+
+  const transitions = Object.values(statusTransitions);
+
+  return {
+    currentFile: currentFilename,
+    previousFile: previousFilename,
+    summary: {
+      totalCurrent: currentProps.length,
+      totalPrevious: previousProps.length,
+      newProperties: newProperties.length,
+      removedProperties: removedProperties.length,
+      statusChanges: changedProperties.filter(p => p.statusChanged).length,
+      percentageChanges: changedProperties.filter(p => p.percentageChanged).length,
+    },
+    statusTransitions: transitions,
+    newProperties: newProperties.slice(0, 100),
+    removedProperties: removedProperties.slice(0, 100),
+    changedProperties: changedProperties.slice(0, 100),
+  };
+}
+
+/**
+ * Get file history
+ */
+app.get('/api/files', async (req, res) => {
+  try {
+    const bucket = storage.bucket(BUCKET_NAME);
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    
+    const files = await Promise.all(
+      fileList.map(async (filePath) => {
+        const fileData = await loadJSON(bucket, filePath);
+        return fileData;
+      })
+    );
+
+    // Sort by uploadedAt descending
+    files.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+
+    res.json(files.filter(f => f !== null));
+  } catch (error) {
+    console.error('Get files error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Get comparison report
+ */
+app.get('/api/comparisons/:fileId', async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    const bucket = storage.bucket(BUCKET_NAME);
+    const comparison = await loadJSON(bucket, `data/comparisons/${fileId}.json`);
+
+    if (!comparison) {
+      return res.status(404).json({ error: 'Comparison not found' });
+    }
+
+    res.json(comparison);
+  } catch (error) {
+    console.error('Get comparison error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Get latest comparison
+ */
+app.get('/api/comparisons/latest', async (req, res) => {
+  try {
+    const bucket = storage.bucket(BUCKET_NAME);
+    const fileList = await listFiles(bucket, 'data/comparisons/');
+    
+    if (fileList.length === 0) {
+      return res.status(404).json({ error: 'No comparisons found' });
+    }
+
+    // Get the most recent comparison (by filename timestamp)
+    const fileIds = fileList
+      .map(f => f.replace('data/comparisons/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+
+    const comparison = await loadJSON(bucket, `data/comparisons/${fileIds[0]}.json`);
+    res.json(comparison);
+  } catch (error) {
+    console.error('Get latest comparison error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Get dashboard stats
+ */
+app.get('/api/dashboard', async (req, res) => {
+  try {
+    const bucket = storage.bucket(BUCKET_NAME);
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    
+    // Get latest completed file
+    const files = await Promise.all(
+      fileList.map(async (filePath) => {
+        return await loadJSON(bucket, filePath);
+      })
+    );
+
+    const completedFiles = files
+      .filter(f => f && f.status === 'completed')
+      .sort((a, b) => new Date(b.processedAt) - new Date(a.processedAt));
+
+    if (completedFiles.length === 0) {
+      return res.json({
+        totalProperties: 0,
+        byStatus: { judgment: 0, active: 0, pending: 0 },
+        totalAmountDue: 0,
+        avgAmountDue: 0,
+        newThisMonth: 0,
+        removedThisMonth: 0,
+        deadLeads: 0,
+      });
+    }
+
+    const latestFile = completedFiles[0];
+    const properties = await loadJSON(bucket, `data/properties/${latestFile.id}.json`) || [];
+    
+    const byStatus = {
+      judgment: properties.filter(p => p.status === 'J').length,
+      active: properties.filter(p => p.status === 'A').length,
+      pending: properties.filter(p => p.status === 'P').length,
+    };
+
+    const totalAmountDue = properties.reduce((sum, p) => sum + (p.totalAmountDue || 0), 0);
+    const avgAmountDue = properties.length > 0 ? totalAmountDue / properties.length : 0;
+
+    // Get latest comparison
+    const comparisonList = await listFiles(bucket, 'data/comparisons/');
+    let newThisMonth = 0;
+    let removedThisMonth = 0;
+    
+    if (comparisonList.length > 0) {
+      const latestComparisonId = comparisonList
+        .map(f => f.replace('data/comparisons/', '').replace('.json', ''))
+        .sort((a, b) => parseInt(b) - parseInt(a))[0];
+      const latestComparison = await loadJSON(bucket, `data/comparisons/${latestComparisonId}.json`);
+      if (latestComparison) {
+        newThisMonth = latestComparison.summary?.newProperties || 0;
+        removedThisMonth = latestComparison.summary?.removedProperties || 0;
+      }
+    }
+
+    res.json({
+      totalProperties: properties.length,
+      byStatus,
+      totalAmountDue,
+      avgAmountDue,
+      newThisMonth,
+      removedThisMonth,
+      deadLeads: removedThisMonth,
+    });
+  } catch (error) {
+    console.error('Get dashboard error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Test GCS connection and credentials
+ */
+app.get('/api/debug/test-connection', async (req, res) => {
+  try {
+    const results = {
+      timestamp: new Date().toISOString(),
+      bucket: BUCKET_NAME,
+      credentials: {
+        hasKeyFile: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS || 'Using ADC',
+        keyFileExists: process.env.GOOGLE_APPLICATION_CREDENTIALS 
+          ? fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+          : false,
+        projectId: process.env.GCP_PROJECT_ID || 'Not set',
+      },
+      bucketAccess: null,
+      error: null,
+    };
+
+    try {
+      const bucket = storage.bucket(BUCKET_NAME);
+      const [exists] = await bucket.exists();
+      
+      if (exists) {
+        // Try to list files to verify write permissions
+        const [files] = await bucket.getFiles({ maxResults: 1 });
+        results.bucketAccess = {
+          exists: true,
+          accessible: true,
+          canList: true,
+          fileCount: files.length,
+        };
+      } else {
+        results.bucketAccess = {
+          exists: false,
+          accessible: false,
+          canList: false,
+          error: 'Bucket does not exist',
+        };
+      }
+    } catch (error) {
+      results.bucketAccess = {
+        exists: false,
+        accessible: false,
+        canList: false,
+        error: error.message,
+      };
+      results.error = error.message;
+    }
+
+    res.json(results);
+  } catch (error) {
+    console.error('Connection test error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+  }
+});
+
+/**
+ * Debug endpoint to verify uploads and storage
+ */
+app.get('/api/debug/verify', async (req, res) => {
+  try {
+    const bucket = storage.bucket(BUCKET_NAME);
+    
+    // List all metadata files
+    const metadataFiles = await listFiles(bucket, 'metadata/files/');
+    
+    // List all uploaded files
+    const uploadedFiles = await listFiles(bucket, 'uploads/');
+    
+    // Get details for each metadata file
+    const fileDetails = await Promise.all(
+      metadataFiles.map(async (filePath) => {
+        const fileData = await loadJSON(bucket, filePath);
+        if (fileData) {
+          // Check if the actual file exists
+          const actualFile = bucket.file(fileData.storagePath);
+          const [exists] = await actualFile.exists();
+          const [metadata] = exists ? await actualFile.getMetadata() : [null];
+          
+          return {
+            ...fileData,
+            fileExists: exists,
+            fileSize: metadata?.size || 0,
+            fileCreated: metadata?.timeCreated || null,
+          };
+        }
+        return null;
+      })
+    );
+
+    res.json({
+      bucket: BUCKET_NAME,
+      metadataFilesCount: metadataFiles.length,
+      uploadedFilesCount: uploadedFiles.length,
+      files: fileDetails.filter(f => f !== null),
+      summary: {
+        total: fileDetails.filter(f => f !== null).length,
+        completed: fileDetails.filter(f => f?.status === 'completed').length,
+        processing: fileDetails.filter(f => f?.status === 'processing').length,
+        error: fileDetails.filter(f => f?.status === 'error').length,
+        missingFiles: fileDetails.filter(f => f && !f.fileExists).length,
+      },
+    });
+  } catch (error) {
+    console.error('Debug verify error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Export Express app for Google Cloud Functions/Cloud Run
+module.exports = app;

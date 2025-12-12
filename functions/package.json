@@ -1,0 +1,27 @@
+{
+  "name": "county-cad-tracker-functions",
+  "version": "1.0.0",
+  "description": "Cloud Functions for County CAD Tracker",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "deploy": "gcloud run deploy county-cad-api --source . --platform managed --region us-central1 --allow-unauthenticated --memory=512Mi --timeout=300"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "pdf-parse": "^1.1.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}
