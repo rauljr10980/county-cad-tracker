@@ -1,19 +1,18 @@
 import { useState, useCallback } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { useUploadFile } from '@/hooks/useFiles';
 
 interface FileUploadProps {
-  onUpload?: (file: File) => void;
+  onUploadComplete?: () => void;
 }
 
-export function FileUpload({ onUpload }: FileUploadProps) {
+export function FileUpload({ onUploadComplete }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'processing' | 'complete' | 'error'>('idle');
-  const [progress, setProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const uploadMutation = useUploadFile();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -37,34 +36,26 @@ export function FileUpload({ onUpload }: FileUploadProps) {
     return true;
   };
 
-  const simulateUpload = async (file: File) => {
-    setUploadState('uploading');
-    setProgress(0);
-    
-    // Simulate upload progress
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      setProgress(i);
-    }
+  const handleUpload = async (file: File) => {
+    setSelectedFile(file);
+    setError(null);
 
-    setUploadState('processing');
-    
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setUploadState('complete');
-    onUpload?.(file);
+    try {
+      await uploadMutation.mutateAsync(file);
+      onUploadComplete?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    }
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     setError(null);
-    
+
     const file = e.dataTransfer.files[0];
     if (file && validateFile(file)) {
-      setSelectedFile(file);
-      simulateUpload(file);
+      handleUpload(file);
     }
   }, []);
 
@@ -72,17 +63,19 @@ export function FileUpload({ onUpload }: FileUploadProps) {
     setError(null);
     const file = e.target.files?.[0];
     if (file && validateFile(file)) {
-      setSelectedFile(file);
-      simulateUpload(file);
+      handleUpload(file);
     }
   };
 
   const resetUpload = () => {
-    setUploadState('idle');
-    setProgress(0);
+    uploadMutation.reset();
     setSelectedFile(null);
     setError(null);
   };
+
+  const isUploading = uploadMutation.isPending;
+  const isSuccess = uploadMutation.isSuccess;
+  const isError = uploadMutation.isError || !!error;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -93,11 +86,11 @@ export function FileUpload({ onUpload }: FileUploadProps) {
         className={cn(
           'border-2 border-dashed rounded-xl p-12 text-center transition-all',
           isDragging ? 'border-primary bg-primary/5' : 'border-border',
-          uploadState === 'error' && 'border-destructive bg-destructive/5',
-          uploadState === 'complete' && 'border-success bg-success/5'
+          isError && 'border-destructive bg-destructive/5',
+          isSuccess && 'border-success bg-success/5'
         )}
       >
-        {uploadState === 'idle' && (
+        {!isUploading && !isSuccess && !isError && (
           <>
             <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
               <Upload className="h-8 w-8 text-muted-foreground" />
@@ -126,32 +119,22 @@ export function FileUpload({ onUpload }: FileUploadProps) {
           </>
         )}
 
-        {(uploadState === 'uploading' || uploadState === 'processing') && (
+        {isUploading && (
           <>
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <Loader2 className="h-8 w-8 text-primary animate-spin" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">
-              {uploadState === 'uploading' ? 'Uploading...' : 'Processing...'}
-            </h3>
+            <h3 className="text-lg font-semibold mb-2">Uploading & Processing...</h3>
             <p className="text-muted-foreground mb-4">
               {selectedFile?.name}
             </p>
-            {uploadState === 'uploading' && (
-              <div className="max-w-xs mx-auto">
-                <Progress value={progress} className="h-2" />
-                <p className="text-sm text-muted-foreground mt-2">{progress}%</p>
-              </div>
-            )}
-            {uploadState === 'processing' && (
-              <p className="text-sm text-muted-foreground">
-                Detecting headers and extracting property data...
-              </p>
-            )}
+            <p className="text-sm text-muted-foreground">
+              Uploading file to backend and processing property data...
+            </p>
           </>
         )}
 
-        {uploadState === 'complete' && (
+        {isSuccess && (
           <>
             <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 className="h-8 w-8 text-success" />
@@ -166,13 +149,15 @@ export function FileUpload({ onUpload }: FileUploadProps) {
           </>
         )}
 
-        {error && (
+        {isError && (
           <>
             <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="h-8 w-8 text-destructive" />
             </div>
             <h3 className="text-lg font-semibold mb-2 text-destructive">Upload Error</h3>
-            <p className="text-muted-foreground mb-4">{error}</p>
+            <p className="text-muted-foreground mb-4">
+              {error || (uploadMutation.error instanceof Error ? uploadMutation.error.message : 'Upload failed')}
+            </p>
             <Button onClick={resetUpload} variant="outline">
               Try Again
             </Button>
