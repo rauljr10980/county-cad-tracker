@@ -212,16 +212,22 @@ async function processFile(fileId, storagePath, filename) {
     } else {
       console.log(`[PROCESS] Parsing Excel file`);
       // Parse Excel
+      // Excel structure (per user requirements):
+      // Row 1: Empty or title - will be skipped
+      // Row 2: Descriptions (what each column is for) - will be skipped
+      // Row 3: Column headers/titles (actual column names) - used as headers
+      // Row 4+: Data rows - processed as property data
+
       const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      
+
       // Excel structure:
       // Row 1: (empty or title) - will be skipped
       // Row 2: Descriptions (what each column is for) - will be skipped
       // Row 3: Column headers/titles (actual column names) - used as headers
       // Row 4+: Data rows - processed as property data
-      
+
       // Read row 2 for descriptions (for logging/debugging)
       const descriptions = {};
       Object.keys(worksheet).forEach(cell => {
@@ -235,16 +241,16 @@ async function processFile(fileId, storagePath, filename) {
       if (Object.keys(descriptions).length > 0) {
         console.log(`[PROCESS] Row 2 descriptions found:`, Object.values(descriptions).filter(d => d).slice(0, 5).join(', '), '...');
       }
-      
+
       // Use row 3 as headers (header: 2 means 0-indexed row 2, which is row 3 in Excel)
       // This automatically skips rows 1-2 and uses row 3 as headers
       // Data rows start from row 4 (0-indexed row 3)
-      data = XLSX.utils.sheet_to_json(worksheet, { 
+      data = XLSX.utils.sheet_to_json(worksheet, {
         raw: false,
         header: 2, // Use row 3 (0-indexed row 2) as headers
         defval: '', // Default value for empty cells
       });
-      
+
       console.log(`[PROCESS] Using row 3 as headers. Found ${Object.keys(data[0] || {}).length} columns, ${data.length} data rows`);
     }
 
@@ -322,13 +328,6 @@ async function processFile(fileId, storagePath, filename) {
       }
     } catch (updateError) {
       console.error(`[PROCESS] Failed to update error status:`, updateError);
-    }
-    const bucket = storage.bucket(BUCKET_NAME);
-    const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
-    if (fileDoc) {
-      fileDoc.status = 'error';
-      fileDoc.errorMessage = error.message;
-      await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
     }
   }
 }
@@ -493,6 +492,61 @@ app.get('/api/files', async (req, res) => {
     } else {
       res.status(500).json({ error: error.message });
     }
+  }
+});
+
+/**
+ * Delete a file
+ */
+app.delete('/api/files/:fileId', async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    console.log(`[DELETE] Deleting file: ${fileId}`);
+
+    const bucket = storage.bucket(BUCKET_NAME);
+
+    // Load file metadata to get storage path
+    const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+    if (!fileDoc) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Delete uploaded file
+    try {
+      const uploadedFile = bucket.file(fileDoc.storagePath);
+      await uploadedFile.delete();
+      console.log(`[DELETE] Deleted uploaded file: ${fileDoc.storagePath}`);
+    } catch (err) {
+      console.log(`[DELETE] Upload file not found or already deleted: ${fileDoc.storagePath}`);
+    }
+
+    // Delete properties data
+    try {
+      const propertiesFile = bucket.file(`data/properties/${fileId}.json`);
+      await propertiesFile.delete();
+      console.log(`[DELETE] Deleted properties data`);
+    } catch (err) {
+      console.log(`[DELETE] Properties file not found or already deleted`);
+    }
+
+    // Delete comparison data
+    try {
+      const comparisonFile = bucket.file(`data/comparisons/${fileId}.json`);
+      await comparisonFile.delete();
+      console.log(`[DELETE] Deleted comparison data`);
+    } catch (err) {
+      console.log(`[DELETE] Comparison file not found or already deleted`);
+    }
+
+    // Delete metadata file
+    const metadataFile = bucket.file(`metadata/files/${fileId}.json`);
+    await metadataFile.delete();
+    console.log(`[DELETE] Deleted metadata file`);
+
+    res.json({ success: true, message: 'File deleted successfully' });
+  } catch (error) {
+    console.error('[DELETE] Error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

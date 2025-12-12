@@ -110,3 +110,16 @@ export async function getDashboardStats() {
   return response.json();
 }
 
+/**
+ * Delete a file
+ */
+export async function deleteFile(fileId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete file');
+  }
+  return response.json();
+}
+
