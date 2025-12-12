@@ -293,13 +293,6 @@ async function processFile(fileId, storagePath, filename) {
     } catch (updateError) {
       console.error(`[PROCESS] Failed to update error status:`, updateError);
     }
-    const bucket = storage.bucket(BUCKET_NAME);
-    const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
-    if (fileDoc) {
-      fileDoc.status = 'error';
-      fileDoc.errorMessage = error.message;
-      await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
-    }
   }
 }
 
