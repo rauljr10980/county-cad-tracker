@@ -1,10 +1,10 @@
 import { Download, Trash2, FileSpreadsheet, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { mockFiles } from '@/data/mockData';
 import { cn } from '@/lib/utils';
+import { useFiles } from '@/hooks/useFiles';
 
 export function FileHistory() {
-  const files = mockFiles;
+  const { data: files = [], isLoading, error } = useFiles();
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -29,6 +29,18 @@ export function FileHistory() {
     }
   };
 
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-6 text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <p className="text-destructive">Failed to load file history</p>
+          <p className="text-sm text-muted-foreground mt-2">{String(error)}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -39,19 +51,25 @@ export function FileHistory() {
       </div>
 
       <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Filename</th>
-              <th>Properties</th>
-              <th>Uploaded</th>
-              <th>Processed</th>
-              <th className="w-24">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {files.map((file) => (
+        {isLoading ? (
+          <div className="p-12 text-center">
+            <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
+            <p className="text-muted-foreground">Loading files...</p>
+          </div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Filename</th>
+                <th>Properties</th>
+                <th>Uploaded</th>
+                <th>Processed</th>
+                <th className="w-24">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {files.map((file) => (
               <tr key={file.id}>
                 <td>
                   <div className="flex items-center gap-2">
@@ -88,8 +106,9 @@ export function FileHistory() {
             ))}
           </tbody>
         </table>
+        )}
 
-        {files.length === 0 && (
+        {!isLoading && files.length === 0 && (
           <div className="p-12 text-center">
             <FileSpreadsheet className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No files uploaded yet</p>

@@ -1,17 +1,19 @@
-import { Building2, DollarSign, TrendingUp, AlertTriangle, Plus, Minus, ArrowRightLeft, Gavel, CheckCircle, Clock } from 'lucide-react';
+import { Building2, DollarSign, TrendingUp, AlertTriangle, Plus, Minus, ArrowRightLeft, Gavel, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
-import { mockDashboardStats, mockStatusTransitions, mockComparisonReport } from '@/data/mockData';
 import { PropertyStatus } from '@/types/property';
+import { useDashboardStats, useLatestComparison } from '@/hooks/useFiles';
 
 interface DashboardProps {
   onFilterChange?: (filter: { from?: PropertyStatus; to?: PropertyStatus }) => void;
 }
 
 export function Dashboard({ onFilterChange }: DashboardProps) {
-  const stats = mockDashboardStats;
-  const transitions = mockStatusTransitions;
-  const comparison = mockComparisonReport;
+  const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats();
+  const { data: comparison, isLoading: comparisonLoading, error: comparisonError } = useLatestComparison();
+
+  const isLoading = statsLoading || comparisonLoading;
+  const error = statsError || comparisonError;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -21,6 +23,31 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       maximumFractionDigits: 0,
     }).format(amount);
   };
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-6 text-center">
+          <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <p className="text-destructive">Failed to load dashboard data</p>
+          <p className="text-sm text-muted-foreground mt-2">{String(error)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading || !stats) {
+    return (
+      <div className="p-6">
+        <div className="p-12 text-center">
+          <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const transitions = comparison?.statusTransitions || [];
 
   return (
     <div className="p-6 space-y-6">
@@ -81,76 +108,86 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       </div>
 
       {/* Comparison Summary */}
-      <div className="bg-card border border-border rounded-lg p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <ArrowRightLeft className="h-5 w-5 text-primary" />
-              Monthly Comparison
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {comparison.currentFile} vs {comparison.previousFile}
-            </p>
-          </div>
-        </div>
+      {comparison ? (
+        <>
+          <div className="bg-card border border-border rounded-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <ArrowRightLeft className="h-5 w-5 text-primary" />
+                  Monthly Comparison
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {comparison.currentFile} vs {comparison.previousFile}
+                </p>
+              </div>
+            </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-secondary/50 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground mb-1">New Properties</p>
-            <p className="text-xl font-semibold font-mono text-success">
-              +{comparison.summary.newProperties.toLocaleString()}
-            </p>
-          </div>
-          <div className="bg-secondary/50 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground mb-1">Removed</p>
-            <p className="text-xl font-semibold font-mono text-judgment">
-              -{comparison.summary.removedProperties.toLocaleString()}
-            </p>
-          </div>
-          <div className="bg-secondary/50 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground mb-1">Status Changes</p>
-            <p className="text-xl font-semibold font-mono text-warning">
-              {comparison.summary.statusChanges.toLocaleString()}
-            </p>
-          </div>
-          <div className="bg-secondary/50 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground mb-1">Net Change</p>
-            <p className="text-xl font-semibold font-mono">
-              {(comparison.summary.totalCurrent - comparison.summary.totalPrevious).toLocaleString()}
-            </p>
-          </div>
-        </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-secondary/50 rounded-lg p-4">
+                <p className="text-xs text-muted-foreground mb-1">New Properties</p>
+                <p className="text-xl font-semibold font-mono text-success">
+                  +{comparison.summary.newProperties.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-secondary/50 rounded-lg p-4">
+                <p className="text-xs text-muted-foreground mb-1">Removed</p>
+                <p className="text-xl font-semibold font-mono text-judgment">
+                  -{comparison.summary.removedProperties.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-secondary/50 rounded-lg p-4">
+                <p className="text-xs text-muted-foreground mb-1">Status Changes</p>
+                <p className="text-xl font-semibold font-mono text-warning">
+                  {comparison.summary.statusChanges.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-secondary/50 rounded-lg p-4">
+                <p className="text-xs text-muted-foreground mb-1">Net Change</p>
+                <p className="text-xl font-semibold font-mono">
+                  {(comparison.summary.totalCurrent - comparison.summary.totalPrevious).toLocaleString()}
+                </p>
+              </div>
+            </div>
 
-        {/* Status Transitions */}
-        <div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">Status Transitions</h3>
-          <div className="flex flex-wrap gap-2">
-            {transitions.map((transition, index) => (
-              <StatusTransitionBadge
-                key={index}
-                from={transition.from}
-                to={transition.to}
-                count={transition.count}
-                onClick={() => onFilterChange?.({ from: transition.from, to: transition.to })}
-              />
-            ))}
+            {/* Status Transitions */}
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Status Transitions</h3>
+              <div className="flex flex-wrap gap-2">
+                {transitions.map((transition, index) => (
+                  <StatusTransitionBadge
+                    key={index}
+                    from={transition.from}
+                    to={transition.to}
+                    count={transition.count}
+                    onClick={() => onFilterChange?.({ from: transition.from, to: transition.to })}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Alerts Section */}
-      <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-medium text-warning">Attention Required</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {comparison.summary.statusChanges} properties changed status this month. 
-              Review the transitions above to identify potential opportunities or risks.
-            </p>
+          {/* Alerts Section */}
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-warning">Attention Required</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {comparison.summary.statusChanges} properties changed status this month.
+                  Review the transitions above to identify potential opportunities or risks.
+                </p>
+              </div>
+            </div>
           </div>
+        </>
+      ) : (
+        <div className="bg-card border border-border rounded-lg p-6 text-center">
+          <ArrowRightLeft className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No comparison data available</p>
+          <p className="text-sm text-muted-foreground mt-2">Upload at least two files to see comparisons</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }

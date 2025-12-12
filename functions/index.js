@@ -442,23 +442,57 @@ function generateComparison(currentProps, previousProps, currentFilename, previo
  */
 app.get('/api/files', async (req, res) => {
   try {
+    console.log('[FILES] Starting file list request');
     const bucket = storage.bucket(BUCKET_NAME);
-    const fileList = await listFiles(bucket, 'metadata/files/');
-    
-    const files = await Promise.all(
-      fileList.map(async (filePath) => {
-        const fileData = await loadJSON(bucket, filePath);
-        return fileData;
-      })
+
+    // Add timeout wrapper
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timeout after 10s')), 10000)
     );
 
-    // Sort by uploadedAt descending
-    files.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    const filesPromise = (async () => {
+      console.log('[FILES] Listing files from GCS');
+      const fileList = await listFiles(bucket, 'metadata/files/');
+      console.log(`[FILES] Found ${fileList.length} metadata files`);
 
-    res.json(files.filter(f => f !== null));
+      // Limit to most recent 50 files to prevent timeout
+      const recentFiles = fileList
+        .sort((a, b) => {
+          const aId = a.replace('metadata/files/', '').replace('.json', '');
+          const bId = b.replace('metadata/files/', '').replace('.json', '');
+          return parseInt(bId) - parseInt(aId);
+        })
+        .slice(0, 50);
+
+      console.log(`[FILES] Loading metadata for ${recentFiles.length} recent files`);
+      const files = await Promise.all(
+        recentFiles.map(async (filePath) => {
+          try {
+            const fileData = await loadJSON(bucket, filePath);
+            return fileData;
+          } catch (err) {
+            console.error(`[FILES] Error loading ${filePath}:`, err.message);
+            return null;
+          }
+        })
+      );
+
+      // Sort by uploadedAt descending
+      const validFiles = files.filter(f => f !== null);
+      validFiles.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+      console.log(`[FILES] Returning ${validFiles.length} files`);
+      return validFiles;
+    })();
+
+    const files = await Promise.race([filesPromise, timeoutPromise]);
+    res.json(files);
   } catch (error) {
-    console.error('Get files error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[FILES] Error:', error.message);
+    if (error.message.includes('timeout')) {
+      res.status(504).json({ error: 'Request timeout - try again' });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 });
 
@@ -512,72 +546,106 @@ app.get('/api/comparisons/latest', async (req, res) => {
  */
 app.get('/api/dashboard', async (req, res) => {
   try {
+    console.log('[DASHBOARD] Starting dashboard request');
     const bucket = storage.bucket(BUCKET_NAME);
-    const fileList = await listFiles(bucket, 'metadata/files/');
-    
-    // Get latest completed file
-    const files = await Promise.all(
-      fileList.map(async (filePath) => {
-        return await loadJSON(bucket, filePath);
-      })
+
+    // Add timeout
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timeout after 10s')), 10000)
     );
 
-    const completedFiles = files
-      .filter(f => f && f.status === 'completed')
-      .sort((a, b) => new Date(b.processedAt) - new Date(a.processedAt));
+    const dashboardPromise = (async () => {
+      const fileList = await listFiles(bucket, 'metadata/files/');
+      console.log(`[DASHBOARD] Found ${fileList.length} files`);
 
-    if (completedFiles.length === 0) {
-      return res.json({
-        totalProperties: 0,
-        byStatus: { judgment: 0, active: 0, pending: 0 },
-        totalAmountDue: 0,
-        avgAmountDue: 0,
-        newThisMonth: 0,
-        removedThisMonth: 0,
-        deadLeads: 0,
-      });
-    }
+      // Only check recent 20 files for completed status
+      const recentFiles = fileList
+        .sort((a, b) => {
+          const aId = a.replace('metadata/files/', '').replace('.json', '');
+          const bId = b.replace('metadata/files/', '').replace('.json', '');
+          return parseInt(bId) - parseInt(aId);
+        })
+        .slice(0, 20);
 
-    const latestFile = completedFiles[0];
-    const properties = await loadJSON(bucket, `data/properties/${latestFile.id}.json`) || [];
-    
-    const byStatus = {
-      judgment: properties.filter(p => p.status === 'J').length,
-      active: properties.filter(p => p.status === 'A').length,
-      pending: properties.filter(p => p.status === 'P').length,
-    };
+      const files = await Promise.all(
+        recentFiles.map(async (filePath) => {
+          try {
+            return await loadJSON(bucket, filePath);
+          } catch (err) {
+            console.error(`[DASHBOARD] Error loading ${filePath}:`, err.message);
+            return null;
+          }
+        })
+      );
 
-    const totalAmountDue = properties.reduce((sum, p) => sum + (p.totalAmountDue || 0), 0);
-    const avgAmountDue = properties.length > 0 ? totalAmountDue / properties.length : 0;
+      const completedFiles = files
+        .filter(f => f && f.status === 'completed')
+        .sort((a, b) => new Date(b.processedAt) - new Date(a.processedAt));
 
-    // Get latest comparison
-    const comparisonList = await listFiles(bucket, 'data/comparisons/');
-    let newThisMonth = 0;
-    let removedThisMonth = 0;
-    
-    if (comparisonList.length > 0) {
-      const latestComparisonId = comparisonList
-        .map(f => f.replace('data/comparisons/', '').replace('.json', ''))
-        .sort((a, b) => parseInt(b) - parseInt(a))[0];
-      const latestComparison = await loadJSON(bucket, `data/comparisons/${latestComparisonId}.json`);
-      if (latestComparison) {
-        newThisMonth = latestComparison.summary?.newProperties || 0;
-        removedThisMonth = latestComparison.summary?.removedProperties || 0;
+      if (completedFiles.length === 0) {
+        console.log('[DASHBOARD] No completed files found');
+        return {
+          totalProperties: 0,
+          byStatus: { judgment: 0, active: 0, pending: 0 },
+          totalAmountDue: 0,
+          avgAmountDue: 0,
+          newThisMonth: 0,
+          removedThisMonth: 0,
+          deadLeads: 0,
+        };
       }
-    }
 
-    res.json({
-      totalProperties: properties.length,
-      byStatus,
-      totalAmountDue,
-      avgAmountDue,
-      newThisMonth,
-      removedThisMonth,
-      deadLeads: removedThisMonth,
-    });
+      const latestFile = completedFiles[0];
+      console.log(`[DASHBOARD] Loading properties for file: ${latestFile.id}`);
+      const properties = await loadJSON(bucket, `data/properties/${latestFile.id}.json`) || [];
+      console.log(`[DASHBOARD] Loaded ${properties.length} properties`);
+
+      const byStatus = {
+        judgment: properties.filter(p => p.status === 'J').length,
+        active: properties.filter(p => p.status === 'A').length,
+        pending: properties.filter(p => p.status === 'P').length,
+      };
+
+      const totalAmountDue = properties.reduce((sum, p) => sum + (p.totalAmountDue || 0), 0);
+      const avgAmountDue = properties.length > 0 ? totalAmountDue / properties.length : 0;
+
+      // Get latest comparison
+      const comparisonList = await listFiles(bucket, 'data/comparisons/');
+      let newThisMonth = 0;
+      let removedThisMonth = 0;
+
+      if (comparisonList.length > 0) {
+        const latestComparisonId = comparisonList
+          .map(f => f.replace('data/comparisons/', '').replace('.json', ''))
+          .sort((a, b) => parseInt(b) - parseInt(a))[0];
+        const latestComparison = await loadJSON(bucket, `data/comparisons/${latestComparisonId}.json`);
+        if (latestComparison) {
+          newThisMonth = latestComparison.summary?.newProperties || 0;
+          removedThisMonth = latestComparison.summary?.removedProperties || 0;
+        }
+      }
+
+      console.log('[DASHBOARD] Returning dashboard stats');
+      return {
+        totalProperties: properties.length,
+        byStatus,
+        totalAmountDue,
+        avgAmountDue,
+        newThisMonth,
+        removedThisMonth,
+        deadLeads: removedThisMonth,
+      };
+    })();
+
+    const stats = await Promise.race([dashboardPromise, timeoutPromise]);
+    res.json(stats);
   } catch (error) {
-    console.error('Get dashboard error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[DASHBOARD] Error:', error.message);
+    if (error.message.includes('timeout')) {
+      res.status(504).json({ error: 'Request timeout - try again' });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 });
 
