@@ -4,10 +4,10 @@ import { useToast } from '@/hooks/use-toast';
 export function UploadView() {
   const { toast } = useToast();
 
-  const handleUpload = (file: File) => {
+  const handleUploadComplete = () => {
     toast({
-      title: 'File Uploaded',
-      description: `${file.name} has been uploaded and is being processed.`,
+      title: 'File Uploaded Successfully',
+      description: 'Your file has been uploaded and is being processed on the server.',
     });
   };
 
@@ -20,7 +20,7 @@ export function UploadView() {
         </p>
       </div>
 
-      <FileUpload onUpload={handleUpload} />
+      <FileUpload onUploadComplete={handleUploadComplete} />
     </div>
   );
 }
