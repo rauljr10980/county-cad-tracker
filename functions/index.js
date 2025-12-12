@@ -13,7 +13,7 @@ const pdfParse = require('pdf-parse');
 
 // Initialize Storage with credentials
 // Supports multiple credential methods:
-// 1. Service account JSON from environment variable (for Render, Railway, etc.)
+// 1. Service account JSON from environment variable (for Render, Railway, etc.)l
 // 2. Service account key file path (for local dev)
 // 3. Application Default Credentials (for Cloud Run, GCP)
 const storageOptions = {};
@@ -215,7 +215,37 @@ async function processFile(fileId, storagePath, filename) {
       const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      data = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+      
+      // Excel structure:
+      // Row 1: (empty or title) - will be skipped
+      // Row 2: Descriptions (what each column is for) - will be skipped
+      // Row 3: Column headers/titles (actual column names) - used as headers
+      // Row 4+: Data rows - processed as property data
+      
+      // Read row 2 for descriptions (for logging/debugging)
+      const descriptions = {};
+      Object.keys(worksheet).forEach(cell => {
+        const cellRef = XLSX.utils.decode_cell(cell);
+        if (cellRef.r === 1 && cell[0] !== '!') { // Row 2 (0-indexed row 1)
+          const colLetter = XLSX.utils.encode_col(cellRef.c);
+          const value = worksheet[cell]?.v || '';
+          if (value) descriptions[colLetter] = value;
+        }
+      });
+      if (Object.keys(descriptions).length > 0) {
+        console.log(`[PROCESS] Row 2 descriptions found:`, Object.values(descriptions).filter(d => d).slice(0, 5).join(', '), '...');
+      }
+      
+      // Use row 3 as headers (header: 2 means 0-indexed row 2, which is row 3 in Excel)
+      // This automatically skips rows 1-2 and uses row 3 as headers
+      // Data rows start from row 4 (0-indexed row 3)
+      data = XLSX.utils.sheet_to_json(worksheet, { 
+        raw: false,
+        header: 2, // Use row 3 (0-indexed row 2) as headers
+        defval: '', // Default value for empty cells
+      });
+      
+      console.log(`[PROCESS] Using row 3 as headers. Found ${Object.keys(data[0] || {}).length} columns, ${data.length} data rows`);
     }
 
     console.log(`[PROCESS] Parsed ${data.length} rows from file`);
