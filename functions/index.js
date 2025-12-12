@@ -212,10 +212,35 @@ async function processFile(fileId, storagePath, filename) {
     } else {
       console.log(`[PROCESS] Parsing Excel file`);
       // Parse Excel
+      // Excel structure (per user requirements):
+      // Row 1: Empty or title - will be skipped
+      // Row 2: Descriptions (what each column is for) - will be skipped
+      // Row 3: Column headers/titles (actual column names) - used as headers
+      // Row 4+: Data rows - processed as property data
+
       const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      data = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+
+      // Read row 2 for descriptions (for logging/debugging)
+      const descriptions = {};
+      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellRef = XLSX.utils.encode_cell({ r: 1, c: col }); // Row 2 (0-indexed row 1)
+        const cell = worksheet[cellRef];
+        if (cell && cell.v) {
+          const colLetter = XLSX.utils.encode_col(col);
+          descriptions[colLetter] = cell.v;
+        }
+      }
+      console.log(`[PROCESS] Row 2 descriptions found:`, Object.keys(descriptions).length > 0 ? 'Yes' : 'No');
+
+      // Use row 3 as headers (header: 2 means 0-indexed row 2, which is row 3 in Excel)
+      data = XLSX.utils.sheet_to_json(worksheet, {
+        raw: false,
+        header: 2, // Use row 3 (0-indexed row 2) as headers
+        defval: '', // Default value for empty cells
+      });
     }
 
     console.log(`[PROCESS] Parsed ${data.length} rows from file`);
