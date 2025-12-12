@@ -485,6 +485,61 @@ app.get('/api/files', async (req, res) => {
 });
 
 /**
+ * Delete a file
+ */
+app.delete('/api/files/:fileId', async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    console.log(`[DELETE] Deleting file: ${fileId}`);
+
+    const bucket = storage.bucket(BUCKET_NAME);
+
+    // Load file metadata to get storage path
+    const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+    if (!fileDoc) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Delete uploaded file
+    try {
+      const uploadedFile = bucket.file(fileDoc.storagePath);
+      await uploadedFile.delete();
+      console.log(`[DELETE] Deleted uploaded file: ${fileDoc.storagePath}`);
+    } catch (err) {
+      console.log(`[DELETE] Upload file not found or already deleted: ${fileDoc.storagePath}`);
+    }
+
+    // Delete properties data
+    try {
+      const propertiesFile = bucket.file(`data/properties/${fileId}.json`);
+      await propertiesFile.delete();
+      console.log(`[DELETE] Deleted properties data`);
+    } catch (err) {
+      console.log(`[DELETE] Properties file not found or already deleted`);
+    }
+
+    // Delete comparison data
+    try {
+      const comparisonFile = bucket.file(`data/comparisons/${fileId}.json`);
+      await comparisonFile.delete();
+      console.log(`[DELETE] Deleted comparison data`);
+    } catch (err) {
+      console.log(`[DELETE] Comparison file not found or already deleted`);
+    }
+
+    // Delete metadata file
+    const metadataFile = bucket.file(`metadata/files/${fileId}.json`);
+    await metadataFile.delete();
+    console.log(`[DELETE] Deleted metadata file`);
+
+    res.json({ success: true, message: 'File deleted successfully' });
+  } catch (error) {
+    console.error('[DELETE] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Get comparison report
  */
 app.get('/api/comparisons/:fileId', async (req, res) => {

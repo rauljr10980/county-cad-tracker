@@ -1,10 +1,17 @@
 import { Download, Trash2, FileSpreadsheet, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useFiles } from '@/hooks/useFiles';
+import { useFiles, useDeleteFile } from '@/hooks/useFiles';
 
 export function FileHistory() {
   const { data: files = [], isLoading, error } = useFiles();
+  const deleteMutation = useDeleteFile();
+
+  const handleDelete = (fileId: string, filename: string) => {
+    if (confirm(`Are you sure you want to delete "${filename}"?`)) {
+      deleteMutation.mutate(fileId);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -97,8 +104,18 @@ export function FileHistory() {
                     <Button variant="ghost" size="icon" className="h-7 w-7">
                       <Download className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={() => handleDelete(file.id, file.filename)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending && deleteMutation.variables === file.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 </td>
