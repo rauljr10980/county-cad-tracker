@@ -3,7 +3,7 @@ import { ArrowRightLeft, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-
 import { StatusBadge, StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyTable } from '@/components/properties/PropertyTable';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
-import { mockComparisonReport, mockStatusTransitions } from '@/data/mockData';
+import { useLatestComparison } from '@/hooks/useFiles';
 import { Property, PropertyStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
 
@@ -14,8 +14,45 @@ export function ComparisonView() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [transitionFilter, setTransitionFilter] = useState<{ from: PropertyStatus; to: PropertyStatus } | null>(null);
 
-  const report = mockComparisonReport;
-  const transitions = mockStatusTransitions;
+  const { data: report, isLoading, error } = useLatestComparison();
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading comparison...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-6 text-center">
+          <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-2" />
+          <p className="text-destructive">Failed to load comparison</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!report) {
+    return (
+      <div className="p-6">
+        <div className="bg-secondary/30 rounded-lg p-8 text-center">
+          <ArrowRightLeft className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No Comparison Available</h3>
+          <p className="text-muted-foreground mb-4">
+            Upload at least two files to generate a comparison report.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const transitions = report.statusTransitions || [];
 
   const tabs = [
     { id: 'summary' as ViewMode, label: 'Summary', count: null },
