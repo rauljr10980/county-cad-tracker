@@ -339,11 +339,11 @@ function extractProperties(data) {
   const headers = Object.keys(data[0] || {});
   
   const mappings = {
-    accountNumber: ['account', 'account number', 'account_number', 'acct', 'acct no'],
+    accountNumber: ['can', 'account', 'account number', 'account_number', 'acct', 'acct no'],
     ownerName: ['owner', 'owner name', 'owner_name', 'name'],
-    propertyAddress: ['property address', 'property_address', 'address', 'property'],
+    propertyAddress: ['addrstring', 'property address', 'property_address', 'address', 'property'],
     mailingAddress: ['mailing address', 'mailing_address', 'mailing'],
-    status: ['status', 'st'],
+    status: ['legalstatus', 'status', 'st'],
     totalAmountDue: ['total', 'amount due', 'amount_due', 'due', 'balance'],
     totalPercentage: ['percentage', 'percent', 'pct', '%'],
   };
@@ -392,18 +392,33 @@ function generateComparison(currentProps, previousProps, currentFilename, previo
   currentMap.forEach((current, accountNumber) => {
     const previous = previousMap.get(accountNumber);
     if (!previous) {
-      newProperties.push({ ...current, isNew: true });
+      // Mark new properties with P status as "new leads"
+      const isNewLead = current.status === 'P';
+      newProperties.push({ ...current, isNew: true, isNewLead });
     } else if (current.status !== previous.status || current.totalPercentage !== previous.totalPercentage) {
+      // Flag critical status transitions
+      const isEscalation = previous.status === 'P' && current.status === 'A'; // P → A
+      const isCritical = previous.status === 'A' && current.status === 'J';    // A → J
+
       changedProperties.push({
         ...current,
         previousStatus: previous.status,
         statusChanged: current.status !== previous.status,
         percentageChanged: current.totalPercentage !== previous.totalPercentage,
+        isEscalation,
+        isCritical,
       });
-      
+
       const transitionKey = `${previous.status}->${current.status}`;
       if (!statusTransitions[transitionKey]) {
-        statusTransitions[transitionKey] = { from: previous.status, to: current.status, count: 0, properties: [] };
+        statusTransitions[transitionKey] = {
+          from: previous.status,
+          to: current.status,
+          count: 0,
+          properties: [],
+          isEscalation,
+          isCritical,
+        };
       }
       statusTransitions[transitionKey].count++;
       statusTransitions[transitionKey].properties.push(current);
@@ -425,8 +440,11 @@ function generateComparison(currentProps, previousProps, currentFilename, previo
       totalCurrent: currentProps.length,
       totalPrevious: previousProps.length,
       newProperties: newProperties.length,
+      newLeads: newProperties.filter(p => p.isNewLead).length, // New P status properties
       removedProperties: removedProperties.length,
       statusChanges: changedProperties.filter(p => p.statusChanged).length,
+      escalations: changedProperties.filter(p => p.isEscalation).length, // P → A
+      criticalChanges: changedProperties.filter(p => p.isCritical).length, // A → J
       percentageChanges: changedProperties.filter(p => p.percentageChanged).length,
     },
     statusTransitions: transitions,
