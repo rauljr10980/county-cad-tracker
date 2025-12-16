@@ -6,10 +6,9 @@ export function useFiles() {
   return useQuery<UploadedFile[]>({
     queryKey: ['files'],
     queryFn: getFiles,
-    refetchInterval: 5000, // Refetch every 5 seconds to check for processing updates
     retry: 3, // Retry failed requests
     refetchOnMount: true, // Always refetch when component mounts
-    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchOnWindowFocus: false, // Don't auto-refetch to save API calls
   });
 }
 
@@ -30,7 +29,8 @@ export function useLatestComparison() {
   return useQuery<ComparisonReport | null>({
     queryKey: ['comparisons', 'latest'],
     queryFn: getLatestComparison,
-    refetchInterval: 10000, // Refetch every 10 seconds
+    refetchOnMount: true,
+    refetchOnWindowFocus: false, // Don't auto-refetch to save API calls
   });
 }
 
@@ -51,7 +51,8 @@ export function useDashboardStats() {
   return useQuery<DashboardStats>({
     queryKey: ['dashboard'],
     queryFn: getDashboardStats,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchOnMount: true,
+    refetchOnWindowFocus: false, // Don't auto-refetch to save API calls
   });
 }
 
