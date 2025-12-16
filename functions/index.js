@@ -218,9 +218,17 @@ async function processFile(fileId, storagePath, filename) {
       // Row 3: Column headers/titles (actual column names) - used as headers
       // Row 4+: Data rows - processed as property data
 
-      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      const workbook = XLSX.read(fileBuffer, {
+        type: 'buffer',
+        cellDates: false, // Don't parse dates to save memory
+        cellStyles: false, // Don't parse styles
+        sheetStubs: false, // Skip empty cells
+      });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
+
+      // Clear buffer to free memory
+      fileBuffer = null;
 
       // Excel structure:
       // Row 1: (empty or title) - will be skipped
@@ -249,9 +257,15 @@ async function processFile(fileId, storagePath, filename) {
         raw: false,
         header: 2, // Use row 3 (0-indexed row 2) as headers
         defval: '', // Default value for empty cells
+        blankrows: false, // Skip blank rows to save memory
       });
 
       console.log(`[PROCESS] Using row 3 as headers. Found ${Object.keys(data[0] || {}).length} columns, ${data.length} data rows`);
+
+      // Warn if file is very large (memory concerns)
+      if (data.length > 50000) {
+        console.log(`[PROCESS] WARNING: Large file with ${data.length} rows. Processing may be slow or fail due to memory constraints.`);
+      }
     }
 
     console.log(`[PROCESS] Parsed ${data.length} rows from file`);
