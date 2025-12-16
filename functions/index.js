@@ -199,7 +199,13 @@ async function processFile(fileId, storagePath, filename) {
     
     // Download file
     const [fileBuffer] = await file.download();
-    console.log(`[PROCESS] Downloaded file, size: ${fileBuffer.length} bytes`);
+    const fileSizeMB = (fileBuffer.length / (1024 * 1024)).toFixed(2);
+    console.log(`[PROCESS] Downloaded file, size: ${fileBuffer.length} bytes (${fileSizeMB} MB)`);
+    
+    // Memory check: Warn if file is very large
+    if (fileBuffer.length > 50 * 1024 * 1024) { // > 50MB
+      console.warn(`[PROCESS] WARNING: Large file detected (${fileSizeMB} MB). This may cause memory issues on free tier.`);
+    }
     
     let data = [];
     
@@ -218,7 +224,16 @@ async function processFile(fileId, storagePath, filename) {
       // Row 3: Column headers/titles (actual column names) - used as headers
       // Row 4+: Data rows - processed as property data
 
-      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      // Memory optimization: Use options to reduce memory usage
+      // - cellStyles: false - skip style information (saves memory)
+      // - cellDates: false - skip date parsing (saves memory)
+      // - sheetStubs: false - skip empty cells (saves memory)
+      const workbook = XLSX.read(fileBuffer, { 
+        type: 'buffer',
+        cellStyles: false, // Skip styles to save memory
+        cellDates: false, // Skip date parsing to save memory
+        sheetStubs: false, // Skip empty cells to save memory
+      });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
 
@@ -245,13 +260,22 @@ async function processFile(fileId, storagePath, filename) {
       // Use row 3 as headers (header: 2 means 0-indexed row 2, which is row 3 in Excel)
       // This automatically skips rows 1-2 and uses row 3 as headers
       // Data rows start from row 4 (0-indexed row 3)
+      // Memory optimization: blankrows: false - skip blank rows to save memory
       data = XLSX.utils.sheet_to_json(worksheet, {
         raw: false,
         header: 2, // Use row 3 (0-indexed row 2) as headers
         defval: '', // Default value for empty cells
+        blankrows: false, // Skip blank rows to save memory
       });
+      
+      // Clear workbook from memory after parsing
+      workbook.SheetNames = null;
+      workbook.Sheets = null;
 
       console.log(`[PROCESS] Using row 3 as headers. Found ${Object.keys(data[0] || {}).length} columns, ${data.length} data rows`);
+      
+      // Clear fileBuffer from memory after parsing (helps with large files)
+      fileBuffer.fill(0); // Overwrite buffer
     }
 
     console.log(`[PROCESS] Parsed ${data.length} rows from file`);
