@@ -40,7 +40,15 @@ else {
   console.log('[STORAGE] Using Application Default Credentials (ADC)');
 }
 
-const storage = new Storage(storageOptions);
+// Initialize storage with error handling
+let storage;
+try {
+  storage = new Storage(storageOptions);
+  console.log('[STORAGE] Storage initialized successfully');
+} catch (error) {
+  console.error('[STORAGE] Failed to initialize storage:', error.message);
+  // Don't crash - storage will be checked when needed
+}
 
 const app = express();
 app.use(cors({ origin: true }));
