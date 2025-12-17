@@ -1,0 +1,13 @@
+[phases.setup]
+nixPkgs = ["nodejs-18_x", "npm"]
+
+[phases.install]
+cmds = [
+  "cd functions",
+  "npm install",
+  "echo 'Dependencies installed in functions directory'"
+]
+
+[start]
+cmd = "cd functions && node index.js"
+
