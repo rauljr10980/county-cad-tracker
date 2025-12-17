@@ -558,26 +558,57 @@ function extractProperties(data) {
     // Use first non-empty column value as accountNumber if CAN not found
     let finalAccountNumber = accountNumber;
     if (!finalAccountNumber || finalAccountNumber === '') {
-      // Try to find CAN column by searching all headers
+      // Try to find CAN column by searching all headers (case-insensitive, handles spaces/special chars)
       for (const header of headers) {
-        const lowerHeader = header.toLowerCase().trim();
-        if (lowerHeader === 'can' || lowerHeader.includes('can') || 
-            header.toUpperCase() === 'CAN' || header.includes('CAN')) {
+        const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (normalizedHeader === 'CAN' || normalizedHeader.includes('CAN')) {
           finalAccountNumber = (row[header] || '').toString().trim();
-          if (finalAccountNumber && index < 1) {
-            console.log(`[EXTRACT] Found CAN column: "${header}" = ${finalAccountNumber}`);
+          if (finalAccountNumber && index === 0) {
+            console.log(`[EXTRACT] ✓ Found CAN column: "${header}" = ${finalAccountNumber}`);
           }
           break;
         }
       }
-      // If still not found, try first column
+      // If still not found, try first column (but only log once)
       if (!finalAccountNumber) {
         const firstCol = headers[0];
         if (firstCol && row[firstCol]) {
           finalAccountNumber = row[firstCol].toString().trim();
-          if (index < 1) {
-            console.log(`[EXTRACT] WARNING: Using first column "${firstCol}" as accountNumber (CAN not found)`);
+          if (index === 0) {
+            console.log(`[EXTRACT] ⚠ WARNING: CAN column not found! Using first column "${firstCol}" = ${finalAccountNumber}`);
+            console.log(`[EXTRACT] Available columns:`, headers.slice(0, 15).join(', '));
           }
+        }
+      }
+    }
+    
+    // Also try to find ADDRSTRING and LEGALSTATUS if not found
+    let finalPropertyAddress = propertyAddress;
+    if (!finalPropertyAddress || finalPropertyAddress === '') {
+      for (const header of headers) {
+        const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (normalizedHeader === 'ADDRSTRING' || normalizedHeader.includes('ADDRSTRING') || 
+            normalizedHeader.includes('ADDRESS')) {
+          finalPropertyAddress = (row[header] || '').toString().trim();
+          if (finalPropertyAddress && index === 0) {
+            console.log(`[EXTRACT] ✓ Found ADDRSTRING column: "${header}"`);
+          }
+          break;
+        }
+      }
+    }
+    
+    let finalStatus = status;
+    if (!finalStatus || finalStatus === '') {
+      for (const header of headers) {
+        const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (normalizedHeader === 'LEGALSTATUS' || normalizedHeader.includes('LEGALSTATUS') ||
+            normalizedHeader === 'STATUS') {
+          finalStatus = (row[header] || '').toString().trim();
+          if (finalStatus && index === 0) {
+            console.log(`[EXTRACT] ✓ Found LEGALSTATUS column: "${header}" = ${finalStatus}`);
+          }
+          break;
         }
       }
     }
@@ -586,9 +617,9 @@ function extractProperties(data) {
       id: `${Date.now()}_${index}`,
       accountNumber: finalAccountNumber || accountNumber || `ROW_${index}`,
       ownerName: getValue('ownerName') || '',
-      propertyAddress: propertyAddress || '',
+      propertyAddress: finalPropertyAddress || propertyAddress || '',
       mailingAddress: getValue('mailingAddress') || '',
-      status: status ? status.charAt(0).toUpperCase() : 'A',
+      status: finalStatus ? finalStatus.charAt(0).toUpperCase() : (status ? status.charAt(0).toUpperCase() : 'A'),
       totalAmountDue: parseFloat(totalAmountDue || '0') || 0,
       totalPercentage: parseFloat(getValue('totalPercentage') || '0') || 0,
     };
