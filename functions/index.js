@@ -501,11 +501,20 @@ function extractProperties(data) {
     console.warn(`[EXTRACT] WARNING: Could not find status column (looking for: LEGALSTATUS, status, etc.)`);
   }
 
-  // Log all available columns and their sample values from first row
+  // Log all available columns ONCE at the start
   if (data.length > 0) {
-    console.log(`[EXTRACT] First row sample data:`, JSON.stringify(data[0], null, 2));
-    console.log(`[EXTRACT] All column names (exact):`, headers);
-    console.log(`[EXTRACT] Column map after matching:`, columnMap);
+    console.log(`[EXTRACT] ===== COLUMN ANALYSIS =====`);
+    console.log(`[EXTRACT] Total columns found: ${headers.length}`);
+    console.log(`[EXTRACT] Column names (first 20):`, headers.slice(0, 20).join(', '));
+    console.log(`[EXTRACT] Looking for: CAN, ADDRSTRING, LEGALSTATUS`);
+    console.log(`[EXTRACT] Column map result:`, columnMap);
+    console.log(`[EXTRACT] First row sample (first 5 columns):`, 
+      Object.keys(data[0]).slice(0, 5).reduce((acc, key) => {
+        acc[key] = data[0][key];
+        return acc;
+      }, {})
+    );
+    console.log(`[EXTRACT] ===========================`);
   }
 
   const properties = data.map((row, index) => {
@@ -535,32 +544,47 @@ function extractProperties(data) {
     const status = getValue('status');
     const totalAmountDue = getValue('totalAmountDue');
     
-    // Log first few rows for debugging
-    if (index < 3) {
-      console.log(`[EXTRACT] Row ${index} raw keys:`, Object.keys(row));
-      console.log(`[EXTRACT] Row ${index} extracted:`, {
-        accountNumber,
+    // Log first row only for debugging (reduce logging)
+    if (index === 0) {
+      console.log(`[EXTRACT] Sample row 0:`, {
+        accountNumber: finalAccountNumber || accountNumber,
         propertyAddress,
         status,
         totalAmountDue,
-        rawRow: Object.keys(row).slice(0, 10).map(k => `${k}: ${row[k]}`).join(', ')
+        availableColumns: Object.keys(row).slice(0, 10)
       });
     }
 
     // Use first non-empty column value as accountNumber if CAN not found
     let finalAccountNumber = accountNumber;
     if (!finalAccountNumber || finalAccountNumber === '') {
-      // Try to use first column that has data
-      const firstCol = headers[0];
-      if (firstCol && row[firstCol]) {
-        finalAccountNumber = row[firstCol].toString().trim();
-        console.log(`[EXTRACT] Using first column "${firstCol}" as accountNumber: ${finalAccountNumber}`);
+      // Try to find CAN column by searching all headers
+      for (const header of headers) {
+        const lowerHeader = header.toLowerCase().trim();
+        if (lowerHeader === 'can' || lowerHeader.includes('can') || 
+            header.toUpperCase() === 'CAN' || header.includes('CAN')) {
+          finalAccountNumber = (row[header] || '').toString().trim();
+          if (finalAccountNumber && index < 1) {
+            console.log(`[EXTRACT] Found CAN column: "${header}" = ${finalAccountNumber}`);
+          }
+          break;
+        }
+      }
+      // If still not found, try first column
+      if (!finalAccountNumber) {
+        const firstCol = headers[0];
+        if (firstCol && row[firstCol]) {
+          finalAccountNumber = row[firstCol].toString().trim();
+          if (index < 1) {
+            console.log(`[EXTRACT] WARNING: Using first column "${firstCol}" as accountNumber (CAN not found)`);
+          }
+        }
       }
     }
 
     return {
       id: `${Date.now()}_${index}`,
-      accountNumber: finalAccountNumber || `ROW_${index}`,
+      accountNumber: finalAccountNumber || accountNumber || `ROW_${index}`,
       ownerName: getValue('ownerName') || '',
       propertyAddress: propertyAddress || '',
       mailingAddress: getValue('mailingAddress') || '',
