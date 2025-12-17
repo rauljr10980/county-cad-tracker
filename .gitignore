@@ -7,11 +7,6 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Package manager lockfiles (we use npm)
-bun.lockb
-yarn.lock
-pnpm-lock.yaml
-
 node_modules
 dist
 dist-ssr
@@ -35,6 +30,8 @@ ui-debug.log
 !tsconfig*.json
 !components.json
 !firestore.indexes.json
+!railway.json
+!nixpacks.toml
 
 # Editor directories and files
 .vscode/*
