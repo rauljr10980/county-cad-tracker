@@ -313,15 +313,34 @@ async function processFile(fileId, storagePath, filename) {
         console.log(`[PROCESS] Row 2 descriptions found:`, Object.values(descriptions).filter(d => d).slice(0, 5).join(', '), '...');
       }
 
-      // Use row 3 as headers (header: 2 means 0-indexed row 2, which is row 3 in Excel)
-      // This automatically skips rows 1-2 and uses row 3 as headers
-      // Data rows start from row 4 (0-indexed row 3)
+      // Use row 3 as headers by setting range to start from row 3 (0-indexed row 2)
+      // Excel structure:
+      // Row 1: Title (Request Seq.:959740, BEXAR COUNTY) - SKIP
+      // Row 2: Descriptions (what each column is for) - SKIP  
+      // Row 3: Column headers (CAN, ADDRSTRING, LEGALSTATUS, etc.) - USE AS HEADERS
+      // Row 4+: Data rows - PROCESS
+      
+      // Use range: 2 to start reading from row 3 (0-indexed row 2)
+      // The first row in the range becomes the headers automatically
       data = XLSX.utils.sheet_to_json(worksheet, {
         raw: false,
-        header: 2, // Use row 3 (0-indexed row 2) as headers
+        range: 2, // Start from row 3 (0-indexed row 2) - this row becomes headers
         defval: '', // Default value for empty cells
         blankrows: false, // Skip blank rows to save memory
       });
+      
+      // Log the actual headers we're getting
+      if (data.length > 0) {
+        const actualHeaders = Object.keys(data[0]);
+        console.log(`[PROCESS] ACTUAL headers from Row 3:`, actualHeaders.slice(0, 15).join(', '));
+        console.log(`[PROCESS] Looking for: CAN at E3, ADDRSTRING at H3, LEGALSTATUS at AE3`);
+        
+        // Verify critical columns exist
+        const hasCAn = actualHeaders.some(h => h.toUpperCase() === 'CAN');
+        const hasAddr = actualHeaders.some(h => h.toUpperCase() === 'ADDRSTRING');
+        const hasStatus = actualHeaders.some(h => h.toUpperCase() === 'LEGALSTATUS');
+        console.log(`[PROCESS] Column check: CAN=${hasCAn}, ADDRSTRING=${hasAddr}, LEGALSTATUS=${hasStatus}`);
+      }
 
       const headers = Object.keys(data[0] || {});
       console.log(`[PROCESS] Using row 3 as headers. Found ${headers.length} columns, ${data.length} data rows`);
