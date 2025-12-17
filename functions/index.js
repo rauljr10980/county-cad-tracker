@@ -488,11 +488,43 @@ function extractProperties(data) {
   });
   
   console.log(`[EXTRACT] Column mapping result:`, columnMap);
+  
+  // Warn if critical columns are missing
+  if (!columnMap.accountNumber) {
+    console.warn(`[EXTRACT] WARNING: Could not find accountNumber column (looking for: CAN, account, etc.)`);
+    console.warn(`[EXTRACT] Available headers:`, headers);
+  }
+  if (!columnMap.propertyAddress) {
+    console.warn(`[EXTRACT] WARNING: Could not find propertyAddress column (looking for: ADDRSTRING, address, etc.)`);
+  }
+  if (!columnMap.status) {
+    console.warn(`[EXTRACT] WARNING: Could not find status column (looking for: LEGALSTATUS, status, etc.)`);
+  }
+
+  // Log all available columns and their sample values from first row
+  if (data.length > 0) {
+    console.log(`[EXTRACT] First row sample data:`, JSON.stringify(data[0], null, 2));
+    console.log(`[EXTRACT] All column names (exact):`, headers);
+    console.log(`[EXTRACT] Column map after matching:`, columnMap);
+  }
 
   const properties = data.map((row, index) => {
     const getValue = (key) => {
       const col = columnMap[key];
-      if (!col) return '';
+      if (!col) {
+        // If column not found, try to find it in the row keys directly
+        const rowKeys = Object.keys(row);
+        const lowerKey = key.toLowerCase();
+        for (const rowKey of rowKeys) {
+          if (rowKey.toLowerCase() === lowerKey || 
+              rowKey.toLowerCase().includes(lowerKey) ||
+              lowerKey.includes(rowKey.toLowerCase())) {
+            console.log(`[EXTRACT] Fallback match: "${rowKey}" for ${key}`);
+            return (row[rowKey] || '').toString().trim();
+          }
+        }
+        return '';
+      }
       const value = row[col];
       if (value === undefined || value === null) return '';
       return value.toString().trim();
@@ -505,18 +537,30 @@ function extractProperties(data) {
     
     // Log first few rows for debugging
     if (index < 3) {
-      console.log(`[EXTRACT] Row ${index}:`, {
+      console.log(`[EXTRACT] Row ${index} raw keys:`, Object.keys(row));
+      console.log(`[EXTRACT] Row ${index} extracted:`, {
         accountNumber,
         propertyAddress,
         status,
         totalAmountDue,
-        rawRow: Object.keys(row).slice(0, 5).map(k => `${k}: ${row[k]}`).join(', ')
+        rawRow: Object.keys(row).slice(0, 10).map(k => `${k}: ${row[k]}`).join(', ')
       });
+    }
+
+    // Use first non-empty column value as accountNumber if CAN not found
+    let finalAccountNumber = accountNumber;
+    if (!finalAccountNumber || finalAccountNumber === '') {
+      // Try to use first column that has data
+      const firstCol = headers[0];
+      if (firstCol && row[firstCol]) {
+        finalAccountNumber = row[firstCol].toString().trim();
+        console.log(`[EXTRACT] Using first column "${firstCol}" as accountNumber: ${finalAccountNumber}`);
+      }
     }
 
     return {
       id: `${Date.now()}_${index}`,
-      accountNumber: accountNumber || `UNKNOWN_${index}`,
+      accountNumber: finalAccountNumber || `ROW_${index}`,
       ownerName: getValue('ownerName') || '',
       propertyAddress: propertyAddress || '',
       mailingAddress: getValue('mailingAddress') || '',
@@ -525,8 +569,13 @@ function extractProperties(data) {
       totalPercentage: parseFloat(getValue('totalPercentage') || '0') || 0,
     };
   }).filter(p => {
-    // Only filter out rows with truly empty account numbers
-    return p.accountNumber && !p.accountNumber.startsWith('UNKNOWN_');
+    // Only filter out completely empty rows (no account number and no address)
+    const hasData = p.accountNumber && 
+                    (p.accountNumber !== '' || p.propertyAddress !== '');
+    if (!hasData) {
+      console.log(`[EXTRACT] Filtering out empty row:`, p);
+    }
+    return hasData;
   });
   
   console.log(`[EXTRACT] Extracted ${properties.length} properties (filtered from ${data.length} rows)`);
