@@ -97,6 +97,7 @@ async function loadJSON(bucket, path) {
     const [data] = await file.download();
     return JSON.parse(data.toString());
   } catch (error) {
+    console.error(`[STORAGE] Error loading JSON from ${path}:`, error.message);
     return null;
   }
 }
