@@ -948,6 +948,53 @@ app.get('/api/debug/test-connection', async (req, res) => {
 });
 
 /**
+ * Debug endpoint to check column extraction from last processed file
+ */
+app.get('/api/debug/columns', async (req, res) => {
+  try {
+    if (!storage) {
+      return res.status(500).json({ error: 'Storage not initialized' });
+    }
+    
+    const bucket = storage.bucket(BUCKET_NAME);
+    
+    // Get the most recent file
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    if (fileList.length === 0) {
+      return res.json({ message: 'No files found' });
+    }
+    
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+    
+    const latestFileId = fileIds[0];
+    const fileDoc = await loadJSON(bucket, `metadata/files/${latestFileId}.json`);
+    
+    if (!fileDoc) {
+      return res.json({ message: 'File metadata not found' });
+    }
+    
+    // Try to get properties to see what was extracted
+    const properties = await loadJSON(bucket, `data/properties/${latestFileId}.json`);
+    
+    return res.json({
+      file: {
+        id: fileDoc.id,
+        filename: fileDoc.filename,
+        status: fileDoc.status,
+        propertyCount: fileDoc.propertyCount,
+      },
+      sampleProperty: properties && properties.length > 0 ? properties[0] : null,
+      message: 'Check Railway logs for [EXTRACT] messages to see column mapping details',
+    });
+  } catch (error) {
+    console.error('[DEBUG] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Debug endpoint to verify uploads and storage
  */
 app.get('/api/debug/verify', async (req, res) => {
