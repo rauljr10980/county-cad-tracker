@@ -35,7 +35,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
-          VITE_API_URL: https://county-cad-tracker.onrender.com
+          VITE_API_URL: https://county-cad-tracker-production.up.railway.app
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
