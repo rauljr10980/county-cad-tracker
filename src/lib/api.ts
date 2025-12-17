@@ -123,3 +123,14 @@ export async function deleteFile(fileId: string) {
   return response.json();
 }
 
+/**
+ * Get properties from latest completed file
+ */
+export async function getProperties(page = 1, limit = 100) {
+  const response = await fetch(`${API_BASE_URL}/api/properties?page=${page}&limit=${limit}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch properties');
+  }
+  return response.json();
+}
+

@@ -652,6 +652,17 @@ function extractProperties(data) {
   });
   
   console.log(`[EXTRACT] Extracted ${properties.length} properties (filtered from ${data.length} rows)`);
+  
+  // Log status breakdown
+  const statusCounts = { J: 0, A: 0, P: 0, other: 0 };
+  properties.forEach(p => {
+    if (p.status === 'J') statusCounts.J++;
+    else if (p.status === 'A') statusCounts.A++;
+    else if (p.status === 'P') statusCounts.P++;
+    else statusCounts.other++;
+  });
+  console.log(`[EXTRACT] Status breakdown: J=${statusCounts.J}, A=${statusCounts.A}, P=${statusCounts.P}, other=${statusCounts.other}`);
+  
   if (properties.length > 0) {
     console.log(`[EXTRACT] Sample property:`, {
       accountNumber: properties[0].accountNumber,
@@ -896,6 +907,62 @@ app.get('/api/comparisons/latest', async (req, res) => {
     res.json(comparison);
   } catch (error) {
     console.error('Get latest comparison error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Get properties from latest completed file
+ */
+app.get('/api/properties', async (req, res) => {
+  try {
+    console.log('[PROPERTIES] Starting properties request');
+    const bucket = storage.bucket(BUCKET_NAME);
+    
+    // Get list of files and find the latest completed one
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    
+    if (fileList.length === 0) {
+      return res.json([]);
+    }
+    
+    // Sort by ID (timestamp) descending
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+    
+    // Find the first completed file
+    for (const fileId of fileIds.slice(0, 10)) {
+      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      if (fileDoc && fileDoc.status === 'completed') {
+        console.log(`[PROPERTIES] Loading properties from file: ${fileId}`);
+        const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
+        console.log(`[PROPERTIES] Returning ${properties.length} properties`);
+        
+        // Log status breakdown
+        const statusCounts = {};
+        properties.forEach(p => {
+          statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
+        });
+        console.log(`[PROPERTIES] Status breakdown:`, statusCounts);
+        
+        // Return paginated results (first 100 for performance)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 100;
+        const start = (page - 1) * limit;
+        
+        return res.json({
+          properties: properties.slice(start, start + limit),
+          total: properties.length,
+          page,
+          totalPages: Math.ceil(properties.length / limit),
+        });
+      }
+    }
+    
+    res.json({ properties: [], total: 0, page: 1, totalPages: 0 });
+  } catch (error) {
+    console.error('[PROPERTIES] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

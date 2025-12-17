@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getFiles, uploadFile, deleteFile, getLatestComparison, getDashboardStats } from '@/lib/api';
-import type { UploadedFile, ComparisonReport, DashboardStats } from '@/types/property';
+import { getFiles, uploadFile, deleteFile, getLatestComparison, getDashboardStats, getProperties } from '@/lib/api';
+import type { UploadedFile, ComparisonReport, DashboardStats, Property } from '@/types/property';
 
 export function useFiles() {
   return useQuery<UploadedFile[]>({
@@ -59,6 +59,15 @@ export function useDashboardStats() {
     queryFn: getDashboardStats,
     refetchOnMount: true,
     refetchOnWindowFocus: false, // Don't auto-refetch to save API calls
+  });
+}
+
+export function useProperties(page = 1, limit = 100) {
+  return useQuery<{ properties: Property[]; total: number; page: number; totalPages: number }>({
+    queryKey: ['properties', page, limit],
+    queryFn: () => getProperties(page, limit),
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
   });
 }
 

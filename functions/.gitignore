@@ -1,0 +1,9 @@
+node_modules/
+.env
+*.log
+.firebase/
+service-account-key.json
+*-key.json
+*.json
+!package.json
+
