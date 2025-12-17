@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { Property, PropertyStatus } from '@/types/property';
 import { useProperties } from '@/hooks/useFiles';
+import { Button } from '@/components/ui/button';
+
+const ITEMS_PER_PAGE = 100;
 
 export function PropertiesView() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -11,11 +14,12 @@ export function PropertiesView() {
   const [page, setPage] = useState(1);
 
   // Fetch properties from API with safe error handling
-  const { data, isLoading, error } = useProperties(page, 100);
+  const { data, isLoading, error } = useProperties(page, ITEMS_PER_PAGE);
   
   // Safely extract properties with fallbacks
   let properties: Property[] = [];
   let total = 0;
+  let totalPages = 1;
   
   try {
     if (data) {
@@ -23,16 +27,19 @@ export function PropertiesView() {
       if (Array.isArray(data)) {
         properties = data;
         total = data.length;
+        totalPages = 1;
       } else if (data.properties && Array.isArray(data.properties)) {
         properties = data.properties;
         total = data.total || data.properties.length;
+        totalPages = data.totalPages || Math.ceil(total / ITEMS_PER_PAGE);
       }
     }
   } catch (e) {
     console.error('[PropertiesView] Error parsing data:', e);
   }
   
-  console.log('[PropertiesView] Data:', { properties: properties.length, total, isLoading, error });
+  const startItem = (page - 1) * ITEMS_PER_PAGE + 1;
+  const endItem = Math.min(page * ITEMS_PER_PAGE, total);
 
   return (
     <div className="p-6">
@@ -75,12 +82,81 @@ export function PropertiesView() {
           </p>
         </div>
       ) : (
-        <PropertyTable
-          properties={properties}
-          onViewProperty={setSelectedProperty}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-        />
+        <>
+          <PropertyTable
+            properties={properties}
+            onViewProperty={setSelectedProperty}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+          />
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-between bg-card border border-border rounded-lg p-4">
+              <div className="text-sm text-muted-foreground">
+                Showing <span className="font-medium text-foreground">{startItem.toLocaleString()}</span> to{' '}
+                <span className="font-medium text-foreground">{endItem.toLocaleString()}</span> of{' '}
+                <span className="font-medium text-foreground">{total.toLocaleString()}</span> properties
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(1)}
+                  disabled={page === 1 || isLoading}
+                  title="First page"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1 || isLoading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="ml-1">Previous</span>
+                </Button>
+                
+                <div className="flex items-center gap-2 px-3">
+                  <span className="text-sm">Page</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    value={page}
+                    onChange={(e) => {
+                      const newPage = parseInt(e.target.value) || 1;
+                      setPage(Math.max(1, Math.min(totalPages, newPage)));
+                    }}
+                    className="w-16 px-2 py-1 text-center text-sm border border-border rounded bg-background"
+                  />
+                  <span className="text-sm text-muted-foreground">of {totalPages.toLocaleString()}</span>
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages || isLoading}
+                >
+                  <span className="mr-1">Next</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(totalPages)}
+                  disabled={page === totalPages || isLoading}
+                  title="Last page"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <PropertyDetailsModal
