@@ -79,16 +79,26 @@ export function FileHistory() {
               {files.map((file) => (
               <tr key={file.id}>
                 <td>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(file.status)}
-                    <span className={cn(
-                      'text-xs capitalize',
-                      file.status === 'completed' && 'text-success',
-                      file.status === 'processing' && 'text-warning',
-                      file.status === 'error' && 'text-destructive'
-                    )}>
-                      {file.status}
-                    </span>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(file.status)}
+                      <span className={cn(
+                        'text-xs capitalize',
+                        file.status === 'completed' && 'text-success',
+                        file.status === 'processing' && 'text-warning',
+                        file.status === 'error' && 'text-destructive'
+                      )}>
+                        {file.status}
+                      </span>
+                    </div>
+                    {file.status === 'processing' && file.processingMessage && (
+                      <div className="text-xs text-muted-foreground ml-6">
+                        {file.processingMessage}
+                        {file.processingProgress !== undefined && (
+                          <span className="ml-2">({file.processingProgress}%)</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td className="font-mono text-sm">{file.filename}</td>

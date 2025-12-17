@@ -54,6 +54,10 @@ export interface UploadedFile {
   propertyCount: number;
   status: 'pending' | 'processing' | 'completed' | 'error';
   errorMessage?: string;
+  processingStep?: string;
+  processingMessage?: string;
+  processingProgress?: number;
+  processingUpdatedAt?: string;
 }
 
 export interface ComparisonReport {

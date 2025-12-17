@@ -9,6 +9,12 @@ export function useFiles() {
     retry: 3, // Retry failed requests
     refetchOnMount: true, // Always refetch when component mounts
     refetchOnWindowFocus: false, // Don't auto-refetch to save API calls
+    refetchInterval: (query) => {
+      // If any file is processing, refetch every 5 seconds to show progress
+      const files = query.state.data || [];
+      const hasProcessing = files.some(f => f.status === 'processing');
+      return hasProcessing ? 5000 : false;
+    },
   });
 }
 

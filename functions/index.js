@@ -219,11 +219,33 @@ app.post('/api/upload', async (req, res) => {
 });
 
 /**
+ * Helper function to update processing progress
+ */
+async function updateProgress(fileId, step, message, progress = 0) {
+  try {
+    if (!storage) return;
+    const bucket = storage.bucket(BUCKET_NAME);
+    const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+    if (fileDoc) {
+      fileDoc.processingStep = step;
+      fileDoc.processingMessage = message;
+      fileDoc.processingProgress = progress;
+      fileDoc.processingUpdatedAt = new Date().toISOString();
+      await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
+      console.log(`[PROCESS] Progress: ${step} - ${message} (${progress}%)`);
+    }
+  } catch (error) {
+    console.error(`[PROCESS] Failed to update progress:`, error.message);
+  }
+}
+
+/**
  * Process uploaded file (Excel or PDF)
  */
 async function processFile(fileId, storagePath, filename) {
   try {
     console.log(`[PROCESS] Starting processing for fileId: ${fileId}, filename: ${filename}`);
+    await updateProgress(fileId, 'starting', 'Initializing file processing...', 0);
     
     if (!storage) {
       throw new Error('Storage not initialized. Check GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable.');
@@ -233,6 +255,7 @@ async function processFile(fileId, storagePath, filename) {
     const file = bucket.file(storagePath);
     
     // Download file
+    await updateProgress(fileId, 'downloading', 'Downloading file from storage...', 10);
     let fileBuffer = await file.download();
     fileBuffer = fileBuffer[0]; // Get the buffer from the array
     console.log(`[PROCESS] Downloaded file, size: ${fileBuffer.length} bytes`);
@@ -241,6 +264,7 @@ async function processFile(fileId, storagePath, filename) {
     
     // Check file type and parse accordingly
     if (filename.toLowerCase().endsWith('.pdf')) {
+      await updateProgress(fileId, 'parsing', 'Parsing PDF file...', 20);
       console.log(`[PROCESS] Parsing PDF file`);
       // Parse PDF
       const pdfData = await pdfParse(fileBuffer);
@@ -248,6 +272,7 @@ async function processFile(fileId, storagePath, filename) {
       // Clear buffer to free memory
       fileBuffer = null;
     } else {
+      await updateProgress(fileId, 'parsing', 'Reading Excel file structure...', 20);
       console.log(`[PROCESS] Parsing Excel file`);
       // Parse Excel
       // Excel structure (per user requirements):
@@ -299,6 +324,7 @@ async function processFile(fileId, storagePath, filename) {
       });
 
       console.log(`[PROCESS] Using row 3 as headers. Found ${Object.keys(data[0] || {}).length} columns, ${data.length} data rows`);
+      await updateProgress(fileId, 'parsing', `Found ${data.length} data rows, ${Object.keys(data[0] || {}).length} columns`, 40);
 
       // Warn if file is very large (memory concerns)
       if (data.length > 50000) {
@@ -309,9 +335,16 @@ async function processFile(fileId, storagePath, filename) {
     console.log(`[PROCESS] Parsed ${data.length} rows from file`);
 
     // Extract properties
+    await updateProgress(fileId, 'extracting', `Extracting properties from ${data.length} rows...`, 50);
     const properties = extractProperties(data);
     console.log(`[PROCESS] Extracted ${properties.length} properties`);
+    await updateProgress(fileId, 'extracting', `Extracted ${properties.length} properties successfully`, 60);
     
+    // Save properties to Cloud Storage
+    await updateProgress(fileId, 'saving', `Saving ${properties.length} properties to storage...`, 70);
+    await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
+    await updateProgress(fileId, 'saving', 'Properties saved successfully', 80);
+
     // Update file status
     const fileDoc = {
       id: fileId,
@@ -321,14 +354,15 @@ async function processFile(fileId, storagePath, filename) {
       processedAt: new Date().toISOString(),
       propertyCount: properties.length,
       storagePath,
+      processingStep: 'completed',
+      processingMessage: `Successfully processed ${properties.length} properties`,
+      processingProgress: 100,
     };
     await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
     console.log(`[PROCESS] Updated file metadata with status: completed, properties: ${properties.length}`);
 
-    // Save properties to Cloud Storage
-    await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
-
     // Get previous file for comparison
+    await updateProgress(fileId, 'comparing', 'Checking for previous files to compare...', 85);
     const fileList = await listFiles(bucket, 'metadata/files/');
     const fileIds = fileList
       .map(f => f.replace('metadata/files/', '').replace('.json', ''))
@@ -348,6 +382,7 @@ async function processFile(fileId, storagePath, filename) {
 
     // Generate comparison if previous file exists
     if (previousProperties.length > 0) {
+      await updateProgress(fileId, 'comparing', `Comparing with previous file (${previousProperties.length} properties)...`, 90);
       const prevFileDoc = await loadJSON(bucket, `metadata/files/${previousFileId}.json`);
       const comparison = generateComparison(
         properties, 
@@ -362,6 +397,9 @@ async function processFile(fileId, storagePath, filename) {
         previousFileId,
         generatedAt: new Date().toISOString(),
       });
+      await updateProgress(fileId, 'comparing', 'Comparison generated successfully', 95);
+    } else {
+      await updateProgress(fileId, 'comparing', 'No previous file found for comparison', 95);
     }
 
     console.log(`[PROCESS] Successfully processed ${properties.length} properties from ${filename}`);
