@@ -323,8 +323,10 @@ async function processFile(fileId, storagePath, filename) {
         blankrows: false, // Skip blank rows to save memory
       });
 
-      console.log(`[PROCESS] Using row 3 as headers. Found ${Object.keys(data[0] || {}).length} columns, ${data.length} data rows`);
-      await updateProgress(fileId, 'parsing', `Found ${data.length} data rows, ${Object.keys(data[0] || {}).length} columns`, 40);
+      const headers = Object.keys(data[0] || {});
+      console.log(`[PROCESS] Using row 3 as headers. Found ${headers.length} columns, ${data.length} data rows`);
+      console.log(`[PROCESS] Column headers found:`, headers.slice(0, 10).join(', '), headers.length > 10 ? '...' : '');
+      await updateProgress(fileId, 'parsing', `Found ${data.length} data rows, ${headers.length} columns`, 40);
 
       // Warn if file is very large (memory concerns)
       if (data.length > 50000) {
@@ -435,7 +437,13 @@ async function processFile(fileId, storagePath, filename) {
  * Extract properties from Excel data
  */
 function extractProperties(data) {
+  if (!data || data.length === 0) {
+    console.log('[EXTRACT] No data to extract');
+    return [];
+  }
+  
   const headers = Object.keys(data[0] || {});
+  console.log(`[EXTRACT] Extracting from ${data.length} rows with headers:`, headers.join(', '));
   
   const mappings = {
     accountNumber: ['can', 'account', 'account number', 'account_number', 'acct', 'acct no'],
@@ -450,30 +458,82 @@ function extractProperties(data) {
   const columnMap = {};
   headers.forEach(header => {
     const lowerHeader = header.toLowerCase().trim();
+    // Remove any special characters and normalize
+    const normalizedHeader = lowerHeader.replace(/[^a-z0-9]/g, '');
+    
     Object.entries(mappings).forEach(([key, aliases]) => {
-      if (aliases.some(alias => lowerHeader.includes(alias))) {
+      // Try exact match first
+      if (lowerHeader === aliases[0] || normalizedHeader === aliases[0].replace(/[^a-z0-9]/g, '')) {
         columnMap[key] = header;
+        console.log(`[EXTRACT] Matched "${header}" → ${key} (exact match)`);
+        return;
+      }
+      // Try includes match
+      if (aliases.some(alias => {
+        const normalizedAlias = alias.replace(/[^a-z0-9]/g, '');
+        return lowerHeader.includes(alias) || normalizedHeader.includes(normalizedAlias);
+      })) {
+        if (!columnMap[key]) { // Only set if not already matched
+          columnMap[key] = header;
+          console.log(`[EXTRACT] Matched "${header}" → ${key} (partial match)`);
+        }
       }
     });
   });
+  
+  console.log(`[EXTRACT] Column mapping result:`, columnMap);
 
-  return data.map((row, index) => {
+  const properties = data.map((row, index) => {
     const getValue = (key) => {
       const col = columnMap[key];
-      return col ? (row[col] || '').toString().trim() : '';
+      if (!col) return '';
+      const value = row[col];
+      if (value === undefined || value === null) return '';
+      return value.toString().trim();
     };
+
+    const accountNumber = getValue('accountNumber');
+    const propertyAddress = getValue('propertyAddress');
+    const status = getValue('status');
+    const totalAmountDue = getValue('totalAmountDue');
+    
+    // Log first few rows for debugging
+    if (index < 3) {
+      console.log(`[EXTRACT] Row ${index}:`, {
+        accountNumber,
+        propertyAddress,
+        status,
+        totalAmountDue,
+        rawRow: Object.keys(row).slice(0, 5).map(k => `${k}: ${row[k]}`).join(', ')
+      });
+    }
 
     return {
       id: `${Date.now()}_${index}`,
-      accountNumber: getValue('accountNumber') || `UNKNOWN_${index}`,
+      accountNumber: accountNumber || `UNKNOWN_${index}`,
       ownerName: getValue('ownerName') || '',
-      propertyAddress: getValue('propertyAddress') || '',
+      propertyAddress: propertyAddress || '',
       mailingAddress: getValue('mailingAddress') || '',
-      status: (getValue('status') || 'A').charAt(0).toUpperCase(),
-      totalAmountDue: parseFloat(getValue('totalAmountDue') || '0') || 0,
+      status: status ? status.charAt(0).toUpperCase() : 'A',
+      totalAmountDue: parseFloat(totalAmountDue || '0') || 0,
       totalPercentage: parseFloat(getValue('totalPercentage') || '0') || 0,
     };
-  }).filter(p => p.accountNumber && p.accountNumber !== `UNKNOWN_${data.length}`);
+  }).filter(p => {
+    // Only filter out rows with truly empty account numbers
+    return p.accountNumber && !p.accountNumber.startsWith('UNKNOWN_');
+  });
+  
+  console.log(`[EXTRACT] Extracted ${properties.length} properties (filtered from ${data.length} rows)`);
+  if (properties.length > 0) {
+    console.log(`[EXTRACT] Sample property:`, {
+      accountNumber: properties[0].accountNumber,
+      propertyAddress: properties[0].propertyAddress,
+      status: properties[0].status,
+      totalAmountDue: properties[0].totalAmountDue,
+    });
+  }
+  
+  return properties;
 }
 
 /**
