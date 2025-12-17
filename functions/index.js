@@ -313,33 +313,47 @@ async function processFile(fileId, storagePath, filename) {
         console.log(`[PROCESS] Row 2 descriptions found:`, Object.values(descriptions).filter(d => d).slice(0, 5).join(', '), '...');
       }
 
-      // Use row 3 as headers by setting range to start from row 3 (0-indexed row 2)
+      // EXPLICIT ROW 3 HEADER EXTRACTION
       // Excel structure:
       // Row 1: Title (Request Seq.:959740, BEXAR COUNTY) - SKIP
       // Row 2: Descriptions (what each column is for) - SKIP  
       // Row 3: Column headers (CAN, ADDRSTRING, LEGALSTATUS, etc.) - USE AS HEADERS
       // Row 4+: Data rows - PROCESS
       
-      // Use range: 2 to start reading from row 3 (0-indexed row 2)
-      // The first row in the range becomes the headers automatically
+      // Step 1: Manually extract headers from Row 3 (0-indexed row 2)
+      const headerRow = [];
+      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 2, c: col }); // Row 3 is 0-indexed row 2
+        const cell = worksheet[cellAddress];
+        headerRow.push(cell ? cell.v.toString().trim() : `__EMPTY_${col}`);
+      }
+      console.log(`[PROCESS] EXPLICIT Row 3 headers:`, headerRow.slice(0, 15).join(', '));
+      console.log(`[PROCESS] Looking for: CAN at E3, ADDRSTRING at H3, LEGALSTATUS at AE3`);
+      
+      // Step 2: Convert to JSON starting from Row 4 (0-indexed row 3), using explicit headers
       data = XLSX.utils.sheet_to_json(worksheet, {
         raw: false,
-        range: 2, // Start from row 3 (0-indexed row 2) - this row becomes headers
+        header: headerRow, // Use our explicit header row
+        range: 3, // Start reading data from row 4 (0-indexed row 3)
         defval: '', // Default value for empty cells
         blankrows: false, // Skip blank rows to save memory
       });
       
-      // Log the actual headers we're getting
+      // Log what we got
       if (data.length > 0) {
         const actualHeaders = Object.keys(data[0]);
-        console.log(`[PROCESS] ACTUAL headers from Row 3:`, actualHeaders.slice(0, 15).join(', '));
-        console.log(`[PROCESS] Looking for: CAN at E3, ADDRSTRING at H3, LEGALSTATUS at AE3`);
+        console.log(`[PROCESS] Data row keys:`, actualHeaders.slice(0, 15).join(', '));
         
         // Verify critical columns exist
-        const hasCAn = actualHeaders.some(h => h.toUpperCase() === 'CAN');
+        const hasCAN = actualHeaders.some(h => h.toUpperCase() === 'CAN');
         const hasAddr = actualHeaders.some(h => h.toUpperCase() === 'ADDRSTRING');
         const hasStatus = actualHeaders.some(h => h.toUpperCase() === 'LEGALSTATUS');
-        console.log(`[PROCESS] Column check: CAN=${hasCAn}, ADDRSTRING=${hasAddr}, LEGALSTATUS=${hasStatus}`);
+        console.log(`[PROCESS] Column check: CAN=${hasCAN}, ADDRSTRING=${hasAddr}, LEGALSTATUS=${hasStatus}`);
+        
+        // Log sample values for debugging
+        const sample = data[0];
+        console.log(`[PROCESS] Sample row - CAN: ${sample['CAN']}, LEGALSTATUS: ${sample['LEGALSTATUS']}, ADDRSTRING: ${(sample['ADDRSTRING'] || '').substring(0, 50)}...`);
       }
 
       const headers = Object.keys(data[0] || {});
