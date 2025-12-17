@@ -54,13 +54,15 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: '50mb' })); // Increase limit for file uploads
 
-// Start server if running directly (for local testing)
+// Start server - Railway runs this file directly
 const PORT = process.env.PORT || 8080;
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
+
+// Always start the server (Railway runs this file directly)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[SERVER] Server running on port ${PORT}`);
+  console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`[SERVER] Storage initialized: ${storage ? 'Yes' : 'No'}`);
+});
 
 const BUCKET_NAME = process.env.GCS_BUCKET || 'county-cad-tracker-files';
 
