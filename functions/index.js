@@ -224,6 +224,11 @@ app.post('/api/upload', async (req, res) => {
 async function processFile(fileId, storagePath, filename) {
   try {
     console.log(`[PROCESS] Starting processing for fileId: ${fileId}, filename: ${filename}`);
+    
+    if (!storage) {
+      throw new Error('Storage not initialized. Check GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable.');
+    }
+    
     const bucket = storage.bucket(BUCKET_NAME);
     const file = bucket.file(storagePath);
     
@@ -359,19 +364,28 @@ async function processFile(fileId, storagePath, filename) {
     console.log(`[PROCESS] Successfully processed ${properties.length} properties from ${filename}`);
   } catch (error) {
     console.error(`[PROCESS] Error processing file ${fileId} (${filename}):`, error);
+    console.error(`[PROCESS] Error stack:`, error.stack);
     
     // Update file status to error
     try {
-      const bucket = storage.bucket(BUCKET_NAME);
-      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
-      if (fileDoc) {
-        fileDoc.status = 'error';
-        fileDoc.errorMessage = error.message;
-        await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
-        console.log(`[PROCESS] Updated file status to error for ${fileId}`);
+      if (storage) {
+        const bucket = storage.bucket(BUCKET_NAME);
+        const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+        if (fileDoc) {
+          fileDoc.status = 'error';
+          fileDoc.errorMessage = error.message;
+          fileDoc.errorDetails = error.stack;
+          await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
+          console.log(`[PROCESS] Updated file status to error for ${fileId}: ${error.message}`);
+        } else {
+          console.error(`[PROCESS] Could not find file metadata for ${fileId}`);
+        }
+      } else {
+        console.error(`[PROCESS] Cannot update error status - storage not initialized`);
       }
     } catch (updateError) {
       console.error(`[PROCESS] Failed to update error status:`, updateError);
+      console.error(`[PROCESS] Update error stack:`, updateError.stack);
     }
   }
 }
