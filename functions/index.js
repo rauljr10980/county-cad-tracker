@@ -1,3 +1,6 @@
+// Version 2.0 - Fixed Excel Row 3 header parsing
+const CODE_VERSION = '2.0.0';
+
 // Load environment variables from .env file (for local development)
 // Only load if .env file exists (optional for production)
 if (require('fs').existsSync('.env')) {
@@ -64,6 +67,7 @@ app.use(express.json({ limit: '50mb' })); // Increase limit for file uploads
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
+    version: CODE_VERSION,
     timestamp: new Date().toISOString(),
     storage: storage ? 'initialized' : 'not initialized'
   });
