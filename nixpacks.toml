@@ -6,11 +6,7 @@ nixPkgs = ["nodejs-18_x", "npm"]
 
 [phases.install]
 cmds = [
-  "echo 'Installing dependencies from functions directory...'",
-  "cd functions",
-  "npm install",
-  "echo 'Dependencies installed successfully'",
-  "ls -la node_modules | head -5"
+  "cd functions && npm install && echo 'Dependencies installed successfully' && ls -la node_modules | head -5"
 ]
 
 [start]
