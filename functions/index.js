@@ -96,6 +96,11 @@ async function listFiles(bucket, prefix) {
  */
 app.post('/api/upload', async (req, res) => {
   try {
+    if (!storage) {
+      console.error('[UPLOAD] ERROR: Storage not initialized');
+      return res.status(500).json({ error: 'Storage not initialized. Check environment variables.' });
+    }
+    
     const { filename, fileData } = req.body;
     
     if (!filename || !fileData) {
