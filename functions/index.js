@@ -51,8 +51,23 @@ try {
 }
 
 const app = express();
-app.use(cors({ origin: true }));
+// CORS configuration - allow all origins for now
+app.use(cors({ 
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '50mb' })); // Increase limit for file uploads
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    storage: storage ? 'initialized' : 'not initialized'
+  });
+});
 
 // Start server - Railway runs this file directly
 const PORT = process.env.PORT || 8080;
