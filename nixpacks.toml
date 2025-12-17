@@ -1,9 +1,0 @@
-[phases.setup]
-nixPkgs = ["nodejs-18_x"]
-
-[phases.install]
-cmds = ["cd functions && npm install"]
-
-[start]
-cmd = "cd functions && node index.js"
-
