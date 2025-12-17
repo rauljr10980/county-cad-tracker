@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileSpreadsheet, Loader2 } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { Property, PropertyStatus } from '@/types/property';
@@ -10,10 +10,29 @@ export function PropertiesView() {
   const [statusFilter, setStatusFilter] = useState<PropertyStatus | undefined>();
   const [page, setPage] = useState(1);
 
-  // Fetch properties from API
+  // Fetch properties from API with safe error handling
   const { data, isLoading, error } = useProperties(page, 100);
-  const properties = data?.properties || [];
-  const total = data?.total || 0;
+  
+  // Safely extract properties with fallbacks
+  let properties: Property[] = [];
+  let total = 0;
+  
+  try {
+    if (data) {
+      // Handle both array and object response formats
+      if (Array.isArray(data)) {
+        properties = data;
+        total = data.length;
+      } else if (data.properties && Array.isArray(data.properties)) {
+        properties = data.properties;
+        total = data.total || data.properties.length;
+      }
+    }
+  } catch (e) {
+    console.error('[PropertiesView] Error parsing data:', e);
+  }
+  
+  console.log('[PropertiesView] Data:', { properties: properties.length, total, isLoading, error });
 
   return (
     <div className="p-6">
@@ -34,12 +53,18 @@ export function PropertiesView() {
           </p>
         </div>
       ) : error ? (
-        <div className="bg-destructive/10 rounded-lg p-12 text-center">
-          <FileSpreadsheet className="h-16 w-16 text-destructive mx-auto mb-4" />
+        <div className="bg-destructive/10 rounded-lg p-12 text-center border border-destructive/30">
+          <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2 text-destructive">Error Loading Properties</h3>
-          <p className="text-muted-foreground max-w-md mx-auto">
+          <p className="text-muted-foreground max-w-md mx-auto mb-4">
             {error instanceof Error ? error.message : 'Failed to load properties'}
           </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            Retry
+          </button>
         </div>
       ) : properties.length === 0 ? (
         <div className="bg-secondary/30 rounded-lg p-12 text-center">

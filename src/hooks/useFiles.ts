@@ -65,9 +65,23 @@ export function useDashboardStats() {
 export function useProperties(page = 1, limit = 100) {
   return useQuery<{ properties: Property[]; total: number; page: number; totalPages: number }>({
     queryKey: ['properties', page, limit],
-    queryFn: () => getProperties(page, limit),
+    queryFn: async () => {
+      try {
+        const result = await getProperties(page, limit);
+        console.log('[useProperties] API response:', result);
+        // Ensure we always return the expected format
+        if (Array.isArray(result)) {
+          return { properties: result, total: result.length, page: 1, totalPages: 1 };
+        }
+        return result;
+      } catch (error) {
+        console.error('[useProperties] Error:', error);
+        throw error;
+      }
+    },
     refetchOnMount: true,
     refetchOnWindowFocus: false,
+    retry: 2,
   });
 }
 
