@@ -544,17 +544,6 @@ function extractProperties(data) {
     const status = getValue('status');
     const totalAmountDue = getValue('totalAmountDue');
     
-    // Log first row only for debugging (reduce logging)
-    if (index === 0) {
-      console.log(`[EXTRACT] Sample row 0:`, {
-        accountNumber: finalAccountNumber || accountNumber,
-        propertyAddress,
-        status,
-        totalAmountDue,
-        availableColumns: Object.keys(row).slice(0, 10)
-      });
-    }
-
     // Use first non-empty column value as accountNumber if CAN not found
     let finalAccountNumber = accountNumber;
     if (!finalAccountNumber || finalAccountNumber === '') {
@@ -612,7 +601,17 @@ function extractProperties(data) {
         }
       }
     }
-
+    
+    // Log first row only for debugging (reduce logging)
+    if (index === 0) {
+      console.log(`[EXTRACT] Sample row 0 extracted:`, {
+        accountNumber: finalAccountNumber,
+        propertyAddress: finalPropertyAddress || propertyAddress,
+        status: finalStatus || status,
+        totalAmountDue,
+      });
+    }
+    
     return {
       id: `${Date.now()}_${index}`,
       accountNumber: finalAccountNumber || accountNumber || `ROW_${index}`,
