@@ -457,25 +457,31 @@ function extractProperties(data) {
 
   const columnMap = {};
   headers.forEach(header => {
-    const lowerHeader = header.toLowerCase().trim();
+    const trimmedHeader = header.trim();
+    const lowerHeader = trimmedHeader.toLowerCase();
     // Remove any special characters and normalize
     const normalizedHeader = lowerHeader.replace(/[^a-z0-9]/g, '');
     
     Object.entries(mappings).forEach(([key, aliases]) => {
-      // Try exact match first
-      if (lowerHeader === aliases[0] || normalizedHeader === aliases[0].replace(/[^a-z0-9]/g, '')) {
-        columnMap[key] = header;
-        console.log(`[EXTRACT] Matched "${header}" → ${key} (exact match)`);
-        return;
+      // Skip if already matched
+      if (columnMap[key]) return;
+      
+      // Try exact case-insensitive match first (handles "CAN", "can", "Can")
+      for (const alias of aliases) {
+        if (lowerHeader === alias || normalizedHeader === alias.replace(/[^a-z0-9]/g, '')) {
+          columnMap[key] = trimmedHeader; // Use original header name
+          console.log(`[EXTRACT] Matched "${trimmedHeader}" → ${key} (exact match)`);
+          return;
+        }
       }
-      // Try includes match
-      if (aliases.some(alias => {
+      
+      // Try includes match (handles "CAN Number", "Account CAN", etc.)
+      for (const alias of aliases) {
         const normalizedAlias = alias.replace(/[^a-z0-9]/g, '');
-        return lowerHeader.includes(alias) || normalizedHeader.includes(normalizedAlias);
-      })) {
-        if (!columnMap[key]) { // Only set if not already matched
-          columnMap[key] = header;
-          console.log(`[EXTRACT] Matched "${header}" → ${key} (partial match)`);
+        if (lowerHeader.includes(alias) || normalizedHeader.includes(normalizedAlias)) {
+          columnMap[key] = trimmedHeader;
+          console.log(`[EXTRACT] Matched "${trimmedHeader}" → ${key} (partial match)`);
+          return;
         }
       }
     });
