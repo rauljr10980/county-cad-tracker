@@ -233,7 +233,8 @@ async function processFile(fileId, storagePath, filename) {
     const file = bucket.file(storagePath);
     
     // Download file
-    const [fileBuffer] = await file.download();
+    let fileBuffer = await file.download();
+    fileBuffer = fileBuffer[0]; // Get the buffer from the array
     console.log(`[PROCESS] Downloaded file, size: ${fileBuffer.length} bytes`);
     
     let data = [];
@@ -244,6 +245,8 @@ async function processFile(fileId, storagePath, filename) {
       // Parse PDF
       const pdfData = await pdfParse(fileBuffer);
       data = parsePDFToJSON(pdfData.text);
+      // Clear buffer to free memory
+      fileBuffer = null;
     } else {
       console.log(`[PROCESS] Parsing Excel file`);
       // Parse Excel
@@ -262,7 +265,7 @@ async function processFile(fileId, storagePath, filename) {
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
 
-      // Clear buffer to free memory
+      // Clear buffer to free memory after parsing
       fileBuffer = null;
 
       // Excel structure:
