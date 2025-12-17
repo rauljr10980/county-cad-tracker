@@ -2,18 +2,22 @@ import { cn } from '@/lib/utils';
 import { PropertyStatus } from '@/types/property';
 
 interface StatusBadgeProps {
-  status: PropertyStatus;
+  status: PropertyStatus | string;
   size?: 'sm' | 'md';
 }
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; className: string }> = {
   J: { label: 'Judgment', className: 'status-judgment' },
   A: { label: 'Active', className: 'status-active' },
   P: { label: 'Pending', className: 'status-pending' },
 };
 
+// Default config for unknown statuses
+const defaultConfig = { label: 'Unknown', className: 'bg-gray-500/20 text-gray-400' };
+
 export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
-  const config = statusConfig[status];
+  // Safely get config with fallback for invalid/unknown statuses
+  const config = statusConfig[status] || defaultConfig;
   
   return (
     <span 
