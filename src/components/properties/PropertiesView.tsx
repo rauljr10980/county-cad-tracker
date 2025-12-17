@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter } from 'lucide-react';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { Property, PropertyStatus } from '@/types/property';
 import { useProperties } from '@/hooks/useFiles';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 100;
 
@@ -13,13 +14,15 @@ export function PropertiesView() {
   const [statusFilter, setStatusFilter] = useState<PropertyStatus | undefined>();
   const [page, setPage] = useState(1);
 
-  // Fetch properties from API with safe error handling
-  const { data, isLoading, error } = useProperties(page, ITEMS_PER_PAGE);
+  // Fetch properties from API with status filter
+  const { data, isLoading, error } = useProperties(page, ITEMS_PER_PAGE, statusFilter);
   
   // Safely extract properties with fallbacks
   let properties: Property[] = [];
   let total = 0;
+  let totalUnfiltered = 0;
   let totalPages = 1;
+  let statusCounts = { J: 0, A: 0, P: 0, other: 0 };
   
   try {
     if (data) {
@@ -27,28 +30,114 @@ export function PropertiesView() {
       if (Array.isArray(data)) {
         properties = data;
         total = data.length;
+        totalUnfiltered = data.length;
         totalPages = 1;
       } else if (data.properties && Array.isArray(data.properties)) {
         properties = data.properties;
         total = data.total || data.properties.length;
+        totalUnfiltered = data.totalUnfiltered || total;
         totalPages = data.totalPages || Math.ceil(total / ITEMS_PER_PAGE);
+        if (data.statusCounts) {
+          statusCounts = data.statusCounts;
+        }
       }
     }
   } catch (e) {
     console.error('[PropertiesView] Error parsing data:', e);
   }
   
-  const startItem = (page - 1) * ITEMS_PER_PAGE + 1;
+  const startItem = total > 0 ? (page - 1) * ITEMS_PER_PAGE + 1 : 0;
   const endItem = Math.min(page * ITEMS_PER_PAGE, total);
+  
+  // Handle status filter change - reset to page 1
+  const handleStatusFilter = (status: PropertyStatus | undefined) => {
+    setStatusFilter(status);
+    setPage(1);
+  };
 
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold">Property List</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Browse and filter tax-delinquent properties. Click on a property to view details.
-          {total > 0 && ` Showing ${properties.length} of ${total.toLocaleString()} properties.`}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Property List</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Browse and filter tax-delinquent properties. Click on a property to view details.
+              {totalUnfiltered > 0 && ` ${totalUnfiltered.toLocaleString()} total properties.`}
+            </p>
+          </div>
+        </div>
+        
+        {/* Status Filter Buttons */}
+        <div className="mt-4 flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 mr-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Filter by status:</span>
+          </div>
+          
+          <Button
+            variant={statusFilter === undefined ? "default" : "outline"}
+            size="sm"
+            onClick={() => handleStatusFilter(undefined)}
+            className="min-w-[80px]"
+          >
+            All
+            {totalUnfiltered > 0 && (
+              <span className="ml-1 text-xs opacity-70">({totalUnfiltered.toLocaleString()})</span>
+            )}
+          </Button>
+          
+          <Button
+            variant={statusFilter === 'P' ? "default" : "outline"}
+            size="sm"
+            onClick={() => handleStatusFilter('P')}
+            className={cn(
+              "min-w-[100px]",
+              statusFilter !== 'P' && "border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
+            )}
+          >
+            Pending
+            {statusCounts.P > 0 && (
+              <span className="ml-1 text-xs opacity-70">({statusCounts.P.toLocaleString()})</span>
+            )}
+          </Button>
+          
+          <Button
+            variant={statusFilter === 'A' ? "default" : "outline"}
+            size="sm"
+            onClick={() => handleStatusFilter('A')}
+            className={cn(
+              "min-w-[100px]",
+              statusFilter !== 'A' && "border-green-500/50 text-green-500 hover:bg-green-500/10"
+            )}
+          >
+            Active
+            {statusCounts.A > 0 && (
+              <span className="ml-1 text-xs opacity-70">({statusCounts.A.toLocaleString()})</span>
+            )}
+          </Button>
+          
+          <Button
+            variant={statusFilter === 'J' ? "default" : "outline"}
+            size="sm"
+            onClick={() => handleStatusFilter('J')}
+            className={cn(
+              "min-w-[100px]",
+              statusFilter !== 'J' && "border-red-500/50 text-red-500 hover:bg-red-500/10"
+            )}
+          >
+            Judgment
+            {statusCounts.J > 0 && (
+              <span className="ml-1 text-xs opacity-70">({statusCounts.J.toLocaleString()})</span>
+            )}
+          </Button>
+          
+          {statusFilter && (
+            <span className="text-sm text-muted-foreground ml-2">
+              Showing {total.toLocaleString()} {statusFilter === 'J' ? 'Judgment' : statusFilter === 'A' ? 'Active' : 'Pending'} properties
+            </span>
+          )}
+        </div>
       </div>
 
       {isLoading ? (

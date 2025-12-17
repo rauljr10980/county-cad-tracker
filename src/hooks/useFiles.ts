@@ -62,12 +62,22 @@ export function useDashboardStats() {
   });
 }
 
-export function useProperties(page = 1, limit = 100) {
-  return useQuery<{ properties: Property[]; total: number; page: number; totalPages: number }>({
-    queryKey: ['properties', page, limit],
+export interface PropertiesResponse {
+  properties: Property[];
+  total: number;
+  totalUnfiltered?: number;
+  statusCounts?: { J: number; A: number; P: number; other: number };
+  page: number;
+  totalPages: number;
+  filter?: string | null;
+}
+
+export function useProperties(page = 1, limit = 100, status?: string) {
+  return useQuery<PropertiesResponse>({
+    queryKey: ['properties', page, limit, status],
     queryFn: async () => {
       try {
-        const result = await getProperties(page, limit);
+        const result = await getProperties(page, limit, status);
         console.log('[useProperties] API response:', result);
         // Ensure we always return the expected format
         if (Array.isArray(result)) {

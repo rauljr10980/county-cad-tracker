@@ -940,22 +940,36 @@ app.get('/api/properties', async (req, res) => {
         console.log(`[PROPERTIES] Returning ${properties.length} properties`);
         
         // Log status breakdown
-        const statusCounts = {};
+        const statusCounts = { J: 0, A: 0, P: 0, other: 0 };
         properties.forEach(p => {
-          statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
+          if (p.status === 'J') statusCounts.J++;
+          else if (p.status === 'A') statusCounts.A++;
+          else if (p.status === 'P') statusCounts.P++;
+          else statusCounts.other++;
         });
         console.log(`[PROPERTIES] Status breakdown:`, statusCounts);
         
-        // Return paginated results (first 100 for performance)
+        // Apply status filter if provided
+        const statusFilter = req.query.status;
+        let filteredProperties = properties;
+        if (statusFilter && ['J', 'A', 'P'].includes(statusFilter.toUpperCase())) {
+          filteredProperties = properties.filter(p => p.status === statusFilter.toUpperCase());
+          console.log(`[PROPERTIES] Filtered by status ${statusFilter}: ${filteredProperties.length} properties`);
+        }
+        
+        // Return paginated results (100 per page for performance)
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 100;
         const start = (page - 1) * limit;
         
         return res.json({
-          properties: properties.slice(start, start + limit),
-          total: properties.length,
+          properties: filteredProperties.slice(start, start + limit),
+          total: filteredProperties.length,
+          totalUnfiltered: properties.length,
+          statusCounts,
           page,
-          totalPages: Math.ceil(properties.length / limit),
+          totalPages: Math.ceil(filteredProperties.length / limit),
+          filter: statusFilter ? statusFilter.toUpperCase() : null,
         });
       }
     }
