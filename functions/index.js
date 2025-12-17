@@ -21,13 +21,22 @@ if (process.env.GCP_PROJECT_ID) {
   storageOptions.projectId = process.env.GCP_PROJECT_ID;
 }
 
-// Method 1: Service account JSON from environment variable (for free hosting like Render)
+// Method 1: Service account JSON from environment variable (for free hosting like Render, Railway)
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
   try {
-    storageOptions.credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-    console.log('[STORAGE] Using service account credentials from environment variable');
+    // Ensure we have valid JSON before parsing
+    const credJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON.trim();
+    if (!credJson || credJson.length < 10) {
+      console.error('[STORAGE] GOOGLE_APPLICATION_CREDENTIALS_JSON is too short or empty');
+    } else {
+      storageOptions.credentials = JSON.parse(credJson);
+      console.log('[STORAGE] ✓ Using service account credentials from environment variable');
+      console.log('[STORAGE] Project ID from credentials:', storageOptions.credentials.project_id);
+    }
   } catch (error) {
-    console.error('[STORAGE] Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:', error.message);
+    console.error('[STORAGE] ERROR: Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON');
+    console.error('[STORAGE] Error details:', error.message);
+    console.error('[STORAGE] First 50 chars:', process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON?.substring(0, 50));
   }
 }
 // Method 2: Service account key file path (for local dev)
@@ -42,17 +51,20 @@ else {
 
 // Initialize storage with error handling
 let storage;
+let storageError = null;
 try {
   storage = new Storage(storageOptions);
-  console.log('[STORAGE] Storage initialized successfully');
+  console.log('[STORAGE] ✓ Storage client initialized successfully');
 } catch (error) {
-  console.error('[STORAGE] Failed to initialize storage:', error.message);
+  storageError = error.message;
+  console.error('[STORAGE] ✗ Failed to initialize storage:', error.message);
+  console.error('[STORAGE] This is OK - storage will be checked when needed');
   // Don't crash - storage will be checked when needed
 }
 
 const app = express();
 // CORS configuration - allow all origins for now
-app.use(cors({ 
+app.use(cors({
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -60,26 +72,61 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' })); // Increase limit for file uploads
 
+// Configuration
+const PORT = process.env.PORT || 8080;
+const BUCKET_NAME = process.env.GCS_BUCKET || 'county-cad-tracker-files';
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  const healthStatus = {
+    status: 'ok',
     timestamp: new Date().toISOString(),
-    storage: storage ? 'initialized' : 'not initialized'
-  });
+    server: {
+      port: PORT,
+      nodeVersion: process.version,
+      platform: process.platform,
+      uptime: process.uptime()
+    },
+    storage: {
+      initialized: storage ? true : false,
+      error: storageError || null,
+      bucket: BUCKET_NAME,
+      hasCredentials: !!(storageOptions.credentials || storageOptions.keyFilename)
+    },
+    environment: {
+      hasGcpProjectId: !!process.env.GCP_PROJECT_ID,
+      hasCredentialsJson: !!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON,
+      hasCredentialsFile: !!process.env.GOOGLE_APPLICATION_CREDENTIALS
+    }
+  };
+
+  res.json(healthStatus);
 });
 
 // Start server - Railway runs this file directly
-const PORT = process.env.PORT || 8080;
+
+console.log('='.repeat(60));
+console.log('[SERVER] Starting County CAD Tracker Backend');
+console.log('='.repeat(60));
+console.log('[ENV] PORT:', PORT);
+console.log('[ENV] NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('[ENV] GCS_BUCKET:', process.env.GCS_BUCKET || 'county-cad-tracker-files (default)');
+console.log('[ENV] GCP_PROJECT_ID:', process.env.GCP_PROJECT_ID ? 'Set' : 'Not set');
+console.log('[ENV] GOOGLE_APPLICATION_CREDENTIALS_JSON:', process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ? 'Set (' + process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON.length + ' chars)' : 'Not set');
+console.log('[ENV] GOOGLE_APPLICATION_CREDENTIALS:', process.env.GOOGLE_APPLICATION_CREDENTIALS || 'Not set');
+console.log('[STORAGE] Status:', storage ? '✓ Initialized' : '✗ Not initialized');
+if (storageError) {
+  console.log('[STORAGE] Error:', storageError);
+}
+console.log('='.repeat(60));
 
 // Always start the server (Railway runs this file directly)
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[SERVER] Server running on port ${PORT}`);
-  console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`[SERVER] Storage initialized: ${storage ? 'Yes' : 'No'}`);
+  console.log(`[SERVER] ✓ Server running on port ${PORT}`);
+  console.log(`[SERVER] ✓ Listening on 0.0.0.0:${PORT}`);
+  console.log(`[SERVER] ✓ Health check: http://localhost:${PORT}/api/health`);
+  console.log('='.repeat(60));
 });
-
-const BUCKET_NAME = process.env.GCS_BUCKET || 'county-cad-tracker-files';
 
 // Helper functions for Cloud Storage JSON operations
 async function saveJSON(bucket, path, data) {
