@@ -1,10 +1,12 @@
 [phases.setup]
-nixPkgs = ["nodejs-18_x"]
+nixPkgs = ["nodejs-18_x", "npm"]
 
 [phases.install]
 cmds = [
-  "npm install --production",
-  "echo 'Dependencies installed successfully'"
+  "echo 'Starting npm install...'",
+  "npm install",
+  "echo 'Dependencies installed successfully'",
+  "ls -la node_modules | head -5"
 ]
 
 [start]
