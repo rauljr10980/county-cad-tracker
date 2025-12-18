@@ -1,5 +1,5 @@
-// Version 2.0 - Fixed Excel Row 3 header parsing
-const CODE_VERSION = '2.0.0';
+// Version 2.1 - Fixed Excel Row 3 header parsing (forced redeploy)
+const CODE_VERSION = '2.1.0';
 
 // Load environment variables from .env file (for local development)
 // Only load if .env file exists (optional for production)
