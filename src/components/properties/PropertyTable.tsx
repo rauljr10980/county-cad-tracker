@@ -252,10 +252,10 @@ export function PropertyTable({
                         size="icon" 
                         className="h-7 w-7"
                         asChild
-                        title="View on Bexar County"
+                        title="View on Bexar County Tax Office"
                       >
                         <a 
-                          href={`https://bexar.trueautomation.com/clientdb/Property.aspx?prop_id=${property.accountNumber}`}
+                          href="https://bexar.acttax.com/act_webdev/bexar/index.jsp"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
