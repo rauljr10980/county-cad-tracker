@@ -123,3 +123,17 @@ export async function deleteFile(fileId: string) {
   return response.json();
 }
 
+/**
+ * Reprocess an existing file with current parsing logic
+ */
+export async function reprocessFile(fileId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/files/${fileId}/reprocess`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to reprocess file');
+  }
+  return response.json();
+}
+

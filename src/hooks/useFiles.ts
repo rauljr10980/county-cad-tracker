@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getFiles, uploadFile, deleteFile, getLatestComparison, getDashboardStats } from '@/lib/api';
+import { getFiles, uploadFile, deleteFile, reprocessFile, getLatestComparison, getDashboardStats } from '@/lib/api';
 import type { UploadedFile, ComparisonReport, DashboardStats } from '@/types/property';
 
 export function useFiles() {
@@ -39,6 +39,19 @@ export function useDeleteFile() {
 
   return useMutation({
     mutationFn: deleteFile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['files'] });
+      queryClient.invalidateQueries({ queryKey: ['comparisons'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+export function useReprocessFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: reprocessFile,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['files'] });
       queryClient.invalidateQueries({ queryKey: ['comparisons'] });

@@ -1,15 +1,22 @@
-import { Download, Trash2, FileSpreadsheet, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { Download, Trash2, RefreshCw, FileSpreadsheet, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useFiles, useDeleteFile } from '@/hooks/useFiles';
+import { useFiles, useDeleteFile, useReprocessFile } from '@/hooks/useFiles';
 
 export function FileHistory() {
   const { data: files = [], isLoading, error } = useFiles();
   const deleteMutation = useDeleteFile();
+  const reprocessMutation = useReprocessFile();
 
   const handleDelete = (fileId: string, filename: string) => {
     if (confirm(`Are you sure you want to delete "${filename}"?`)) {
       deleteMutation.mutate(fileId);
+    }
+  };
+
+  const handleReprocess = (fileId: string, filename: string) => {
+    if (confirm(`Reprocess "${filename}" with current parsing logic?`)) {
+      reprocessMutation.mutate(fileId);
     }
   };
 
@@ -101,6 +108,20 @@ export function FileHistory() {
                 </td>
                 <td>
                   <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      title="Reprocess file with current logic"
+                      onClick={() => handleReprocess(file.id, file.filename)}
+                      disabled={reprocessMutation.isPending}
+                    >
+                      {reprocessMutation.isPending && reprocessMutation.variables === file.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7">
                       <Download className="h-4 w-4" />
                     </Button>

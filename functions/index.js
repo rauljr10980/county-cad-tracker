@@ -692,6 +692,57 @@ app.delete('/api/files/:fileId', async (req, res) => {
 });
 
 /**
+ * Reprocess an existing file with current parsing logic
+ */
+app.post('/api/files/:fileId/reprocess', async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    console.log(`[REPROCESS] Starting reprocess for file: ${fileId}`);
+
+    if (!storage) {
+      console.error('[REPROCESS] ERROR: Storage not initialized');
+      return res.status(500).json({ error: 'Storage not initialized. Check environment variables.' });
+    }
+
+    const bucket = storage.bucket(BUCKET_NAME);
+
+    // Load file metadata to get storage path and filename
+    const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+    if (!fileDoc) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Check if original file exists
+    const originalFile = bucket.file(fileDoc.storagePath);
+    const [exists] = await originalFile.exists();
+    if (!exists) {
+      return res.status(404).json({
+        error: 'Original file not found in storage. File may have been deleted.'
+      });
+    }
+
+    console.log(`[REPROCESS] Found file: ${fileDoc.filename} at ${fileDoc.storagePath}`);
+
+    // Update status to processing
+    fileDoc.status = 'processing';
+    fileDoc.reprocessedAt = new Date().toISOString();
+    await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
+
+    // Trigger reprocessing (async)
+    processFile(fileId, fileDoc.storagePath, fileDoc.filename).catch(console.error);
+
+    res.json({
+      success: true,
+      fileId,
+      message: 'File reprocessing started',
+    });
+  } catch (error) {
+    console.error('[REPROCESS] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Get comparison report
  */
 app.get('/api/comparisons/:fileId', async (req, res) => {
