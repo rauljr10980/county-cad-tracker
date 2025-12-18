@@ -1,5 +1,5 @@
-// Version 2.2 - Fixed status mapping, removed 'st' alias that caused false matches
-const CODE_VERSION = '2.2.0';
+// Version 2.3 - Fixed LEGALSTATUS extraction: exact column match only, U for unknown
+const CODE_VERSION = '2.3.0';
 
 // Load environment variables from .env file (for local development)
 // Only load if .env file exists (optional for production)
@@ -669,19 +669,23 @@ function extractProperties(data) {
       }
     }
     
-    let finalStatus = status;
-    if (!finalStatus || finalStatus === '') {
-      for (const header of headers) {
-        const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-        if (normalizedHeader === 'LEGALSTATUS' || normalizedHeader.includes('LEGALSTATUS') ||
-            normalizedHeader === 'STATUS') {
-          finalStatus = (row[header] || '').toString().trim();
-          if (finalStatus && index === 0) {
-            console.log(`[EXTRACT] ✓ Found LEGALSTATUS column: "${header}" = ${finalStatus}`);
-          }
-          break;
+    // EXPLICITLY find LEGALSTATUS column - must be exact match
+    let finalStatus = '';
+    for (const header of headers) {
+      // Only match EXACTLY "LEGALSTATUS" - not SPECIAL_STATUS, PPSTATUS, BANKRUPT_STATUS
+      if (header.trim().toUpperCase() === 'LEGALSTATUS') {
+        finalStatus = (row[header] || '').toString().trim();
+        if (index === 0) {
+          console.log(`[EXTRACT] ✓ Found LEGALSTATUS column: "${header}" = "${finalStatus}" (blank means no legal status)`);
         }
+        break;
       }
+    }
+    
+    // If LEGALSTATUS not found, log warning once
+    if (index === 0 && !headers.some(h => h.trim().toUpperCase() === 'LEGALSTATUS')) {
+      console.log(`[EXTRACT] ⚠ WARNING: LEGALSTATUS column not found in headers!`);
+      console.log(`[EXTRACT] Available headers:`, headers.join(', '));
     }
     
     // Log first row only for debugging (reduce logging)
@@ -694,13 +698,24 @@ function extractProperties(data) {
       });
     }
     
+    // Determine final status: P, A, J, or blank (unknown)
+    // finalStatus comes ONLY from LEGALSTATUS column
+    let statusValue = '';
+    if (finalStatus) {
+      const firstChar = finalStatus.charAt(0).toUpperCase();
+      // Only accept P, A, or J - anything else is unknown
+      if (firstChar === 'P' || firstChar === 'A' || firstChar === 'J') {
+        statusValue = firstChar;
+      }
+    }
+    
     return {
       id: `${Date.now()}_${index}`,
       accountNumber: finalAccountNumber || accountNumber || `ROW_${index}`,
       ownerName: getValue('ownerName') || '',
       propertyAddress: finalPropertyAddress || propertyAddress || '',
       mailingAddress: getValue('mailingAddress') || '',
-      status: finalStatus ? finalStatus.charAt(0).toUpperCase() : (status ? status.charAt(0).toUpperCase() : 'A'),
+      status: statusValue || 'U', // U = Unknown (blank LEGALSTATUS)
       totalAmountDue: parseFloat(totalAmountDue || '0') || 0,
       totalPercentage: parseFloat(getValue('totalPercentage') || '0') || 0,
     };
@@ -1002,20 +1017,20 @@ app.get('/api/properties', async (req, res) => {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
         console.log(`[PROPERTIES] Returning ${properties.length} properties`);
         
-        // Log status breakdown
-        const statusCounts = { J: 0, A: 0, P: 0, other: 0 };
+        // Log status breakdown (U = Unknown/blank LEGALSTATUS)
+        const statusCounts = { J: 0, A: 0, P: 0, U: 0 };
         properties.forEach(p => {
           if (p.status === 'J') statusCounts.J++;
           else if (p.status === 'A') statusCounts.A++;
           else if (p.status === 'P') statusCounts.P++;
-          else statusCounts.other++;
+          else statusCounts.U++; // Unknown status (blank LEGALSTATUS)
         });
         console.log(`[PROPERTIES] Status breakdown:`, statusCounts);
         
-        // Apply status filter if provided
+        // Apply status filter if provided (J, A, P, or U for unknown)
         const statusFilter = req.query.status;
         let filteredProperties = properties;
-        if (statusFilter && ['J', 'A', 'P'].includes(statusFilter.toUpperCase())) {
+        if (statusFilter && ['J', 'A', 'P', 'U'].includes(statusFilter.toUpperCase())) {
           filteredProperties = properties.filter(p => p.status === statusFilter.toUpperCase());
           console.log(`[PROPERTIES] Filtered by status ${statusFilter}: ${filteredProperties.length} properties`);
         }
