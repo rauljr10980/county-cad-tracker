@@ -328,12 +328,12 @@ async function processFile(fileId, storagePath, filename) {
         console.log(`[PROCESS] Row 2 descriptions found:`, Object.values(descriptions).filter(d => d).slice(0, 5).join(', '), '...');
       }
 
-      // Use row 3 as headers (header: 2 means 0-indexed row 2, which is row 3 in Excel)
-      // This automatically skips rows 1-2 and uses row 3 as headers
+      // Use row 3 as headers (range: 2 means skip first 2 rows, row 3 becomes headers)
+      // This skips rows 1-2 and uses row 3 as headers
       // Data rows start from row 4 (0-indexed row 3)
       data = XLSX.utils.sheet_to_json(worksheet, {
         raw: false,
-        header: 2, // Use row 3 (0-indexed row 2) as headers
+        range: 2, // Skip first 2 rows (0-indexed), start from row 3 as headers
         defval: '', // Default value for empty cells
         blankrows: false, // Skip blank rows to save memory
       });
@@ -429,7 +429,9 @@ async function processFile(fileId, storagePath, filename) {
  */
 function extractProperties(data) {
   const headers = Object.keys(data[0] || {});
-  
+
+  console.log(`[EXTRACT] Found ${headers.length} column headers:`, headers.slice(0, 10).join(', '), '...');
+
   const mappings = {
     accountNumber: ['can', 'account', 'account number', 'account_number', 'acct', 'acct no'],
     ownerName: ['owner', 'owner name', 'owner_name', 'name'],
@@ -450,11 +452,22 @@ function extractProperties(data) {
     });
   });
 
-  return data.map((row, index) => {
+  console.log(`[EXTRACT] Column mapping:`, columnMap);
+  console.log(`[EXTRACT] Status column found:`, columnMap.status || 'NOT FOUND');
+
+  const properties = data.map((row, index) => {
     const getValue = (key) => {
       const col = columnMap[key];
       return col ? (row[col] || '').toString().trim() : '';
     };
+
+    const statusValue = getValue('status');
+    const finalStatus = (statusValue || 'A').charAt(0).toUpperCase();
+
+    // Log first 3 rows for debugging
+    if (index < 3) {
+      console.log(`[EXTRACT] Row ${index + 1} status: raw="${statusValue}", final="${finalStatus}"`);
+    }
 
     return {
       id: `${Date.now()}_${index}`,
@@ -462,11 +475,23 @@ function extractProperties(data) {
       ownerName: getValue('ownerName') || '',
       propertyAddress: getValue('propertyAddress') || '',
       mailingAddress: getValue('mailingAddress') || '',
-      status: (getValue('status') || 'A').charAt(0).toUpperCase(),
+      status: finalStatus,
       totalAmountDue: parseFloat(getValue('totalAmountDue') || '0') || 0,
       totalPercentage: parseFloat(getValue('totalPercentage') || '0') || 0,
     };
   }).filter(p => p.accountNumber && p.accountNumber !== `UNKNOWN_${data.length}`);
+
+  // Count statuses for debugging
+  const statusCounts = { P: 0, A: 0, J: 0, other: 0 };
+  properties.forEach(p => {
+    if (p.status === 'P') statusCounts.P++;
+    else if (p.status === 'A') statusCounts.A++;
+    else if (p.status === 'J') statusCounts.J++;
+    else statusCounts.other++;
+  });
+  console.log(`[EXTRACT] Status distribution: P=${statusCounts.P}, A=${statusCounts.A}, J=${statusCounts.J}, Other=${statusCounts.other}`);
+
+  return properties;
 }
 
 /**
