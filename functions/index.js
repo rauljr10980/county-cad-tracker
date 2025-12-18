@@ -309,33 +309,39 @@ async function processFile(fileId, storagePath, filename) {
       fileBuffer = null;
 
       // Excel structure:
-      // Row 1: (empty or title) - will be skipped
-      // Row 2: Descriptions (what each column is for) - will be skipped
-      // Row 3: Column headers/titles (actual column names) - used as headers
-      // Row 4+: Data rows - processed as property data
+      // Row 1: Title (e.g., "Request Seq.:959740", "BEXAR COUNTY")
+      // Row 2: Descriptions (e.g., "County Account Number...", "Legal case status: P — Pending...")
+      // Row 3: Column headers (REQUEST_SEQ, CAN, ADDRSTRING, LEGALSTATUS, etc.)
+      // Row 4+: Data rows (actual property data)
 
-      // Read row 2 for descriptions (for logging/debugging)
-      const descriptions = {};
-      Object.keys(worksheet).forEach(cell => {
-        const cellRef = XLSX.utils.decode_cell(cell);
-        if (cellRef.r === 1 && cell[0] !== '!') { // Row 2 (0-indexed row 1)
-          const colLetter = XLSX.utils.encode_col(cellRef.c);
-          const value = worksheet[cell]?.v || '';
-          if (value) descriptions[colLetter] = value;
-        }
-      });
-      if (Object.keys(descriptions).length > 0) {
-        console.log(`[PROCESS] Row 2 descriptions found:`, Object.values(descriptions).filter(d => d).slice(0, 5).join(', '), '...');
+      // Step 1: Manually extract headers from Row 3 (0-indexed row 2)
+      const range = XLSX.utils.decode_range(worksheet['!ref']);
+      const maxCol = range.e.c;
+      const headerRow = [];
+
+      for (let col = 0; col <= maxCol; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 2, c: col }); // Row 3 (0-indexed row 2)
+        const cell = worksheet[cellAddress];
+        headerRow.push(cell ? cell.v.toString().trim() : `__EMPTY_${col}`);
       }
 
-      // Use row 3 as headers (range: 2 means skip first 2 rows, row 3 becomes headers)
-      // This skips rows 1-2 and uses row 3 as headers
-      // Data rows start from row 4 (0-indexed row 3)
+      console.log(`[PROCESS] Extracted ${headerRow.length} headers from Row 3:`, headerRow.slice(0, 10).join(', '), '...');
+      console.log(`[PROCESS] Looking for LEGALSTATUS column...`);
+      const legalStatusIndex = headerRow.indexOf('LEGALSTATUS');
+      if (legalStatusIndex >= 0) {
+        const colLetter = XLSX.utils.encode_col(legalStatusIndex);
+        console.log(`[PROCESS] ✓ LEGALSTATUS found at column ${colLetter} (index ${legalStatusIndex})`);
+      } else {
+        console.log(`[PROCESS] ✗ LEGALSTATUS column NOT FOUND in headers!`);
+      }
+
+      // Step 2: Read data starting from Row 4 (0-indexed row 3) using explicit headers
       data = XLSX.utils.sheet_to_json(worksheet, {
-        raw: false,
-        range: 2, // Skip first 2 rows (0-indexed), start from row 3 as headers
-        defval: '', // Default value for empty cells
-        blankrows: false, // Skip blank rows to save memory
+        header: headerRow,  // Use our explicit headers from Row 3
+        range: 3,           // Start reading data from Row 4 (0-indexed row 3)
+        raw: false,         // Convert to strings
+        defval: '',         // Default value for empty cells
+        blankrows: false,   // Skip blank rows to save memory
       });
 
       console.log(`[PROCESS] Using row 3 as headers. Found ${Object.keys(data[0] || {}).length} columns, ${data.length} data rows`);
