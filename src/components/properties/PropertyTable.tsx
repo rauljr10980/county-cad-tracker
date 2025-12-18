@@ -95,32 +95,6 @@ export function PropertyTable({
 
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">
-      {/* Filters */}
-      <div className="p-4 border-b border-border flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Filter by status:</span>
-          <div className="flex gap-1">
-            {(['J', 'A', 'P'] as PropertyStatus[]).map((status) => (
-              <button
-                key={status}
-                onClick={() => onStatusFilterChange?.(statusFilter === status ? undefined : status)}
-                className={cn(
-                  'px-3 py-1 text-xs rounded-md transition-all',
-                  statusFilter === status 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                )}
-              >
-                {status === 'J' ? 'Judgment' : status === 'A' ? 'Active' : 'Pending'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <span className="text-sm text-muted-foreground">
-          {filteredProperties.length.toLocaleString()} properties
-        </span>
-      </div>
-
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="data-table">
