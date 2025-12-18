@@ -1,5 +1,5 @@
-// Version 2.1 - Fixed Excel Row 3 header parsing (forced redeploy)
-const CODE_VERSION = '2.1.0';
+// Version 2.2 - Fixed status mapping, removed 'st' alias that caused false matches
+const CODE_VERSION = '2.2.0';
 
 // Load environment variables from .env file (for local development)
 // Only load if .env file exists (optional for production)
@@ -71,6 +71,51 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     storage: storage ? 'initialized' : 'not initialized'
   });
+});
+
+// Debug endpoint to check last processed file's raw data
+app.get('/api/debug/sample', async (req, res) => {
+  try {
+    const bucket = storage.bucket(BUCKET_NAME);
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+    
+    if (fileIds.length === 0) {
+      return res.json({ error: 'No files found' });
+    }
+    
+    const latestFileId = fileIds[0];
+    const properties = await loadJSON(bucket, `data/properties/${latestFileId}.json`) || [];
+    
+    // Get sample of different status values
+    const samples = {
+      first5: properties.slice(0, 5).map(p => ({ accountNumber: p.accountNumber, status: p.status, ownerName: p.ownerName })),
+      statusCounts: { J: 0, A: 0, P: 0, other: 0, otherValues: [] },
+    };
+    
+    properties.forEach(p => {
+      if (p.status === 'J') samples.statusCounts.J++;
+      else if (p.status === 'A') samples.statusCounts.A++;
+      else if (p.status === 'P') samples.statusCounts.P++;
+      else {
+        samples.statusCounts.other++;
+        if (samples.statusCounts.otherValues.length < 10 && !samples.statusCounts.otherValues.includes(p.status)) {
+          samples.statusCounts.otherValues.push(p.status);
+        }
+      }
+    });
+    
+    res.json({
+      version: CODE_VERSION,
+      fileId: latestFileId,
+      totalProperties: properties.length,
+      samples
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Start server - Railway runs this file directly
@@ -487,9 +532,9 @@ function extractProperties(data) {
     ownerName: ['owner', 'owner name', 'owner_name', 'name'],
     propertyAddress: ['addrstring', 'property address', 'property_address', 'address', 'property'],
     mailingAddress: ['mailing address', 'mailing_address', 'mailing'],
-    status: ['legalstatus', 'status', 'st'],
-    totalAmountDue: ['total', 'amount due', 'amount_due', 'due', 'balance'],
-    totalPercentage: ['percentage', 'percent', 'pct', '%'],
+    status: ['legalstatus', 'legal_status', 'legal status'],  // Removed 'st' and 'status' to avoid false matches
+    totalAmountDue: ['tot_percan', 'total', 'amount due', 'amount_due', 'due', 'balance', 'levy_balance'],
+    totalPercentage: ['percentage', 'percent', 'pct'],
   };
 
   const columnMap = {};
