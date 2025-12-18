@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Property, PropertyStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { updatePropertyFollowUp } from '@/lib/api';
 
 interface PropertyTableProps {
   properties: Property[];
@@ -27,6 +30,30 @@ export function PropertyTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<keyof Property>('totalAmountDue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [savingFollowUp, setSavingFollowUp] = useState<string | null>(null);
+  const [localFollowUps, setLocalFollowUps] = useState<Record<string, string>>({});
+
+  const handleSetFollowUp = async (property: Property, date: Date | undefined) => {
+    if (!date) return;
+    
+    setSavingFollowUp(property.id);
+    try {
+      await updatePropertyFollowUp(property.id, date.toISOString());
+      setLocalFollowUps(prev => ({ ...prev, [property.id]: date.toISOString() }));
+      toast({
+        title: "Follow-up Date Set",
+        description: `Set follow-up for ${property.accountNumber} on ${format(date, 'MMM d, yyyy')}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save follow-up date",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingFollowUp(null);
+    }
+  };
 
   const filteredProperties = statusFilter 
     ? properties.filter(p => p.status === statusFilter)
@@ -132,7 +159,8 @@ export function PropertyTable({
           </thead>
           <tbody>
             {paginatedProperties.map((property) => {
-              const followUp = formatFollowUp(property.lastFollowUp);
+              const followUpDate = localFollowUps[property.id] || property.lastFollowUp;
+              const followUp = formatFollowUp(followUpDate);
               
               return (
                 <tr 
@@ -165,16 +193,39 @@ export function PropertyTable({
                     {property.marketValue ? formatCurrency(property.marketValue) : '—'}
                   </td>
                   <td>
-                    {followUp ? (
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm" title={followUp.relative}>
-                          {followUp.formatted}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">—</span>
-                    )}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button 
+                          className={cn(
+                            "flex items-center gap-1.5 px-2 py-1 rounded hover:bg-secondary transition-colors",
+                            savingFollowUp === property.id && "opacity-50 pointer-events-none"
+                          )}
+                          title="Click to set follow-up date"
+                        >
+                          {followUp ? (
+                            <>
+                              <Calendar className="h-3 w-3 text-primary" />
+                              <span className="text-sm" title={followUp.relative}>
+                                {followUp.formatted}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <CalendarPlus className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-muted-foreground text-sm">Set date</span>
+                            </>
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={followUpDate ? new Date(followUpDate) : undefined}
+                          onSelect={(date) => handleSetFollowUp(property, date)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </td>
                   <td>
                     <div className="flex items-center gap-1">

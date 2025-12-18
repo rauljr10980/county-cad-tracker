@@ -138,3 +138,20 @@ export async function getProperties(page = 1, limit = 100, status?: string) {
   return response.json();
 }
 
+/**
+ * Update property follow-up date
+ */
+export async function updatePropertyFollowUp(propertyId: string, followUpDate: string) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/followup`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ followUpDate }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update follow-up date');
+  }
+  return response.json();
+}
+
