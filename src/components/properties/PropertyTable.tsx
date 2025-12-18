@@ -112,7 +112,7 @@ export function PropertyTable({
     try {
       const parsed = new Date(date);
       return {
-        formatted: format(parsed, 'MMM d'),
+        formatted: format(parsed, 'MMM d, yyyy'), // Include year
         relative: formatDistanceToNow(parsed, { addSuffix: true }),
       };
     } catch {
