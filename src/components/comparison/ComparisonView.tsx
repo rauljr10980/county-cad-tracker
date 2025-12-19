@@ -25,22 +25,38 @@ export function ComparisonView() {
   const handleRegenerateComparison = async () => {
     setIsRegenerating(true);
     try {
+      console.log('[COMPARISON] Starting comparison generation...');
+      
       // Call the generate endpoint directly
-      await generateComparison();
+      const result = await generateComparison();
+      console.log('[COMPARISON] Generation result:', result);
+      
+      // Wait a moment for the file to be saved
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Invalidate and refetch
       await queryClient.invalidateQueries({ queryKey: ['comparisons', 'latest'] });
-      await refetch();
+      const refetchResult = await refetch();
+      console.log('[COMPARISON] Refetch result:', refetchResult);
       
-      toast({
-        title: "Comparison Generated",
-        description: "Comparison report has been generated successfully",
-      });
+      if (refetchResult.data) {
+        toast({
+          title: "Comparison Generated",
+          description: "Comparison report has been generated successfully",
+        });
+      } else {
+        toast({
+          title: "Warning",
+          description: "Comparison generated but not found. Please refresh the page.",
+          variant: "default",
+        });
+      }
     } catch (err: any) {
-      console.error('Failed to regenerate comparison:', err);
+      console.error('[COMPARISON] Failed to regenerate comparison:', err);
+      const errorMessage = err?.message || err?.error || "Failed to generate comparison";
       toast({
         title: "Error",
-        description: err.message || "Failed to generate comparison",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

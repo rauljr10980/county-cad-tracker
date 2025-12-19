@@ -993,29 +993,38 @@ app.post('/api/comparisons/generate', async (req, res) => {
     
     // Find the two most recent completed files
     const metadataList = await listFiles(bucket, 'metadata/files/');
+    console.log(`[COMPARISONS] Found ${metadataList.length} metadata files`);
+    
     const fileIds = metadataList
       .map(f => f.replace('metadata/files/', '').replace('.json', ''))
       .sort((a, b) => parseInt(b) - parseInt(a));
+    
+    console.log(`[COMPARISONS] File IDs (sorted):`, fileIds.slice(0, 5));
     
     let currentFileId = null;
     let previousFileId = null;
     
     for (const fileId of fileIds) {
       const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      console.log(`[COMPARISONS] Checking file ${fileId}: status=${fileDoc?.status}`);
       if (fileDoc && fileDoc.status === 'completed') {
         if (!currentFileId) {
           currentFileId = fileId;
+          console.log(`[COMPARISONS] Set current file: ${currentFileId}`);
         } else if (!previousFileId) {
           previousFileId = fileId;
+          console.log(`[COMPARISONS] Set previous file: ${previousFileId}`);
           break;
         }
       }
     }
     
     if (!currentFileId || !previousFileId) {
+      console.log(`[COMPARISONS] Missing files - current: ${currentFileId}, previous: ${previousFileId}`);
       return res.status(400).json({ 
         error: 'Need at least two completed files to generate comparison',
-        found: { current: !!currentFileId, previous: !!previousFileId }
+        found: { current: !!currentFileId, previous: !!previousFileId },
+        totalFiles: fileIds.length
       });
     }
     
@@ -1024,17 +1033,22 @@ app.post('/api/comparisons/generate', async (req, res) => {
     const currentProperties = await loadJSON(bucket, `data/properties/${currentFileId}.json`) || [];
     const previousProperties = await loadJSON(bucket, `data/properties/${previousFileId}.json`) || [];
     
+    console.log(`[COMPARISONS] Loaded properties - current: ${currentProperties.length}, previous: ${previousProperties.length}`);
+    
     if (currentProperties.length === 0 || previousProperties.length === 0) {
       return res.status(400).json({ 
         error: 'One or both files have no properties',
         currentCount: currentProperties.length,
-        previousCount: previousProperties.length
+        previousCount: previousProperties.length,
+        currentFileId,
+        previousFileId
       });
     }
     
     const currentFileDoc = await loadJSON(bucket, `metadata/files/${currentFileId}.json`);
     const previousFileDoc = await loadJSON(bucket, `metadata/files/${previousFileId}.json`);
     
+    console.log(`[COMPARISONS] Calling generateComparison function...`);
     const comparison = generateComparison(
       currentProperties,
       previousProperties,
@@ -1042,14 +1056,31 @@ app.post('/api/comparisons/generate', async (req, res) => {
       previousFileDoc?.filename || previousFileId
     );
     
-    await saveJSON(bucket, `data/comparisons/${currentFileId}.json`, {
+    console.log(`[COMPARISONS] Comparison generated:`, {
+      newProperties: comparison.summary.newProperties,
+      removedProperties: comparison.summary.removedProperties,
+      statusChanges: comparison.summary.statusChanges,
+    });
+    
+    const comparisonPath = `data/comparisons/${currentFileId}.json`;
+    console.log(`[COMPARISONS] Saving comparison to: ${comparisonPath}`);
+    await saveJSON(bucket, comparisonPath, {
       ...comparison,
       currentFileId,
       previousFileId,
       generatedAt: new Date().toISOString(),
     });
     
-    console.log(`[COMPARISONS] Comparison generated successfully: ${comparison.summary.statusChanges} status changes`);
+    console.log(`[COMPARISONS] Comparison saved successfully`);
+    
+    // Verify it was saved
+    const savedComparison = await loadJSON(bucket, comparisonPath);
+    if (!savedComparison) {
+      console.error(`[COMPARISONS] ERROR: Comparison was not saved properly!`);
+      return res.status(500).json({ error: 'Failed to save comparison file' });
+    }
+    
+    console.log(`[COMPARISONS] Comparison verified and returning to client`);
     res.json({
       success: true,
       ...comparison,
@@ -1059,7 +1090,11 @@ app.post('/api/comparisons/generate', async (req, res) => {
     });
   } catch (error) {
     console.error('[COMPARISONS] Error generating comparison:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[COMPARISONS] Error stack:', error.stack);
+    res.status(500).json({ 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
