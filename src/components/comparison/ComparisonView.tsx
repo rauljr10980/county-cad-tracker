@@ -1,20 +1,37 @@
 import { useState } from 'react';
-import { ArrowRightLeft, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { ArrowRightLeft, TrendingUp, TrendingDown, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 import { StatusBadge, StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyTable } from '@/components/properties/PropertyTable';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
 import { useLatestComparison } from '@/hooks/useFiles';
 import { Property, PropertyStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useQueryClient } from '@tanstack/react-query';
 
 type ViewMode = 'summary' | 'new' | 'removed' | 'changed';
 
 export function ComparisonView() {
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<ViewMode>('summary');
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [transitionFilter, setTransitionFilter] = useState<{ from: PropertyStatus; to: PropertyStatus } | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
-  const { data: report, isLoading, error } = useLatestComparison();
+  const { data: report, isLoading, error, refetch } = useLatestComparison();
+
+  const handleRegenerateComparison = async () => {
+    setIsRegenerating(true);
+    try {
+      // Invalidate and refetch to trigger backend auto-generation
+      await queryClient.invalidateQueries({ queryKey: ['comparisons', 'latest'] });
+      await refetch();
+    } catch (err) {
+      console.error('Failed to regenerate comparison:', err);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -45,8 +62,38 @@ export function ComparisonView() {
           <ArrowRightLeft className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Comparison Available</h3>
           <p className="text-muted-foreground mb-4">
-            Upload at least two files to generate a comparison report.
+            {isLoading ? (
+              <>
+                <Loader2 className="h-6 w-6 text-primary mx-auto mb-2 animate-spin" />
+                <span>Generating comparison...</span>
+              </>
+            ) : (
+              <>
+                Upload at least two files to generate a comparison report.
+                <br />
+                <span className="text-sm">If you've already uploaded files, click below to generate the comparison.</span>
+              </>
+            )}
           </p>
+          {!isLoading && (
+            <Button
+              onClick={handleRegenerateComparison}
+              disabled={isRegenerating}
+              className="mt-4"
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Generate Comparison
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
     );
