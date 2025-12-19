@@ -62,17 +62,15 @@ export function ComparisonView() {
           description: "Comparison report has been generated successfully",
         });
       } else {
-        // If refetch didn't work, try using the result directly
+        // If refetch didn't work, use the result directly
         console.log('[COMPARISON] Refetch failed, using generation result directly');
-        queryClient.setQueryData(['comparisons', 'latest'], result);
+        // Remove 'success' field if present (it's not part of ComparisonReport type)
+        const { success, ...comparisonData } = result;
+        queryClient.setQueryData(['comparisons', 'latest'], comparisonData);
         toast({
           title: "Comparison Generated",
-          description: "Comparison report generated. Refreshing view...",
+          description: "Comparison report generated successfully",
         });
-        // Force a re-render
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
       }
     } catch (err: any) {
       console.error('[COMPARISON] Failed to regenerate comparison:', err);
