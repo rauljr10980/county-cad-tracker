@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -20,12 +20,15 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
-  if (!property) return null;
+  // Initialize notes from property when modal opens or property changes
+  useEffect(() => {
+    if (property && isOpen) {
+      setNotes(property.notes || '');
+      setIsEditingNotes(false);
+    }
+  }, [property?.id, isOpen]);
 
-  // Initialize notes from property when modal opens
-  if (isOpen && notes === '' && property.notes !== notes) {
-    setNotes(property.notes || '');
-  }
+  if (!property) return null;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
