@@ -1035,6 +1035,26 @@ app.get('/api/properties', async (req, res) => {
           console.log(`[PROPERTIES] Filtered by status ${statusFilter}: ${filteredProperties.length} properties`);
         }
         
+        // Apply search filter if provided
+        const search = req.query.search;
+        if (search && search.trim()) {
+          const lowerSearch = search.toLowerCase().trim();
+          filteredProperties = filteredProperties.filter(p => {
+            const accountNumber = (p.accountNumber || '').toLowerCase();
+            const ownerName = (p.ownerName || '').toLowerCase();
+            const propertyAddress = (p.propertyAddress || '').toLowerCase();
+            const notes = (p.notes || '').toLowerCase();
+            const phoneNumbers = (p.phoneNumbers || []).join(' ').toLowerCase();
+            
+            return accountNumber.includes(lowerSearch) ||
+                   ownerName.includes(lowerSearch) ||
+                   propertyAddress.includes(lowerSearch) ||
+                   notes.includes(lowerSearch) ||
+                   phoneNumbers.includes(lowerSearch);
+          });
+          console.log(`[PROPERTIES] Filtered by search "${search}": ${filteredProperties.length} properties`);
+        }
+        
         // Return paginated results (100 per page for performance)
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 100;

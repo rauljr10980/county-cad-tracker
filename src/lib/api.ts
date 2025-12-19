@@ -128,10 +128,13 @@ export async function deleteFile(fileId: string) {
 /**
  * Get properties from latest completed file
  */
-export async function getProperties(page = 1, limit = 100, status?: string) {
+export async function getProperties(page = 1, limit = 100, status?: string, search?: string) {
   let url = `${API_BASE_URL}/api/properties?page=${page}&limit=${limit}`;
   if (status) {
     url += `&status=${status}`;
+  }
+  if (search && search.trim()) {
+    url += `&search=${encodeURIComponent(search.trim())}`;
   }
   const response = await fetch(url);
   if (!response.ok) {

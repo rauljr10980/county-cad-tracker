@@ -72,12 +72,12 @@ export interface PropertiesResponse {
   filter?: string | null;
 }
 
-export function useProperties(page = 1, limit = 100, status?: string) {
+export function useProperties(page = 1, limit = 100, status?: string, search?: string) {
   return useQuery<PropertiesResponse>({
-    queryKey: ['properties', page, limit, status],
+    queryKey: ['properties', page, limit, status, search],
     queryFn: async () => {
       try {
-        const result = await getProperties(page, limit, status);
+        const result = await getProperties(page, limit, status, search);
         console.log('[useProperties] API response:', result);
         // Ensure we always return the expected format
         if (Array.isArray(result)) {

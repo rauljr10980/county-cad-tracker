@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X } from 'lucide-react';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { Property, PropertyStatus } from '@/types/property';
 import { useProperties } from '@/hooks/useFiles';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 100;
@@ -13,9 +14,20 @@ export function PropertiesView() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [statusFilter, setStatusFilter] = useState<PropertyStatus | undefined>();
   const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  
+  // Update debounced search after delay
+  useMemo(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setPage(1); // Reset to page 1 when search changes
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  // Fetch properties from API with status filter
-  const { data, isLoading, error } = useProperties(page, ITEMS_PER_PAGE, statusFilter);
+  // Fetch properties from API with status filter and search
+  const { data, isLoading, error } = useProperties(page, ITEMS_PER_PAGE, statusFilter, debouncedSearchQuery);
   
   // Safely extract properties with fallbacks
   let properties: Property[] = [];
@@ -54,11 +66,18 @@ export function PropertiesView() {
     setStatusFilter(status);
     setPage(1);
   };
+  
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setDebouncedSearchQuery('');
+    setPage(1);
+  };
 
   return (
     <div className="p-6">
       <div className="mb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl font-semibold">Property List</h2>
             <p className="text-sm text-muted-foreground mt-1">
@@ -66,6 +85,34 @@ export function PropertiesView() {
               {totalUnfiltered > 0 && ` ${totalUnfiltered.toLocaleString()} total properties.`}
             </p>
           </div>
+        </div>
+        
+        {/* Search Bar */}
+        <div className="mb-4">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search by account number, owner name, address, notes, or phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-10"
+            />
+            {searchQuery && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                title="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {debouncedSearchQuery && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Searching for "{debouncedSearchQuery}"... {total > 0 && `Found ${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
+            </p>
+          )}
         </div>
         
         {/* Status Filter Buttons */}
