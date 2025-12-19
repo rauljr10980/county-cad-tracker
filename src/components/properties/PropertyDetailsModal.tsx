@@ -53,6 +53,29 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
     }).format(amount);
   };
 
+  // Parse property address to extract owner name and address
+  // Format: "OWNER NAME 123 STREET CITY, STATE ZIP"
+  // The middle number (not at start/end) separates owner name from address
+  const parsePropertyAddress = (address: string) => {
+    if (!address) return { ownerName: '', address: '' };
+    
+    // Find the first number that's in the middle (not at start, not at end)
+    // Look for pattern: word(s) + space + number + space + word(s)
+    const middleNumberMatch = address.match(/\s+(\d+)\s+/);
+    
+    if (middleNumberMatch) {
+      const middleNumberIndex = address.indexOf(middleNumberMatch[0]);
+      const ownerName = address.substring(0, middleNumberIndex).trim();
+      const addressPart = address.substring(middleNumberIndex + 1).trim(); // +1 to skip the space
+      return { ownerName, address: addressPart };
+    }
+    
+    // Fallback: if no middle number found, treat entire string as address
+    return { ownerName: '', address: address.trim() };
+  };
+
+  const { ownerName: parsedOwnerName, address: parsedAddress } = parsePropertyAddress(property.propertyAddress);
+
   const handleSaveNotes = async () => {
     setSavingNotes(true);
     try {
@@ -140,7 +163,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 <MapPin className="h-4 w-4 text-primary mt-1 shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Property Address</p>
-                  <p className="font-medium">{property.propertyAddress}</p>
+                  <p className="font-medium">{parsedAddress || property.propertyAddress}</p>
                 </div>
               </div>
               
@@ -156,7 +179,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 <Calendar className="h-4 w-4 text-primary mt-1 shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Owner</p>
-                  <p className="font-medium">{property.ownerName}</p>
+                  <p className="font-medium">{parsedOwnerName || property.ownerName}</p>
                   <p className="text-sm text-muted-foreground">{property.mailingAddress}</p>
                 </div>
               </div>
