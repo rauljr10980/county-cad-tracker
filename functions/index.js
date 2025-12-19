@@ -1,5 +1,5 @@
-// Version 2.4 - Added follow-up date picker for properties
-const CODE_VERSION = '2.4.0';
+// Version 2.5 - Added notes feature for properties
+const CODE_VERSION = '2.5.0';
 
 // Load environment variables from .env file (for local development)
 // Only load if .env file exists (optional for production)
@@ -1099,6 +1099,50 @@ app.put('/api/properties/:propertyId/followup', async (req, res) => {
     res.status(404).json({ error: 'Property not found' });
   } catch (error) {
     console.error('[FOLLOWUP] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Update property notes
+ */
+app.put('/api/properties/:propertyId/notes', async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { notes } = req.body;
+    
+    console.log(`[NOTES] Updating notes for property ${propertyId}`);
+    
+    const bucket = storage.bucket(BUCKET_NAME);
+    
+    // Find the file containing this property
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+    
+    for (const fileId of fileIds.slice(0, 5)) {
+      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      if (fileDoc && fileDoc.status === 'completed') {
+        const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
+        
+        // Find and update the property
+        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        if (propertyIndex !== -1) {
+          properties[propertyIndex].notes = notes || '';
+          
+          // Save updated properties
+          await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
+          
+          console.log(`[NOTES] Updated property ${propertyId} in file ${fileId}`);
+          return res.json({ success: true, propertyId, notes });
+        }
+      }
+    }
+    
+    res.status(404).json({ error: 'Property not found' });
+  } catch (error) {
+    console.error('[NOTES] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

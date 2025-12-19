@@ -155,3 +155,20 @@ export async function updatePropertyFollowUp(propertyId: string, followUpDate: s
   return response.json();
 }
 
+/**
+ * Update property notes
+ */
+export async function updatePropertyNotes(propertyId: string, notes: string) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/notes`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ notes }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update notes');
+  }
+  return response.json();
+}
+

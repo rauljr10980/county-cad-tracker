@@ -20,6 +20,7 @@ export interface Property {
   lastPaymentDate?: string;
   lastPaymentAmount?: number;
   lastFollowUp?: string;
+  notes?: string;
   paymentHistory?: PaymentRecord[];
   cadData?: CADData;
   isNew?: boolean;
