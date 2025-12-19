@@ -14,13 +14,18 @@ export function useFiles() {
 
 export function useUploadFile() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: uploadFile,
     onSuccess: () => {
+      // Invalidate immediately
       queryClient.invalidateQueries({ queryKey: ['files'] });
-      queryClient.invalidateQueries({ queryKey: ['comparisons'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+
+      // Delay comparison and dashboard refetch to allow backend processing
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['comparisons'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      }, 2000); // 2 second delay
     },
   });
 }
@@ -31,6 +36,9 @@ export function useLatestComparison() {
     queryFn: getLatestComparison,
     refetchOnMount: true,
     refetchOnWindowFocus: false, // Don't auto-refetch to save API calls
+    retry: 3, // Retry up to 3 times
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s
+    staleTime: 0, // Always consider data stale to refetch on mount
   });
 }
 
@@ -53,9 +61,14 @@ export function useReprocessFile() {
   return useMutation({
     mutationFn: reprocessFile,
     onSuccess: () => {
+      // Invalidate immediately
       queryClient.invalidateQueries({ queryKey: ['files'] });
-      queryClient.invalidateQueries({ queryKey: ['comparisons'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+
+      // Delay comparison and dashboard refetch to allow backend processing
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['comparisons'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      }, 2000); // 2 second delay
     },
   });
 }

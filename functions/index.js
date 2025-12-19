@@ -394,20 +394,33 @@ async function processFile(fileId, storagePath, filename) {
 
     // Generate comparison if previous file exists
     if (previousProperties.length > 0) {
+      console.log(`[PROCESS] Generating comparison with previous file: ${previousFileId}`);
       const prevFileDoc = await loadJSON(bucket, `metadata/files/${previousFileId}.json`);
       const comparison = generateComparison(
-        properties, 
-        previousProperties, 
-        filename, 
+        properties,
+        previousProperties,
+        filename,
         prevFileDoc?.filename || previousFileId
       );
-      
-      await saveJSON(bucket, `data/comparisons/${fileId}.json`, {
+
+      const comparisonData = {
         ...comparison,
         currentFileId: fileId,
         previousFileId,
         generatedAt: new Date().toISOString(),
+      };
+
+      console.log(`[PROCESS] Saving comparison to data/comparisons/${fileId}.json`);
+      console.log(`[PROCESS] Comparison summary:`, {
+        newProperties: comparisonData.summary.newProperties,
+        removedProperties: comparisonData.summary.removedProperties,
+        statusChanges: comparisonData.summary.statusChanges,
       });
+
+      await saveJSON(bucket, `data/comparisons/${fileId}.json`, comparisonData);
+      console.log(`[PROCESS] ✓ Comparison saved successfully`);
+    } else {
+      console.log(`[PROCESS] No previous file found, skipping comparison generation`);
     }
 
     console.log(`[PROCESS] Successfully processed ${properties.length} properties from ${filename}`);
@@ -767,10 +780,13 @@ app.get('/api/comparisons/:fileId', async (req, res) => {
  */
 app.get('/api/comparisons/latest', async (req, res) => {
   try {
+    console.log('[COMPARISON-LATEST] Fetching latest comparison');
     const bucket = storage.bucket(BUCKET_NAME);
     const fileList = await listFiles(bucket, 'data/comparisons/');
-    
+    console.log(`[COMPARISON-LATEST] Found ${fileList.length} comparison files`);
+
     if (fileList.length === 0) {
+      console.log('[COMPARISON-LATEST] No comparisons found');
       return res.status(404).json({ error: 'No comparisons found' });
     }
 
@@ -779,10 +795,27 @@ app.get('/api/comparisons/latest', async (req, res) => {
       .map(f => f.replace('data/comparisons/', '').replace('.json', ''))
       .sort((a, b) => parseInt(b) - parseInt(a));
 
-    const comparison = await loadJSON(bucket, `data/comparisons/${fileIds[0]}.json`);
+    const latestFileId = fileIds[0];
+    console.log(`[COMPARISON-LATEST] Latest comparison fileId: ${latestFileId}`);
+    console.log(`[COMPARISON-LATEST] Loading from: data/comparisons/${latestFileId}.json`);
+
+    const comparison = await loadJSON(bucket, `data/comparisons/${latestFileId}.json`);
+
+    if (!comparison) {
+      console.error(`[COMPARISON-LATEST] ERROR: Comparison file exists but loadJSON returned null`);
+      return res.status(404).json({ error: 'Comparison data not found' });
+    }
+
+    console.log(`[COMPARISON-LATEST] ✓ Successfully loaded comparison:`, {
+      currentFileId: comparison.currentFileId,
+      previousFileId: comparison.previousFileId,
+      newProperties: comparison.summary?.newProperties,
+      statusChanges: comparison.summary?.statusChanges,
+    });
+
     res.json(comparison);
   } catch (error) {
-    console.error('Get latest comparison error:', error);
+    console.error('[COMPARISON-LATEST] ERROR:', error);
     res.status(500).json({ error: error.message });
   }
 });
