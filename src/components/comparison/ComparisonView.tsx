@@ -31,8 +31,10 @@ export function ComparisonView() {
       const result = await generateComparison();
       console.log('[COMPARISON] Generation result:', result);
       
-      if (!result || !result.success) {
-        throw new Error('Comparison generation returned no data');
+      // Check if we have comparison data (it might not have 'success' field)
+      if (!result || (!result.summary && !result.currentFile)) {
+        console.error('[COMPARISON] Invalid result structure:', result);
+        throw new Error('Comparison generation returned invalid data structure');
       }
       
       // Wait a moment for the file to be saved to storage
@@ -65,12 +67,21 @@ export function ComparisonView() {
         // If refetch didn't work, use the result directly
         console.log('[COMPARISON] Refetch failed, using generation result directly');
         // Remove 'success' field if present (it's not part of ComparisonReport type)
-        const { success, ...comparisonData } = result;
-        queryClient.setQueryData(['comparisons', 'latest'], comparisonData);
-        toast({
-          title: "Comparison Generated",
-          description: "Comparison report generated successfully",
-        });
+        const comparisonData = result;
+        if (comparisonData && (comparisonData.summary || comparisonData.currentFile)) {
+          queryClient.setQueryData(['comparisons', 'latest'], comparisonData);
+          toast({
+            title: "Comparison Generated",
+            description: "Comparison report generated successfully",
+          });
+        } else {
+          console.error('[COMPARISON] Result data is invalid:', comparisonData);
+          toast({
+            title: "Warning",
+            description: "Comparison generated but data structure is invalid. Please refresh the page.",
+            variant: "default",
+          });
+        }
       }
     } catch (err: any) {
       console.error('[COMPARISON] Failed to regenerate comparison:', err);
