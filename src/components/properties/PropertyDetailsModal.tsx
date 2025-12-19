@@ -1,9 +1,13 @@
-import { X, ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp } from 'lucide-react';
+import { useState } from 'react';
+import { X, ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Property } from '@/types/property';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Textarea } from '@/components/ui/textarea';
+import { updatePropertyNotes } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 
 interface PropertyDetailsModalProps {
   property: Property | null;
@@ -12,7 +16,16 @@ interface PropertyDetailsModalProps {
 }
 
 export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDetailsModalProps) {
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+
   if (!property) return null;
+
+  // Initialize notes from property when modal opens
+  if (isOpen && notes === '' && property.notes !== notes) {
+    setNotes(property.notes || '');
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -20,6 +33,28 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       currency: 'USD',
       minimumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true);
+    try {
+      await updatePropertyNotes(property.id, notes);
+      toast({
+        title: "Notes Saved",
+        description: `Notes saved for ${property.accountNumber}`,
+      });
+      setIsEditingNotes(false);
+      // Update property object directly (will be refreshed on next load)
+      property.notes = notes;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save notes",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingNotes(false);
+    }
   };
 
   const paymentChartData = property.paymentHistory?.map(p => ({
@@ -197,6 +232,61 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             </div>
           )}
 
+          {/* Notes Section */}
+          <div className="bg-secondary/30 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <StickyNote className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Notes</span>
+              </div>
+              {!isEditingNotes && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditingNotes(true)}
+                  className="h-7"
+                >
+                  <Edit2 className="h-3 w-3 mr-1" />
+                  {notes ? 'Edit' : 'Add Notes'}
+                </Button>
+              )}
+            </div>
+            {isEditingNotes ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add your notes here..."
+                  className="min-h-[120px]"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsEditingNotes(false);
+                      setNotes(property.notes || '');
+                    }}
+                    disabled={savingNotes}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveNotes}
+                    disabled={savingNotes}
+                  >
+                    {savingNotes ? 'Saving...' : 'Save Notes'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground min-h-[60px] whitespace-pre-wrap">
+                {notes || 'No notes added yet. Click "Add Notes" to add notes for this property.'}
+              </div>
+            )}
+          </div>
+
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button variant="outline" onClick={onClose}>
@@ -204,7 +294,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             </Button>
             <Button asChild>
               <a 
-                href={`https://bexar.trueautomation.com/clientdb/Property.aspx?prop_id=${property.accountNumber}`}
+                href="https://bexar.acttax.com/act_webdev/bexar/index.jsp"
                 target="_blank"
                 rel="noopener noreferrer"
               >
