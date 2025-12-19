@@ -172,3 +172,20 @@ export async function updatePropertyNotes(propertyId: string, notes: string) {
   return response.json();
 }
 
+/**
+ * Update property phone numbers
+ */
+export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumbers: string[], ownerPhoneIndex?: number) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/phones`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ phoneNumbers, ownerPhoneIndex }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update phone numbers');
+  }
+  return response.json();
+}
+

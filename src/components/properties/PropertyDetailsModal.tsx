@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X, ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2 } from 'lucide-react';
+import { X, ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2, Phone, Star } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Property } from '@/types/property';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Textarea } from '@/components/ui/textarea';
-import { updatePropertyNotes } from '@/lib/api';
+import { Input } from '@/components/ui/input';
+import { updatePropertyNotes, updatePropertyPhoneNumbers } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
 interface PropertyDetailsModalProps {
@@ -19,12 +20,25 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [phoneNumbers, setPhoneNumbers] = useState<string[]>(['', '', '', '', '', '']);
+  const [ownerPhoneIndex, setOwnerPhoneIndex] = useState<number | undefined>(undefined);
+  const [savingPhones, setSavingPhones] = useState(false);
 
-  // Initialize notes from property when modal opens or property changes
+  // Initialize notes and phone numbers from property when modal opens or property changes
   useEffect(() => {
     if (property && isOpen) {
       setNotes(property.notes || '');
       setIsEditingNotes(false);
+      const phones = property.phoneNumbers || [];
+      setPhoneNumbers([
+        phones[0] || '',
+        phones[1] || '',
+        phones[2] || '',
+        phones[3] || '',
+        phones[4] || '',
+        phones[5] || '',
+      ]);
+      setOwnerPhoneIndex(property.ownerPhoneIndex);
     }
   }, [property?.id, isOpen]);
 
@@ -57,6 +71,36 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       });
     } finally {
       setSavingNotes(false);
+    }
+  };
+
+  const handleSavePhoneNumbers = async () => {
+    setSavingPhones(true);
+    try {
+      const filteredPhones = phoneNumbers.filter(p => p.trim() !== '');
+      await updatePropertyPhoneNumbers(property.id, filteredPhones, ownerPhoneIndex);
+      toast({
+        title: "Phone Numbers Saved",
+        description: `Phone numbers saved for ${property.accountNumber}`,
+      });
+      property.phoneNumbers = filteredPhones;
+      property.ownerPhoneIndex = ownerPhoneIndex;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save phone numbers",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPhones(false);
+    }
+  };
+
+  const handleToggleOwnerPhone = (index: number) => {
+    if (ownerPhoneIndex === index) {
+      setOwnerPhoneIndex(undefined);
+    } else {
+      setOwnerPhoneIndex(index);
     }
   };
 
@@ -234,6 +278,58 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               </div>
             </div>
           )}
+
+          {/* Phone Numbers Section */}
+          <div className="bg-secondary/30 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Phone className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Phone Numbers</span>
+            </div>
+            <div className="space-y-2">
+              {phoneNumbers.map((phone, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">
+                    Phone {index + 1}:
+                  </span>
+                  <Input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => {
+                      const newPhones = [...phoneNumbers];
+                      newPhones[index] = e.target.value;
+                      setPhoneNumbers(newPhones);
+                    }}
+                    placeholder="Enter phone number"
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "h-8 w-8 shrink-0",
+                      ownerPhoneIndex === index && "text-yellow-500"
+                    )}
+                    onClick={() => handleToggleOwnerPhone(index)}
+                    title={ownerPhoneIndex === index ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                  >
+                    <Star className={cn(
+                      "h-4 w-4",
+                      ownerPhoneIndex === index ? "fill-yellow-500" : "fill-none"
+                    )} />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  size="sm"
+                  onClick={handleSavePhoneNumbers}
+                  disabled={savingPhones}
+                >
+                  {savingPhones ? 'Saving...' : 'Save Phone Numbers'}
+                </Button>
+              </div>
+            </div>
+          </div>
 
           {/* Notes Section */}
           <div className="bg-secondary/30 rounded-lg p-4">

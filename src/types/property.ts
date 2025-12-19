@@ -21,6 +21,8 @@ export interface Property {
   lastPaymentAmount?: number;
   lastFollowUp?: string;
   notes?: string;
+  phoneNumbers?: string[];
+  ownerPhoneIndex?: number; // Index of which phone number is the owner's (0-5)
   paymentHistory?: PaymentRecord[];
   cadData?: CADData;
   isNew?: boolean;

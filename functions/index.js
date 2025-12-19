@@ -1148,6 +1148,51 @@ app.put('/api/properties/:propertyId/notes', async (req, res) => {
 });
 
 /**
+ * Update property phone numbers
+ */
+app.put('/api/properties/:propertyId/phones', async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { phoneNumbers, ownerPhoneIndex } = req.body;
+    
+    console.log(`[PHONES] Updating phone numbers for property ${propertyId}`);
+    
+    const bucket = storage.bucket(BUCKET_NAME);
+    
+    // Find the file containing this property
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+    
+    for (const fileId of fileIds.slice(0, 5)) {
+      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      if (fileDoc && fileDoc.status === 'completed') {
+        const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
+        
+        // Find and update the property
+        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        if (propertyIndex !== -1) {
+          properties[propertyIndex].phoneNumbers = phoneNumbers || [];
+          properties[propertyIndex].ownerPhoneIndex = ownerPhoneIndex;
+          
+          // Save updated properties
+          await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
+          
+          console.log(`[PHONES] Updated property ${propertyId} in file ${fileId}`);
+          return res.json({ success: true, propertyId, phoneNumbers, ownerPhoneIndex });
+        }
+      }
+    }
+    
+    res.status(404).json({ error: 'Property not found' });
+  } catch (error) {
+    console.error('[PHONES] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Get dashboard stats
  */
 app.get('/api/dashboard', async (req, res) => {
