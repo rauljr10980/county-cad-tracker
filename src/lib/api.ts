@@ -102,6 +102,23 @@ export async function getLatestComparison() {
 }
 
 /**
+ * Force generate comparison from latest two files
+ */
+export async function generateComparison() {
+  const response = await fetch(`${API_BASE_URL}/api/comparisons/generate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to generate comparison');
+  }
+  return response.json();
+}
+
+/**
  * Get dashboard statistics
  */
 export async function getDashboardStats() {

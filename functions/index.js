@@ -983,6 +983,86 @@ app.get('/api/comparisons/:fileId', async (req, res) => {
 /**
  * Get latest comparison
  */
+/**
+ * Force generate comparison from latest two files
+ */
+app.post('/api/comparisons/generate', async (req, res) => {
+  try {
+    const bucket = storage.bucket(BUCKET_NAME);
+    console.log('[COMPARISONS] Force generating comparison...');
+    
+    // Find the two most recent completed files
+    const metadataList = await listFiles(bucket, 'metadata/files/');
+    const fileIds = metadataList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+    
+    let currentFileId = null;
+    let previousFileId = null;
+    
+    for (const fileId of fileIds) {
+      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      if (fileDoc && fileDoc.status === 'completed') {
+        if (!currentFileId) {
+          currentFileId = fileId;
+        } else if (!previousFileId) {
+          previousFileId = fileId;
+          break;
+        }
+      }
+    }
+    
+    if (!currentFileId || !previousFileId) {
+      return res.status(400).json({ 
+        error: 'Need at least two completed files to generate comparison',
+        found: { current: !!currentFileId, previous: !!previousFileId }
+      });
+    }
+    
+    console.log(`[COMPARISONS] Generating comparison: ${currentFileId} vs ${previousFileId}`);
+    
+    const currentProperties = await loadJSON(bucket, `data/properties/${currentFileId}.json`) || [];
+    const previousProperties = await loadJSON(bucket, `data/properties/${previousFileId}.json`) || [];
+    
+    if (currentProperties.length === 0 || previousProperties.length === 0) {
+      return res.status(400).json({ 
+        error: 'One or both files have no properties',
+        currentCount: currentProperties.length,
+        previousCount: previousProperties.length
+      });
+    }
+    
+    const currentFileDoc = await loadJSON(bucket, `metadata/files/${currentFileId}.json`);
+    const previousFileDoc = await loadJSON(bucket, `metadata/files/${previousFileId}.json`);
+    
+    const comparison = generateComparison(
+      currentProperties,
+      previousProperties,
+      currentFileDoc?.filename || currentFileId,
+      previousFileDoc?.filename || previousFileId
+    );
+    
+    await saveJSON(bucket, `data/comparisons/${currentFileId}.json`, {
+      ...comparison,
+      currentFileId,
+      previousFileId,
+      generatedAt: new Date().toISOString(),
+    });
+    
+    console.log(`[COMPARISONS] Comparison generated successfully: ${comparison.summary.statusChanges} status changes`);
+    res.json({
+      success: true,
+      ...comparison,
+      currentFileId,
+      previousFileId,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[COMPARISONS] Error generating comparison:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/comparisons/latest', async (req, res) => {
   try {
     const bucket = storage.bucket(BUCKET_NAME);
@@ -1017,7 +1097,7 @@ app.get('/api/comparisons/latest', async (req, res) => {
       
       // Generate comparison if we have two files
       if (currentFileId && previousFileId) {
-        console.log(`[COMPARISONS] Generating comparison: ${currentFileId} vs ${previousFileId}`);
+        console.log(`[COMPARISONS] Auto-generating comparison: ${currentFileId} vs ${previousFileId}`);
         
         const currentProperties = await loadJSON(bucket, `data/properties/${currentFileId}.json`) || [];
         const previousProperties = await loadJSON(bucket, `data/properties/${previousFileId}.json`) || [];
@@ -1040,7 +1120,7 @@ app.get('/api/comparisons/latest', async (req, res) => {
             generatedAt: new Date().toISOString(),
           });
           
-          console.log(`[COMPARISONS] Comparison generated successfully`);
+          console.log(`[COMPARISONS] Comparison auto-generated successfully`);
           return res.json({
             ...comparison,
             currentFileId,

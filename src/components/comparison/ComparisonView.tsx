@@ -8,6 +8,8 @@ import { Property, PropertyStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
+import { generateComparison } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 
 type ViewMode = 'summary' | 'new' | 'removed' | 'changed';
 
@@ -23,11 +25,24 @@ export function ComparisonView() {
   const handleRegenerateComparison = async () => {
     setIsRegenerating(true);
     try {
-      // Invalidate and refetch to trigger backend auto-generation
+      // Call the generate endpoint directly
+      await generateComparison();
+      
+      // Invalidate and refetch
       await queryClient.invalidateQueries({ queryKey: ['comparisons', 'latest'] });
       await refetch();
-    } catch (err) {
+      
+      toast({
+        title: "Comparison Generated",
+        description: "Comparison report has been generated successfully",
+      });
+    } catch (err: any) {
       console.error('Failed to regenerate comparison:', err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to generate comparison",
+        variant: "destructive",
+      });
     } finally {
       setIsRegenerating(false);
     }
