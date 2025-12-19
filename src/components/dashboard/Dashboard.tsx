@@ -150,20 +150,66 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
               </div>
             </div>
 
-            {/* Status Transitions */}
+            {/* Status Transitions - Detailed */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-3">Status Transitions</h3>
-              <div className="flex flex-wrap gap-2">
-                {transitions.map((transition, index) => (
-                  <StatusTransitionBadge
-                    key={index}
-                    from={transition.from}
-                    to={transition.to}
-                    count={transition.count}
-                    onClick={() => onFilterChange?.({ from: transition.from, to: transition.to })}
-                  />
-                ))}
-              </div>
+              {transitions.length > 0 ? (
+                <div className="space-y-3">
+                  {/* Transition Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-4">
+                    {transitions.map((transition, index) => (
+                      <StatusTransitionBadge
+                        key={index}
+                        from={transition.from}
+                        to={transition.to}
+                        count={transition.count}
+                        onClick={() => onFilterChange?.({ from: transition.from, to: transition.to })}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Detailed Transition Table */}
+                  <div className="bg-secondary/30 rounded-lg p-4">
+                    <h4 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                      Transition Breakdown
+                    </h4>
+                    <div className="space-y-2">
+                      {transitions.map((transition, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-2 rounded-md hover:bg-secondary/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <StatusTransitionBadge
+                              from={transition.from}
+                              to={transition.to}
+                              count={transition.count}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              {transition.from === 'P' ? 'Pending' : transition.from === 'A' ? 'Active' : transition.from === 'J' ? 'Judgment' : 'Unknown'} 
+                              {' → '}
+                              {transition.to === 'P' ? 'Pending' : transition.to === 'A' ? 'Active' : transition.to === 'J' ? 'Judgment' : 'Unknown'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold font-mono">
+                              {transition.count.toLocaleString()}
+                            </span>
+                            <span className="text-xs text-muted-foreground">properties</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <p className="text-xs text-muted-foreground">
+                        Total properties with status changes: <span className="font-semibold text-foreground">{comparison.summary.statusChanges.toLocaleString()}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No status transitions found</p>
+              )}
             </div>
           </div>
 

@@ -122,31 +122,120 @@ export function ComparisonView() {
         </div>
       </div>
 
-      {/* Status Transitions */}
-      <div className="bg-card border border-border rounded-lg p-4">
-        <h3 className="text-sm font-medium mb-3">Status Transitions</h3>
-        <div className="flex flex-wrap gap-2">
-          {transitions.map((transition, index) => (
-            <StatusTransitionBadge
-              key={index}
-              from={transition.from}
-              to={transition.to}
-              count={transition.count}
-              onClick={() => {
-                setTransitionFilter({ from: transition.from, to: transition.to });
-                setViewMode('changed');
-              }}
-            />
-          ))}
-          {transitionFilter && (
-            <button
-              onClick={() => setTransitionFilter(null)}
-              className="text-xs px-2 py-1 rounded bg-destructive/20 text-destructive hover:bg-destructive/30"
-            >
-              Clear Filter
-            </button>
-          )}
+      {/* Status Transitions - Detailed */}
+      <div className="bg-card border border-border rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium">Status Transitions</h3>
+          <span className="text-xs text-muted-foreground">
+            {transitions.length} transition type{transitions.length !== 1 ? 's' : ''} • {report.summary.statusChanges.toLocaleString()} total changes
+          </span>
         </div>
+        
+        {transitions.length > 0 ? (
+          <div className="space-y-3">
+            {/* Quick Badge View */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {transitions.map((transition, index) => (
+                <StatusTransitionBadge
+                  key={index}
+                  from={transition.from}
+                  to={transition.to}
+                  count={transition.count}
+                  onClick={() => {
+                    setTransitionFilter({ from: transition.from, to: transition.to });
+                    setViewMode('changed');
+                  }}
+                />
+              ))}
+              {transitionFilter && (
+                <button
+                  onClick={() => {
+                    setTransitionFilter(null);
+                    setViewMode('changed');
+                  }}
+                  className="text-xs px-2 py-1 rounded bg-destructive/20 text-destructive hover:bg-destructive/30"
+                >
+                  Clear Filter
+                </button>
+              )}
+            </div>
+            
+            {/* Detailed Transition Table */}
+            <div className="bg-secondary/30 rounded-lg p-4">
+              <h4 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                Detailed Breakdown
+              </h4>
+              <div className="space-y-2">
+                {transitions
+                  .sort((a, b) => b.count - a.count) // Sort by count descending
+                  .map((transition, index) => {
+                    const statusLabels = {
+                      P: 'Pending',
+                      A: 'Active',
+                      J: 'Judgment',
+                      U: 'Unknown',
+                    };
+                    const fromLabel = statusLabels[transition.from as keyof typeof statusLabels] || transition.from;
+                    const toLabel = statusLabels[transition.to as keyof typeof statusLabels] || transition.to;
+                    
+                    return (
+                      <div
+                        key={index}
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-md hover:bg-secondary/50 transition-colors cursor-pointer border border-transparent",
+                          transitionFilter?.from === transition.from && transitionFilter?.to === transition.to && "border-primary bg-primary/10"
+                        )}
+                        onClick={() => {
+                          setTransitionFilter({ from: transition.from, to: transition.to });
+                          setViewMode('changed');
+                        }}
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <StatusTransitionBadge
+                            from={transition.from}
+                            to={transition.to}
+                            count={transition.count}
+                          />
+                          <div className="flex-1">
+                            <div className="text-sm font-medium">
+                              {fromLabel} → {toLabel}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {transition.properties.length > 0 && (
+                                <span>
+                                  Sample: {transition.properties[0].accountNumber} - {transition.properties[0].ownerName?.substring(0, 30)}...
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="text-lg font-semibold font-mono text-primary">
+                              {transition.count.toLocaleString()}
+                            </div>
+                            <div className="text-xs text-muted-foreground">properties</div>
+                          </div>
+                          <button
+                            className="text-xs px-3 py-1.5 rounded bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTransitionFilter({ from: transition.from, to: transition.to });
+                              setViewMode('changed');
+                            }}
+                          >
+                            View All
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">No status transitions found</p>
+        )}
       </div>
 
       {/* View Tabs */}
