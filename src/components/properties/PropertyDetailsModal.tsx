@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { updatePropertyNotes, updatePropertyPhoneNumbers } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface PropertyDetailsModalProps {
   property: Property | null;
