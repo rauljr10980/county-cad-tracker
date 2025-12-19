@@ -1239,6 +1239,50 @@ app.put('/api/properties/:propertyId/action', async (req, res) => {
 });
 
 /**
+ * Update property priority only (quick update)
+ */
+app.put('/api/properties/:propertyId/priority', async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { priority } = req.body;
+    
+    console.log(`[PRIORITY] Updating priority for property ${propertyId}: ${priority}`);
+    
+    const bucket = storage.bucket(BUCKET_NAME);
+    
+    // Find the file containing this property
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+    
+    for (const fileId of fileIds.slice(0, 5)) {
+      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      if (fileDoc && fileDoc.status === 'completed') {
+        const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
+        
+        // Find and update the property
+        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        if (propertyIndex !== -1) {
+          properties[propertyIndex].priority = priority;
+          
+          // Save updated properties
+          await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
+          
+          console.log(`[PRIORITY] Updated property ${propertyId} in file ${fileId}`);
+          return res.json({ success: true, propertyId, priority });
+        }
+      }
+    }
+    
+    res.status(404).json({ error: 'Property not found' });
+  } catch (error) {
+    console.error('[PRIORITY] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Mark task as done with outcome
  */
 app.put('/api/properties/:propertyId/task-done', async (req, res) => {

@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Phone, MessageSquare, Mail, Car, CheckSquare, Loader2, AlertCircle, Eye, Clock, Flag, Filter, CheckCircle2, X } from 'lucide-react';
 import { Property } from '@/types/property';
-import { useQuery } from '@tanstack/react-query';
-import { getTasks, updatePropertyAction, markTaskDone } from '@/lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getTasks, updatePropertyAction, markTaskDone, updatePropertyPriority } from '@/lib/api';
 import { format, isToday, isPast, parseISO, startOfDay, isBefore, isAfter } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from '@/hooks/use-toast';
 
 type ActionType = 'call' | 'text' | 'mail' | 'driveby';
@@ -50,6 +51,7 @@ const OUTCOME_OPTIONS: { value: Outcome; label: string; nextAction?: ActionType 
 ];
 
 export function TasksView() {
+  const queryClient = useQueryClient();
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedForOutcome, setSelectedForOutcome] = useState<Property | null>(null);
   const [selectedOutcome, setSelectedOutcome] = useState<Outcome | ''>('');
@@ -57,6 +59,8 @@ export function TasksView() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [sortBy, setSortBy] = useState<'urgency' | 'action' | 'overdue'>('urgency');
+  const [updatingPriority, setUpdatingPriority] = useState<Set<string>>(new Set());
+  const [priorityPopoverOpen, setPriorityPopoverOpen] = useState<{ [key: string]: boolean }>({});
 
   const { data, isLoading, error, refetch } = useQuery<Property[]>({
     queryKey: ['tasks'],
@@ -254,6 +258,51 @@ export function TasksView() {
     setSelectedIds(newSelected);
   };
 
+  const handlePriorityChange = async (property: Property, newPriority: Priority) => {
+    if (property.priority === newPriority) {
+      setPriorityPopoverOpen(prev => ({ ...prev, [property.id]: false }));
+      return;
+    }
+
+    setUpdatingPriority(prev => new Set(prev).add(property.id));
+    setPriorityPopoverOpen(prev => ({ ...prev, [property.id]: false }));
+
+    try {
+      await updatePropertyPriority(property.id, newPriority);
+      
+      // Update local cache immediately for instant feedback
+      queryClient.setQueryData<Property[]>(['tasks'], (oldData) => {
+        if (!oldData) return oldData;
+        return oldData.map(p => 
+          p.id === property.id 
+            ? { ...p, priority: newPriority }
+            : p
+        );
+      });
+
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+
+      toast({
+        title: "Priority Updated",
+        description: `Changed to ${newPriority.toUpperCase()}`,
+        duration: 2000,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update priority",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingPriority(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(property.id);
+        return newSet;
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
@@ -319,7 +368,7 @@ export function TasksView() {
       {/* Header Controls */}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Call Room Dashboard</h2>
+          <h2 className="text-xl font-semibold">Action Queue</h2>
           <p className="text-sm text-muted-foreground mt-1">
             {filteredAndSortedTasks.length} task{filteredAndSortedTasks.length !== 1 ? 's' : ''} ready for action
           </p>
@@ -415,9 +464,66 @@ export function TasksView() {
                         <span className="font-semibold">{ownerName || property.ownerName}</span>
                         {city && <span className="text-sm text-muted-foreground">• {city}</span>}
                         <StatusBadge status={property.status} size="sm" />
-                        <Badge variant="outline" className={cn("text-xs", PRIORITY_COLORS[priority])}>
-                          {priority.toUpperCase()}
-                        </Badge>
+                        <Popover
+                          open={priorityPopoverOpen[property.id] || false}
+                          onOpenChange={(open) => {
+                            setPriorityPopoverOpen(prev => ({ ...prev, [property.id]: open }));
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-xs cursor-pointer transition-all hover:scale-105",
+                                PRIORITY_COLORS[priority],
+                                updatingPriority.has(property.id) && "opacity-50 animate-pulse"
+                              )}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPriorityPopoverOpen(prev => ({ ...prev, [property.id]: true }));
+                              }}
+                            >
+                              {updatingPriority.has(property.id) ? '...' : priority.toUpperCase()}
+                            </Badge>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-40 p-2" onClick={(e) => e.stopPropagation()}>
+                            <div className="space-y-1">
+                              <button
+                                className={cn(
+                                  "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                                  priority === 'high' 
+                                    ? "bg-red-500/20 text-red-500 font-medium" 
+                                    : "hover:bg-secondary"
+                                )}
+                                onClick={() => handlePriorityChange(property, 'high')}
+                              >
+                                High
+                              </button>
+                              <button
+                                className={cn(
+                                  "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                                  priority === 'med' 
+                                    ? "bg-yellow-500/20 text-yellow-500 font-medium" 
+                                    : "hover:bg-secondary"
+                                )}
+                                onClick={() => handlePriorityChange(property, 'med')}
+                              >
+                                Medium
+                              </button>
+                              <button
+                                className={cn(
+                                  "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                                  priority === 'low' 
+                                    ? "bg-blue-500/20 text-blue-500 font-medium" 
+                                    : "hover:bg-secondary"
+                                )}
+                                onClick={() => handlePriorityChange(property, 'low')}
+                              >
+                                Low
+                              </button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                         {status.icon && <span className="text-lg">{status.icon}</span>}
                         {property.attempts && property.attempts > 0 && (
                           <span className="text-xs text-muted-foreground">

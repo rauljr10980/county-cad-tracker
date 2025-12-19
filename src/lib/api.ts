@@ -227,6 +227,26 @@ export async function updatePropertyAction(
 }
 
 /**
+ * Update property priority only (quick update)
+ */
+export async function updatePropertyPriority(
+  propertyId: string,
+  priority: 'high' | 'med' | 'low'
+) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/priority`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ priority }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update priority');
+  }
+  return response.json();
+}
+
+/**
  * Mark task as done with outcome
  */
 export async function markTaskDone(
