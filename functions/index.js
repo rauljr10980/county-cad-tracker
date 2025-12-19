@@ -986,22 +986,83 @@ app.get('/api/comparisons/:fileId', async (req, res) => {
 app.get('/api/comparisons/latest', async (req, res) => {
   try {
     const bucket = storage.bucket(BUCKET_NAME);
-    const fileList = await listFiles(bucket, 'data/comparisons/');
+    
+    // First, check if comparison exists
+    let fileList = await listFiles(bucket, 'data/comparisons/');
     
     if (fileList.length === 0) {
-      console.log('[COMPARISONS] No comparison files found');
-      return res.status(404).json({ error: 'No comparisons found' });
+      console.log('[COMPARISONS] No comparison files found, attempting to generate one...');
+      
+      // Try to generate comparison from latest two completed files
+      const metadataList = await listFiles(bucket, 'metadata/files/');
+      const fileIds = metadataList
+        .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+        .sort((a, b) => parseInt(b) - parseInt(a));
+      
+      // Find the two most recent completed files
+      let currentFileId = null;
+      let previousFileId = null;
+      
+      for (const fileId of fileIds) {
+        const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+        if (fileDoc && fileDoc.status === 'completed') {
+          if (!currentFileId) {
+            currentFileId = fileId;
+          } else if (!previousFileId) {
+            previousFileId = fileId;
+            break;
+          }
+        }
+      }
+      
+      // Generate comparison if we have two files
+      if (currentFileId && previousFileId) {
+        console.log(`[COMPARISONS] Generating comparison: ${currentFileId} vs ${previousFileId}`);
+        
+        const currentProperties = await loadJSON(bucket, `data/properties/${currentFileId}.json`) || [];
+        const previousProperties = await loadJSON(bucket, `data/properties/${previousFileId}.json`) || [];
+        
+        if (currentProperties.length > 0 && previousProperties.length > 0) {
+          const currentFileDoc = await loadJSON(bucket, `metadata/files/${currentFileId}.json`);
+          const previousFileDoc = await loadJSON(bucket, `metadata/files/${previousFileId}.json`);
+          
+          const comparison = generateComparison(
+            currentProperties,
+            previousProperties,
+            currentFileDoc?.filename || currentFileId,
+            previousFileDoc?.filename || previousFileId
+          );
+          
+          await saveJSON(bucket, `data/comparisons/${currentFileId}.json`, {
+            ...comparison,
+            currentFileId,
+            previousFileId,
+            generatedAt: new Date().toISOString(),
+          });
+          
+          console.log(`[COMPARISONS] Comparison generated successfully`);
+          return res.json({
+            ...comparison,
+            currentFileId,
+            previousFileId,
+            generatedAt: new Date().toISOString(),
+          });
+        }
+      }
+      
+      // If we couldn't generate, return 404
+      return res.status(404).json({ error: 'No comparisons found and could not generate one' });
     }
 
     console.log(`[COMPARISONS] Found ${fileList.length} comparison files`);
     
     // Get the most recent comparison (by filename timestamp)
-    const fileIds = fileList
+    const comparisonFileIds = fileList
       .map(f => f.replace('data/comparisons/', '').replace('.json', ''))
       .sort((a, b) => parseInt(b) - parseInt(a));
 
-    console.log(`[COMPARISONS] Loading latest comparison: ${fileIds[0]}`);
-    const comparison = await loadJSON(bucket, `data/comparisons/${fileIds[0]}.json`);
+    console.log(`[COMPARISONS] Loading latest comparison: ${comparisonFileIds[0]}`);
+    const comparison = await loadJSON(bucket, `data/comparisons/${comparisonFileIds[0]}.json`);
     
     if (!comparison) {
       console.log('[COMPARISONS] Comparison file exists but could not be loaded');
