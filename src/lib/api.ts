@@ -189,3 +189,14 @@ export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumber
   return response.json();
 }
 
+/**
+ * Get all properties with follow-up dates (tasks)
+ */
+export async function getTasks() {
+  const response = await fetch(`${API_BASE_URL}/api/tasks`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch tasks');
+  }
+  return response.json();
+}
+

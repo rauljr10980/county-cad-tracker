@@ -1193,6 +1193,51 @@ app.put('/api/properties/:propertyId/phones', async (req, res) => {
 });
 
 /**
+ * Get all properties with follow-up dates (tasks)
+ */
+app.get('/api/tasks', async (req, res) => {
+  try {
+    console.log('[TASKS] Starting tasks request');
+    const bucket = storage.bucket(BUCKET_NAME);
+    
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timeout after 10s')), 10000)
+    );
+
+    const tasksPromise = (async () => {
+      const fileList = await listFiles(bucket, 'metadata/files/');
+      const completedFiles = (await Promise.all(
+        fileList.map(f => loadJSON(bucket, f))
+      )).filter(f => f && f.status === 'completed')
+        .sort((a, b) => new Date(b.processedAt).getTime() - new Date(a.processedAt).getTime());
+
+      if (completedFiles.length === 0) {
+        return [];
+      }
+
+      const latestFile = completedFiles[0];
+      const allProperties = await loadJSON(bucket, `data/properties/${latestFile.id}.json`) || [];
+      
+      // Filter properties that have a follow-up date
+      const tasks = allProperties.filter(p => p.lastFollowUp && p.lastFollowUp.trim() !== '');
+      
+      console.log(`[TASKS] Returning ${tasks.length} tasks from ${allProperties.length} total properties`);
+      return tasks;
+    })();
+
+    const result = await Promise.race([tasksPromise, timeoutPromise]);
+    res.json(result);
+  } catch (error) {
+    console.error('[TASKS] Error:', error.message);
+    if (error.message.includes('timeout')) {
+      res.status(504).json({ error: 'Request timeout - try again' });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
+/**
  * Get dashboard stats
  */
 app.get('/api/dashboard', async (req, res) => {
