@@ -23,6 +23,14 @@ export interface Property {
   notes?: string;
   phoneNumbers?: string[];
   ownerPhoneIndex?: number; // Index of which phone number is the owner's (0-5)
+  // Task/Action fields
+  actionType?: 'call' | 'text' | 'mail' | 'driveby';
+  priority?: 'high' | 'med' | 'low';
+  dueTime?: string; // ISO datetime string
+  attempts?: number; // Number of contact attempts
+  lastOutcome?: 'no_answer' | 'voicemail' | 'text_sent' | 'spoke_owner' | 'wrong_number' | 'not_interested' | 'new_owner' | 'call_back_later';
+  lastOutcomeDate?: string;
+  snoozedUntil?: string;
   paymentHistory?: PaymentRecord[];
   cadData?: CADData;
   isNew?: boolean;

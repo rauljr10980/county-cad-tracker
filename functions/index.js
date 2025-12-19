@@ -1193,6 +1193,115 @@ app.put('/api/properties/:propertyId/phones', async (req, res) => {
 });
 
 /**
+ * Update property action (actionType, priority, dueTime)
+ */
+app.put('/api/properties/:propertyId/action', async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { actionType, priority, dueTime } = req.body;
+    
+    console.log(`[ACTION] Updating action for property ${propertyId}: ${actionType}, ${priority}, ${dueTime}`);
+    
+    const bucket = storage.bucket(BUCKET_NAME);
+    
+    // Find the file containing this property
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+    
+    for (const fileId of fileIds.slice(0, 5)) {
+      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      if (fileDoc && fileDoc.status === 'completed') {
+        const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
+        
+        // Find and update the property
+        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        if (propertyIndex !== -1) {
+          properties[propertyIndex].actionType = actionType;
+          properties[propertyIndex].priority = priority;
+          properties[propertyIndex].dueTime = dueTime;
+          
+          // Save updated properties
+          await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
+          
+          console.log(`[ACTION] Updated property ${propertyId} in file ${fileId}`);
+          return res.json({ success: true, propertyId, actionType, priority, dueTime });
+        }
+      }
+    }
+    
+    res.status(404).json({ error: 'Property not found' });
+  } catch (error) {
+    console.error('[ACTION] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Mark task as done with outcome
+ */
+app.put('/api/properties/:propertyId/task-done', async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { outcome, nextAction } = req.body;
+    
+    console.log(`[TASK-DONE] Marking task done for property ${propertyId}: ${outcome}, nextAction: ${nextAction}`);
+    
+    const bucket = storage.bucket(BUCKET_NAME);
+    
+    // Find the file containing this property
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+    
+    for (const fileId of fileIds.slice(0, 5)) {
+      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      if (fileDoc && fileDoc.status === 'completed') {
+        const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
+        
+        // Find and update the property
+        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        if (propertyIndex !== -1) {
+          const property = properties[propertyIndex];
+          
+          // Update outcome
+          property.lastOutcome = outcome;
+          property.lastOutcomeDate = new Date().toISOString();
+          property.attempts = (property.attempts || 0) + 1;
+          
+          // Create next action if specified
+          if (nextAction) {
+            property.actionType = nextAction;
+            // Set due time to tomorrow by default, or adjust based on outcome
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(9, 0, 0, 0); // 9 AM tomorrow
+            property.dueTime = tomorrow.toISOString();
+          } else {
+            // Clear action if no next action (e.g., not interested)
+            property.actionType = undefined;
+            property.dueTime = undefined;
+          }
+          
+          // Save updated properties
+          await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
+          
+          console.log(`[TASK-DONE] Updated property ${propertyId} in file ${fileId}`);
+          return res.json({ success: true, propertyId, outcome, nextAction });
+        }
+      }
+    }
+    
+    res.status(404).json({ error: 'Property not found' });
+  } catch (error) {
+    console.error('[TASK-DONE] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Get all properties with follow-up dates (tasks)
  */
 app.get('/api/tasks', async (req, res) => {
@@ -1218,8 +1327,13 @@ app.get('/api/tasks', async (req, res) => {
       const latestFile = completedFiles[0];
       const allProperties = await loadJSON(bucket, `data/properties/${latestFile.id}.json`) || [];
       
-      // Filter properties that have a follow-up date
-      const tasks = allProperties.filter(p => p.lastFollowUp && p.lastFollowUp.trim() !== '');
+      // Filter properties that have an action (dueTime or actionType)
+      // Also include properties with lastFollowUp for backward compatibility
+      const tasks = allProperties.filter(p => 
+        (p.dueTime && p.dueTime.trim() !== '') || 
+        (p.actionType) ||
+        (p.lastFollowUp && p.lastFollowUp.trim() !== '')
+      );
       
       console.log(`[TASKS] Returning ${tasks.length} tasks from ${allProperties.length} total properties`);
       return tasks;

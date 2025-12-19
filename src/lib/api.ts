@@ -1,3 +1,5 @@
+import { Property } from '@/types/property';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 // Debug: Log API URL in production
@@ -190,12 +192,57 @@ export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumber
 }
 
 /**
- * Get all properties with follow-up dates (tasks)
+ * Get all properties with actions/tasks (dueTime or actionType)
  */
-export async function getTasks() {
+export async function getTasks(): Promise<Property[]> {
   const response = await fetch(`${API_BASE_URL}/api/tasks`);
   if (!response.ok) {
     throw new Error('Failed to fetch tasks');
+  }
+  const data = await response.json();
+  // Backend returns array directly, not wrapped in { tasks: [...] }
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * Update property action (actionType, priority, dueTime)
+ */
+export async function updatePropertyAction(
+  propertyId: string,
+  actionType: 'call' | 'text' | 'mail' | 'driveby',
+  priority: 'high' | 'med' | 'low',
+  dueTime: string
+) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/action`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ actionType, priority, dueTime }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update action');
+  }
+  return response.json();
+}
+
+/**
+ * Mark task as done with outcome
+ */
+export async function markTaskDone(
+  propertyId: string,
+  outcome: 'no_answer' | 'voicemail' | 'text_sent' | 'spoke_owner' | 'wrong_number' | 'not_interested' | 'new_owner' | 'call_back_later',
+  nextAction?: 'call' | 'text' | 'mail' | 'driveby'
+) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/task-done`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ outcome, nextAction }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to mark task as done');
   }
   return response.json();
 }
