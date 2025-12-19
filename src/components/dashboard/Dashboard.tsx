@@ -184,8 +184,18 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       ) : (
         <div className="bg-card border border-border rounded-lg p-6 text-center">
           <ArrowRightLeft className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">No comparison data available</p>
-          <p className="text-sm text-muted-foreground mt-2">Upload at least two files to see comparisons</p>
+          {comparisonLoading ? (
+            <>
+              <Loader2 className="h-8 w-8 text-muted-foreground mx-auto mb-4 animate-spin" />
+              <p className="text-muted-foreground">Generating comparison...</p>
+              <p className="text-sm text-muted-foreground mt-2">This may take a moment</p>
+            </>
+          ) : (
+            <>
+              <p className="text-muted-foreground">No comparison data available</p>
+              <p className="text-sm text-muted-foreground mt-2">Upload at least two files to see comparisons</p>
+            </>
+          )}
         </div>
       )}
     </div>

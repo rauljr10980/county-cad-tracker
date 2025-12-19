@@ -37,7 +37,18 @@ export function useLatestComparison() {
     queryFn: getLatestComparison,
     refetchOnMount: true,
     refetchOnWindowFocus: false, // Don't auto-refetch to save API calls
-    retry: false, // Don't retry on 404 (no comparison available)
+    retry: (failureCount, error) => {
+      // Don't retry on 404 (no comparison available) - but the backend will auto-generate
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMsg = String(error.message);
+        if (errorMsg.includes('404') || errorMsg.includes('No comparisons found')) {
+          // Retry once after a delay to allow backend to generate comparison
+          return failureCount < 1;
+        }
+      }
+      return false;
+    },
+    retryDelay: 2000, // Wait 2 seconds before retry to allow backend generation
   });
 }
 
