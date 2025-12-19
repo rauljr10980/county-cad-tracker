@@ -1,5 +1,5 @@
-// Version 2.6 - Added phone number fields with owner phone star
-const CODE_VERSION = '2.6.0';
+// Version 2.7 - Added Tasks tab for follow-up management
+const CODE_VERSION = '2.7.0';
 
 // Load environment variables from .env file (for local development)
 // Only load if .env file exists (optional for production)
