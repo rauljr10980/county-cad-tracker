@@ -146,17 +146,17 @@ export function PropertyTable({
     }
   };
 
-  // Parse property address to extract only the address part (remove owner name)
+  // Parse property address to extract owner name and address
   // Format: "OWNER NAME 123 STREET CITY, STATE ZIP"
   // The middle number (not at start/end) separates owner name from address
-  const parseAddressOnly = (address: string) => {
-    if (!address) return '';
+  const parsePropertyAddress = (address: string) => {
+    if (!address) return { ownerName: '', address: '' };
     
     // Find all numbers in the string with their positions
     const numberMatches = Array.from(address.matchAll(/\b(\d+)\b/g));
     
     if (numberMatches.length === 0) {
-      return address.trim();
+      return { ownerName: '', address: address.trim() };
     }
     
     // Find the first number that's NOT at the start and NOT at the end (middle number)
@@ -179,7 +179,9 @@ export function PropertyTable({
       if (beforeMatch.length > 0 && afterMatch.length > 0) {
         // Make sure there's a space before the number
         if (address[index - 1] === ' ') {
-          return address.substring(index).trim();
+          const ownerName = beforeMatch.trim();
+          const addressPart = address.substring(index).trim();
+          return { ownerName, address: addressPart };
         }
       }
     }
@@ -188,11 +190,13 @@ export function PropertyTable({
     const firstNumberWithSpace = address.match(/\s+(\d+)\s+/);
     if (firstNumberWithSpace) {
       const matchIndex = address.indexOf(firstNumberWithSpace[0]);
-      return address.substring(matchIndex + 1).trim();
+      const ownerName = address.substring(0, matchIndex).trim();
+      const addressPart = address.substring(matchIndex + 1).trim();
+      return { ownerName, address: addressPart };
     }
     
-    // Final fallback: return original
-    return address.trim();
+    // Final fallback: treat entire string as address
+    return { ownerName: '', address: address.trim() };
   };
 
   return (
@@ -257,9 +261,17 @@ export function PropertyTable({
                     </div>
                   </td>
                   <td className="font-mono text-sm">{property.accountNumber}</td>
-                  <td className="max-w-[180px] truncate">{property.ownerName}</td>
+                  <td className="max-w-[180px] truncate">
+                    {(() => {
+                      const parsed = parsePropertyAddress(property.propertyAddress);
+                      return parsed.ownerName || property.ownerName || '';
+                    })()}
+                  </td>
                   <td className="max-w-[250px] truncate text-muted-foreground">
-                    {parseAddressOnly(property.propertyAddress)}
+                    {(() => {
+                      const parsed = parsePropertyAddress(property.propertyAddress);
+                      return parsed.address || property.propertyAddress || '';
+                    })()}
                   </td>
                   <td className="text-right font-mono">
                     {formatCurrency(property.totalAmountDue)}
