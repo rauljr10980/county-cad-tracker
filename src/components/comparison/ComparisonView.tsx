@@ -31,13 +31,30 @@ export function ComparisonView() {
       const result = await generateComparison();
       console.log('[COMPARISON] Generation result:', result);
       
-      // Wait a moment for the file to be saved
+      if (!result || !result.success) {
+        throw new Error('Comparison generation returned no data');
+      }
+      
+      // Wait a moment for the file to be saved to storage
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Invalidate queries to force fresh fetch
+      queryClient.invalidateQueries({ queryKey: ['comparisons', 'latest'] });
+      
+      // Wait a bit more and then refetch
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Invalidate and refetch
-      await queryClient.invalidateQueries({ queryKey: ['comparisons', 'latest'] });
-      const refetchResult = await refetch();
-      console.log('[COMPARISON] Refetch result:', refetchResult);
+      // Try multiple refetches with delays
+      let refetchResult = await refetch();
+      let attempts = 0;
+      while (!refetchResult.data && attempts < 3) {
+        console.log(`[COMPARISON] Refetch attempt ${attempts + 1} - no data yet, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        refetchResult = await refetch();
+        attempts++;
+      }
+      
+      console.log('[COMPARISON] Final refetch result:', refetchResult);
       
       if (refetchResult.data) {
         toast({
@@ -45,11 +62,17 @@ export function ComparisonView() {
           description: "Comparison report has been generated successfully",
         });
       } else {
+        // If refetch didn't work, try using the result directly
+        console.log('[COMPARISON] Refetch failed, using generation result directly');
+        queryClient.setQueryData(['comparisons', 'latest'], result);
         toast({
-          title: "Warning",
-          description: "Comparison generated but not found. Please refresh the page.",
-          variant: "default",
+          title: "Comparison Generated",
+          description: "Comparison report generated. Refreshing view...",
         });
+        // Force a re-render
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       }
     } catch (err: any) {
       console.error('[COMPARISON] Failed to regenerate comparison:', err);

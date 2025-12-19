@@ -1081,13 +1081,17 @@ app.post('/api/comparisons/generate', async (req, res) => {
     }
     
     console.log(`[COMPARISONS] Comparison verified and returning to client`);
-    res.json({
-      success: true,
+    
+    // Return the full comparison object (same structure as GET /api/comparisons/latest)
+    const responseData = {
       ...comparison,
       currentFileId,
       previousFileId,
       generatedAt: new Date().toISOString(),
-    });
+    };
+    
+    console.log(`[COMPARISONS] Returning comparison with ${responseData.summary.statusChanges} status changes`);
+    res.json(responseData);
   } catch (error) {
     console.error('[COMPARISONS] Error generating comparison:', error);
     console.error('[COMPARISONS] Error stack:', error.stack);
