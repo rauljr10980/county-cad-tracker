@@ -59,18 +59,52 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const parsePropertyAddress = (address: string) => {
     if (!address) return { ownerName: '', address: '' };
     
-    // Find the first number that's in the middle (not at start, not at end)
-    // Look for pattern: word(s) + space + number + space + word(s)
-    const middleNumberMatch = address.match(/\s+(\d+)\s+/);
+    // Find all numbers in the string with their positions
+    const numberMatches = Array.from(address.matchAll(/\b(\d+)\b/g));
     
-    if (middleNumberMatch) {
-      const middleNumberIndex = address.indexOf(middleNumberMatch[0]);
-      const ownerName = address.substring(0, middleNumberIndex).trim();
-      const addressPart = address.substring(middleNumberIndex + 1).trim(); // +1 to skip the space
+    if (numberMatches.length === 0) {
+      // No numbers found, treat entire string as address
+      return { ownerName: '', address: address.trim() };
+    }
+    
+    // Find the first number that's NOT at the start and NOT at the end (middle number)
+    // Skip numbers that are part of zip codes (5 digits at the end) or very short numbers at start
+    for (const match of numberMatches) {
+      const number = match[0];
+      const index = match.index!;
+      const beforeMatch = address.substring(0, index).trim();
+      const afterMatch = address.substring(index + number.length).trim();
+      
+      // Skip if number is at the very start (likely part of address number)
+      if (index === 0) continue;
+      
+      // Skip if it's a zip code (5 digits at the end)
+      if (number.length === 5 && /^\d{5}$/.test(number)) {
+        const remainingAfter = address.substring(index + number.length).trim();
+        if (remainingAfter.length < 5) continue; // Likely at the end
+      }
+      
+      // If we have text before and after, this is likely the middle number
+      if (beforeMatch.length > 0 && afterMatch.length > 0) {
+        // Make sure there's a space before the number
+        if (address[index - 1] === ' ') {
+          const ownerName = beforeMatch.trim();
+          const addressPart = address.substring(index).trim();
+          return { ownerName, address: addressPart };
+        }
+      }
+    }
+    
+    // Fallback: if no clear middle number found, try to find first number with space before it
+    const firstNumberWithSpace = address.match(/\s+(\d+)\s+/);
+    if (firstNumberWithSpace) {
+      const matchIndex = address.indexOf(firstNumberWithSpace[0]);
+      const ownerName = address.substring(0, matchIndex).trim();
+      const addressPart = address.substring(matchIndex + 1).trim();
       return { ownerName, address: addressPart };
     }
     
-    // Fallback: if no middle number found, treat entire string as address
+    // Final fallback: treat entire string as address
     return { ownerName: '', address: address.trim() };
   };
 
