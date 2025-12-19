@@ -37,6 +37,7 @@ export function useLatestComparison() {
     queryFn: getLatestComparison,
     refetchOnMount: true,
     refetchOnWindowFocus: false, // Don't auto-refetch to save API calls
+    retry: false, // Don't retry on 404 (no comparison available)
   });
 }
 
