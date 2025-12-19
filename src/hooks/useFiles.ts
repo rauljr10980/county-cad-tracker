@@ -34,11 +34,12 @@ export function useLatestComparison() {
   return useQuery<ComparisonReport | null>({
     queryKey: ['comparisons', 'latest'],
     queryFn: getLatestComparison,
-    refetchOnMount: true,
+    refetchOnMount: 'always', // Always refetch, even if data exists
     refetchOnWindowFocus: false, // Don't auto-refetch to save API calls
     retry: 3, // Retry up to 3 times
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s
     staleTime: 0, // Always consider data stale to refetch on mount
+    gcTime: 0, // Don't cache - always fresh fetch (previously cacheTime in v4)
   });
 }
 
