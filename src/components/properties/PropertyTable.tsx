@@ -146,6 +146,55 @@ export function PropertyTable({
     }
   };
 
+  // Parse property address to extract only the address part (remove owner name)
+  // Format: "OWNER NAME 123 STREET CITY, STATE ZIP"
+  // The middle number (not at start/end) separates owner name from address
+  const parseAddressOnly = (address: string) => {
+    if (!address) return '';
+    
+    // Find all numbers in the string with their positions
+    const numberMatches = Array.from(address.matchAll(/\b(\d+)\b/g));
+    
+    if (numberMatches.length === 0) {
+      return address.trim();
+    }
+    
+    // Find the first number that's NOT at the start and NOT at the end (middle number)
+    for (const match of numberMatches) {
+      const number = match[0];
+      const index = match.index!;
+      const beforeMatch = address.substring(0, index).trim();
+      const afterMatch = address.substring(index + number.length).trim();
+      
+      // Skip if number is at the very start
+      if (index === 0) continue;
+      
+      // Skip if it's a zip code (5 digits at the end)
+      if (number.length === 5 && /^\d{5}$/.test(number)) {
+        const remainingAfter = address.substring(index + number.length).trim();
+        if (remainingAfter.length < 5) continue;
+      }
+      
+      // If we have text before and after, this is likely the middle number
+      if (beforeMatch.length > 0 && afterMatch.length > 0) {
+        // Make sure there's a space before the number
+        if (address[index - 1] === ' ') {
+          return address.substring(index).trim();
+        }
+      }
+    }
+    
+    // Fallback: try to find first number with space before it
+    const firstNumberWithSpace = address.match(/\s+(\d+)\s+/);
+    if (firstNumberWithSpace) {
+      const matchIndex = address.indexOf(firstNumberWithSpace[0]);
+      return address.substring(matchIndex + 1).trim();
+    }
+    
+    // Final fallback: return original
+    return address.trim();
+  };
+
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">
       {/* Table */}
@@ -210,7 +259,7 @@ export function PropertyTable({
                   <td className="font-mono text-sm">{property.accountNumber}</td>
                   <td className="max-w-[180px] truncate">{property.ownerName}</td>
                   <td className="max-w-[250px] truncate text-muted-foreground">
-                    {property.propertyAddress}
+                    {parseAddressOnly(property.propertyAddress)}
                   </td>
                   <td className="text-right font-mono">
                     {formatCurrency(property.totalAmountDue)}
