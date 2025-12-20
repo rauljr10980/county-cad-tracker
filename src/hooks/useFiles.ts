@@ -31,12 +31,13 @@ export function useUploadFile() {
   });
 }
 
-export function useLatestComparison() {
+export function useLatestComparison(options?: { refetchInterval?: number | false }) {
   return useQuery<ComparisonReport | null>({
     queryKey: ['comparisons', 'latest'],
     queryFn: getLatestComparison,
     refetchOnMount: true,
-    refetchOnWindowFocus: false, // Don't auto-refetch to save API calls
+    refetchOnWindowFocus: true, // Refetch when window gains focus to catch new comparisons
+    refetchInterval: options?.refetchInterval !== undefined ? options.refetchInterval : false,
     retry: (failureCount, error) => {
       // Don't retry on 404 (no comparison available) - but the backend will auto-generate
       if (error && typeof error === 'object' && 'message' in error) {

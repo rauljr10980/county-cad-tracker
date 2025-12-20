@@ -496,6 +496,15 @@ async function processFile(fileId, storagePath, filename) {
         generatedAt: new Date().toISOString(),
       });
       console.log(`[PROCESS] Saved comparison to data/comparisons/${fileId}.json`);
+      
+      // Verify the comparison was saved
+      const savedComparison = await loadJSON(bucket, `data/comparisons/${fileId}.json`);
+      if (savedComparison) {
+        console.log(`[PROCESS] Comparison verified - saved successfully with ${savedComparison.summary?.statusChanges || 0} status changes`);
+      } else {
+        console.error(`[PROCESS] WARNING: Comparison was not saved properly!`);
+      }
+      
       await updateProgress(fileId, 'comparing', 'Comparison generated successfully', 95);
     } else {
       console.log(`[PROCESS] No previous completed file found for comparison (checked ${fileIds.length} files)`);
