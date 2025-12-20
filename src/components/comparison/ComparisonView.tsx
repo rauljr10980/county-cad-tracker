@@ -134,7 +134,7 @@ export function ComparisonView() {
                 Upload at least two files to generate a comparison report.
                 <br />
                 <span className="text-sm mt-2 block">
-                  Comparisons are automatically generated when you upload your second file.
+                  Comparisons are automatically generated based on the 2 most recent files.
                 </span>
               </>
             )}
