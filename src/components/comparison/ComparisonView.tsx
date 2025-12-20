@@ -1,20 +1,99 @@
 import { useState } from 'react';
-import { ArrowRightLeft, TrendingUp, TrendingDown, AlertTriangle, Loader2 } from 'lucide-react';
+import { ArrowRightLeft, TrendingUp, TrendingDown, AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { StatusBadge, StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyTable } from '@/components/properties/PropertyTable';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
 import { useLatestComparison } from '@/hooks/useFiles';
 import { Property, PropertyStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useQueryClient } from '@tanstack/react-query';
+import { generateComparison } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 
 type ViewMode = 'summary' | 'new' | 'removed' | 'changed';
 
 export function ComparisonView() {
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<ViewMode>('summary');
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [transitionFilter, setTransitionFilter] = useState<{ from: PropertyStatus; to: PropertyStatus } | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
-  const { data: report, isLoading, error } = useLatestComparison();
+  const { data: report, isLoading, error, refetch } = useLatestComparison();
+
+  const handleRegenerateComparison = async () => {
+    setIsRegenerating(true);
+    try {
+      console.log('[COMPARISON] Starting comparison generation...');
+      
+      // Call the generate endpoint directly
+      const result = await generateComparison();
+      console.log('[COMPARISON] Generation result:', result);
+      
+      // Check if we have comparison data
+      if (!result || (!result.summary && !result.currentFile)) {
+        console.error('[COMPARISON] Invalid result structure:', result);
+        throw new Error('Comparison generation returned invalid data structure');
+      }
+      
+      // Wait a moment for the file to be saved to storage
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Invalidate queries to force fresh fetch
+      queryClient.invalidateQueries({ queryKey: ['comparisons', 'latest'] });
+      
+      // Wait a bit more and then refetch
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Try multiple refetches with delays
+      let refetchResult = await refetch();
+      let attempts = 0;
+      while (!refetchResult.data && attempts < 3) {
+        console.log(`[COMPARISON] Refetch attempt ${attempts + 1} - no data yet, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        refetchResult = await refetch();
+        attempts++;
+      }
+      
+      console.log('[COMPARISON] Final refetch result:', refetchResult);
+      
+      if (refetchResult.data) {
+        toast({
+          title: "Comparison Generated",
+          description: "Comparison report has been generated successfully",
+        });
+      } else {
+        // If refetch didn't work, use the result directly
+        console.log('[COMPARISON] Refetch failed, using generation result directly');
+        const comparisonData = result;
+        if (comparisonData && (comparisonData.summary || comparisonData.currentFile)) {
+          queryClient.setQueryData(['comparisons', 'latest'], comparisonData);
+          toast({
+            title: "Comparison Generated",
+            description: "Comparison report generated successfully",
+          });
+        } else {
+          console.error('[COMPARISON] Result data is invalid:', comparisonData);
+          toast({
+            title: "Warning",
+            description: "Comparison generated but data structure is invalid. Please refresh the page.",
+            variant: "default",
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error('[COMPARISON] Failed to regenerate comparison:', err);
+      const errorMessage = err?.message || err?.error || "Failed to generate comparison";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -44,7 +123,7 @@ export function ComparisonView() {
         <div className="bg-secondary/30 rounded-lg p-8 text-center">
           <ArrowRightLeft className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Comparison Available</h3>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-4">
             {isLoading ? (
               <>
                 <Loader2 className="h-6 w-6 text-primary mx-auto mb-2 animate-spin" />
@@ -60,6 +139,25 @@ export function ComparisonView() {
               </>
             )}
           </p>
+          {!isLoading && (
+            <Button
+              onClick={handleRegenerateComparison}
+              disabled={isRegenerating}
+              className="mt-4"
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Generate Comparison
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
     );
