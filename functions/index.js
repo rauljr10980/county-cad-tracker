@@ -782,8 +782,12 @@ function extractProperties(data) {
  * Generate comparison report
  */
 function generateComparison(currentProps, previousProps, currentFilename, previousFilename) {
-  const currentMap = new Map(currentProps.map(p => [p.accountNumber, p]));
-  const previousMap = new Map(previousProps.map(p => [p.accountNumber, p]));
+  // Filter out properties without accountNumber to prevent Map key issues
+  const validCurrentProps = (currentProps || []).filter(p => p && p.accountNumber != null);
+  const validPreviousProps = (previousProps || []).filter(p => p && p.accountNumber != null);
+  
+  const currentMap = new Map(validCurrentProps.map(p => [p.accountNumber, p]));
+  const previousMap = new Map(validPreviousProps.map(p => [p.accountNumber, p]));
 
   const newProperties = [];
   const removedProperties = [];
@@ -834,12 +838,12 @@ function generateComparison(currentProps, previousProps, currentFilename, previo
 
   const transitions = Object.values(statusTransitions);
 
-  return {
+    return {
     currentFile: currentFilename,
     previousFile: previousFilename,
     summary: {
-      totalCurrent: currentProps.length,
-      totalPrevious: previousProps.length,
+      totalCurrent: validCurrentProps.length,
+      totalPrevious: validPreviousProps.length,
       newProperties: newProperties.length,
       newLeads: newProperties.filter(p => p.isNewLead).length, // New P status properties
       removedProperties: removedProperties.length,
