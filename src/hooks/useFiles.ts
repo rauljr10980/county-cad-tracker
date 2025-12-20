@@ -39,8 +39,8 @@ export function useLatestComparison() {
     refetchOnWindowFocus: true, // Refetch when window gains focus to catch new comparisons
     // Auto-refetch every 15 seconds when no data (to catch auto-generated comparisons after file uploads)
     refetchInterval: (query) => {
-      // Only auto-refetch if we don't have data and we're not currently loading
-      return !query.state.data && !query.state.isLoading ? 15000 : false;
+      // Only auto-refetch if we don't have data (to catch auto-generated comparisons)
+      return !query.state.data ? 15000 : false;
     },
     retry: (failureCount, error) => {
       // Don't retry on 404 (no comparison available) - but the backend will auto-generate
