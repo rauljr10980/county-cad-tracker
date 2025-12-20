@@ -21,9 +21,6 @@ export function ComparisonView() {
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   const { data: report, isLoading, error, refetch } = useLatestComparison();
-  
-  // Auto-refetch every 10 seconds when no comparison is available (to catch auto-generated ones)
-  const shouldRefetch = !report && !isLoading;
 
   const handleRegenerateComparison = async () => {
     setIsRegenerating(true);
