@@ -96,7 +96,13 @@ export async function getLatestComparison() {
     if (response.status === 404) {
       return null;
     }
-    throw new Error('Failed to fetch latest comparison');
+    // Try to get error message from response
+    try {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch latest comparison');
+    } catch (e) {
+      throw new Error('Failed to fetch latest comparison');
+    }
   }
   return response.json();
 }
