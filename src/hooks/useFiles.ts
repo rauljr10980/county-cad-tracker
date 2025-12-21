@@ -37,18 +37,18 @@ export function useLatestComparison() {
     queryFn: getLatestComparison,
     refetchOnMount: true,
     refetchOnWindowFocus: true, // Refetch when window gains focus to catch new comparisons
-    // Auto-refetch every 15 seconds when no data (to catch auto-generated comparisons after file uploads)
+    // Auto-refetch every 3 seconds when no data (to catch auto-generated comparisons quickly)
     refetchInterval: (query) => {
-      // Only auto-refetch if we don't have data (to catch auto-generated comparisons)
-      return !query.state.data ? 15000 : false;
+      // Aggressively refetch if we don't have data (to catch auto-generated comparisons)
+      return !query.state.data ? 3000 : false;
     },
     retry: (failureCount, error) => {
       // Don't retry on 404 (no comparison available) - but the backend will auto-generate
       if (error && typeof error === 'object' && 'message' in error) {
         const errorMsg = String(error.message);
         if (errorMsg.includes('404') || errorMsg.includes('No comparisons found')) {
-          // Retry once after a delay to allow backend to generate comparison
-          return failureCount < 1;
+          // Retry multiple times to allow backend to generate comparison
+          return failureCount < 3;
         }
       }
       return false;

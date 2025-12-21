@@ -22,6 +22,21 @@ export function ComparisonView() {
 
   const { data: report, isLoading, error, refetch } = useLatestComparison();
 
+  // Aggressively refetch when component mounts or becomes visible
+  React.useEffect(() => {
+    // Refetch immediately when component mounts
+    refetch();
+    
+    // Set up interval to refetch every 2 seconds if no data
+    const interval = setInterval(() => {
+      if (!report) {
+        refetch();
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [report, refetch]);
+
   const handleRegenerateComparison = async () => {
     setIsRegenerating(true);
     try {
