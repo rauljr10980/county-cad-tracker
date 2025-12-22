@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowRightLeft, TrendingUp, TrendingDown, AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { StatusBadge, StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyTable } from '@/components/properties/PropertyTable';
@@ -23,7 +23,7 @@ export function ComparisonView() {
   const { data: report, isLoading, error, refetch } = useLatestComparison();
 
   // Aggressively refetch when component mounts or becomes visible
-  React.useEffect(() => {
+  useEffect(() => {
     // Refetch immediately when component mounts
     refetch();
     
@@ -35,7 +35,8 @@ export function ComparisonView() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [report, refetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report]);
 
   const handleRegenerateComparison = async () => {
     setIsRegenerating(true);
