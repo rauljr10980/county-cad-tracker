@@ -38,6 +38,26 @@ export function useLatestComparison() {
     queryKey: ['comparisons', 'latest'],
     queryFn: async () => {
       console.log('[useLatestComparison] Fetching comparison...');
+      
+      // Check cache first - if we have valid cached data, use it
+      const cached = queryClient.getQueryData<ComparisonReport | null>(['comparisons', 'latest']);
+      if (cached && cached.summary && cached.currentFile) {
+        console.log('[useLatestComparison] Using cached data:', {
+          currentFile: cached.currentFile,
+          hasSummary: !!cached.summary,
+        });
+        // Still try to fetch fresh data in background, but return cached immediately
+        getLatestComparison().then((freshData) => {
+          if (freshData) {
+            console.log('[useLatestComparison] Fresh data fetched, updating cache');
+            queryClient.setQueryData(['comparisons', 'latest'], freshData);
+          }
+        }).catch(() => {
+          // Ignore errors - keep cached data
+        });
+        return cached;
+      }
+      
       try {
         const data = await getLatestComparison();
         console.log('[useLatestComparison] Fetch result:', {
@@ -47,18 +67,14 @@ export function useLatestComparison() {
           previousFile: data?.previousFile,
         });
         // If we get null but have cached data, don't overwrite it
-        if (!data) {
-          const cached = queryClient.getQueryData<ComparisonReport | null>(['comparisons', 'latest']);
-          if (cached) {
-            console.log('[useLatestComparison] Got null but have cached data, keeping cache');
-            return cached;
-          }
+        if (!data && cached) {
+          console.log('[useLatestComparison] Got null but have cached data, keeping cache');
+          return cached;
         }
         return data;
       } catch (error) {
         console.error('[useLatestComparison] Fetch error:', error);
         // On error, try to keep cached data
-        const cached = queryClient.getQueryData<ComparisonReport | null>(['comparisons', 'latest']);
         if (cached) {
           console.log('[useLatestComparison] Error but have cached data, returning cache');
           return cached;
@@ -66,8 +82,8 @@ export function useLatestComparison() {
         throw error;
       }
     },
-    refetchOnMount: true,
-    refetchOnWindowFocus: true, // Refetch when window gains focus to catch new comparisons
+    refetchOnMount: false, // Don't refetch on mount if we have data - prevents clearing
+    refetchOnWindowFocus: false, // Don't refetch on focus if we have data - prevents clearing
     // Auto-refetch every 5 seconds when no data (to catch auto-generated comparisons)
     refetchInterval: (query) => {
       // Only refetch if we don't have data (don't refetch if we already have data)

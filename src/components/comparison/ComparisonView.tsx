@@ -57,25 +57,9 @@ export function ComparisonView() {
         currentFile: cachedData?.currentFile,
       });
       
-      // Wait a moment for the file to be saved to storage
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Refetch but only update if we get valid data (don't overwrite with null)
-      console.log('[COMPARISON] Refetching to verify...');
-      const refetchResult = await refetch();
-      console.log('[COMPARISON] Refetch result:', {
-        hasData: !!refetchResult.data,
-        data: refetchResult.data ? {
-          hasSummary: !!refetchResult.data.summary,
-          currentFile: refetchResult.data.currentFile,
-        } : null,
-      });
-      
-      // If refetch returned null/empty, keep our cached data
-      if (!refetchResult.data) {
-        console.log('[COMPARISON] Refetch returned null, keeping cached data');
-        queryClient.setQueryData(['comparisons', 'latest'], result);
-      }
+      // Don't refetch immediately - the data is already set and will persist
+      // The refetch interval will naturally pick it up later if needed
+      // This prevents the data from being cleared by a premature refetch
       
       toast({
         title: "Comparison Generated",
