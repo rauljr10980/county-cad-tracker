@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X } from 'lucide-react';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
@@ -18,7 +18,7 @@ export function PropertiesView() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   
   // Update debounced search after delay
-  useMemo(() => {
+  useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
       setPage(1); // Reset to page 1 when search changes
@@ -27,7 +27,12 @@ export function PropertiesView() {
   }, [searchQuery]);
 
   // Fetch properties from API with status filter and search
-  const { data, isLoading, error } = useProperties(page, ITEMS_PER_PAGE, statusFilter, debouncedSearchQuery);
+  const { data, isLoading, error } = useProperties({
+    status: statusFilter,
+    search: debouncedSearchQuery,
+    page,
+    limit: ITEMS_PER_PAGE,
+  });
   
   // Safely extract properties with fallbacks
   let properties: Property[] = [];

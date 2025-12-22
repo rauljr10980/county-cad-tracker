@@ -53,10 +53,17 @@ export function useProperties(filters?: {
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
 }) {
   return useQuery<Property[]>({
     queryKey: ['properties', filters],
-    queryFn: () => getProperties(filters),
+    queryFn: () => getProperties(
+      filters?.page || 1,
+      filters?.limit || 100,
+      filters?.status,
+      filters?.search
+    ),
     refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchInterval: false,
