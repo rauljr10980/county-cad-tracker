@@ -118,3 +118,51 @@ export interface ProcessingStatus {
   startedAt?: string;
   estimatedCompletion?: string;
 }
+
+// Pre-Foreclosure Types (Strict Mode - No Enrichment)
+export type PreForeclosureType = 'Mortgage' | 'Tax';
+export type PreForeclosureInternalStatus = 'New' | 'Contact Attempted' | 'Monitoring' | 'Dead';
+
+export interface PreForeclosure {
+  // Immutable (from file) - Primary Key
+  document_number: string;
+  
+  // Immutable (from file)
+  type: PreForeclosureType;
+  address: string;
+  city: string;
+  zip: string;
+  filing_month: string; // e.g., "January 2026"
+  county: string; // e.g., "Bexar"
+  
+  // System tracking (internal)
+  first_seen_month: string;
+  last_seen_month: string;
+  inactive: boolean;
+  
+  // Operator-Entered (manual only)
+  internal_status: PreForeclosureInternalStatus;
+  notes?: string;
+  last_action_date?: string;
+  next_follow_up_date?: string;
+}
+
+export interface PreForeclosureFile {
+  id: string;
+  filename: string;
+  uploadedAt: string;
+  processedAt?: string;
+  recordCount: number;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  errorMessage?: string;
+}
+
+export interface PreForeclosureDashboardStats {
+  totalFilingsThisMonth: number;
+  mortgageCount: number;
+  taxCount: number;
+  byCity: Record<string, number>;
+  byZip: Record<string, number>;
+  activeCount: number;
+  inactiveCount: number;
+}

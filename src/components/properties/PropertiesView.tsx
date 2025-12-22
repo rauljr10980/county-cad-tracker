@@ -49,7 +49,7 @@ export function PropertiesView() {
         total = data.length;
         totalUnfiltered = data.length;
         totalPages = 1;
-      } else if (data.properties && Array.isArray(data.properties)) {
+      } else if ('properties' in data && Array.isArray(data.properties)) {
         properties = data.properties;
         total = data.total || data.properties.length;
         totalUnfiltered = data.totalUnfiltered || total;
