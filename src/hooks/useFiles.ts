@@ -37,43 +37,54 @@ export function useLatestComparison() {
   return useQuery<ComparisonReport | null>({
     queryKey: ['comparisons', 'latest'],
     queryFn: async () => {
-      console.log('[useLatestComparison] Fetching comparison...');
+      console.log('[useLatestComparison] QueryFn called');
       
-      // Check cache first - if we have valid cached data, use it
+      // ALWAYS check cache first - if we have valid cached data, use it immediately
       const cached = queryClient.getQueryData<ComparisonReport | null>(['comparisons', 'latest']);
+      console.log('[useLatestComparison] Cache check:', {
+        hasCached: !!cached,
+        hasSummary: !!cached?.summary,
+        hasCurrentFile: !!cached?.currentFile,
+        currentFile: cached?.currentFile,
+      });
+      
       if (cached && cached.summary && cached.currentFile) {
-        console.log('[useLatestComparison] Using cached data:', {
-          currentFile: cached.currentFile,
-          hasSummary: !!cached.summary,
-        });
+        console.log('[useLatestComparison] ✓ Using cached data - returning immediately');
         // Still try to fetch fresh data in background, but return cached immediately
-        getLatestComparison().then((freshData) => {
-          if (freshData) {
-            console.log('[useLatestComparison] Fresh data fetched, updating cache');
-            queryClient.setQueryData(['comparisons', 'latest'], freshData);
-          }
-        }).catch(() => {
-          // Ignore errors - keep cached data
-        });
+        getLatestComparison()
+          .then((freshData) => {
+            if (freshData && freshData.summary) {
+              console.log('[useLatestComparison] Fresh data fetched in background, updating cache');
+              queryClient.setQueryData(['comparisons', 'latest'], freshData);
+            }
+          })
+          .catch((err) => {
+            console.log('[useLatestComparison] Background fetch failed, keeping cached data:', err.message);
+            // Ignore errors - keep cached data
+          });
         return cached;
       }
       
+      // No valid cache, fetch from API
       try {
+        console.log('[useLatestComparison] No valid cache, fetching from API...');
         const data = await getLatestComparison();
-        console.log('[useLatestComparison] Fetch result:', {
+        console.log('[useLatestComparison] API fetch result:', {
           hasData: !!data,
           hasSummary: !!data?.summary,
           currentFile: data?.currentFile,
           previousFile: data?.previousFile,
         });
-        // If we get null but have cached data, don't overwrite it
+        
+        // If we get null but had cached data, keep the cache
         if (!data && cached) {
-          console.log('[useLatestComparison] Got null but have cached data, keeping cache');
+          console.log('[useLatestComparison] API returned null but have cached data, keeping cache');
           return cached;
         }
+        
         return data;
       } catch (error) {
-        console.error('[useLatestComparison] Fetch error:', error);
+        console.error('[useLatestComparison] API fetch error:', error);
         // On error, try to keep cached data
         if (cached) {
           console.log('[useLatestComparison] Error but have cached data, returning cache');

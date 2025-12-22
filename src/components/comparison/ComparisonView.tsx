@@ -57,9 +57,24 @@ export function ComparisonView() {
         currentFile: cachedData?.currentFile,
       });
       
-      // Don't refetch immediately - the data is already set and will persist
-      // The refetch interval will naturally pick it up later if needed
-      // This prevents the data from being cleared by a premature refetch
+      // Force the query to update by calling refetch, but it will use cached data first
+      // The queryFn checks cache first, so it will return our cached data
+      console.log('[COMPARISON] Triggering query update to re-render component...');
+      await refetch();
+      
+      // Double-check the data is still there after refetch
+      const finalData = queryClient.getQueryData(['comparisons', 'latest']);
+      console.log('[COMPARISON] Final cached data after refetch:', {
+        hasData: !!finalData,
+        hasSummary: !!finalData?.summary,
+        currentFile: finalData?.currentFile,
+      });
+      
+      // If refetch cleared it (shouldn't happen with our cache-first logic), restore it
+      if (!finalData) {
+        console.log('[COMPARISON] WARNING: Data was cleared, restoring...');
+        queryClient.setQueryData(['comparisons', 'latest'], result);
+      }
       
       toast({
         title: "Comparison Generated",
