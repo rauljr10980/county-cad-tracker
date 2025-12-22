@@ -18,67 +18,30 @@ export function ComparisonView() {
   const [viewMode, setViewMode] = useState<ViewMode>('summary');
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [transitionFilter, setTransitionFilter] = useState<{ from: PropertyStatus; to: PropertyStatus } | null>(null);
-  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const { data: report, isLoading, error, refetch } = useLatestComparison();
 
-  const handleRegenerateComparison = useCallback(async () => {
-    setIsRegenerating(true);
+  const handleGenerateComparison = useCallback(async () => {
+    setIsGenerating(true);
     try {
-      console.log('[COMPARISON] Starting comparison generation...');
-      
-      // Call the generate endpoint directly
       const result = await generateComparison();
-      console.log('[COMPARISON] Generation result:', result);
-      console.log('[COMPARISON] Result structure check:', {
-        hasResult: !!result,
-        hasSummary: !!result?.summary,
-        hasCurrentFile: !!result?.currentFile,
-        summary: result?.summary,
-        currentFile: result?.currentFile,
-        previousFile: result?.previousFile,
-      });
       
-      // Check if we have comparison data
-      if (!result || (!result.summary && !result.currentFile)) {
-        console.error('[COMPARISON] Invalid result structure:', result);
-        throw new Error('Comparison generation returned invalid data structure');
+      if (!result || !result.summary) {
+        throw new Error('Invalid comparison data received');
       }
-      
-      // Set the data directly in the cache immediately
-      console.log('[COMPARISON] Setting data in cache...');
+
+      // Update cache with the new comparison
       queryClient.setQueryData(['comparisons', 'latest'], result);
       
-      // Verify it was set
-      const cachedData = queryClient.getQueryData(['comparisons', 'latest']);
-      console.log('[COMPARISON] Cached data after setting:', {
-        hasData: !!cachedData,
-        hasSummary: !!cachedData?.summary,
-        currentFile: cachedData?.currentFile,
-        previousFile: cachedData?.previousFile,
-      });
-      
-      // Invalidate the query to trigger a re-render, but don't refetch (use cached data)
-      // This ensures the component updates to show the new data
-      console.log('[COMPARISON] Invalidating query to trigger component update...');
-      await queryClient.invalidateQueries({ 
-        queryKey: ['comparisons', 'latest'],
-        refetchType: 'none', // Don't refetch, just update state
-      });
-      
-      console.log('[COMPARISON] Query invalidated - component should re-render with cached data');
+      // Refetch to ensure we have the latest data
+      await refetch();
       
       toast({
         title: "Comparison Generated",
         description: "Comparison report has been generated successfully",
       });
     } catch (err: any) {
-      console.error('[COMPARISON] Failed to regenerate comparison:', err);
-      console.error('[COMPARISON] Error details:', {
-        message: err?.message,
-        error: err?.error,
-        stack: err?.stack,
-      });
       const errorMessage = err?.message || err?.error || "Failed to generate comparison";
       toast({
         title: "Error",
@@ -86,79 +49,82 @@ export function ComparisonView() {
         variant: "destructive",
       });
     } finally {
-      setIsRegenerating(false);
+      setIsGenerating(false);
     }
   }, [queryClient, refetch]);
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <Loader2 className="h-8 w-8 text-primary mx-auto mb-4 animate-spin" />
           <p className="text-muted-foreground">Loading comparison...</p>
         </div>
       </div>
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="p-6">
         <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-6 text-center">
           <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-2" />
-          <p className="text-destructive">Failed to load comparison</p>
+          <p className="text-destructive font-medium mb-2">Failed to load comparison</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            {error instanceof Error ? error.message : 'An unexpected error occurred'}
+          </p>
+          <Button onClick={() => refetch()} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
         </div>
       </div>
     );
   }
 
+  // No comparison available
   if (!report) {
     return (
       <div className="p-6">
         <div className="bg-secondary/30 rounded-lg p-8 text-center">
           <ArrowRightLeft className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Comparison Available</h3>
-          <p className="text-muted-foreground mb-4">
-            {isLoading ? (
+          <p className="text-muted-foreground mb-6">
+            Upload at least two files to generate a comparison report.
+            <br />
+            <span className="text-sm mt-2 block">
+              Comparisons are automatically generated based on the 2 most recent files.
+            </span>
+          </p>
+          <Button
+            onClick={handleGenerateComparison}
+            disabled={isGenerating}
+            size="lg"
+          >
+            {isGenerating ? (
               <>
-                <Loader2 className="h-6 w-6 text-primary mx-auto mb-2 animate-spin" />
-                <span>Loading comparison...</span>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
               </>
             ) : (
               <>
-                Upload at least two files to generate a comparison report.
-                <br />
-                <span className="text-sm mt-2 block">
-                  Comparisons are automatically generated based on the 2 most recent files.
-                </span>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Generate Comparison
               </>
             )}
-          </p>
-          {!isLoading && (
-            <Button
-              onClick={handleRegenerateComparison}
-              disabled={isRegenerating}
-              className="mt-4"
-            >
-              {isRegenerating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Generate Comparison
-                </>
-              )}
-            </Button>
-          )}
+          </Button>
         </div>
       </div>
     );
   }
 
+  // Render comparison report
   const transitions = report.statusTransitions || [];
+  const filteredChangedProperties = transitionFilter
+    ? transitions.find(t => t.from === transitionFilter.from && t.to === transitionFilter.to)?.properties || []
+    : report.changedProperties;
 
   const tabs = [
     { id: 'summary' as ViewMode, label: 'Summary', count: null },
@@ -166,10 +132,6 @@ export function ComparisonView() {
     { id: 'removed' as ViewMode, label: 'Removed (Dead Leads)', count: report.summary.removedProperties },
     { id: 'changed' as ViewMode, label: 'Status Changes', count: report.summary.statusChanges },
   ];
-
-  const filteredChangedProperties = transitionFilter
-    ? transitions.find(t => t.from === transitionFilter.from && t.to === transitionFilter.to)?.properties || []
-    : report.changedProperties;
 
   return (
     <div className="p-6 space-y-6">
@@ -184,9 +146,30 @@ export function ComparisonView() {
             {report.currentFile} vs {report.previousFile}
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Generated: {new Date(report.generatedAt).toLocaleString()}
-        </p>
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground">
+            Generated: {new Date(report.generatedAt).toLocaleString()}
+          </p>
+          <Button
+            onClick={handleGenerateComparison}
+            disabled={isGenerating}
+            variant="outline"
+            size="sm"
+            className="mt-2"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                Regenerating...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-3 w-3 mr-2" />
+                Regenerate
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -211,7 +194,7 @@ export function ComparisonView() {
         </div>
         <div className="bg-success/10 border border-success/30 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs text-success">New Properties</span>
+            <span className="text-xs text-success font-medium">New Properties</span>
           </div>
           <p className="text-2xl font-semibold font-mono text-success">
             +{report.summary.newProperties.toLocaleString()}
@@ -220,7 +203,7 @@ export function ComparisonView() {
         <div className="bg-judgment/10 border border-judgment/30 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="h-4 w-4 text-judgment" />
-            <span className="text-xs text-judgment">Dead Leads</span>
+            <span className="text-xs text-judgment font-medium">Dead Leads</span>
           </div>
           <p className="text-2xl font-semibold font-mono text-judgment">
             -{report.summary.removedProperties.toLocaleString()}
@@ -228,7 +211,7 @@ export function ComparisonView() {
         </div>
       </div>
 
-      {/* Status Transitions - Detailed */}
+      {/* Status Transitions */}
       <div className="bg-card border border-border rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium">Status Transitions</h3>
@@ -259,7 +242,7 @@ export function ComparisonView() {
                     setTransitionFilter(null);
                     setViewMode('changed');
                   }}
-                  className="text-xs px-2 py-1 rounded bg-destructive/20 text-destructive hover:bg-destructive/30"
+                  className="text-xs px-2 py-1 rounded bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors"
                 >
                   Clear Filter
                 </button>
@@ -273,7 +256,7 @@ export function ComparisonView() {
               </h4>
               <div className="space-y-2">
                 {transitions
-                  .sort((a, b) => b.count - a.count) // Sort by count descending
+                  .sort((a, b) => b.count - a.count)
                   .map((transition, index) => {
                     const statusLabels = {
                       P: 'Pending',
@@ -350,7 +333,10 @@ export function ComparisonView() {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setViewMode(tab.id)}
+              onClick={() => {
+                setViewMode(tab.id);
+                setTransitionFilter(null); // Clear filter when switching tabs
+              }}
               className={cn(
                 'px-4 py-2 text-sm font-medium transition-all relative',
                 viewMode === tab.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
@@ -405,6 +391,12 @@ export function ComparisonView() {
                 from={transitionFilter.from}
                 to={transitionFilter.to}
               />
+              <button
+                onClick={() => setTransitionFilter(null)}
+                className="text-xs px-2 py-1 rounded bg-destructive/20 text-destructive hover:bg-destructive/30"
+              >
+                Clear
+              </button>
             </div>
           )}
           <PropertyTable
