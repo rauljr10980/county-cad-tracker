@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { getFiles, uploadFile, deleteFile, getLatestComparison, getDashboardStats, getProperties } from '@/lib/api';
-import type { UploadedFile, ComparisonReport, DashboardStats, Property } from '@/types/property';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getFiles, uploadFile, deleteFile, getDashboardStats, getProperties } from '@/lib/api';
+import type { UploadedFile, DashboardStats, Property } from '@/types/property';
 
 export function useFiles() {
   return useQuery<UploadedFile[]>({
@@ -21,22 +21,8 @@ export function useUploadFile() {
     mutationFn: uploadFile,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['files'] });
-      queryClient.invalidateQueries({ queryKey: ['comparisons'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-  });
-}
-
-export function useLatestComparison() {
-  return useQuery<ComparisonReport | null>({
-    queryKey: ['comparisons', 'latest'],
-    queryFn: getLatestComparison,
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
-    refetchInterval: false,
-    placeholderData: keepPreviousData,
-    retry: 2,
-    retryDelay: 1000,
   });
 }
 
@@ -47,7 +33,6 @@ export function useDeleteFile() {
     mutationFn: deleteFile,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['files'] });
-      queryClient.invalidateQueries({ queryKey: ['comparisons'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });

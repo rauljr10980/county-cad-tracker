@@ -5,13 +5,12 @@ import { Dashboard } from '@/components/dashboard/Dashboard';
 import { PropertiesView } from '@/components/properties/PropertiesView';
 import { TasksView } from '@/components/tasks/TasksView';
 import { UploadView } from '@/components/upload/UploadView';
-import { ComparisonView } from '@/components/comparison/ComparisonView';
 import { FileHistory } from '@/components/files/FileHistory';
 
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
   const hash = window.location.hash.slice(1); // Remove the #
-  const validTabs: TabType[] = ['dashboard', 'properties', 'tasks', 'upload', 'comparison', 'files'];
+  const validTabs: TabType[] = ['dashboard', 'properties', 'tasks', 'upload', 'files'];
   return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
 };
 
@@ -52,8 +51,6 @@ const Index = () => {
         return <TasksView />;
       case 'upload':
         return <UploadView />;
-      case 'comparison':
-        return <ComparisonView />;
       case 'files':
         return <FileHistory />;
       default:

@@ -171,7 +171,6 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         <ul className="text-sm text-muted-foreground space-y-1">
           <li>• Automatic header detection and column mapping</li>
           <li>• Status detection for each property (J/A/P)</li>
-          <li>• Comparison with previous uploads</li>
           <li>• Optional CAD data fetching from Bexar County</li>
         </ul>
       </div>

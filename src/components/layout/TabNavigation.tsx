@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, List, Upload, GitCompare, FileText, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, List, Upload, FileText, CheckSquare } from 'lucide-react';
 
-export type TabType = 'dashboard' | 'properties' | 'tasks' | 'upload' | 'comparison' | 'files';
+export type TabType = 'dashboard' | 'properties' | 'tasks' | 'upload' | 'files';
 
 interface TabNavigationProps {
   activeTab: TabType;
@@ -12,7 +12,6 @@ const tabs = [
   { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
   { id: 'properties' as TabType, label: 'Properties', icon: List },
   { id: 'tasks' as TabType, label: 'Tasks', icon: CheckSquare },
-  { id: 'comparison' as TabType, label: 'Comparison', icon: GitCompare },
   { id: 'upload' as TabType, label: 'Upload', icon: Upload },
   { id: 'files' as TabType, label: 'Files', icon: FileText },
 ];

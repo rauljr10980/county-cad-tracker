@@ -88,43 +88,6 @@ export async function getComparison(fileId: string) {
 }
 
 /**
- * Get latest comparison report
- */
-export async function getLatestComparison() {
-  const response = await fetch(`${API_BASE_URL}/api/comparisons/latest`);
-  if (!response.ok) {
-    if (response.status === 404) {
-      return null;
-    }
-    // Try to get error message from response
-    try {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch latest comparison');
-    } catch (e) {
-      throw new Error('Failed to fetch latest comparison');
-    }
-  }
-  return response.json();
-}
-
-/**
- * Force generate comparison from latest two files
- */
-export async function generateComparison() {
-  const response = await fetch(`${API_BASE_URL}/api/comparisons/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to generate comparison');
-  }
-  return response.json();
-}
-
-/**
  * Get dashboard statistics
  */
 export async function getDashboardStats() {
