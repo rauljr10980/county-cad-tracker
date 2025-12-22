@@ -2,6 +2,7 @@ import { Building2, RefreshCw, Settings, LogIn, LogOut, User } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
+import { SignupModal } from '@/components/auth/SignupModal';
 import { useState } from 'react';
 import {
   DropdownMenu,
@@ -20,6 +21,7 @@ interface HeaderProps {
 export function Header({ onRefresh, isRefreshing }: HeaderProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isSignupOpen, setIsSignupOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -97,7 +99,22 @@ export function Header({ onRefresh, isRefreshing }: HeaderProps) {
           </div>
         </div>
       </header>
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+      <LoginModal 
+        isOpen={isLoginOpen} 
+        onClose={() => setIsLoginOpen(false)}
+        onSwitchToSignup={() => {
+          setIsLoginOpen(false);
+          setIsSignupOpen(true);
+        }}
+      />
+      <SignupModal
+        isOpen={isSignupOpen}
+        onClose={() => setIsSignupOpen(false)}
+        onSwitchToLogin={() => {
+          setIsSignupOpen(false);
+          setIsLoginOpen(true);
+        }}
+      />
     </>
   );
 }

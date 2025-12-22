@@ -10,9 +10,10 @@ import { toast } from '@/hooks/use-toast';
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSwitchToSignup: () => void;
 }
 
-export function LoginModal({ isOpen, onClose }: LoginModalProps) {
+export function LoginModal({ isOpen, onClose, onSwitchToSignup }: LoginModalProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -105,6 +106,16 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               'Login'
             )}
           </Button>
+          <div className="text-center text-sm">
+            <span className="text-muted-foreground">Don't have an account? </span>
+            <button
+              type="button"
+              onClick={onSwitchToSignup}
+              className="text-primary hover:underline"
+            >
+              Sign up
+            </button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

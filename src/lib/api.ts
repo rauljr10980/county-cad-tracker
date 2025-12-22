@@ -345,3 +345,39 @@ export async function checkSession() {
   return response.json();
 }
 
+/**
+ * Register new user
+ */
+export async function register(username: string, email: string, password: string) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, email, password }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Registration failed');
+  }
+  
+  return response.json();
+}
+
+/**
+ * Verify email with token
+ */
+export async function verifyEmail(token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/verify-email?token=${encodeURIComponent(token)}`, {
+    method: 'GET',
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Email verification failed');
+  }
+  
+  return response.json();
+}
+

@@ -76,15 +76,58 @@ app.get('/api/health', (req, res) => {
 // Simple JWT implementation (for production, use a proper library like jsonwebtoken)
 // For now, we'll use a simple token-based system
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const USERS = {
+const BUCKET_NAME = process.env.GCS_BUCKET || 'county-cad-tracker-files';
+
+// User storage (in production, use a database)
+// Format: { username: { id, username, password, email, verified, createdAt } }
+let USERS = {
   // Default user - in production, store in database with hashed passwords
   admin: {
     id: '1',
     username: 'admin',
     password: 'admin', // In production, use bcrypt to hash passwords
-    email: 'admin@example.com'
+    email: 'admin@example.com',
+    verified: true,
+    createdAt: new Date().toISOString()
   }
 };
+
+// Verification tokens storage: { token: { email, username, expiresAt } }
+const VERIFICATION_TOKENS = {};
+
+// Load users from storage if available (for persistence)
+async function loadUsers() {
+  try {
+    if (storage) {
+      const bucket = storage.bucket(BUCKET_NAME);
+      const usersData = await loadJSON(bucket, 'data/users.json');
+      if (usersData) {
+        USERS = { ...USERS, ...usersData };
+        console.log('[AUTH] Loaded users from storage');
+      }
+    }
+  } catch (error) {
+    console.log('[AUTH] No existing users file, starting fresh');
+  }
+}
+
+// Save users to storage
+async function saveUsers() {
+  try {
+    if (storage) {
+      const bucket = storage.bucket(BUCKET_NAME);
+      await saveJSON(bucket, 'data/users.json', USERS);
+      console.log('[AUTH] Saved users to storage');
+    }
+  } catch (error) {
+    console.error('[AUTH] Failed to save users:', error);
+  }
+}
+
+// Initialize users on startup (after storage is ready)
+setTimeout(() => {
+  loadUsers();
+}, 1000);
 
 // Simple token generation (in production, use proper JWT library)
 function generateToken(user) {
@@ -128,6 +171,174 @@ function authenticateToken(req, res, next) {
   next();
 }
 
+// Email configuration (using nodemailer)
+const nodemailer = require('nodemailer');
+
+// Create email transporter
+// For production, configure with real SMTP credentials
+// For development, you can use Gmail, SendGrid, or other services
+const emailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: false, // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER || process.env.EMAIL_USER,
+    pass: process.env.SMTP_PASS || process.env.EMAIL_PASSWORD,
+  },
+});
+
+// Generate verification token
+function generateVerificationToken() {
+  return Buffer.from(Date.now().toString() + Math.random().toString()).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
+}
+
+// Send verification email
+async function sendVerificationEmail(email, username, token) {
+  const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:8080'}/verify-email?token=${token}`;
+  
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || 'noreply@county-cad-tracker.com',
+    to: email,
+    subject: 'Verify your email address',
+    html: `
+      <h2>Welcome to County CAD Tracker!</h2>
+      <p>Hi ${username},</p>
+      <p>Thank you for signing up. Please verify your email address by clicking the link below:</p>
+      <p><a href="${verificationUrl}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a></p>
+      <p>Or copy and paste this link into your browser:</p>
+      <p>${verificationUrl}</p>
+      <p>This link will expire in 24 hours.</p>
+      <p>If you didn't create an account, please ignore this email.</p>
+    `,
+  };
+
+  try {
+    // If no email credentials are configured, log the verification link instead
+    if (!process.env.SMTP_USER && !process.env.EMAIL_USER) {
+      console.log('[AUTH] Email not configured. Verification link:', verificationUrl);
+      return { success: true, verificationUrl };
+    }
+    
+    await emailTransporter.sendMail(mailOptions);
+    console.log('[AUTH] Verification email sent to:', email);
+    return { success: true };
+  } catch (error) {
+    console.error('[AUTH] Failed to send email:', error);
+    // Still return success and log the URL for development
+    console.log('[AUTH] Verification link (email failed):', verificationUrl);
+    return { success: true, verificationUrl };
+  }
+}
+
+// Registration endpoint
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, password, email } = req.body;
+
+    if (!username || !password || !email) {
+      return res.status(400).json({ error: 'Username, password, and email are required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Check if username already exists
+    if (USERS[username]) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+
+    // Check if email already exists
+    const existingUser = Object.values(USERS).find(u => u.email === email);
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    // Create new user (not verified yet)
+    const userId = Date.now().toString();
+    const newUser = {
+      id: userId,
+      username,
+      password, // In production, hash with bcrypt
+      email,
+      verified: false,
+      createdAt: new Date().toISOString()
+    };
+
+    USERS[username] = newUser;
+    await saveUsers();
+
+    // Generate verification token
+    const verificationToken = generateVerificationToken();
+    VERIFICATION_TOKENS[verificationToken] = {
+      email,
+      username,
+      expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+    };
+
+    // Send verification email
+    const emailResult = await sendVerificationEmail(email, username, verificationToken);
+
+    res.json({
+      message: 'Registration successful. Please check your email to verify your account.',
+      verificationUrl: emailResult.verificationUrl // Include in response for development
+    });
+  } catch (error) {
+    console.error('[AUTH] Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Email verification endpoint
+app.get('/api/auth/verify-email', async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Verification token is required' });
+    }
+
+    const verification = VERIFICATION_TOKENS[token];
+    if (!verification) {
+      return res.status(400).json({ error: 'Invalid verification token' });
+    }
+
+    // Check if token expired
+    if (verification.expiresAt < Date.now()) {
+      delete VERIFICATION_TOKENS[token];
+      return res.status(400).json({ error: 'Verification token has expired' });
+    }
+
+    // Find user by email
+    const user = Object.values(USERS).find(u => u.email === verification.email);
+    if (!user) {
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    // Mark user as verified
+    user.verified = true;
+    USERS[user.username] = user;
+    await saveUsers();
+
+    // Clean up verification token
+    delete VERIFICATION_TOKENS[token];
+
+    res.json({
+      message: 'Email verified successfully. You can now log in.',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('[AUTH] Verification error:', error);
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
 // Login endpoint
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -140,6 +351,13 @@ app.post('/api/auth/login', async (req, res) => {
     const user = USERS[username];
     if (!user || user.password !== password) {
       return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    // Check if email is verified
+    if (!user.verified) {
+      return res.status(403).json({ 
+        error: 'Email not verified. Please check your email and verify your account.' 
+      });
     }
 
     const token = generateToken(user);
@@ -230,8 +448,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`[SERVER] Storage initialized: ${storage ? 'Yes' : 'No'}`);
 });
-
-const BUCKET_NAME = process.env.GCS_BUCKET || 'county-cad-tracker-files';
 
 // Helper functions for Cloud Storage JSON operations
 async function saveJSON(bucket, path, data) {
