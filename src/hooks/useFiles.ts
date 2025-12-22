@@ -32,15 +32,48 @@ export function useUploadFile() {
 }
 
 export function useLatestComparison() {
+  const queryClient = useQueryClient();
+  
   return useQuery<ComparisonReport | null>({
     queryKey: ['comparisons', 'latest'],
-    queryFn: getLatestComparison,
+    queryFn: async () => {
+      console.log('[useLatestComparison] Fetching comparison...');
+      try {
+        const data = await getLatestComparison();
+        console.log('[useLatestComparison] Fetch result:', {
+          hasData: !!data,
+          hasSummary: !!data?.summary,
+          currentFile: data?.currentFile,
+          previousFile: data?.previousFile,
+        });
+        // If we get null but have cached data, don't overwrite it
+        if (!data) {
+          const cached = queryClient.getQueryData<ComparisonReport | null>(['comparisons', 'latest']);
+          if (cached) {
+            console.log('[useLatestComparison] Got null but have cached data, keeping cache');
+            return cached;
+          }
+        }
+        return data;
+      } catch (error) {
+        console.error('[useLatestComparison] Fetch error:', error);
+        // On error, try to keep cached data
+        const cached = queryClient.getQueryData<ComparisonReport | null>(['comparisons', 'latest']);
+        if (cached) {
+          console.log('[useLatestComparison] Error but have cached data, returning cache');
+          return cached;
+        }
+        throw error;
+      }
+    },
     refetchOnMount: true,
     refetchOnWindowFocus: true, // Refetch when window gains focus to catch new comparisons
     // Auto-refetch every 5 seconds when no data (to catch auto-generated comparisons)
     refetchInterval: (query) => {
       // Only refetch if we don't have data (don't refetch if we already have data)
-      return !query.state.data ? 5000 : false;
+      const shouldRefetch = !query.state.data;
+      console.log('[useLatestComparison] Refetch interval check:', { hasData: !!query.state.data, shouldRefetch });
+      return shouldRefetch ? 5000 : false;
     },
     // Keep previous data when refetching to prevent flickering
     placeholderData: keepPreviousData,
@@ -57,8 +90,16 @@ export function useLatestComparison() {
     },
     retryDelay: 2000, // Wait 2 seconds before retry to allow backend generation
     // Don't clear data on error - keep existing data if available
-    onError: () => {
+    onError: (error) => {
+      console.error('[useLatestComparison] Query error:', error);
       // Keep existing data even on error
+    },
+    onSuccess: (data) => {
+      console.log('[useLatestComparison] Query success:', {
+        hasData: !!data,
+        hasSummary: !!data?.summary,
+        currentFile: data?.currentFile,
+      });
     },
   });
 }

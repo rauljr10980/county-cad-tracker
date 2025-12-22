@@ -30,6 +30,14 @@ export function ComparisonView() {
       // Call the generate endpoint directly
       const result = await generateComparison();
       console.log('[COMPARISON] Generation result:', result);
+      console.log('[COMPARISON] Result structure check:', {
+        hasResult: !!result,
+        hasSummary: !!result?.summary,
+        hasCurrentFile: !!result?.currentFile,
+        summary: result?.summary,
+        currentFile: result?.currentFile,
+        previousFile: result?.previousFile,
+      });
       
       // Check if we have comparison data
       if (!result || (!result.summary && !result.currentFile)) {
@@ -38,13 +46,36 @@ export function ComparisonView() {
       }
       
       // Set the data directly in the cache immediately to prevent it from disappearing
+      console.log('[COMPARISON] Setting data in cache...');
       queryClient.setQueryData(['comparisons', 'latest'], result);
       
-      // Wait a moment for the file to be saved to storage
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Verify it was set
+      const cachedData = queryClient.getQueryData(['comparisons', 'latest']);
+      console.log('[COMPARISON] Cached data after setting:', {
+        hasData: !!cachedData,
+        hasSummary: !!cachedData?.summary,
+        currentFile: cachedData?.currentFile,
+      });
       
-      // Then refetch to ensure we have the latest (but don't invalidate, which would clear it)
-      await refetch();
+      // Wait a moment for the file to be saved to storage
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refetch but only update if we get valid data (don't overwrite with null)
+      console.log('[COMPARISON] Refetching to verify...');
+      const refetchResult = await refetch();
+      console.log('[COMPARISON] Refetch result:', {
+        hasData: !!refetchResult.data,
+        data: refetchResult.data ? {
+          hasSummary: !!refetchResult.data.summary,
+          currentFile: refetchResult.data.currentFile,
+        } : null,
+      });
+      
+      // If refetch returned null/empty, keep our cached data
+      if (!refetchResult.data) {
+        console.log('[COMPARISON] Refetch returned null, keeping cached data');
+        queryClient.setQueryData(['comparisons', 'latest'], result);
+      }
       
       toast({
         title: "Comparison Generated",
@@ -52,6 +83,11 @@ export function ComparisonView() {
       });
     } catch (err: any) {
       console.error('[COMPARISON] Failed to regenerate comparison:', err);
+      console.error('[COMPARISON] Error details:', {
+        message: err?.message,
+        error: err?.error,
+        stack: err?.stack,
+      });
       const errorMessage = err?.message || err?.error || "Failed to generate comparison";
       toast({
         title: "Error",
