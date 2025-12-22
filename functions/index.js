@@ -1,5 +1,5 @@
-// Version 2.9.0 - Comparison generation fixes, search functionality, Action Queue improvements
-const CODE_VERSION = '2.9.0';
+// Version 2.9.1 - Fix infinite loop: disable frontend auto-gen, backend only fetches existing comparisons
+const CODE_VERSION = '2.9.1';
 
 // Load environment variables from .env file (for local development)
 // Only load if .env file exists (optional for production)
