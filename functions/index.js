@@ -1,5 +1,5 @@
-// Version 2.9.1 - Fix infinite loop: disable frontend auto-gen, backend only fetches existing comparisons
-const CODE_VERSION = '2.9.1';
+// Version 2.9.2 - Add detailed logging to debug comparison lookup issues
+const CODE_VERSION = '2.9.2';
 
 // Load environment variables from .env file (for local development)
 // Only load if .env file exists (optional for production)
@@ -142,10 +142,14 @@ async function loadJSON(bucket, path) {
   try {
     const file = bucket.file(path);
     const [exists] = await file.exists();
-    if (!exists) return null;
+    if (!exists) {
+      // Not an error - file just doesn't exist
+      return null;
+    }
     const [data] = await file.download();
     return JSON.parse(data.toString());
   } catch (error) {
+    console.error(`[STORAGE] Error loading JSON from ${path}:`, error.message);
     return null;
   }
 }
@@ -1178,6 +1182,7 @@ app.get('/api/comparisons/latest', async (req, res) => {
     // This is more reliable than listing comparison directory directly
     const metadataList = await listFiles(bucket, 'metadata/files/');
     console.log(`[COMPARISON-LATEST] Found ${metadataList.length} metadata files`);
+    console.log(`[COMPARISON-LATEST] Sample metadata paths:`, metadataList.slice(0, 3));
 
     if (metadataList.length === 0) {
       console.log('[COMPARISON-LATEST] No files found');
@@ -1190,16 +1195,17 @@ app.get('/api/comparisons/latest', async (req, res) => {
       .filter(id => id && !isNaN(parseInt(id)))
       .sort((a, b) => parseInt(b) - parseInt(a));
 
-    console.log(`[COMPARISON-LATEST] Checking ${fileIds.length} files for comparisons`);
+    console.log(`[COMPARISON-LATEST] Extracted ${fileIds.length} file IDs`);
+    console.log(`[COMPARISON-LATEST] Top 3 file IDs:`, fileIds.slice(0, 3));
 
     // Try each file until we find a comparison (starting with newest)
     for (const fileId of fileIds) {
       const comparisonPath = `data/comparisons/${fileId}.json`;
-      console.log(`[COMPARISON-LATEST] Checking for comparison at: ${comparisonPath}`);
+      console.log(`[COMPARISON-LATEST] Attempting to load: ${comparisonPath}`);
 
       const comparison = await loadJSON(bucket, comparisonPath);
       if (comparison) {
-        console.log(`[COMPARISON-LATEST] ✓ Found comparison for fileId: ${fileId}`);
+        console.log(`[COMPARISON-LATEST] ✓ SUCCESS - Found comparison for fileId: ${fileId}`);
         console.log(`[COMPARISON-LATEST] Comparison summary:`, {
           currentFileId: comparison.currentFileId,
           previousFileId: comparison.previousFileId,
@@ -1207,13 +1213,16 @@ app.get('/api/comparisons/latest', async (req, res) => {
           statusChanges: comparison.summary?.statusChanges,
         });
         return res.json(comparison);
+      } else {
+        console.log(`[COMPARISON-LATEST] ✗ No comparison file at: ${comparisonPath}`);
       }
     }
 
-    console.log('[COMPARISON-LATEST] No comparisons found for any file');
+    console.log('[COMPARISON-LATEST] FINAL: No comparisons found for any of the ${fileIds.length} files checked');
     return res.status(404).json({ error: 'Comparison not found' });
   } catch (error) {
     console.error('[COMPARISON-LATEST] ERROR:', error);
+    console.error('[COMPARISON-LATEST] Error stack:', error.stack);
     res.status(500).json({ error: error.message });
   }
 });
