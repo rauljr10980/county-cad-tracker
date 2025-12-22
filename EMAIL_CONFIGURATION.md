@@ -2,9 +2,11 @@
 
 This guide explains how to configure email sending for user registration and email verification.
 
-## Quick Setup Options
+## 🆓 Free Email Service Options
 
-### Option 1: Gmail (Easiest for Testing)
+### Option 1: Gmail (Easiest - 500 emails/day FREE)
+**Best for**: Quick setup, personal projects
+**Free Limit**: 500 emails per day
 
 Gmail is the easiest option to get started. You'll need to create an "App Password" since regular passwords won't work.
 
@@ -51,9 +53,53 @@ FRONTEND_URL=http://localhost:8080
 
 ---
 
-### Option 2: SendGrid (Recommended for Production)
+### Option 2: Brevo (formerly Sendinblue) - ⭐ RECOMMENDED
 
-SendGrid offers a free tier (100 emails/day) and is more reliable for production.
+**Best free option!** Brevo offers 300 emails/day forever, better deliverability than Gmail, and easy setup.
+
+**Free Limit**: 300 emails per day (forever)
+
+#### Step 1: Create Brevo Account
+1. Sign up at: https://www.brevo.com/signup
+2. Verify your email address
+3. Complete account setup
+
+#### Step 2: Get SMTP Credentials
+1. Go to: https://app.brevo.com/settings/smtp
+2. Click **Generate** next to "SMTP Key" (if you don't have one)
+3. **Copy your SMTP key**
+4. Note your **SMTP server** and **port**:
+   - Server: `smtp-relay.brevo.com`
+   - Port: `587`
+   - Login: Your Brevo account email
+
+#### Step 3: Set Environment Variables
+
+**For Railway:**
+```
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=your-brevo-email@example.com
+SMTP_PASS=your-brevo-smtp-key-here
+EMAIL_FROM=your-brevo-email@example.com
+FRONTEND_URL=https://your-username.github.io/county-cad-tracker
+```
+
+**For Local Development (`functions/.env`):**
+```env
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=your-brevo-email@example.com
+SMTP_PASS=your-brevo-smtp-key-here
+EMAIL_FROM=your-brevo-email@example.com
+FRONTEND_URL=http://localhost:8080
+```
+
+---
+
+### Option 3: SendGrid (100 emails/day FREE)
+
+SendGrid offers a free tier (100 emails/day) and is reliable for production.
 
 #### Step 1: Create SendGrid Account
 1. Sign up at: https://signup.sendgrid.com
@@ -92,7 +138,34 @@ FRONTEND_URL=http://localhost:8080
 
 ---
 
-### Option 3: Other SMTP Providers
+### Option 4: Resend (3,000 emails/month FREE)
+
+**Note**: Resend uses a REST API, not SMTP. Would require code changes to use.
+
+**Free Limit**: 3,000 emails per month
+
+---
+
+### Option 5: Mailgun (5,000 emails/month FREE for 3 months)
+
+**Free Limit**: 5,000 emails/month for first 3 months, then paid
+
+1. Sign up at: https://signup.mailgun.com
+2. Verify your domain (or use sandbox domain for testing)
+3. Get SMTP credentials from dashboard
+
+**For Railway:**
+```
+SMTP_HOST=smtp.mailgun.org
+SMTP_PORT=587
+SMTP_USER=postmaster@yourdomain.mailgun.org
+SMTP_PASS=your-mailgun-smtp-password
+EMAIL_FROM=noreply@yourdomain.com
+```
+
+---
+
+### Option 6: Other SMTP Providers
 
 You can use any SMTP provider. Here are common ones:
 
@@ -233,10 +306,24 @@ This is useful for development and testing.
 
 ---
 
+## 🆓 Free Tier Comparison
+
+| Service | Free Limit | Setup | Reliability | Best For |
+|---------|-----------|-------|-------------|----------|
+| **Gmail** | 500/day | ⭐ Easy | ⭐⭐ Good | Quick start |
+| **Brevo** | 300/day | ⭐⭐ Medium | ⭐⭐⭐ Excellent | **Recommended** |
+| **SendGrid** | 100/day | ⭐⭐ Medium | ⭐⭐⭐ Excellent | Professional |
+| **Resend** | 3,000/month | ⭐⭐⭐ Hard | ⭐⭐⭐ Excellent | High volume |
+| **Mailgun** | 5,000/month (3mo) | ⭐⭐ Medium | ⭐⭐⭐ Excellent | Temporary boost |
+
+**Our Recommendation**: 
+- **Start with Gmail** (easiest setup)
+- **Switch to Brevo** when you need better reliability (300/day is plenty for user registration)
+
 ## Production Recommendations
 
 For production, consider:
-- **SendGrid** or **Mailgun** (more reliable than Gmail)
+- **Brevo** or **SendGrid** (best free options with good deliverability)
 - **Custom domain** for EMAIL_FROM (e.g., noreply@yourdomain.com)
 - **SPF/DKIM records** configured for your domain
 - **Rate limiting** on registration endpoint

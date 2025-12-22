@@ -1,6 +1,26 @@
-# Email Setup - Quick Start
+# Email Setup - Quick Start (FREE Options)
 
-## For Railway (Production) - 5 Minutes
+## 🆓 Best Free Options
+
+### Option 1: Gmail (Easiest - 500 emails/day)
+**Best for**: Getting started quickly, personal projects
+**Limit**: 500 emails per day
+
+### Option 2: Brevo (formerly Sendinblue) (300 emails/day)
+**Best for**: More reliable than Gmail, good free tier
+**Limit**: 300 emails per day forever
+
+### Option 3: SendGrid (100 emails/day)
+**Best for**: Professional setup, reliable delivery
+**Limit**: 100 emails per day forever
+
+### Option 4: Resend (3,000 emails/month)
+**Best for**: Modern API, generous free tier
+**Limit**: 3,000 emails per month
+
+---
+
+## 🚀 Quick Setup: Gmail (5 Minutes)
 
 ### Step 1: Get Gmail App Password (2 min)
 1. Go to: https://myaccount.google.com/apppasswords
@@ -10,7 +30,7 @@
 ### Step 2: Add Variables to Railway (2 min)
 1. Go to: https://railway.app
 2. Select your project → Backend service → **Variables** tab
-3. Click **New Variable** and add these one by one:
+3. Click **New Variable** and add these:
 
 ```
 SMTP_HOST = smtp.gmail.com
@@ -26,51 +46,89 @@ FRONTEND_URL = https://rauljr10980.github.io/county-cad-tracker
 - `your-16-char-app-password` with the app password from Step 1
 - `rauljr10980.github.io/county-cad-tracker` with your actual GitHub Pages URL
 
-### Step 3: Wait for Redeploy (1 min)
-Railway will automatically redeploy when you add variables. Check the **Deployments** tab to see when it's done.
-
-### Step 4: Test It!
-1. Go to your app
-2. Click **Login** → **Sign up**
-3. Create an account
-4. Check your email for verification link
-5. Click the link to verify
+### Step 3: Test It!
+Railway auto-redeploys. Then register a new user and check your email!
 
 ---
 
-## For Local Development
+## 🎯 Recommended: Brevo (300 emails/day - FREE Forever)
 
-Create `functions/.env` file with:
+**Why Brevo?** More reliable than Gmail, better deliverability, 300/day is plenty for user registration.
+
+### Setup Steps:
+
+1. **Sign up**: https://www.brevo.com/signup (free account)
+2. **Verify your email** and complete setup
+3. **Go to**: Settings → SMTP & API → SMTP
+4. **Copy your SMTP credentials**:
+   - Server: `smtp-relay.brevo.com`
+   - Port: `587`
+   - Login: Your Brevo email
+   - Password: Your SMTP key (click "Generate" if needed)
+
+5. **Add to Railway**:
+```
+SMTP_HOST = smtp-relay.brevo.com
+SMTP_PORT = 587
+SMTP_USER = your-brevo-email@example.com
+SMTP_PASS = your-brevo-smtp-key
+EMAIL_FROM = your-brevo-email@example.com
+FRONTEND_URL = https://rauljr10980.github.io/county-cad-tracker
+```
+
+---
+
+## 📧 Other Free Options
+
+### SendGrid (100/day - FREE)
+```
+SMTP_HOST = smtp.sendgrid.net
+SMTP_PORT = 587
+SMTP_USER = apikey
+SMTP_PASS = your-sendgrid-api-key
+EMAIL_FROM = verified-sender@yourdomain.com
+```
+
+### Resend (3,000/month - FREE)
+**Note**: Resend uses API, not SMTP. Would need code changes.
+
+### Mailgun (5,000/month - FREE for 3 months)
+```
+SMTP_HOST = smtp.mailgun.org
+SMTP_PORT = 587
+SMTP_USER = postmaster@yourdomain.mailgun.org
+SMTP_PASS = your-mailgun-password
+EMAIL_FROM = noreply@yourdomain.com
+```
+
+---
+
+## 💻 For Local Development
+
+Create `functions/.env` file:
 
 ```env
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-16-char-app-password
+SMTP_PASS=your-app-password
 EMAIL_FROM=your-email@gmail.com
 FRONTEND_URL=http://localhost:8080
 ```
 
-Then restart your backend server.
-
 ---
 
-## Alternative: SendGrid (Better for Production)
+## 🆓 Free Tier Comparison
 
-If you want to use SendGrid instead of Gmail:
+| Service | Free Limit | Setup Difficulty | Best For |
+|---------|-----------|-------------------|----------|
+| **Gmail** | 500/day | ⭐ Easy | Quick start |
+| **Brevo** | 300/day | ⭐⭐ Medium | Best balance |
+| **SendGrid** | 100/day | ⭐⭐ Medium | Professional |
+| **Resend** | 3,000/month | ⭐⭐⭐ Hard | High volume |
+| **Mailgun** | 5,000/month (3mo) | ⭐⭐ Medium | Temporary |
 
-1. Sign up: https://signup.sendgrid.com
-2. Create API Key: https://app.sendgrid.com/settings/api_keys
-3. Use these variables in Railway:
-
-```
-SMTP_HOST=smtp.sendgrid.net
-SMTP_PORT=587
-SMTP_USER=apikey
-SMTP_PASS=your-sendgrid-api-key
-EMAIL_FROM=noreply@yourdomain.com
-FRONTEND_URL=https://rauljr10980.github.io/county-cad-tracker
-```
+**Recommendation**: Start with **Gmail** (easiest), then switch to **Brevo** for better reliability.
 
 ---
 
