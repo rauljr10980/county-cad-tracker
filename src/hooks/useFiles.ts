@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { getFiles, uploadFile, deleteFile, getLatestComparison, getDashboardStats, getProperties } from '@/lib/api';
 import type { UploadedFile, ComparisonReport, DashboardStats, Property } from '@/types/property';
 
@@ -37,11 +37,13 @@ export function useLatestComparison() {
     queryFn: getLatestComparison,
     refetchOnMount: true,
     refetchOnWindowFocus: true, // Refetch when window gains focus to catch new comparisons
-    // Auto-refetch every 3 seconds when no data (to catch auto-generated comparisons quickly)
+    // Auto-refetch every 5 seconds when no data (to catch auto-generated comparisons)
     refetchInterval: (query) => {
-      // Aggressively refetch if we don't have data (to catch auto-generated comparisons)
-      return !query.state.data ? 3000 : false;
+      // Only refetch if we don't have data (don't refetch if we already have data)
+      return !query.state.data ? 5000 : false;
     },
+    // Keep previous data when refetching to prevent flickering
+    placeholderData: keepPreviousData,
     retry: (failureCount, error) => {
       // Don't retry on 404 (no comparison available) - but the backend will auto-generate
       if (error && typeof error === 'object' && 'message' in error) {
@@ -54,6 +56,10 @@ export function useLatestComparison() {
       return false;
     },
     retryDelay: 2000, // Wait 2 seconds before retry to allow backend generation
+    // Don't clear data on error - keep existing data if available
+    onError: () => {
+      // Keep existing data even on error
+    },
   });
 }
 
