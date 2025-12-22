@@ -11,10 +11,10 @@ interface TabNavigationProps {
 const tabs = [
   { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
   { id: 'properties' as TabType, label: 'Properties', icon: List },
-  { id: 'preforeclosures' as TabType, label: 'Pre-Foreclosures', icon: Home },
   { id: 'tasks' as TabType, label: 'Tasks', icon: CheckSquare },
   { id: 'upload' as TabType, label: 'Upload', icon: Upload },
   { id: 'files' as TabType, label: 'Files', icon: FileText },
+  { id: 'preforeclosures' as TabType, label: 'Pre-Foreclosures', icon: Home },
 ];
 
 export function TabNavigation({ activeTab, onTabChange }: TabNavigationProps) {
