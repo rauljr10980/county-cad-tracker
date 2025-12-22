@@ -1174,43 +1174,60 @@ app.get('/api/comparisons/latest', async (req, res) => {
     console.log('[COMPARISON-LATEST] Fetching latest comparison');
     const bucket = storage.bucket(BUCKET_NAME);
 
-    // Strategy: List metadata files and check each for a comparison
-    // This is more reliable than listing comparison directory directly
-    const metadataList = await listFiles(bucket, 'metadata/files/');
-    console.log(`[COMPARISON-LATEST] Found ${metadataList.length} metadata files`);
+    // Strategy: List comparison files directly - more reliable than checking metadata
+    const comparisonList = await listFiles(bucket, 'data/comparisons/');
+    console.log(`[COMPARISON-LATEST] Found ${comparisonList.length} comparison files`);
 
-    if (metadataList.length === 0) {
-      console.log('[COMPARISON-LATEST] No files found');
+    if (comparisonList.length === 0) {
+      console.log('[COMPARISON-LATEST] No comparison files found');
       return res.status(404).json({ error: 'No comparisons found' });
     }
 
-    // Extract file IDs and sort by timestamp (newest first)
-    const fileIds = metadataList
-      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+    // Extract file IDs from comparison paths and sort by timestamp (newest first)
+    // Format: data/comparisons/1766180559090.json
+    const fileIds = comparisonList
+      .map(f => f.replace('data/comparisons/', '').replace('.json', ''))
       .filter(id => id && !isNaN(parseInt(id)))
       .sort((a, b) => parseInt(b) - parseInt(a));
 
-    console.log(`[COMPARISON-LATEST] Checking ${fileIds.length} files for comparisons`);
+    console.log(`[COMPARISON-LATEST] Found ${fileIds.length} comparison files, checking newest first`);
 
-    // Try each file until we find a comparison (starting with newest)
+    // Try each file until we find a valid comparison (starting with newest)
     for (const fileId of fileIds) {
       const comparisonPath = `data/comparisons/${fileId}.json`;
-      console.log(`[COMPARISON-LATEST] Checking for comparison at: ${comparisonPath}`);
+      console.log(`[COMPARISON-LATEST] Loading comparison from: ${comparisonPath}`);
 
-      const comparison = await loadJSON(bucket, comparisonPath);
-      if (comparison) {
-        console.log(`[COMPARISON-LATEST] ✓ Found comparison for fileId: ${fileId}`);
-        console.log(`[COMPARISON-LATEST] Comparison summary:`, {
-          currentFileId: comparison.currentFileId,
-          previousFileId: comparison.previousFileId,
-          newProperties: comparison.summary?.newProperties,
-          statusChanges: comparison.summary?.statusChanges,
-        });
-        return res.json(comparison);
+      try {
+        const comparison = await loadJSON(bucket, comparisonPath);
+        if (comparison && comparison.summary) {
+          console.log(`[COMPARISON-LATEST] ✓ Found valid comparison for fileId: ${fileId}`);
+          console.log(`[COMPARISON-LATEST] Comparison summary:`, {
+            currentFileId: comparison.currentFileId || fileId,
+            previousFileId: comparison.previousFileId,
+            newProperties: comparison.summary?.newProperties,
+            removedProperties: comparison.summary?.removedProperties,
+            statusChanges: comparison.summary?.statusChanges,
+          });
+          
+          // Ensure currentFileId and previousFileId are set (for backwards compatibility)
+          const responseData = {
+            ...comparison,
+            currentFileId: comparison.currentFileId || fileId,
+            currentFile: comparison.currentFile || comparison.currentFileId || fileId,
+            previousFile: comparison.previousFile || comparison.previousFileId,
+          };
+          
+          return res.json(responseData);
+        } else {
+          console.log(`[COMPARISON-LATEST] Comparison file exists but is invalid or missing summary`);
+        }
+      } catch (loadError) {
+        console.log(`[COMPARISON-LATEST] Error loading comparison ${fileId}:`, loadError.message);
+        // Continue to next file
       }
     }
 
-    console.log('[COMPARISON-LATEST] No comparisons found for any file');
+    console.log('[COMPARISON-LATEST] No valid comparisons found');
     return res.status(404).json({ error: 'Comparison not found' });
   } catch (error) {
     console.error('[COMPARISON-LATEST] ERROR:', error);
