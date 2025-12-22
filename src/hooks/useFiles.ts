@@ -35,25 +35,16 @@ export function useLatestComparison() {
   return useQuery<ComparisonReport | null>({
     queryKey: ['comparisons', 'latest'],
     queryFn: getLatestComparison,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true, // Refetch when window gains focus to catch new comparisons
-    // Auto-refetch every 3 seconds when no data (to catch auto-generated comparisons quickly)
-    refetchInterval: (query) => {
-      // Aggressively refetch if we don't have data (to catch auto-generated comparisons)
-      return !query.state.data ? 3000 : false;
+    refetchOnMount: true, // Check once on mount
+    refetchOnWindowFocus: false, // Don't refetch - rely on manual generation
+    // Disable auto-refetch - manual "Generate Comparison" button sets data directly
+    refetchInterval: false,
+    retry: 1, // Only retry once
+    retryDelay: 1000,
+    // Treat 404 as success with null data (no comparison available yet)
+    onError: () => {
+      // Don't throw on 404 - just means no comparison exists yet
     },
-    retry: (failureCount, error) => {
-      // Don't retry on 404 (no comparison available) - but the backend will auto-generate
-      if (error && typeof error === 'object' && 'message' in error) {
-        const errorMsg = String(error.message);
-        if (errorMsg.includes('404') || errorMsg.includes('No comparisons found')) {
-          // Retry multiple times to allow backend to generate comparison
-          return failureCount < 3;
-        }
-      }
-      return false;
-    },
-    retryDelay: 2000, // Wait 2 seconds before retry to allow backend generation
   });
 }
 
