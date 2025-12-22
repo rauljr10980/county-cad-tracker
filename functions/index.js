@@ -1,5 +1,5 @@
-// Version 2.9.0 - Comparison generation fixes, search functionality, Action Queue improvements
-const CODE_VERSION = '2.9.0';
+// Version 2.9.3 - Fix comparison display: cache-first loading, improved error handling
+const CODE_VERSION = '2.9.3';
 
 // Load environment variables from .env file (for local development)
 // Only load if .env file exists (optional for production)
@@ -142,10 +142,14 @@ async function loadJSON(bucket, path) {
   try {
     const file = bucket.file(path);
     const [exists] = await file.exists();
-    if (!exists) return null;
+    if (!exists) {
+      // Not an error - file just doesn't exist
+      return null;
+    }
     const [data] = await file.download();
     return JSON.parse(data.toString());
   } catch (error) {
+    console.error(`[STORAGE] Error loading JSON from ${path}:`, error.message);
     return null;
   }
 }
