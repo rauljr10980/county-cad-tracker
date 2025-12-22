@@ -45,7 +45,7 @@ export function ComparisonView() {
         throw new Error('Comparison generation returned invalid data structure');
       }
       
-      // Set the data directly in the cache immediately to prevent it from disappearing
+      // Set the data directly in the cache immediately
       console.log('[COMPARISON] Setting data in cache...');
       queryClient.setQueryData(['comparisons', 'latest'], result);
       
@@ -55,26 +55,18 @@ export function ComparisonView() {
         hasData: !!cachedData,
         hasSummary: !!cachedData?.summary,
         currentFile: cachedData?.currentFile,
+        previousFile: cachedData?.previousFile,
       });
       
-      // Force the query to update by calling refetch, but it will use cached data first
-      // The queryFn checks cache first, so it will return our cached data
-      console.log('[COMPARISON] Triggering query update to re-render component...');
-      await refetch();
-      
-      // Double-check the data is still there after refetch
-      const finalData = queryClient.getQueryData(['comparisons', 'latest']);
-      console.log('[COMPARISON] Final cached data after refetch:', {
-        hasData: !!finalData,
-        hasSummary: !!finalData?.summary,
-        currentFile: finalData?.currentFile,
+      // Invalidate the query to trigger a re-render, but don't refetch (use cached data)
+      // This ensures the component updates to show the new data
+      console.log('[COMPARISON] Invalidating query to trigger component update...');
+      await queryClient.invalidateQueries({ 
+        queryKey: ['comparisons', 'latest'],
+        refetchType: 'none', // Don't refetch, just update state
       });
       
-      // If refetch cleared it (shouldn't happen with our cache-first logic), restore it
-      if (!finalData) {
-        console.log('[COMPARISON] WARNING: Data was cleared, restoring...');
-        queryClient.setQueryData(['comparisons', 'latest'], result);
-      }
+      console.log('[COMPARISON] Query invalidated - component should re-render with cached data');
       
       toast({
         title: "Comparison Generated",
