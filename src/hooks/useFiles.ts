@@ -48,6 +48,19 @@ export function useDashboardStats() {
   });
 }
 
+export interface PropertiesResponse {
+  properties: Property[];
+  total: number;
+  totalUnfiltered: number;
+  totalPages: number;
+  statusCounts: {
+    J: number;
+    A: number;
+    P: number;
+    other: number;
+  };
+}
+
 export function useProperties(filters?: {
   status?: string;
   search?: string;
@@ -56,7 +69,7 @@ export function useProperties(filters?: {
   page?: number;
   limit?: number;
 }) {
-  return useQuery<Property[]>({
+  return useQuery<PropertiesResponse | Property[]>({
     queryKey: ['properties', filters],
     queryFn: () => getProperties(
       filters?.page || 1,
