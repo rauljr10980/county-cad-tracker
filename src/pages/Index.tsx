@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header';
 import { TabNavigation, TabType } from '@/components/layout/TabNavigation';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { PropertiesView } from '@/components/properties/PropertiesView';
+import { TasksView } from '@/components/tasks/TasksView';
 import { UploadView } from '@/components/upload/UploadView';
 import { ComparisonView } from '@/components/comparison/ComparisonView';
 import { FileHistory } from '@/components/files/FileHistory';
@@ -24,6 +25,8 @@ const Index = () => {
         return <Dashboard onFilterChange={() => setActiveTab('properties')} />;
       case 'properties':
         return <PropertiesView />;
+      case 'tasks':
+        return <TasksView />;
       case 'upload':
         return <UploadView />;
       case 'comparison':
