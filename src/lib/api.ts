@@ -7,6 +7,23 @@ if (import.meta.env.PROD) {
   console.log('[API] Using API URL:', API_BASE_URL);
 }
 
+// Helper function to get auth token
+function getAuthToken(): string | null {
+  return localStorage.getItem('authToken');
+}
+
+// Helper function to get headers with auth
+function getAuthHeaders(): HeadersInit {
+  const token = getAuthToken();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export interface ApiResponse<T> {
   success?: boolean;
   data?: T;
@@ -253,6 +270,78 @@ export async function markTaskDone(
   if (!response.ok) {
     throw new Error('Failed to mark task as done');
   }
+  return response.json();
+}
+
+/**
+ * Login user
+ */
+export async function login(username: string, password: string) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, password }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Login failed');
+  }
+  
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Logout user
+ */
+export async function logout() {
+  const token = getAuthToken();
+  if (!token) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      // Even if API call fails, we'll clear local storage
+      console.error('Logout API call failed');
+    }
+  } catch (error) {
+    // Network error - still clear local storage
+    console.error('Logout error:', error);
+  }
+}
+
+/**
+ * Check current session
+ */
+export async function checkSession() {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('No token found');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/auth/session`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('authToken');
+      throw new Error('Session expired');
+    }
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to check session');
+  }
+  
   return response.json();
 }
 

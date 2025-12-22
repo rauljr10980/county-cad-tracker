@@ -73,6 +73,109 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Simple JWT implementation (for production, use a proper library like jsonwebtoken)
+// For now, we'll use a simple token-based system
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const USERS = {
+  // Default user - in production, store in database with hashed passwords
+  admin: {
+    id: '1',
+    username: 'admin',
+    password: 'admin', // In production, use bcrypt to hash passwords
+    email: 'admin@example.com'
+  }
+};
+
+// Simple token generation (in production, use proper JWT library)
+function generateToken(user) {
+  const payload = {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    exp: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+  };
+  // Simple base64 encoding (in production, use proper JWT signing)
+  return Buffer.from(JSON.stringify(payload)).toString('base64');
+}
+
+function verifyToken(token) {
+  try {
+    const payload = JSON.parse(Buffer.from(token, 'base64').toString());
+    if (payload.exp && payload.exp < Date.now()) {
+      return null; // Token expired
+    }
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Authentication middleware
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  const payload = verifyToken(token);
+  if (!payload) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  req.user = payload;
+  next();
+}
+
+// Login endpoint
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    const user = USERS[username];
+    if (!user || user.password !== password) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const token = generateToken(user);
+    
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email
+      },
+      token
+    });
+  } catch (error) {
+    console.error('[AUTH] Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', authenticateToken, (req, res) => {
+  // In a stateless JWT system, logout is handled client-side
+  // But we can log it for audit purposes
+  res.json({ message: 'Logged out successfully' });
+});
+
+// Session check endpoint
+app.get('/api/auth/session', authenticateToken, (req, res) => {
+  res.json({
+    user: {
+      id: req.user.id,
+      username: req.user.username,
+      email: req.user.email
+    }
+  });
+});
+
 // Debug endpoint to check last processed file's raw data
 app.get('/api/debug/sample', async (req, res) => {
   try {
