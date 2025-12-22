@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/layout/Header';
 import { TabNavigation, TabType } from '@/components/layout/TabNavigation';
 import { Dashboard } from '@/components/dashboard/Dashboard';
@@ -8,9 +8,32 @@ import { UploadView } from '@/components/upload/UploadView';
 import { ComparisonView } from '@/components/comparison/ComparisonView';
 import { FileHistory } from '@/components/files/FileHistory';
 
+// Get initial tab from URL hash, default to dashboard
+const getInitialTab = (): TabType => {
+  const hash = window.location.hash.slice(1); // Remove the #
+  const validTabs: TabType[] = ['dashboard', 'properties', 'tasks', 'upload', 'comparison', 'files'];
+  return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
+};
+
 const Index = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Update URL hash when tab changes
+  useEffect(() => {
+    window.location.hash = activeTab;
+  }, [activeTab]);
+
+  // Listen for hash changes (e.g., browser back/forward)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const newTab = getInitialTab();
+      setActiveTab(newTab);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
