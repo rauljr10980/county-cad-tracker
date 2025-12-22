@@ -1,4 +1,4 @@
-import { Building2, DollarSign, TrendingUp, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import { Building2, TrendingUp, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyStatus } from '@/types/property';
@@ -13,15 +13,6 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
 
   const isLoading = statsLoading;
   const error = statsError;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   if (error) {
     return (
@@ -49,19 +40,13 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   return (
     <div className="p-6 space-y-6">
       {/* Main Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
           title="Total Properties"
           value={stats.totalProperties}
           subtitle="In current dataset"
           icon={Building2}
           variant="primary"
-        />
-        <StatCard
-          title="Total Amount Due"
-          value={formatCurrency(stats.totalAmountDue)}
-          subtitle={`Avg: ${formatCurrency(stats.avgAmountDue)}`}
-          icon={DollarSign}
         />
         <StatCard
           title="New This Month"
