@@ -96,11 +96,6 @@ export function PropertiesView() {
           </div>
         </div>
 
-        {/* Drag and Drop File Upload Zone */}
-        <div className="mb-6">
-          <FileDropZone compact onUploadComplete={handleUploadComplete} />
-        </div>
-
         {/* Search Bar */}
         <div className="mb-4">
           <div className="relative max-w-md">
@@ -199,6 +194,11 @@ export function PropertiesView() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* Drag and Drop File Upload Zone */}
+      <div className="mb-6">
+        <FileDropZone compact onUploadComplete={handleUploadComplete} />
       </div>
 
       {isLoading ? (
