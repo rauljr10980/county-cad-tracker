@@ -119,15 +119,13 @@ export interface ProcessingStatus {
   estimatedCompletion?: string;
 }
 
-// Pre-Foreclosure Types (Strict Mode - No Enrichment)
+// Pre-Foreclosure Data Model (Strict - No Enrichment)
 export type PreForeclosureType = 'Mortgage' | 'Tax';
-export type PreForeclosureInternalStatus = 'New' | 'Contact Attempted' | 'Monitoring' | 'Dead';
+export type PreForeclosureStatus = 'New' | 'Contact Attempted' | 'Monitoring' | 'Dead';
 
-export interface PreForeclosure {
-  // Immutable (from file) - Primary Key
-  document_number: string;
-  
+export interface PreForeclosureRecord {
   // Immutable (from file)
+  document_number: string; // Primary key
   type: PreForeclosureType;
   address: string;
   city: string;
@@ -135,34 +133,16 @@ export interface PreForeclosure {
   filing_month: string; // e.g., "January 2026"
   county: string; // e.g., "Bexar"
   
-  // System tracking (internal)
-  first_seen_month: string;
-  last_seen_month: string;
-  inactive: boolean;
-  
   // Operator-Entered (manual only)
-  internal_status: PreForeclosureInternalStatus;
+  internal_status: PreForeclosureStatus;
   notes?: string;
-  last_action_date?: string;
-  next_follow_up_date?: string;
-}
-
-export interface PreForeclosureFile {
-  id: string;
-  filename: string;
-  uploadedAt: string;
-  processedAt?: string;
-  recordCount: number;
-  status: 'pending' | 'processing' | 'completed' | 'error';
-  errorMessage?: string;
-}
-
-export interface PreForeclosureDashboardStats {
-  totalFilingsThisMonth: number;
-  mortgageCount: number;
-  taxCount: number;
-  byCity: Record<string, number>;
-  byZip: Record<string, number>;
-  activeCount: number;
-  inactiveCount: number;
+  last_action_date?: string; // ISO date string
+  next_follow_up_date?: string; // ISO date string
+  
+  // System-tracked (not user-editable)
+  inactive: boolean; // true if record missing from latest upload
+  first_seen_month: string; // System-tracked
+  last_seen_month: string; // System-tracked
+  created_at: string; // ISO timestamp
+  updated_at: string; // ISO timestamp
 }

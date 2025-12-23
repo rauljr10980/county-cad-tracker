@@ -2253,5 +2253,222 @@ app.get('/api/debug/verify', async (req, res) => {
   }
 });
 
+// ============================================================================
+// PRE-FORECLOSURE ENDPOINTS (Strict Data Model - No Enrichment)
+// ============================================================================
+
+/**
+ * Get all pre-foreclosure records
+ */
+app.get('/api/preforeclosure', async (req, res) => {
+  try {
+    const bucket = storage.bucket(BUCKET_NAME);
+    const file = bucket.file('data/preforeclosure/records.json');
+    
+    // Check if file exists
+    const [exists] = await file.exists();
+    if (!exists) {
+      return res.json([]);
+    }
+    
+    // Download and parse
+    const [data] = await file.download();
+    const records = JSON.parse(data.toString());
+    
+    res.json(records);
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Error fetching records:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Update a pre-foreclosure record (operator-entered fields only)
+ */
+app.put('/api/preforeclosure/:document_number', async (req, res) => {
+  try {
+    const { document_number } = req.params;
+    const { internal_status, notes, last_action_date, next_follow_up_date } = req.body;
+    
+    const bucket = storage.bucket(BUCKET_NAME);
+    const file = bucket.file('data/preforeclosure/records.json');
+    
+    // Load existing records
+    let records = [];
+    const [exists] = await file.exists();
+    if (exists) {
+      const [data] = await file.download();
+      records = JSON.parse(data.toString());
+    }
+    
+    // Find and update record
+    const recordIndex = records.findIndex(r => r.document_number === document_number);
+    if (recordIndex === -1) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    
+    // Update only operator-entered fields
+    const record = records[recordIndex];
+    if (internal_status !== undefined) record.internal_status = internal_status;
+    if (notes !== undefined) record.notes = notes;
+    if (last_action_date !== undefined) record.last_action_date = last_action_date;
+    if (next_follow_up_date !== undefined) record.next_follow_up_date = next_follow_up_date;
+    record.updated_at = new Date().toISOString();
+    
+    // Save back to storage
+    await file.save(JSON.stringify(records, null, 2), {
+      contentType: 'application/json',
+    });
+    
+    res.json(record);
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Error updating record:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Upload pre-foreclosure file
+ * Matches on document_number, sets inactive=true for missing records
+ */
+app.post('/api/preforeclosure/upload', async (req, res) => {
+  try {
+    const { filename, fileData } = req.body;
+    
+    if (!fileData) {
+      return res.status(400).json({ error: 'No file data provided' });
+    }
+    
+    // Decode base64
+    const buffer = Buffer.from(fileData, 'base64');
+    
+    // Parse Excel file
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+    
+    console.log(`[PRE-FORECLOSURE] Parsed ${rawData.length} rows from ${filename}`);
+    
+    // Determine current month (for filing_month if not in file)
+    const currentDate = new Date();
+    const currentMonth = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    // Map Excel columns to our data model
+    // Expected columns: document_number, type, address, city, zip, filing_month (optional)
+    const newRecords = rawData.map((row, index) => {
+      // Try to find columns (case-insensitive, flexible matching)
+      const docNum = row['Document Number'] || row['document_number'] || row['Document #'] || row['Doc Number'] || '';
+      const type = row['Type'] || row['type'] || '';
+      const address = row['Address'] || row['address'] || '';
+      const city = row['City'] || row['city'] || '';
+      const zip = row['ZIP'] || row['zip'] || row['Zip'] || row['Zip Code'] || '';
+      const filingMonth = row['Filing Month'] || row['filing_month'] || row['FilingMonth'] || currentMonth;
+      
+      if (!docNum) {
+        console.warn(`[PRE-FORECLOSURE] Row ${index + 1} missing document_number, skipping`);
+        return null;
+      }
+      
+      return {
+        document_number: String(docNum).trim(),
+        type: (type === 'Mortgage' || type === 'Tax') ? type : 'Mortgage', // Default to Mortgage
+        address: String(address).trim(),
+        city: String(city).trim(),
+        zip: String(zip).trim(),
+        filing_month: String(filingMonth).trim(),
+        county: 'Bexar',
+        // Operator-entered fields (preserved from existing record)
+        internal_status: 'New',
+        notes: undefined,
+        last_action_date: undefined,
+        next_follow_up_date: undefined,
+        // System-tracked
+        inactive: false,
+        first_seen_month: currentMonth,
+        last_seen_month: currentMonth,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }).filter(r => r !== null);
+    
+    console.log(`[PRE-FORECLOSURE] Mapped ${newRecords.length} valid records`);
+    
+    // Load existing records
+    const bucket = storage.bucket(BUCKET_NAME);
+    const file = bucket.file('data/preforeclosure/records.json');
+    
+    let existingRecords = [];
+    const [exists] = await file.exists();
+    if (exists) {
+      const [data] = await file.download();
+      existingRecords = JSON.parse(data.toString());
+    }
+    
+    // Create a map of existing records by document_number
+    const existingMap = new Map();
+    existingRecords.forEach(r => {
+      existingMap.set(r.document_number, r);
+    });
+    
+    // Create a set of new document_numbers
+    const newDocNumbers = new Set(newRecords.map(r => r.document_number));
+    
+    // Process new records: match on document_number, preserve operator-entered fields
+    const updatedRecords = newRecords.map(newRecord => {
+      const existing = existingMap.get(newRecord.document_number);
+      
+      if (existing) {
+        // Preserve operator-entered fields
+        return {
+          ...newRecord,
+          internal_status: existing.internal_status || 'New',
+          notes: existing.notes,
+          last_action_date: existing.last_action_date,
+          next_follow_up_date: existing.next_follow_up_date,
+          first_seen_month: existing.first_seen_month || currentMonth,
+          last_seen_month: currentMonth,
+          inactive: false,
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        // New record
+        return newRecord;
+      }
+    });
+    
+    // Mark missing records as inactive (preserve history)
+    existingRecords.forEach(existing => {
+      if (!newDocNumbers.has(existing.document_number)) {
+        // Record is missing from new upload - mark inactive but keep it
+        if (!existing.inactive) {
+          existing.inactive = true;
+          existing.updated_at = new Date().toISOString();
+        }
+        updatedRecords.push(existing);
+      }
+    });
+    
+    // Save all records
+    await file.save(JSON.stringify(updatedRecords, null, 2), {
+      contentType: 'application/json',
+    });
+    
+    console.log(`[PRE-FORECLOSURE] Saved ${updatedRecords.length} total records (${newRecords.length} new/updated, ${updatedRecords.length - newRecords.length} inactive)`);
+    
+    res.json({
+      success: true,
+      fileId: `preforeclosure-${Date.now()}`,
+      recordsProcessed: newRecords.length,
+      totalRecords: updatedRecords.length,
+      activeRecords: updatedRecords.filter(r => !r.inactive).length,
+      inactiveRecords: updatedRecords.filter(r => r.inactive).length,
+    });
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Error processing upload:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Export Express app for Google Cloud Functions/Cloud Run
 module.exports = app;

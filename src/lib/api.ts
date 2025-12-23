@@ -381,3 +381,80 @@ export async function verifyEmail(token: string) {
   return response.json();
 }
 
+/**
+ * Get all pre-foreclosure records
+ */
+export async function getPreForeclosures() {
+  const response = await fetch(`${API_BASE_URL}/api/preforeclosure`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch pre-foreclosure records');
+  }
+  return response.json();
+}
+
+/**
+ * Update a pre-foreclosure record (operator-entered fields only)
+ */
+export async function updatePreForeclosure(updates: {
+  document_number: string;
+  internal_status?: string;
+  notes?: string;
+  last_action_date?: string;
+  next_follow_up_date?: string;
+}) {
+  const response = await fetch(`${API_BASE_URL}/api/preforeclosure/${updates.document_number}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(updates),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update pre-foreclosure record');
+  }
+  return response.json();
+}
+
+/**
+ * Upload pre-foreclosure file
+ */
+export async function uploadPreForeclosureFile(file: File): Promise<{
+  success: boolean;
+  fileId: string;
+  recordsProcessed: number;
+  totalRecords: number;
+  activeRecords: number;
+  inactiveRecords: number;
+}> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = async (e) => {
+      try {
+        const base64 = (e.target?.result as string).split(',')[1];
+        
+        const response = await fetch(`${API_BASE_URL}/api/preforeclosure/upload`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            filename: file.name,
+            fileData: base64,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Upload failed');
+        }
+
+        const result = await response.json();
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+

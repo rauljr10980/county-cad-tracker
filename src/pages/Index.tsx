@@ -3,15 +3,15 @@ import { Header } from '@/components/layout/Header';
 import { TabNavigation, TabType } from '@/components/layout/TabNavigation';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { PropertiesView } from '@/components/properties/PropertiesView';
-import { PreForeclosuresView } from '@/components/preforeclosures/PreForeclosuresView';
 import { TasksView } from '@/components/tasks/TasksView';
 import { UploadView } from '@/components/upload/UploadView';
 import { FileHistory } from '@/components/files/FileHistory';
+import { PreForeclosureView } from '@/components/preforeclosure/PreForeclosureView';
 
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
   const hash = window.location.hash.slice(1); // Remove the #
-  const validTabs: TabType[] = ['dashboard', 'properties', 'preforeclosures', 'tasks', 'upload', 'files'];
+  const validTabs: TabType[] = ['dashboard', 'properties', 'tasks', 'upload', 'files', 'preforeclosure'];
   return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
 };
 
@@ -48,14 +48,14 @@ const Index = () => {
         return <Dashboard onFilterChange={() => setActiveTab('properties')} />;
       case 'properties':
         return <PropertiesView />;
-      case 'preforeclosures':
-        return <PreForeclosuresView />;
       case 'tasks':
         return <TasksView />;
       case 'upload':
         return <UploadView />;
       case 'files':
         return <FileHistory />;
+      case 'preforeclosure':
+        return <PreForeclosureView />;
       default:
         return <Dashboard />;
     }
