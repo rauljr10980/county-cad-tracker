@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, MapPin, CheckCircle2, Trash2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,7 +31,6 @@ export function PreForeclosureView() {
   const deleteMutation = useDeletePreForeclosures();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Get unique values for filters
@@ -148,46 +147,6 @@ export function PreForeclosureView() {
       : 'bg-orange-500/20 text-orange-500 border-orange-500/30';
   };
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      // Validate file type
-      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls') && !file.name.endsWith('.csv')) {
-        toast({
-          title: 'Invalid file type',
-          description: 'Please select an Excel file (.xlsx or .xls) or CSV file (.csv)',
-          variant: 'destructive',
-        });
-        return;
-      }
-      // Validate file size (100MB limit)
-      if (file.size > 100 * 1024 * 1024) {
-        toast({
-          title: 'File too large',
-          description: 'File size must be less than 100MB',
-          variant: 'destructive',
-        });
-        return;
-      }
-      handleFileUpload(file);
-    }
-  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -382,98 +341,11 @@ export function PreForeclosureView() {
         </Dialog>
   );
 
-  // Upload Drop Zone Component (reusable)
-  const uploadDropZone = (
-    <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={cn(
-        'border-2 border-dashed rounded-xl p-8 text-center transition-all',
-        isDragging ? 'border-primary bg-primary/5' : 'border-border bg-secondary/20',
-        uploadMutation.isPending && 'border-primary/50 bg-primary/5',
-        uploadMutation.isSuccess && 'border-green-500/50 bg-green-500/5',
-        uploadMutation.isError && 'border-destructive/50 bg-destructive/5'
-      )}
-    >
-      {!uploadMutation.isPending && !uploadMutation.isSuccess && !uploadMutation.isError && (
-        <>
-          <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mx-auto mb-3">
-            <Upload className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <h3 className="text-base font-semibold mb-2">Upload Pre-Foreclosure File</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Drag and drop your Excel file here, or click to browse
-          </p>
-          <label>
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <Button asChild>
-              <span className="cursor-pointer">
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Select File
-              </span>
-            </Button>
-          </label>
-          <p className="text-xs text-muted-foreground mt-3">
-            Supports .xlsx, .xls, and .csv files up to 100MB
-          </p>
-        </>
-      )}
-
-      {uploadMutation.isPending && (
-        <>
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-            <Loader2 className="h-6 w-6 text-primary animate-spin" />
-          </div>
-          <h3 className="text-base font-semibold mb-2">Uploading & Processing...</h3>
-          <p className="text-sm text-muted-foreground">
-            Processing your pre-foreclosure file...
-          </p>
-        </>
-      )}
-
-      {uploadMutation.isSuccess && (
-        <>
-          <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-3">
-            <CheckCircle2 className="h-6 w-6 text-green-500" />
-          </div>
-          <h3 className="text-base font-semibold mb-2 text-green-500">Upload Complete!</h3>
-          <p className="text-sm text-muted-foreground mb-3">
-            Your file has been processed successfully.
-          </p>
-          <Button onClick={() => uploadMutation.reset()} variant="outline" size="sm">
-            Upload Another File
-          </Button>
-        </>
-      )}
-
-      {uploadMutation.isError && (
-        <>
-          <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
-            <AlertCircle className="h-6 w-6 text-destructive" />
-          </div>
-          <h3 className="text-base font-semibold mb-2 text-destructive">Upload Error</h3>
-          <p className="text-sm text-muted-foreground mb-3">
-            {uploadMutation.error instanceof Error ? uploadMutation.error.message : 'Upload failed'}
-          </p>
-          <Button onClick={() => uploadMutation.reset()} variant="outline" size="sm">
-            Try Again
-          </Button>
-        </>
-      )}
-    </div>
-  );
 
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
         {headerSection}
-        {uploadDropZone}
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 text-primary mx-auto mb-4 animate-spin" />
@@ -489,7 +361,6 @@ export function PreForeclosureView() {
     return (
       <div className="p-6 space-y-6">
         {headerSection}
-        {uploadDropZone}
         <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-6 text-center">
           <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
           <p className="text-destructive">Failed to load pre-foreclosure records</p>
@@ -503,9 +374,6 @@ export function PreForeclosureView() {
     <div className="p-6 space-y-6">
       {/* Header */}
       {headerSection}
-
-      {/* File Upload Drop Zone - Always visible in Pre-Foreclosure tab */}
-      {uploadDropZone}
 
       {/* Search and Filters */}
       <div className="space-y-4">
