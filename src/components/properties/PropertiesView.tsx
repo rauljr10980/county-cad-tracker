@@ -7,6 +7,7 @@ import { useProperties } from '@/hooks/useFiles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FileDropZone } from '@/components/upload/FileDropZone';
 
 const ITEMS_PER_PAGE = 100;
 
@@ -74,6 +75,14 @@ export function PropertiesView() {
     setPage(1);
   };
 
+  // Handle upload completion - reset to page 1
+  const handleUploadComplete = () => {
+    setPage(1);
+    setStatusFilter(undefined);
+    setSearchQuery('');
+    setDebouncedSearchQuery('');
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -86,7 +95,12 @@ export function PropertiesView() {
             </p>
           </div>
         </div>
-        
+
+        {/* Drag and Drop File Upload Zone */}
+        <div className="mb-6">
+          <FileDropZone compact onUploadComplete={handleUploadComplete} />
+        </div>
+
         {/* Search Bar */}
         <div className="mb-4">
           <div className="relative max-w-md">
