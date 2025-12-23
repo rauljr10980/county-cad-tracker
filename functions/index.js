@@ -2470,5 +2470,30 @@ app.post('/api/preforeclosure/upload', async (req, res) => {
   }
 });
 
+/**
+ * Delete all preforeclosure records
+ */
+app.delete('/api/preforeclosure', authenticateToken, async (req, res) => {
+  try {
+    const bucket = storage.bucket(BUCKET_NAME);
+    const file = bucket.file('data/preforeclosure/records.json');
+    
+    // Check if file exists
+    const [exists] = await file.exists();
+    if (!exists) {
+      return res.json({ success: true, message: 'No records to delete' });
+    }
+    
+    // Delete the file
+    await file.delete();
+    
+    console.log('[PRE-FORECLOSURE] Deleted all records');
+    res.json({ success: true, message: 'All preforeclosure records deleted' });
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Error deleting records:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Export Express app for Google Cloud Functions/Cloud Run
 module.exports = app;

@@ -458,3 +458,20 @@ export async function uploadPreForeclosureFile(file: File): Promise<{
   });
 }
 
+/**
+ * Delete all pre-foreclosure records
+ */
+export async function deletePreForeclosures(): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/preforeclosure`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete pre-foreclosure records');
+  }
+  
+  return response.json();
+}
+

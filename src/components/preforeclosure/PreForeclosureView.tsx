@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, MapPin, CheckCircle2 } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, MapPin, CheckCircle2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile } from '@/hooks/usePreForeclosure';
+import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useDeletePreForeclosures } from '@/hooks/usePreForeclosure';
 import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -28,9 +28,11 @@ export function PreForeclosureView() {
   const { data: records = [], isLoading, error } = usePreForeclosures();
   const updateMutation = useUpdatePreForeclosure();
   const uploadMutation = useUploadPreForeclosureFile();
+  const deleteMutation = useDeletePreForeclosures();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -247,10 +249,22 @@ export function PreForeclosureView() {
           </p>
         )}
       </div>
-      <Button onClick={() => setUploadOpen(true)} size="lg">
-        <Upload className="h-4 w-4 mr-2" />
-        Upload Pre-Foreclosure File
-      </Button>
+      <div className="flex gap-2">
+        {records.length > 0 && (
+          <Button 
+            onClick={() => setDeleteConfirmOpen(true)} 
+            variant="destructive" 
+            size="lg"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete All Records
+          </Button>
+        )}
+        <Button onClick={() => setUploadOpen(true)} size="lg">
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Pre-Foreclosure File
+        </Button>
+      </div>
     </div>
   );
 
@@ -369,10 +383,98 @@ export function PreForeclosureView() {
         </Dialog>
   );
 
+  // Upload Drop Zone Component (reusable)
+  const uploadDropZone = (
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={cn(
+        'border-2 border-dashed rounded-xl p-8 text-center transition-all',
+        isDragging ? 'border-primary bg-primary/5' : 'border-border bg-secondary/20',
+        uploadMutation.isPending && 'border-primary/50 bg-primary/5',
+        uploadMutation.isSuccess && 'border-green-500/50 bg-green-500/5',
+        uploadMutation.isError && 'border-destructive/50 bg-destructive/5'
+      )}
+    >
+      {!uploadMutation.isPending && !uploadMutation.isSuccess && !uploadMutation.isError && (
+        <>
+          <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mx-auto mb-3">
+            <Upload className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h3 className="text-base font-semibold mb-2">Upload Pre-Foreclosure File</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Drag and drop your Excel file here, or click to browse
+          </p>
+          <label>
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Button asChild>
+              <span className="cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Select File
+              </span>
+            </Button>
+          </label>
+          <p className="text-xs text-muted-foreground mt-3">
+            Supports .xlsx and .xls files up to 100MB
+          </p>
+        </>
+      )}
+
+      {uploadMutation.isPending && (
+        <>
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+            <Loader2 className="h-6 w-6 text-primary animate-spin" />
+          </div>
+          <h3 className="text-base font-semibold mb-2">Uploading & Processing...</h3>
+          <p className="text-sm text-muted-foreground">
+            Processing your pre-foreclosure file...
+          </p>
+        </>
+      )}
+
+      {uploadMutation.isSuccess && (
+        <>
+          <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-3">
+            <CheckCircle2 className="h-6 w-6 text-green-500" />
+          </div>
+          <h3 className="text-base font-semibold mb-2 text-green-500">Upload Complete!</h3>
+          <p className="text-sm text-muted-foreground mb-3">
+            Your file has been processed successfully.
+          </p>
+          <Button onClick={() => uploadMutation.reset()} variant="outline" size="sm">
+            Upload Another File
+          </Button>
+        </>
+      )}
+
+      {uploadMutation.isError && (
+        <>
+          <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
+            <AlertCircle className="h-6 w-6 text-destructive" />
+          </div>
+          <h3 className="text-base font-semibold mb-2 text-destructive">Upload Error</h3>
+          <p className="text-sm text-muted-foreground mb-3">
+            {uploadMutation.error instanceof Error ? uploadMutation.error.message : 'Upload failed'}
+          </p>
+          <Button onClick={() => uploadMutation.reset()} variant="outline" size="sm">
+            Try Again
+          </Button>
+        </>
+      )}
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
         {headerSection}
+        {uploadDropZone}
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 text-primary mx-auto mb-4 animate-spin" />
@@ -388,124 +490,12 @@ export function PreForeclosureView() {
     return (
       <div className="p-6 space-y-6">
         {headerSection}
+        {uploadDropZone}
         <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-6 text-center">
           <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
           <p className="text-destructive">Failed to load pre-foreclosure records</p>
         </div>
         {uploadModal}
-      </div>
-    );
-  }
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Upload Pre-Foreclosure File</DialogTitle>
-              <DialogDescription>
-                Upload an Excel file (.xlsx or .xls) with pre-foreclosure records.
-                Required columns: Document Number, Type (Mortgage/Tax), Address, City, ZIP, Filing Month (optional).
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Select Excel File (.xlsx or .xls)</Label>
-                <Input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      // Validate file type
-                      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-                        toast({
-                          title: 'Invalid file type',
-                          description: 'Please select an Excel file (.xlsx or .xls)',
-                          variant: 'destructive',
-                        });
-                        e.target.value = ''; // Clear the input
-                        return;
-                      }
-                      // Validate file size (100MB limit)
-                      if (file.size > 100 * 1024 * 1024) {
-                        toast({
-                          title: 'File too large',
-                          description: 'File size must be less than 100MB',
-                          variant: 'destructive',
-                        });
-                        e.target.value = ''; // Clear the input
-                        return;
-                      }
-                      setUploadFile(file);
-                    }
-                  }}
-                  className="mt-2"
-                />
-                {uploadFile && (
-                  <div className="mt-2 p-3 bg-secondary/30 rounded-lg">
-                    <p className="text-sm font-medium">
-                      Selected: {uploadFile.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Size: {(uploadFile.size / 1024).toFixed(1)} KB
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="bg-secondary/30 rounded-lg p-4 text-sm space-y-2">
-                <p className="font-medium">File Requirements:</p>
-                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                  <li>Document Number (required)</li>
-                  <li>Type: Mortgage or Tax</li>
-                  <li>Address, City, ZIP</li>
-                  <li>Filing Month (optional, defaults to current month)</li>
-                </ul>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Records are matched by Document Number. Missing records from new uploads are marked inactive.
-                </p>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => {
-                  setUploadOpen(false);
-                  setUploadFile(null);
-                }}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={async () => {
-                    if (!uploadFile) return;
-                    try {
-                      const result = await uploadMutation.mutateAsync(uploadFile);
-                      toast({
-                        title: 'Upload successful',
-                        description: `Processed ${result.recordsProcessed} records. Total: ${result.totalRecords} (${result.activeRecords} active, ${result.inactiveRecords} inactive)`,
-                      });
-                      setUploadOpen(false);
-                      setUploadFile(null);
-                    } catch (error) {
-                      toast({
-                        title: 'Upload failed',
-                        description: error instanceof Error ? error.message : 'Upload failed',
-                        variant: 'destructive',
-                      });
-                      console.error('Upload error:', error);
-                    }
-                  }}
-                  disabled={!uploadFile || uploadMutation.isPending}
-                >
-                  {uploadMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     );
   }
@@ -515,90 +505,8 @@ export function PreForeclosureView() {
       {/* Header */}
       {headerSection}
 
-      {/* File Upload Drop Zone */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={cn(
-          'border-2 border-dashed rounded-xl p-8 text-center transition-all',
-          isDragging ? 'border-primary bg-primary/5' : 'border-border bg-secondary/20',
-          uploadMutation.isPending && 'border-primary/50 bg-primary/5',
-          uploadMutation.isSuccess && 'border-green-500/50 bg-green-500/5',
-          uploadMutation.isError && 'border-destructive/50 bg-destructive/5'
-        )}
-      >
-        {!uploadMutation.isPending && !uploadMutation.isSuccess && !uploadMutation.isError && (
-          <>
-            <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mx-auto mb-3">
-              <Upload className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <h3 className="text-base font-semibold mb-2">Upload Pre-Foreclosure File</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Drag and drop your Excel file here, or click to browse
-            </p>
-            <label>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <Button asChild>
-                <span className="cursor-pointer">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Select File
-                </span>
-              </Button>
-            </label>
-            <p className="text-xs text-muted-foreground mt-3">
-              Supports .xlsx and .xls files up to 100MB
-            </p>
-          </>
-        )}
-
-        {uploadMutation.isPending && (
-          <>
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-              <Loader2 className="h-6 w-6 text-primary animate-spin" />
-            </div>
-            <h3 className="text-base font-semibold mb-2">Uploading & Processing...</h3>
-            <p className="text-sm text-muted-foreground">
-              Processing your pre-foreclosure file...
-            </p>
-          </>
-        )}
-
-        {uploadMutation.isSuccess && (
-          <>
-            <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-3">
-              <CheckCircle2 className="h-6 w-6 text-green-500" />
-            </div>
-            <h3 className="text-base font-semibold mb-2 text-green-500">Upload Complete!</h3>
-            <p className="text-sm text-muted-foreground mb-3">
-              Your file has been processed successfully.
-            </p>
-            <Button onClick={() => uploadMutation.reset()} variant="outline" size="sm">
-              Upload Another File
-            </Button>
-          </>
-        )}
-
-        {uploadMutation.isError && (
-          <>
-            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
-              <AlertCircle className="h-6 w-6 text-destructive" />
-            </div>
-            <h3 className="text-base font-semibold mb-2 text-destructive">Upload Error</h3>
-            <p className="text-sm text-muted-foreground mb-3">
-              {uploadMutation.error instanceof Error ? uploadMutation.error.message : 'Upload failed'}
-            </p>
-            <Button onClick={() => uploadMutation.reset()} variant="outline" size="sm">
-              Try Again
-            </Button>
-          </>
-        )}
-      </div>
+      {/* File Upload Drop Zone - Always visible in Pre-Foreclosure tab */}
+      {uploadDropZone}
 
       {/* Search and Filters */}
       <div className="space-y-4">
@@ -720,14 +628,20 @@ export function PreForeclosureView() {
       </div>
 
       {/* Table */}
-      {filteredRecords.length === 0 ? (
+      {filteredRecords.length === 0 && records.length === 0 ? (
         <div className="bg-secondary/30 rounded-lg p-12 text-center">
           <FileSpreadsheet className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Records Found</h3>
           <p className="text-muted-foreground">
-            {records.length === 0
-              ? 'Upload a pre-foreclosure file to get started.'
-              : 'No records match your current filters.'}
+            Upload a pre-foreclosure file using the drop zone above to get started.
+          </p>
+        </div>
+      ) : filteredRecords.length === 0 ? (
+        <div className="bg-secondary/30 rounded-lg p-12 text-center">
+          <FileSpreadsheet className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No Records Match Filters</h3>
+          <p className="text-muted-foreground">
+            No records match your current filters. Try adjusting your search or filters.
           </p>
         </div>
       ) : (
@@ -820,115 +734,6 @@ export function PreForeclosureView() {
 
       {/* Upload Modal */}
       {uploadModal}
-          <DialogHeader>
-            <DialogTitle>Upload Pre-Foreclosure File</DialogTitle>
-            <DialogDescription>
-              Upload an Excel file (.xlsx or .xls) with pre-foreclosure records.
-              Required columns: Document Number, Type (Mortgage/Tax), Address, City, ZIP, Filing Month (optional).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Select Excel File (.xlsx or .xls)</Label>
-              <Input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    // Validate file type
-                    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-                      toast({
-                        title: 'Invalid file type',
-                        description: 'Please select an Excel file (.xlsx or .xls)',
-                        variant: 'destructive',
-                      });
-                      e.target.value = ''; // Clear the input
-                      return;
-                    }
-                    // Validate file size (100MB limit)
-                    if (file.size > 100 * 1024 * 1024) {
-                      toast({
-                        title: 'File too large',
-                        description: 'File size must be less than 100MB',
-                        variant: 'destructive',
-                      });
-                      e.target.value = ''; // Clear the input
-                      return;
-                    }
-                    setUploadFile(file);
-                  }
-                }}
-                className="mt-2"
-              />
-              {uploadFile && (
-                <div className="mt-2 p-3 bg-secondary/30 rounded-lg">
-                  <p className="text-sm font-medium">
-                    Selected: {uploadFile.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Size: {(uploadFile.size / 1024).toFixed(1)} KB
-                  </p>
-                </div>
-              )}
-            </div>
-            <div className="bg-secondary/30 rounded-lg p-4 text-sm space-y-2">
-              <p className="font-medium">File Requirements:</p>
-              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                <li>Document Number (required)</li>
-                <li>Type: Mortgage or Tax</li>
-                <li>Address, City, ZIP</li>
-                <li>Filing Month (optional, defaults to current month)</li>
-              </ul>
-              <p className="text-xs text-muted-foreground mt-2">
-                Records are matched by Document Number. Missing records from new uploads are marked inactive.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => {
-                setUploadOpen(false);
-                setUploadFile(null);
-              }}>
-                Cancel
-              </Button>
-              <Button
-                onClick={async () => {
-                  if (!uploadFile) return;
-                  try {
-                    const result = await uploadMutation.mutateAsync(uploadFile);
-                    toast({
-                      title: 'Upload successful',
-                      description: `Processed ${result.recordsProcessed} records. Total: ${result.totalRecords} (${result.activeRecords} active, ${result.inactiveRecords} inactive)`,
-                    });
-                    setUploadOpen(false);
-                    setUploadFile(null);
-                  } catch (error) {
-                    toast({
-                      title: 'Upload failed',
-                      description: error instanceof Error ? error.message : 'Upload failed',
-                      variant: 'destructive',
-                    });
-                    console.error('Upload error:', error);
-                  }
-                }}
-                disabled={!uploadFile || uploadMutation.isPending}
-              >
-                {uploadMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Notes Modal */}
       <Dialog open={notesOpen} onOpenChange={setNotesOpen}>
@@ -994,6 +799,58 @@ export function PreForeclosureView() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete All Pre-Foreclosure Records</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete all pre-foreclosure records? This action cannot be undone.
+              <br />
+              <br />
+              <strong>This will delete {records.length.toLocaleString()} record{records.length !== 1 ? 's' : ''}.</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                try {
+                  await deleteMutation.mutateAsync();
+                  toast({
+                    title: 'Records deleted',
+                    description: 'All pre-foreclosure records have been deleted.',
+                  });
+                  setDeleteConfirmOpen(false);
+                } catch (error) {
+                  toast({
+                    title: 'Delete failed',
+                    description: error instanceof Error ? error.message : 'Failed to delete records',
+                    variant: 'destructive',
+                  });
+                }
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete All
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

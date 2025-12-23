@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getPreForeclosures, updatePreForeclosure, uploadPreForeclosureFile } from '@/lib/api';
+import { getPreForeclosures, updatePreForeclosure, uploadPreForeclosureFile, deletePreForeclosures } from '@/lib/api';
 import type { PreForeclosureRecord } from '@/types/property';
 
 export function usePreForeclosures() {
@@ -29,6 +29,18 @@ export function useUploadPreForeclosureFile() {
   return useMutation({
     mutationFn: uploadPreForeclosureFile,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+    },
+  });
+}
+
+export function useDeletePreForeclosures() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deletePreForeclosures,
+    onSuccess: () => {
+      queryClient.setQueryData(['preforeclosure'], []);
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
     },
   });
