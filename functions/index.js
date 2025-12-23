@@ -2342,27 +2342,38 @@ app.post('/api/preforeclosure/upload', async (req, res) => {
     // Decode base64
     const buffer = Buffer.from(fileData, 'base64');
     
-    // Parse Excel file
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+    // Determine file type and parse accordingly
+    const isCSV = filename.toLowerCase().endsWith('.csv');
+    let rawData;
     
-    console.log(`[PRE-FORECLOSURE] Parsed ${rawData.length} rows from ${filename}`);
+    if (isCSV) {
+      // Parse CSV file
+      const csvString = buffer.toString('utf-8');
+      rawData = XLSX.utils.sheet_to_json(XLSX.read(csvString, { type: 'string' }).Sheets[XLSX.read(csvString, { type: 'string' }).SheetNames[0]], { raw: false });
+    } else {
+      // Parse Excel file (.xlsx, .xls)
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      rawData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+    }
+    
+    console.log(`[PRE-FORECLOSURE] Parsed ${rawData.length} rows from ${filename} (${isCSV ? 'CSV' : 'Excel'})`);
     
     // Determine current month (for filing_month if not in file)
     const currentDate = new Date();
     const currentMonth = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
     
-    // Map Excel columns to our data model
-    // Expected columns: document_number, type, address, city, zip, filing_month (optional)
+    // Map columns to our data model
+    // Expected columns: document_number (Doc Number), type, address, city, zip, filing_month (optional)
     const newRecords = rawData.map((row, index) => {
       // Try to find columns (case-insensitive, flexible matching)
-      const docNum = row['Document Number'] || row['document_number'] || row['Document #'] || row['Doc Number'] || '';
-      const type = row['Type'] || row['type'] || '';
-      const address = row['Address'] || row['address'] || '';
-      const city = row['City'] || row['city'] || '';
-      const zip = row['ZIP'] || row['zip'] || row['Zip'] || row['Zip Code'] || '';
+      // Get all possible column name variations
+      const docNum = row['Document Number'] || row['document_number'] || row['Document #'] || row['Doc Number'] || row['DocNumber'] || row['doc number'] || row['DOC NUMBER'] || '';
+      const type = row['Type'] || row['type'] || row['TYPE'] || '';
+      const address = row['Address'] || row['address'] || row['ADDRESS'] || '';
+      const city = row['City'] || row['city'] || row['CITY'] || '';
+      const zip = row['ZIP'] || row['zip'] || row['Zip'] || row['Zip Code'] || row['ZipCode'] || row['ZIP CODE'] || '';
       const filingMonth = row['Filing Month'] || row['filing_month'] || row['FilingMonth'] || currentMonth;
       
       if (!docNum) {
@@ -2370,9 +2381,23 @@ app.post('/api/preforeclosure/upload', async (req, res) => {
         return null;
       }
       
+      // Normalize type: MORTGAGE -> Mortgage, TAX -> Tax
+      let normalizedType = 'Mortgage'; // Default
+      const typeUpper = String(type).toUpperCase().trim();
+      if (typeUpper === 'MORTGAGE') {
+        normalizedType = 'Mortgage';
+      } else if (typeUpper === 'TAX') {
+        normalizedType = 'Tax';
+      }
+      
+      // Log type normalization for debugging (first 5 rows and all TAX rows)
+      if (index < 5 || typeUpper === 'TAX') {
+        console.log(`[PRE-FORECLOSURE] Row ${index + 1}: type="${type}" (${typeUpper}) -> normalized="${normalizedType}"`);
+      }
+      
       return {
         document_number: String(docNum).trim(),
-        type: (type === 'Mortgage' || type === 'Tax') ? type : 'Mortgage', // Default to Mortgage
+        type: normalizedType,
         address: String(address).trim(),
         city: String(city).trim(),
         zip: String(zip).trim(),
@@ -2392,7 +2417,12 @@ app.post('/api/preforeclosure/upload', async (req, res) => {
       };
     }).filter(r => r !== null);
     
-    console.log(`[PRE-FORECLOSURE] Mapped ${newRecords.length} valid records`);
+    // Count by type for logging
+    const typeCounts = newRecords.reduce((acc, r) => {
+      acc[r.type] = (acc[r.type] || 0) + 1;
+      return acc;
+    }, {});
+    console.log(`[PRE-FORECLOSURE] Mapped ${newRecords.length} valid records. Type breakdown:`, typeCounts);
     
     // Load existing records
     const bucket = storage.bucket(BUCKET_NAME);

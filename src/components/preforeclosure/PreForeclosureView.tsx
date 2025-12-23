@@ -168,10 +168,10 @@ export function PreForeclosureView() {
     const file = e.dataTransfer.files[0];
     if (file) {
       // Validate file type
-      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls') && !file.name.endsWith('.csv')) {
         toast({
           title: 'Invalid file type',
-          description: 'Please select an Excel file (.xlsx or .xls)',
+          description: 'Please select an Excel file (.xlsx or .xls) or CSV file (.csv)',
           variant: 'destructive',
         });
         return;
@@ -193,10 +193,10 @@ export function PreForeclosureView() {
     const file = e.target.files?.[0];
     if (file) {
       // Validate file type
-      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls') && !file.name.endsWith('.csv')) {
         toast({
           title: 'Invalid file type',
-          description: 'Please select an Excel file (.xlsx or .xls)',
+          description: 'Please select an Excel file (.xlsx or .xls) or CSV file (.csv)',
           variant: 'destructive',
         });
         e.target.value = '';
@@ -250,16 +250,15 @@ export function PreForeclosureView() {
         )}
       </div>
       <div className="flex gap-2">
-        {records.length > 0 && (
-          <Button 
-            onClick={() => setDeleteConfirmOpen(true)} 
-            variant="destructive" 
-            size="lg"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete All Records
-          </Button>
-        )}
+        <Button 
+          onClick={() => setDeleteConfirmOpen(true)} 
+          variant="destructive" 
+          size="default"
+          disabled={records.length === 0}
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete All Records
+        </Button>
         <Button onClick={() => setUploadOpen(true)} size="lg">
           <Upload className="h-4 w-4 mr-2" />
           Upload Pre-Foreclosure File
@@ -275,24 +274,24 @@ export function PreForeclosureView() {
             <DialogHeader>
               <DialogTitle>Upload Pre-Foreclosure File</DialogTitle>
               <DialogDescription>
-                Upload an Excel file (.xlsx or .xls) with pre-foreclosure records.
-                Required columns: Document Number, Type (Mortgage/Tax), Address, City, ZIP, Filing Month (optional).
+                Upload an Excel file (.xlsx or .xls) or CSV file (.csv) with pre-foreclosure records.
+                Required columns: Doc Number (or Document Number), Type (Mortgage/Tax), Address, City, ZIP, Filing Month (optional).
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Select Excel File (.xlsx or .xls)</Label>
+                <Label>Select File (.xlsx, .xls, or .csv)</Label>
                 <Input
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx,.xls,.csv"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
                       // Validate file type
-                      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+                      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls') && !file.name.endsWith('.csv')) {
                         toast({
                           title: 'Invalid file type',
-                          description: 'Please select an Excel file (.xlsx or .xls)',
+                          description: 'Please select an Excel file (.xlsx or .xls) or CSV file (.csv)',
                           variant: 'destructive',
                         });
                         e.target.value = ''; // Clear the input
@@ -409,7 +408,7 @@ export function PreForeclosureView() {
           <label>
             <input
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx,.xls,.csv"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -421,7 +420,7 @@ export function PreForeclosureView() {
             </Button>
           </label>
           <p className="text-xs text-muted-foreground mt-3">
-            Supports .xlsx and .xls files up to 100MB
+            Supports .xlsx, .xls, and .csv files up to 100MB
           </p>
         </>
       )}
@@ -808,10 +807,16 @@ export function PreForeclosureView() {
           <DialogHeader>
             <DialogTitle>Delete All Pre-Foreclosure Records</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete all pre-foreclosure records? This action cannot be undone.
-              <br />
-              <br />
-              <strong>This will delete {records.length.toLocaleString()} record{records.length !== 1 ? 's' : ''}.</strong>
+              {records.length > 0 ? (
+                <>
+                  Are you sure you want to delete all pre-foreclosure records? This action cannot be undone.
+                  <br />
+                  <br />
+                  <strong>This will delete {records.length.toLocaleString()} record{records.length !== 1 ? 's' : ''}.</strong>
+                </>
+              ) : (
+                'No records to delete.'
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">
@@ -821,6 +826,10 @@ export function PreForeclosureView() {
             <Button
               variant="destructive"
               onClick={async () => {
+                if (records.length === 0) {
+                  setDeleteConfirmOpen(false);
+                  return;
+                }
                 try {
                   await deleteMutation.mutateAsync();
                   toast({
@@ -836,7 +845,7 @@ export function PreForeclosureView() {
                   });
                 }
               }}
-              disabled={deleteMutation.isPending}
+              disabled={deleteMutation.isPending || records.length === 0}
             >
               {deleteMutation.isPending ? (
                 <>
