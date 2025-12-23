@@ -33,6 +33,11 @@ ui-debug.log
 !railway.json
 !nixpacks.toml
 
+# Data files
+*.csv
+*.xlsx
+*.xls
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
