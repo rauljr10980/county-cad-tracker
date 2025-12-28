@@ -146,3 +146,7 @@ export interface PreForeclosureRecord {
   created_at: string; // ISO timestamp
   updated_at: string; // ISO timestamp
 }
+
+// Type aliases for convenience
+export type PreForeclosure = PreForeclosureRecord;
+export type PreForeclosureInternalStatus = PreForeclosureStatus;

@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { 
-  FileSpreadsheet, 
-  Loader2, 
-  AlertCircle, 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronsLeft, 
-  ChevronsRight, 
-  Filter, 
-  Search, 
+import {
+  FileSpreadsheet,
+  Loader2,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Filter,
+  Search,
   X,
   Home,
   Building
@@ -21,6 +21,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { updatePreForeclosure } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 const ITEMS_PER_PAGE = 100;
 
@@ -61,6 +63,7 @@ const generateMockData = (): PreForeclosure[] => {
 };
 
 export function PreForeclosuresView() {
+  const { toast } = useToast();
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosure | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -171,9 +174,49 @@ export function PreForeclosuresView() {
     }
   };
 
-  const handleUpdate = (documentNumber: string, updates: Partial<PreForeclosure>) => {
-    // TODO: Implement API call to update record
-    console.log('Updating:', documentNumber, updates);
+  const handleUpdate = async (documentNumber: string, updates: Partial<PreForeclosure>) => {
+    try {
+      // Only send fields that the API accepts
+      const apiUpdates: {
+        document_number: string;
+        internal_status?: string;
+        notes?: string;
+        last_action_date?: string;
+        next_follow_up_date?: string;
+      } = {
+        document_number: documentNumber,
+      };
+
+      if (updates.internal_status !== undefined) {
+        apiUpdates.internal_status = updates.internal_status;
+      }
+      if (updates.notes !== undefined) {
+        apiUpdates.notes = updates.notes;
+      }
+      if (updates.last_action_date !== undefined) {
+        apiUpdates.last_action_date = updates.last_action_date;
+      }
+      if (updates.next_follow_up_date !== undefined) {
+        apiUpdates.next_follow_up_date = updates.next_follow_up_date;
+      }
+
+      await updatePreForeclosure(apiUpdates);
+
+      toast({
+        title: 'Success',
+        description: 'Pre-foreclosure record updated successfully',
+      });
+
+      // Close the modal after successful update
+      setSelectedRecord(null);
+    } catch (error) {
+      console.error('Failed to update record:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update record',
+        variant: 'destructive',
+      });
+    }
   };
 
   const clearFilters = () => {
