@@ -59,13 +59,33 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       // Initialize actions & tasks
       setActionType(property.actionType || '');
       setPriority(property.priority || 'med');
-      setDueDateTime(property.dueTime || '');
+      // Convert ISO datetime to datetime-local format (YYYY-MM-DDTHH:MM)
+      if (property.dueTime) {
+        const date = new Date(property.dueTime);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        setDueDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+      } else {
+        setDueDateTime('');
+      }
 
       // Initialize deal stage
       setDealStage(property.dealStage || '');
       setEstimatedDealValue(property.estimatedDealValue?.toString() || '');
       setOfferAmount(property.offerAmount?.toString() || '');
-      setExpectedCloseDate(property.expectedCloseDate || '');
+      // Convert ISO date to YYYY-MM-DD format for date input
+      if (property.expectedCloseDate) {
+        const date = new Date(property.expectedCloseDate);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        setExpectedCloseDate(`${year}-${month}-${day}`);
+      } else {
+        setExpectedCloseDate('');
+      }
     }
   }, [property?.id, isOpen]);
 
@@ -200,7 +220,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
     setSavingAction(true);
     try {
-      await updatePropertyAction(property.id, actionType, priority, dueDateTime);
+      // Convert datetime-local format to ISO string for API
+      const isoDateTime = new Date(dueDateTime).toISOString();
+      await updatePropertyAction(property.id, actionType, priority, isoDateTime);
       toast({
         title: "Action Scheduled",
         description: `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} scheduled for ${property.accountNumber}`,
@@ -208,7 +230,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       // Update property object
       property.actionType = actionType;
       property.priority = priority;
-      property.dueTime = dueDateTime;
+      property.dueTime = isoDateTime;
     } catch (error) {
       toast({
         title: "Error",
