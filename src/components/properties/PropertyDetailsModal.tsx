@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2, Phone, Star } from 'lucide-react';
+import { X, ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, Target } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -7,7 +7,9 @@ import { Property } from '@/types/property';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { updatePropertyNotes, updatePropertyPhoneNumbers } from '@/lib/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyDealStage } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +27,19 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [ownerPhoneIndex, setOwnerPhoneIndex] = useState<number | undefined>(undefined);
   const [savingPhones, setSavingPhones] = useState(false);
 
+  // Actions & Tasks state
+  const [actionType, setActionType] = useState<'call' | 'text' | 'mail' | 'driveby' | ''>('');
+  const [priority, setPriority] = useState<'high' | 'med' | 'low'>('med');
+  const [dueDateTime, setDueDateTime] = useState('');
+  const [savingAction, setSavingAction] = useState(false);
+
+  // Deal Stage state
+  const [dealStage, setDealStage] = useState<'new_lead' | 'contacted' | 'interested' | 'offer_sent' | 'negotiating' | 'under_contract' | 'closed' | 'dead' | ''>('');
+  const [estimatedDealValue, setEstimatedDealValue] = useState('');
+  const [offerAmount, setOfferAmount] = useState('');
+  const [expectedCloseDate, setExpectedCloseDate] = useState('');
+  const [savingDealStage, setSavingDealStage] = useState(false);
+
   // Initialize notes and phone numbers from property when modal opens or property changes
   useEffect(() => {
     if (property && isOpen) {
@@ -40,6 +55,17 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
         phones[5] || '',
       ]);
       setOwnerPhoneIndex(property.ownerPhoneIndex);
+
+      // Initialize actions & tasks
+      setActionType(property.actionType || '');
+      setPriority(property.priority || 'med');
+      setDueDateTime(property.dueTime || '');
+
+      // Initialize deal stage
+      setDealStage(property.dealStage || '');
+      setEstimatedDealValue(property.estimatedDealValue?.toString() || '');
+      setOfferAmount(property.offerAmount?.toString() || '');
+      setExpectedCloseDate(property.expectedCloseDate || '');
     }
   }, [property?.id, isOpen]);
 
@@ -159,6 +185,77 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setOwnerPhoneIndex(undefined);
     } else {
       setOwnerPhoneIndex(index);
+    }
+  };
+
+  const handleSaveAction = async () => {
+    if (!actionType || !dueDateTime) {
+      toast({
+        title: "Missing Information",
+        description: "Please select an action type and due date/time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingAction(true);
+    try {
+      await updatePropertyAction(property.id, actionType, priority, dueDateTime);
+      toast({
+        title: "Action Scheduled",
+        description: `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} scheduled for ${property.accountNumber}`,
+      });
+      // Update property object
+      property.actionType = actionType;
+      property.priority = priority;
+      property.dueTime = dueDateTime;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to schedule action",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingAction(false);
+    }
+  };
+
+  const handleSaveDealStage = async () => {
+    if (!dealStage) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a deal stage",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingDealStage(true);
+    try {
+      await updatePropertyDealStage(
+        property.id,
+        dealStage,
+        estimatedDealValue ? parseFloat(estimatedDealValue) : undefined,
+        offerAmount ? parseFloat(offerAmount) : undefined,
+        expectedCloseDate || undefined
+      );
+      toast({
+        title: "Deal Stage Updated",
+        description: `Deal stage updated to ${dealStage.replace(/_/g, ' ')} for ${property.accountNumber}`,
+      });
+      // Update property object
+      property.dealStage = dealStage;
+      property.estimatedDealValue = estimatedDealValue ? parseFloat(estimatedDealValue) : undefined;
+      property.offerAmount = offerAmount ? parseFloat(offerAmount) : undefined;
+      property.expectedCloseDate = expectedCloseDate || undefined;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update deal stage",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingDealStage(false);
     }
   };
 
@@ -439,6 +536,149 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   disabled={savingPhones}
                 >
                   {savingPhones ? 'Saving...' : 'Save Phone Numbers'}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions & Tasks Section */}
+          <div className="bg-secondary/30 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Actions & Tasks</span>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Action Type</label>
+                  <Select value={actionType} onValueChange={(value) => setActionType(value as any)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select action type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="call">📞 Call</SelectItem>
+                      <SelectItem value="text">💬 Text</SelectItem>
+                      <SelectItem value="mail">✉️ Mail</SelectItem>
+                      <SelectItem value="driveby">🚗 Drive-by</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Priority</label>
+                  <div className="flex gap-2">
+                    <Badge
+                      variant={priority === 'high' ? 'default' : 'outline'}
+                      className={cn(
+                        "cursor-pointer flex-1 justify-center",
+                        priority === 'high' && "bg-red-500 hover:bg-red-600"
+                      )}
+                      onClick={() => setPriority('high')}
+                    >
+                      High
+                    </Badge>
+                    <Badge
+                      variant={priority === 'med' ? 'default' : 'outline'}
+                      className={cn(
+                        "cursor-pointer flex-1 justify-center",
+                        priority === 'med' && "bg-yellow-500 hover:bg-yellow-600"
+                      )}
+                      onClick={() => setPriority('med')}
+                    >
+                      Med
+                    </Badge>
+                    <Badge
+                      variant={priority === 'low' ? 'default' : 'outline'}
+                      className={cn(
+                        "cursor-pointer flex-1 justify-center",
+                        priority === 'low' && "bg-green-500 hover:bg-green-600"
+                      )}
+                      onClick={() => setPriority('low')}
+                    >
+                      Low
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">Due Date & Time</label>
+                <Input
+                  type="datetime-local"
+                  value={dueDateTime}
+                  onChange={(e) => setDueDateTime(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveAction}
+                  disabled={savingAction || !actionType || !dueDateTime}
+                >
+                  {savingAction ? 'Scheduling...' : 'Schedule Action'}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Deal Stage Section */}
+          <div className="bg-secondary/30 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Target className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Deal Stage</span>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">Current Stage</label>
+                <Select value={dealStage} onValueChange={(value) => setDealStage(value as any)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select deal stage" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new_lead">New Lead</SelectItem>
+                    <SelectItem value="contacted">Contacted</SelectItem>
+                    <SelectItem value="interested">Interested</SelectItem>
+                    <SelectItem value="offer_sent">Offer Sent</SelectItem>
+                    <SelectItem value="negotiating">Negotiating</SelectItem>
+                    <SelectItem value="under_contract">Under Contract</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                    <SelectItem value="dead">Dead</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Estimated Deal Value</label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={estimatedDealValue}
+                    onChange={(e) => setEstimatedDealValue(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Offer Amount</label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={offerAmount}
+                    onChange={(e) => setOfferAmount(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">Expected Close Date</label>
+                <Input
+                  type="date"
+                  value={expectedCloseDate}
+                  onChange={(e) => setExpectedCloseDate(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveDealStage}
+                  disabled={savingDealStage || !dealStage}
+                >
+                  {savingDealStage ? 'Updating...' : 'Update Deal Stage'}
                 </Button>
               </div>
             </div>

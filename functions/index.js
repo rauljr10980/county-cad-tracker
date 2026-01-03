@@ -1878,32 +1878,32 @@ app.put('/api/properties/:propertyId/task-done', async (req, res) => {
   try {
     const { propertyId } = req.params;
     const { outcome, nextAction } = req.body;
-    
+
     console.log(`[TASK-DONE] Marking task done for property ${propertyId}: ${outcome}, nextAction: ${nextAction}`);
-    
+
     const bucket = storage.bucket(BUCKET_NAME);
-    
+
     // Find the file containing this property
     const fileList = await listFiles(bucket, 'metadata/files/');
     const fileIds = fileList
       .map(f => f.replace('metadata/files/', '').replace('.json', ''))
       .sort((a, b) => parseInt(b) - parseInt(a));
-    
+
     for (const fileId of fileIds.slice(0, 5)) {
       const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
       if (fileDoc && fileDoc.status === 'completed') {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
-        
+
         // Find and update the property
         const propertyIndex = properties.findIndex(p => p.id === propertyId);
         if (propertyIndex !== -1) {
           const property = properties[propertyIndex];
-          
+
           // Update outcome
           property.lastOutcome = outcome;
           property.lastOutcomeDate = new Date().toISOString();
           property.attempts = (property.attempts || 0) + 1;
-          
+
           // Create next action if specified
           if (nextAction) {
             property.actionType = nextAction;
@@ -1917,19 +1917,79 @@ app.put('/api/properties/:propertyId/task-done', async (req, res) => {
             property.actionType = undefined;
             property.dueTime = undefined;
           }
-          
+
           // Save updated properties
           await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
-          
+
           console.log(`[TASK-DONE] Updated property ${propertyId} in file ${fileId}`);
           return res.json({ success: true, propertyId, outcome, nextAction });
         }
       }
     }
-    
+
     res.status(404).json({ error: 'Property not found' });
   } catch (error) {
     console.error('[TASK-DONE] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Update property deal stage
+ */
+app.put('/api/properties/:propertyId/deal-stage', async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { dealStage, estimatedDealValue, offerAmount, expectedCloseDate } = req.body;
+
+    console.log(`[DEAL-STAGE] Updating deal stage for property ${propertyId}: ${dealStage}`);
+
+    const bucket = storage.bucket(BUCKET_NAME);
+
+    // Find the file containing this property
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+
+    for (const fileId of fileIds.slice(0, 5)) {
+      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      if (fileDoc && fileDoc.status === 'completed') {
+        const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
+
+        // Find and update the property
+        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        if (propertyIndex !== -1) {
+          properties[propertyIndex].dealStage = dealStage;
+          if (estimatedDealValue !== undefined) {
+            properties[propertyIndex].estimatedDealValue = estimatedDealValue;
+          }
+          if (offerAmount !== undefined) {
+            properties[propertyIndex].offerAmount = offerAmount;
+          }
+          if (expectedCloseDate !== undefined) {
+            properties[propertyIndex].expectedCloseDate = expectedCloseDate;
+          }
+
+          // Save updated properties
+          await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
+
+          console.log(`[DEAL-STAGE] Updated property ${propertyId} in file ${fileId}`);
+          return res.json({
+            success: true,
+            propertyId,
+            dealStage,
+            estimatedDealValue,
+            offerAmount,
+            expectedCloseDate
+          });
+        }
+      }
+    }
+
+    res.status(404).json({ error: 'Property not found' });
+  } catch (error) {
+    console.error('[DEAL-STAGE] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
