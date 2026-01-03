@@ -173,8 +173,8 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         </CardContent>
       </Card>
 
-      {/* Bottom Row - Status Distribution and Amount Ranges */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Bottom Row - Status Distribution, Amount Ranges, and Tasks */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Property Status Distribution */}
         <Card>
           <CardHeader>
@@ -182,16 +182,16 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             <p className="text-sm text-muted-foreground">Breakdown by delinquency status</p>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-6">
-              <div className="flex-1">
-                <ResponsiveContainer width="100%" height={250}>
+            <div className="flex flex-col items-center">
+              <div className="w-full">
+                <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie
                       data={statusData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
+                      innerRadius={50}
+                      outerRadius={80}
                       paddingAngle={2}
                       dataKey="value"
                     >
@@ -202,19 +202,14 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex-1 space-y-3">
+              <div className="w-full space-y-2 mt-4">
                 {statusData.map((item, index) => (
-                  <div key={index} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
-                        <span className="text-muted-foreground">{item.name}</span>
-                      </div>
-                      <span className="font-medium">{item.percentage}%</span>
+                  <div key={index} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
+                      <span className="text-muted-foreground">{item.name}</span>
                     </div>
-                    <div className="text-xs text-muted-foreground ml-5">
-                      {item.value.toLocaleString()} properties
-                    </div>
+                    <span className="font-medium">{item.percentage}%</span>
                   </div>
                 ))}
               </div>
@@ -245,6 +240,46 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                       style={{
                         backgroundColor: range.color,
                         width: `${(range.count / stats.totalProperties) * 100}%`
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tasks & Actions Overview */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Tasks & Actions</CardTitle>
+            <p className="text-sm text-muted-foreground">Active follow-ups and pending actions</p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[
+                { action: 'Calls Due Today', count: 45, color: '#EF4444', icon: '📞' },
+                { action: 'Follow-ups This Week', count: 128, color: '#F59E0B', icon: '📅' },
+                { action: 'Texts Scheduled', count: 67, color: '#8B5CF6', icon: '💬' },
+                { action: 'Mail Campaign Active', count: 234, color: '#3B82F6', icon: '✉️' },
+                { action: 'Drive-bys Planned', count: 12, color: '#10B981', icon: '🚗' },
+              ].map((task, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{task.icon}</span>
+                      <span className="text-muted-foreground">{task.action}</span>
+                    </div>
+                    <span className="font-bold" style={{ color: task.color }}>
+                      {task.count}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className="h-1.5 rounded-full transition-all"
+                      style={{
+                        backgroundColor: task.color,
+                        width: `${Math.min((task.count / 250) * 100, 100)}%`
                       }}
                     />
                   </div>
