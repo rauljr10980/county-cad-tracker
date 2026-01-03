@@ -489,58 +489,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             )}
           </div>
 
-          {/* Phone Numbers Section */}
-          <div className="bg-secondary/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Phone className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Phone Numbers</span>
-            </div>
-            <div className="space-y-2">
-              {phoneNumbers.map((phone, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">
-                    Phone {index + 1}:
-                  </span>
-                  <Input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => {
-                      const newPhones = [...phoneNumbers];
-                      newPhones[index] = e.target.value;
-                      setPhoneNumbers(newPhones);
-                    }}
-                    placeholder="Enter phone number"
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                      "h-8 w-8 shrink-0",
-                      ownerPhoneIndex === index && "text-yellow-500"
-                    )}
-                    onClick={() => handleToggleOwnerPhone(index)}
-                    title={ownerPhoneIndex === index ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
-                  >
-                    <Star className={cn(
-                      "h-4 w-4",
-                      ownerPhoneIndex === index ? "fill-yellow-500" : "fill-none"
-                    )} />
-                  </Button>
-                </div>
-              ))}
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  size="sm"
-                  onClick={handleSavePhoneNumbers}
-                  disabled={savingPhones}
-                >
-                  {savingPhones ? 'Saving...' : 'Save Phone Numbers'}
-                </Button>
-              </div>
-            </div>
-          </div>
-
           {/* Actions & Tasks Section */}
           <div className="bg-secondary/30 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
@@ -679,6 +627,58 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   disabled={savingDealStage || !dealStage}
                 >
                   {savingDealStage ? 'Updating...' : 'Update Deal Stage'}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Phone Numbers Section */}
+          <div className="bg-secondary/30 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Phone className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Phone Numbers</span>
+            </div>
+            <div className="space-y-2">
+              {phoneNumbers.map((phone, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">
+                    Phone {index + 1}:
+                  </span>
+                  <Input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => {
+                      const newPhones = [...phoneNumbers];
+                      newPhones[index] = e.target.value;
+                      setPhoneNumbers(newPhones);
+                    }}
+                    placeholder="Enter phone number"
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "h-8 w-8 shrink-0",
+                      ownerPhoneIndex === index && "text-yellow-500"
+                    )}
+                    onClick={() => handleToggleOwnerPhone(index)}
+                    title={ownerPhoneIndex === index ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                  >
+                    <Star className={cn(
+                      "h-4 w-4",
+                      ownerPhoneIndex === index ? "fill-yellow-500" : "fill-none"
+                    )} />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  size="sm"
+                  onClick={handleSavePhoneNumbers}
+                  disabled={savingPhones}
+                >
+                  {savingPhones ? 'Saving...' : 'Save Phone Numbers'}
                 </Button>
               </div>
             </div>
