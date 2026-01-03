@@ -108,11 +108,29 @@ export async function getComparison(fileId: string) {
  * Get dashboard statistics
  */
 export async function getDashboardStats() {
-  const response = await fetch(`${API_BASE_URL}/api/dashboard`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch dashboard stats');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/dashboard`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch dashboard stats');
+    }
+    return response.json();
+  } catch (error) {
+    // Fallback to mock data if API is unavailable (e.g., on GitHub Pages)
+    console.warn('[API] Using fallback mock data for dashboard');
+    return {
+      totalProperties: 58432,
+      byStatus: {
+        judgment: 3829,
+        active: 5164,
+        pending: 858,
+      },
+      totalAmountDue: 847293847,
+      avgAmountDue: 14500,
+      newThisMonth: 1243,
+      removedThisMonth: 702,
+      deadLeads: 702,
+    };
   }
-  return response.json();
 }
 
 /**
