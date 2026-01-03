@@ -2068,7 +2068,75 @@ app.get('/api/dashboard', async (req, res) => {
         }
       }
 
-      console.log('[DASHBOARD] Returning dashboard stats');
+      // Calculate pipeline metrics from actual property data
+      const pipelineByStage = {
+        new_lead: properties.filter(p => p.dealStage === 'new_lead').length,
+        contacted: properties.filter(p => p.dealStage === 'contacted').length,
+        interested: properties.filter(p => p.dealStage === 'interested').length,
+        offer_sent: properties.filter(p => p.dealStage === 'offer_sent').length,
+        negotiating: properties.filter(p => p.dealStage === 'negotiating').length,
+        under_contract: properties.filter(p => p.dealStage === 'under_contract').length,
+        closed: properties.filter(p => p.dealStage === 'closed').length,
+        dead: properties.filter(p => p.dealStage === 'dead').length,
+      };
+
+      const activeDealsProps = properties.filter(p =>
+        p.dealStage &&
+        p.dealStage !== 'dead' &&
+        p.dealStage !== 'closed'
+      );
+
+      const totalPipelineValue = activeDealsProps.reduce((sum, p) =>
+        sum + (p.estimatedDealValue || 0), 0
+      );
+
+      const closedDeals = pipelineByStage.closed;
+      const totalLeads = properties.filter(p => p.dealStage).length;
+      const conversionRate = totalLeads > 0 ? ((closedDeals / totalLeads) * 100).toFixed(1) : 0;
+
+      const avgDealValue = activeDealsProps.length > 0
+        ? Math.round(totalPipelineValue / activeDealsProps.length)
+        : 0;
+
+      // Calculate task/action metrics from actual property data
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(today);
+      todayEnd.setHours(23, 59, 59, 999);
+
+      const weekFromNow = new Date(today);
+      weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+      const taskMetrics = {
+        callsDueToday: properties.filter(p =>
+          p.actionType === 'call' &&
+          p.dueTime &&
+          new Date(p.dueTime) >= today &&
+          new Date(p.dueTime) <= todayEnd
+        ).length,
+        followUpsThisWeek: properties.filter(p =>
+          p.dueTime &&
+          new Date(p.dueTime) >= today &&
+          new Date(p.dueTime) <= weekFromNow
+        ).length,
+        textsScheduled: properties.filter(p =>
+          p.actionType === 'text' &&
+          p.dueTime &&
+          new Date(p.dueTime) >= today
+        ).length,
+        mailCampaignActive: properties.filter(p =>
+          p.actionType === 'mail' &&
+          p.dueTime &&
+          new Date(p.dueTime) >= today
+        ).length,
+        drivebyPlanned: properties.filter(p =>
+          p.actionType === 'driveby' &&
+          p.dueTime &&
+          new Date(p.dueTime) >= today
+        ).length,
+      };
+
+      console.log('[DASHBOARD] Returning dashboard stats with pipeline and task metrics');
       return {
         totalProperties: properties.length,
         byStatus,
@@ -2077,6 +2145,14 @@ app.get('/api/dashboard', async (req, res) => {
         newThisMonth,
         removedThisMonth,
         deadLeads: removedThisMonth,
+        pipeline: {
+          totalValue: totalPipelineValue,
+          activeDeals: activeDealsProps.length,
+          byStage: pipelineByStage,
+          conversionRate: parseFloat(conversionRate),
+          avgDealValue,
+        },
+        tasks: taskMetrics,
       };
     })();
 

@@ -130,6 +130,14 @@ export interface DashboardStats {
     conversionRate: number;
     avgDealValue: number;
   };
+  // Task/Action metrics
+  tasks?: {
+    callsDueToday: number;
+    followUpsThisWeek: number;
+    textsScheduled: number;
+    mailCampaignActive: number;
+    drivebyPlanned: number;
+  };
 }
 
 export interface ProcessingStatus {

@@ -287,11 +287,11 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           <CardContent>
             <div className="space-y-4">
               {[
-                { action: 'Calls Due Today', count: 45, color: '#EF4444', icon: '📞' },
-                { action: 'Follow-ups This Week', count: 128, color: '#F59E0B', icon: '📅' },
-                { action: 'Texts Scheduled', count: 67, color: '#8B5CF6', icon: '💬' },
-                { action: 'Mail Campaign Active', count: 234, color: '#3B82F6', icon: '✉️' },
-                { action: 'Drive-bys Planned', count: 12, color: '#10B981', icon: '🚗' },
+                { action: 'Calls Due Today', count: stats.tasks?.callsDueToday || 0, color: '#EF4444', icon: '📞' },
+                { action: 'Follow-ups This Week', count: stats.tasks?.followUpsThisWeek || 0, color: '#F59E0B', icon: '📅' },
+                { action: 'Texts Scheduled', count: stats.tasks?.textsScheduled || 0, color: '#8B5CF6', icon: '💬' },
+                { action: 'Mail Campaign Active', count: stats.tasks?.mailCampaignActive || 0, color: '#3B82F6', icon: '✉️' },
+                { action: 'Drive-bys Planned', count: stats.tasks?.drivebyPlanned || 0, color: '#10B981', icon: '🚗' },
               ].map((task, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
