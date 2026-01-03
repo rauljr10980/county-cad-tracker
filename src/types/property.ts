@@ -27,6 +27,7 @@ export interface Property {
   actionType?: 'call' | 'text' | 'mail' | 'driveby';
   priority?: 'high' | 'med' | 'low';
   dueTime?: string; // ISO datetime string
+  assignedTo?: 'Luciano' | 'Raul'; // Task assignment
   attempts?: number; // Number of contact attempts
   lastOutcome?: 'no_answer' | 'voicemail' | 'text_sent' | 'spoke_owner' | 'wrong_number' | 'not_interested' | 'new_owner' | 'call_back_later';
   lastOutcomeDate?: string;

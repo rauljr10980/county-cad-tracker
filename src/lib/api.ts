@@ -245,20 +245,21 @@ export async function getTasks(): Promise<Property[]> {
 }
 
 /**
- * Update property action (actionType, priority, dueTime)
+ * Update property action (actionType, priority, dueTime, assignedTo)
  */
 export async function updatePropertyAction(
   propertyId: string,
   actionType: 'call' | 'text' | 'mail' | 'driveby',
   priority: 'high' | 'med' | 'low',
-  dueTime: string
+  dueTime: string,
+  assignedTo?: 'Luciano' | 'Raul'
 ) {
   const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/action`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ actionType, priority, dueTime }),
+    body: JSON.stringify({ actionType, priority, dueTime, assignedTo }),
   });
   if (!response.ok) {
     throw new Error('Failed to update action');

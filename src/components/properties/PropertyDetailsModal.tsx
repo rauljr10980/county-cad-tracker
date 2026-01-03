@@ -34,6 +34,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [actionType, setActionType] = useState<'call' | 'text' | 'mail' | 'driveby' | ''>('');
   const [priority, setPriority] = useState<'high' | 'med' | 'low'>('med');
   const [dueDateTime, setDueDateTime] = useState<Date | undefined>(undefined);
+  const [assignedTo, setAssignedTo] = useState<'Luciano' | 'Raul' | ''>('');
   const [savingAction, setSavingAction] = useState(false);
 
   // Deal Stage state
@@ -63,6 +64,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setActionType(property.actionType || '');
       setPriority(property.priority || 'med');
       setDueDateTime(property.dueTime ? new Date(property.dueTime) : undefined);
+      setAssignedTo(property.assignedTo || '');
 
       // Initialize deal stage
       setDealStage(property.dealStage || '');
@@ -204,15 +206,16 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
     setSavingAction(true);
     try {
       const isoDateTime = dueDateTime.toISOString();
-      await updatePropertyAction(property.id, actionType, priority, isoDateTime);
+      await updatePropertyAction(property.id, actionType, priority, isoDateTime, assignedTo || undefined);
       toast({
         title: "Action Scheduled",
-        description: `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} scheduled for ${format(dueDateTime, 'MMM d, yyyy h:mm a')}`,
+        description: `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} scheduled for ${format(dueDateTime, 'MMM d, yyyy h:mm a')}${assignedTo ? ` - Assigned to ${assignedTo}` : ''}`,
       });
       // Update property object
       property.actionType = actionType;
       property.priority = priority;
       property.dueTime = isoDateTime;
+      property.assignedTo = assignedTo || undefined;
     } catch (error) {
       toast({
         title: "Error",
@@ -552,30 +555,44 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   </div>
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">Due Date & Time</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !dueDateTime && "text-muted-foreground"
-                      )}
-                    >
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {dueDateTime ? format(dueDateTime, 'PPP p') : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={dueDateTime}
-                      onSelect={setDueDateTime}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Due Date & Time</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !dueDateTime && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {dueDateTime ? format(dueDateTime, 'PPP p') : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={dueDateTime}
+                        onSelect={setDueDateTime}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Assigned To</label>
+                  <Select value={assignedTo} onValueChange={(value) => setAssignedTo(value as any)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select assignee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Luciano">Luciano</SelectItem>
+                      <SelectItem value="Raul">Raul</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="flex justify-end">
                 <Button
