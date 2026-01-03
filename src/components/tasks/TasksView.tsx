@@ -17,7 +17,7 @@ import { toast } from '@/hooks/use-toast';
 type ActionType = 'call' | 'text' | 'mail' | 'driveby';
 type Priority = 'high' | 'med' | 'low';
 type Outcome = 'no_answer' | 'voicemail' | 'text_sent' | 'spoke_owner' | 'wrong_number' | 'not_interested' | 'new_owner' | 'call_back_later';
-type FilterMode = 'all' | 'calls_only' | 'hot_today' | 'overdue';
+type FilterMode = 'all' | 'call' | 'text' | 'mail' | 'driveby' | 'hot_today' | 'overdue';
 
 const ACTION_ICONS = {
   call: Phone,
@@ -27,16 +27,16 @@ const ACTION_ICONS = {
 };
 
 const ACTION_LABELS = {
-  call: 'Call',
-  text: 'Text',
-  mail: 'Mail',
-  driveby: 'Drive by',
+  call: '📞 Call',
+  text: '💬 Text',
+  mail: '✉️ Mail',
+  driveby: '🚗 Drive-by',
 };
 
 const PRIORITY_COLORS = {
   high: 'bg-red-500/20 text-red-500 border-red-500/30',
   med: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30',
-  low: 'bg-blue-500/20 text-blue-500 border-blue-500/30',
+  low: 'bg-green-500/20 text-green-500 border-green-500/30',
 };
 
 const OUTCOME_OPTIONS: { value: Outcome; label: string; nextAction?: ActionType }[] = [
@@ -144,8 +144,8 @@ export function TasksView() {
     let filtered = [...tasksData];
 
     // Apply filters
-    if (filterMode === 'calls_only') {
-      filtered = filtered.filter(p => p.actionType === 'call');
+    if (filterMode === 'call' || filterMode === 'text' || filterMode === 'mail' || filterMode === 'driveby') {
+      filtered = filtered.filter(p => p.actionType === filterMode);
     } else if (filterMode === 'hot_today') {
       filtered = filtered.filter(p => {
         if (!p.dueTime) return false;
@@ -458,7 +458,10 @@ export function TasksView() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Tasks</SelectItem>
-              <SelectItem value="calls_only">Calls Only</SelectItem>
+              <SelectItem value="call">📞 Calls</SelectItem>
+              <SelectItem value="text">💬 Texts</SelectItem>
+              <SelectItem value="mail">✉️ Mail</SelectItem>
+              <SelectItem value="driveby">🚗 Drive-bys</SelectItem>
               <SelectItem value="hot_today">Hot Today</SelectItem>
               <SelectItem value="overdue">Overdue</SelectItem>
             </SelectContent>
@@ -524,12 +527,9 @@ export function TasksView() {
                   </div>
                 )}
 
-                {/* Action Type Icon */}
+                {/* Action Type */}
                 <div className="shrink-0 pt-1">
-                  <div className="flex items-center gap-2">
-                    <ActionIcon className="h-5 w-5 text-primary" />
-                    <span className="text-sm font-medium">{actionLabel}</span>
-                  </div>
+                  <span className="text-sm font-medium">{actionLabel}</span>
                 </div>
 
                 {/* Main Content */}
@@ -578,19 +578,19 @@ export function TasksView() {
                               <button
                                 className={cn(
                                   "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                  priority === 'med' 
-                                    ? "bg-yellow-500/20 text-yellow-500 font-medium" 
+                                  priority === 'med'
+                                    ? "bg-yellow-500/20 text-yellow-500 font-medium"
                                     : "hover:bg-secondary"
                                 )}
                                 onClick={() => handlePriorityChange(property, 'med')}
                               >
-                                Medium
+                                Med
                               </button>
                               <button
                                 className={cn(
                                   "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                  priority === 'low' 
-                                    ? "bg-blue-500/20 text-blue-500 font-medium" 
+                                  priority === 'low'
+                                    ? "bg-green-500/20 text-green-500 font-medium"
                                     : "hover:bg-secondary"
                                 )}
                                 onClick={() => handlePriorityChange(property, 'low')}
