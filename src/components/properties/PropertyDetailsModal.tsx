@@ -9,6 +9,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
 import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyDealStage } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -30,14 +33,14 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   // Actions & Tasks state
   const [actionType, setActionType] = useState<'call' | 'text' | 'mail' | 'driveby' | ''>('');
   const [priority, setPriority] = useState<'high' | 'med' | 'low'>('med');
-  const [dueDateTime, setDueDateTime] = useState('');
+  const [dueDateTime, setDueDateTime] = useState<Date | undefined>(undefined);
   const [savingAction, setSavingAction] = useState(false);
 
   // Deal Stage state
   const [dealStage, setDealStage] = useState<'new_lead' | 'contacted' | 'interested' | 'offer_sent' | 'negotiating' | 'under_contract' | 'closed' | 'dead' | ''>('');
   const [estimatedDealValue, setEstimatedDealValue] = useState('');
   const [offerAmount, setOfferAmount] = useState('');
-  const [expectedCloseDate, setExpectedCloseDate] = useState('');
+  const [expectedCloseDate, setExpectedCloseDate] = useState<Date | undefined>(undefined);
   const [savingDealStage, setSavingDealStage] = useState(false);
 
   // Initialize notes and phone numbers from property when modal opens or property changes
@@ -59,33 +62,13 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       // Initialize actions & tasks
       setActionType(property.actionType || '');
       setPriority(property.priority || 'med');
-      // Convert ISO datetime to datetime-local format (YYYY-MM-DDTHH:MM)
-      if (property.dueTime) {
-        const date = new Date(property.dueTime);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        setDueDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
-      } else {
-        setDueDateTime('');
-      }
+      setDueDateTime(property.dueTime ? new Date(property.dueTime) : undefined);
 
       // Initialize deal stage
       setDealStage(property.dealStage || '');
       setEstimatedDealValue(property.estimatedDealValue?.toString() || '');
       setOfferAmount(property.offerAmount?.toString() || '');
-      // Convert ISO date to YYYY-MM-DD format for date input
-      if (property.expectedCloseDate) {
-        const date = new Date(property.expectedCloseDate);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        setExpectedCloseDate(`${year}-${month}-${day}`);
-      } else {
-        setExpectedCloseDate('');
-      }
+      setExpectedCloseDate(property.expectedCloseDate ? new Date(property.expectedCloseDate) : undefined);
     }
   }, [property?.id, isOpen]);
 
@@ -220,12 +203,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
     setSavingAction(true);
     try {
-      // Convert datetime-local format to ISO string for API
-      const isoDateTime = new Date(dueDateTime).toISOString();
+      const isoDateTime = dueDateTime.toISOString();
       await updatePropertyAction(property.id, actionType, priority, isoDateTime);
       toast({
         title: "Action Scheduled",
-        description: `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} scheduled for ${property.accountNumber}`,
+        description: `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} scheduled for ${format(dueDateTime, 'MMM d, yyyy h:mm a')}`,
       });
       // Update property object
       property.actionType = actionType;
@@ -254,12 +236,13 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
     setSavingDealStage(true);
     try {
+      const closeDateISO = expectedCloseDate ? expectedCloseDate.toISOString() : undefined;
       await updatePropertyDealStage(
         property.id,
         dealStage,
         estimatedDealValue ? parseFloat(estimatedDealValue) : undefined,
         offerAmount ? parseFloat(offerAmount) : undefined,
-        expectedCloseDate || undefined
+        closeDateISO
       );
       toast({
         title: "Deal Stage Updated",
@@ -269,7 +252,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       property.dealStage = dealStage;
       property.estimatedDealValue = estimatedDealValue ? parseFloat(estimatedDealValue) : undefined;
       property.offerAmount = offerAmount ? parseFloat(offerAmount) : undefined;
-      property.expectedCloseDate = expectedCloseDate || undefined;
+      property.expectedCloseDate = closeDateISO;
     } catch (error) {
       toast({
         title: "Error",
@@ -571,11 +554,28 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               </div>
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">Due Date & Time</label>
-                <Input
-                  type="datetime-local"
-                  value={dueDateTime}
-                  onChange={(e) => setDueDateTime(e.target.value)}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dueDateTime && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {dueDateTime ? format(dueDateTime, 'PPP p') : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={dueDateTime}
+                      onSelect={setDueDateTime}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="flex justify-end">
                 <Button
@@ -636,11 +636,28 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               </div>
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">Expected Close Date</label>
-                <Input
-                  type="date"
-                  value={expectedCloseDate}
-                  onChange={(e) => setExpectedCloseDate(e.target.value)}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !expectedCloseDate && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {expectedCloseDate ? format(expectedCloseDate, 'PPP') : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={expectedCloseDate}
+                      onSelect={setExpectedCloseDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="flex justify-end">
                 <Button
