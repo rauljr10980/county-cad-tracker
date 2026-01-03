@@ -16,6 +16,29 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   const isLoading = statsLoading;
   const error = statsError;
 
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-6 text-center">
+          <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <p className="text-destructive">Failed to load dashboard data</p>
+          <p className="text-sm text-muted-foreground mt-2">{String(error)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading || !stats) {
+    return (
+      <div className="p-6">
+        <div className="p-12 text-center">
+          <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Monthly tracking data (simulated - you can connect to real API data)
   const monthlyTrendsData = [
     { month: 'Jun', totalProperties: 56234, newDelinquencies: 892, resolved: 445 },
@@ -42,29 +65,6 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
     { range: '$25K-$50K', count: Math.floor(stats.totalProperties * 0.12), color: '#F59E0B' },
     { range: '$50K+', count: Math.floor(stats.totalProperties * 0.08), color: '#EF4444' },
   ];
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-6 text-center">
-          <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <p className="text-destructive">Failed to load dashboard data</p>
-          <p className="text-sm text-muted-foreground mt-2">{String(error)}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading || !stats) {
-    return (
-      <div className="p-6">
-        <div className="p-12 text-center">
-          <Loader2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
-          <p className="text-muted-foreground">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 space-y-6">
