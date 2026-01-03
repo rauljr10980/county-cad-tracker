@@ -308,6 +308,29 @@ export async function markTaskDone(
 }
 
 /**
+ * Update property deal stage
+ */
+export async function updatePropertyDealStage(
+  propertyId: string,
+  dealStage: 'new_lead' | 'contacted' | 'interested' | 'offer_sent' | 'negotiating' | 'under_contract' | 'closed' | 'dead',
+  estimatedDealValue?: number,
+  offerAmount?: number,
+  expectedCloseDate?: string
+) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/deal-stage`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ dealStage, estimatedDealValue, offerAmount, expectedCloseDate }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update deal stage');
+  }
+  return response.json();
+}
+
+/**
  * Login user
  */
 export async function login(username: string, password: string) {
