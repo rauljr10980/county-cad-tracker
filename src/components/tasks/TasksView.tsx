@@ -196,12 +196,52 @@ export function TasksView() {
     return filtered;
   }, [data, filterMode, sortBy]);
 
-  // End-of-day stats
+  // Task summary stats (matching dashboard)
+  const taskStats = useMemo(() => {
+    const tasksData = data || [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+    const weekFromNow = new Date(today);
+    weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+    return {
+      callsDueToday: tasksData.filter(p =>
+        p.actionType === 'call' &&
+        p.dueTime &&
+        new Date(p.dueTime) >= today &&
+        new Date(p.dueTime) <= todayEnd
+      ).length,
+      followUpsThisWeek: tasksData.filter(p =>
+        p.dueTime &&
+        new Date(p.dueTime) >= today &&
+        new Date(p.dueTime) <= weekFromNow
+      ).length,
+      textsScheduled: tasksData.filter(p =>
+        p.actionType === 'text' &&
+        p.dueTime &&
+        new Date(p.dueTime) >= today
+      ).length,
+      mailCampaignActive: tasksData.filter(p =>
+        p.actionType === 'mail' &&
+        p.dueTime &&
+        new Date(p.dueTime) >= today
+      ).length,
+      drivebyPlanned: tasksData.filter(p =>
+        p.actionType === 'driveby' &&
+        p.dueTime &&
+        new Date(p.dueTime) >= today
+      ).length,
+    };
+  }, [data]);
+
+  // End-of-day stats (performance tracking)
   const todayStats = useMemo(() => {
     const tasksData = data || [];
     const today = new Date();
     const todayStart = startOfDay(today);
-    
+
     return {
       completed: tasksData.filter(p => {
         if (!p.lastOutcomeDate) return false;
@@ -343,8 +383,44 @@ export function TasksView() {
 
   return (
     <div className="p-6">
-      {/* End-of-Day Stats */}
+      {/* Task Summary Cards (matching dashboard) */}
       <div className="mb-6 bg-card border border-border rounded-lg p-4">
+        <h3 className="text-sm font-semibold mb-4">Tasks & Actions Overview</h3>
+        <div className="space-y-4">
+          {[
+            { action: 'Calls Due Today', count: taskStats.callsDueToday, color: '#EF4444', icon: '📞' },
+            { action: 'Follow-ups This Week', count: taskStats.followUpsThisWeek, color: '#F59E0B', icon: '📅' },
+            { action: 'Texts Scheduled', count: taskStats.textsScheduled, color: '#8B5CF6', icon: '💬' },
+            { action: 'Mail Campaign Active', count: taskStats.mailCampaignActive, color: '#3B82F6', icon: '✉️' },
+            { action: 'Drive-bys Planned', count: taskStats.drivebyPlanned, color: '#10B981', icon: '🚗' },
+          ].map((task, index) => (
+            <div key={index} className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{task.icon}</span>
+                  <span className="text-muted-foreground">{task.action}</span>
+                </div>
+                <span className="font-bold" style={{ color: task.color }}>
+                  {task.count}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                <div
+                  className="h-1.5 rounded-full transition-all"
+                  style={{
+                    backgroundColor: task.color,
+                    width: `${Math.min((task.count / 250) * 100, 100)}%`
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Performance Stats */}
+      <div className="mb-6 bg-card border border-border rounded-lg p-4">
+        <h3 className="text-sm font-semibold mb-4">Today's Performance</h3>
         <div className="grid grid-cols-4 gap-4 text-center">
           <div>
             <p className="text-2xl font-bold text-primary">{todayStats.completed}</p>
