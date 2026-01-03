@@ -1,4 +1,4 @@
-import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2, Users, DollarSign, Package, ShoppingCart } from 'lucide-react';
+import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2, Users, DollarSign, Package, ShoppingCart, Target, TrendingUp as Pipeline } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyStatus } from '@/types/property';
@@ -254,6 +254,134 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Pipeline/Deals Tracking Section */}
+      {stats.pipeline && (
+        <>
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-4">Sales Pipeline & Deal Tracking</h3>
+          </div>
+
+          {/* Pipeline Metrics Row */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Pipeline Value
+                </CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  ${(stats.pipeline.totalValue / 1000000).toFixed(2)}M
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Total estimated value
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Active Deals
+                </CardTitle>
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.pipeline.activeDeals}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  In progress
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Avg Deal Value
+                </CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ${stats.pipeline.avgDealValue.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Per property
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Conversion Rate
+                </CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  {stats.pipeline.conversionRate}%
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Lead to close
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sales Funnel Chart */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Sales Funnel</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">Lead progression through pipeline stages</p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { stage: 'New Leads', count: stats.pipeline.byStage.new_lead, color: '#3B82F6', width: 100 },
+                  { stage: 'Contacted', count: stats.pipeline.byStage.contacted, color: '#8B5CF6', width: 85 },
+                  { stage: 'Interested', count: stats.pipeline.byStage.interested, color: '#EC4899', width: 70 },
+                  { stage: 'Offer Sent', count: stats.pipeline.byStage.offer_sent, color: '#F59E0B', width: 55 },
+                  { stage: 'Negotiating', count: stats.pipeline.byStage.negotiating, color: '#EF4444', width: 40 },
+                  { stage: 'Under Contract', count: stats.pipeline.byStage.under_contract, color: '#10B981', width: 25 },
+                  { stage: 'Closed', count: stats.pipeline.byStage.closed, color: '#059669', width: 15 },
+                ].map((item, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{item.stage}</span>
+                      <span className="text-muted-foreground">{item.count.toLocaleString()} leads</span>
+                    </div>
+                    <div className="relative w-full h-8 bg-gray-100 rounded-lg overflow-hidden">
+                      <div
+                        className="h-full flex items-center justify-center text-white font-semibold text-sm transition-all duration-300"
+                        style={{
+                          backgroundColor: item.color,
+                          width: `${item.width}%`,
+                        }}
+                      >
+                        {item.width > 20 && `${item.count.toLocaleString()}`}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 pt-4 border-t border-border">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-sm bg-gray-400" />
+                    <span className="text-muted-foreground">Dead Leads</span>
+                  </div>
+                  <span className="font-medium text-muted-foreground">
+                    {stats.pipeline.byStage.dead.toLocaleString()} leads
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
     </div>
   );

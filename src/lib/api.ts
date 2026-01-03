@@ -129,6 +129,22 @@ export async function getDashboardStats() {
       newThisMonth: 1243,
       removedThisMonth: 702,
       deadLeads: 702,
+      pipeline: {
+        totalValue: 2450000,
+        activeDeals: 127,
+        byStage: {
+          new_lead: 1245,
+          contacted: 892,
+          interested: 234,
+          offer_sent: 89,
+          negotiating: 45,
+          under_contract: 23,
+          closed: 156,
+          dead: 3412,
+        },
+        conversionRate: 12.3,
+        avgDealValue: 19291,
+      },
     };
   }
 }
