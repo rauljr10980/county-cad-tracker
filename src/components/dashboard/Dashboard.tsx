@@ -4,7 +4,7 @@ import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyStatus } from '@/types/property';
 import { useDashboardStats } from '@/hooks/useFiles';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 interface DashboardProps {
   onFilterChange?: (filter: { from?: PropertyStatus; to?: PropertyStatus }) => void;
@@ -64,6 +64,17 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
     { range: '$10K-$25K', count: Math.floor(stats.totalProperties * 0.25), color: '#EC4899' },
     { range: '$25K-$50K', count: Math.floor(stats.totalProperties * 0.12), color: '#F59E0B' },
     { range: '$50K+', count: Math.floor(stats.totalProperties * 0.08), color: '#EF4444' },
+  ];
+
+  // Pipeline progression over time (simulated - you can connect to real API data)
+  const pipelineProgressionData = [
+    { month: 'Jun', interested: 198, offer_sent: 67, negotiating: 34, under_contract: 18, closed: 112 },
+    { month: 'Jul', interested: 212, offer_sent: 73, negotiating: 38, under_contract: 21, closed: 128 },
+    { month: 'Aug', interested: 224, offer_sent: 78, negotiating: 41, under_contract: 19, closed: 134 },
+    { month: 'Sep', interested: 219, offer_sent: 81, negotiating: 42, under_contract: 22, closed: 141 },
+    { month: 'Oct', interested: 228, offer_sent: 85, negotiating: 44, under_contract: 20, closed: 149 },
+    { month: 'Nov', interested: 231, offer_sent: 87, negotiating: 43, under_contract: 24, closed: 153 },
+    { month: 'Dec', interested: 234, offer_sent: 89, negotiating: 45, under_contract: 23, closed: 156 },
   ];
 
   return (
@@ -366,55 +377,144 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             </Card>
           </div>
 
-          {/* Sales Funnel Chart */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Sales Funnel</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">Lead progression through pipeline stages</p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[
-                  { stage: 'New Leads', count: stats.pipeline.byStage.new_lead, color: '#3B82F6', width: 100 },
-                  { stage: 'Contacted', count: stats.pipeline.byStage.contacted, color: '#8B5CF6', width: 85 },
-                  { stage: 'Interested', count: stats.pipeline.byStage.interested, color: '#EC4899', width: 70 },
-                  { stage: 'Offer Sent', count: stats.pipeline.byStage.offer_sent, color: '#F59E0B', width: 55 },
-                  { stage: 'Negotiating', count: stats.pipeline.byStage.negotiating, color: '#EF4444', width: 40 },
-                  { stage: 'Under Contract', count: stats.pipeline.byStage.under_contract, color: '#10B981', width: 25 },
-                  { stage: 'Closed', count: stats.pipeline.byStage.closed, color: '#059669', width: 15 },
-                ].map((item, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{item.stage}</span>
-                      <span className="text-muted-foreground">{item.count.toLocaleString()} leads</span>
-                    </div>
-                    <div className="relative w-full h-8 bg-gray-100 rounded-lg overflow-hidden">
-                      <div
-                        className="h-full flex items-center justify-center text-white font-semibold text-sm transition-all duration-300"
-                        style={{
-                          backgroundColor: item.color,
-                          width: `${item.width}%`,
-                        }}
-                      >
-                        {item.width > 20 && `${item.count.toLocaleString()}`}
+          {/* Sales Funnel and Pipeline Progression Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Sales Funnel Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Sales Funnel</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {[
+                    { stage: 'New Leads', count: stats.pipeline.byStage.new_lead, color: '#3B82F6', width: 100 },
+                    { stage: 'Contacted', count: stats.pipeline.byStage.contacted, color: '#8B5CF6', width: 85 },
+                    { stage: 'Interested', count: stats.pipeline.byStage.interested, color: '#EC4899', width: 70 },
+                    { stage: 'Offer Sent', count: stats.pipeline.byStage.offer_sent, color: '#F59E0B', width: 55 },
+                    { stage: 'Negotiating', count: stats.pipeline.byStage.negotiating, color: '#EF4444', width: 40 },
+                    { stage: 'Under Contract', count: stats.pipeline.byStage.under_contract, color: '#10B981', width: 25 },
+                    { stage: 'Closed', count: stats.pipeline.byStage.closed, color: '#059669', width: 15 },
+                  ].map((item, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{item.stage}</span>
+                        <span className="text-muted-foreground">{item.count.toLocaleString()} leads</span>
+                      </div>
+                      <div className="relative w-full h-8 bg-gray-100 rounded-lg overflow-hidden">
+                        <div
+                          className="h-full flex items-center justify-center text-white font-semibold text-sm transition-all duration-300"
+                          style={{
+                            backgroundColor: item.color,
+                            width: `${item.width}%`,
+                          }}
+                        >
+                          {item.width > 20 && `${item.count.toLocaleString()}`}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 pt-4 border-t border-border">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-sm bg-gray-400" />
-                    <span className="text-muted-foreground">Dead Leads</span>
-                  </div>
-                  <span className="font-medium text-muted-foreground">
-                    {stats.pipeline.byStage.dead.toLocaleString()} leads
-                  </span>
+                  ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="mt-6 pt-4 border-t border-border">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-sm bg-gray-400" />
+                      <span className="text-muted-foreground">Dead Leads</span>
+                    </div>
+                    <span className="font-medium text-muted-foreground">
+                      {stats.pipeline.byStage.dead.toLocaleString()} leads
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pipeline Progression Over Time */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Pipeline Progression</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Track deal stages over time</p>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={pipelineProgressionData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
+                    <YAxis stroke="#9ca3af" fontSize={12} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="interested"
+                      stroke="#EC4899"
+                      strokeWidth={2}
+                      name="Interested"
+                      dot={{ fill: '#EC4899', r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="offer_sent"
+                      stroke="#F59E0B"
+                      strokeWidth={2}
+                      name="Offer Sent"
+                      dot={{ fill: '#F59E0B', r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="negotiating"
+                      stroke="#EF4444"
+                      strokeWidth={2}
+                      name="Negotiating"
+                      dot={{ fill: '#EF4444', r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="under_contract"
+                      stroke="#10B981"
+                      strokeWidth={2}
+                      name="Under Contract"
+                      dot={{ fill: '#10B981', r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="closed"
+                      stroke="#059669"
+                      strokeWidth={3}
+                      name="Closed"
+                      dot={{ fill: '#059669', r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-0.5 bg-[#EC4899]" />
+                    <span className="text-muted-foreground">Interested</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-0.5 bg-[#F59E0B]" />
+                    <span className="text-muted-foreground">Offer Sent</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-0.5 bg-[#EF4444]" />
+                    <span className="text-muted-foreground">Negotiating</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-0.5 bg-[#10B981]" />
+                    <span className="text-muted-foreground">Under Contract</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-0.5 bg-[#059669]" />
+                    <span className="text-muted-foreground font-semibold">Closed</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </>
       )}
 
