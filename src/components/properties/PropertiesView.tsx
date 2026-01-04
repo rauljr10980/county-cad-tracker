@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown } from 'lucide-react';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
+import { AdvancedFiltersPanel, AdvancedFilters } from './AdvancedFilters';
 import { Property, PropertyStatus } from '@/types/property';
 import { useProperties } from '@/hooks/useFiles';
 import { Button } from '@/components/ui/button';
@@ -21,10 +22,26 @@ const ITEMS_PER_PAGE = 100;
 
 export function PropertiesView() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [selectedStatuses, setSelectedStatuses] = useState<PropertyStatus[]>([]);
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({
+    statuses: [],
+    amountDueMin: undefined,
+    amountDueMax: undefined,
+    marketValueMin: undefined,
+    marketValueMax: undefined,
+    taxYear: undefined,
+    hasNotes: 'any',
+    hasLink: 'any',
+    followUpDateFrom: undefined,
+    followUpDateTo: undefined,
+    lastPaymentDateFrom: undefined,
+    lastPaymentDateTo: undefined,
+  });
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  
+  // Convert advancedFilters.statuses to legacy format for API
+  const selectedStatuses = advancedFilters.statuses;
   
   // Update debounced search after delay
   useEffect(() => {
@@ -112,22 +129,28 @@ export function PropertiesView() {
   const startItem = total > 0 ? (page - 1) * ITEMS_PER_PAGE + 1 : 0;
   const endItem = Math.min(page * ITEMS_PER_PAGE, total);
   
-  // Handle status filter toggle - reset to page 1
-  const toggleStatusFilter = (status: PropertyStatus) => {
-    setSelectedStatuses(prev => {
-      const isSelected = prev.includes(status);
-      if (isSelected) {
-        return prev.filter(s => s !== status);
-      } else {
-        return [...prev, status];
-      }
-    });
+  // Handle advanced filters change
+  const handleFiltersChange = (filters: AdvancedFilters) => {
+    setAdvancedFilters(filters);
     setPage(1);
   };
   
-  // Clear all status filters
-  const clearStatusFilters = () => {
-    setSelectedStatuses([]);
+  // Clear all filters
+  const clearAllFilters = () => {
+    setAdvancedFilters({
+      statuses: [],
+      amountDueMin: undefined,
+      amountDueMax: undefined,
+      marketValueMin: undefined,
+      marketValueMax: undefined,
+      taxYear: undefined,
+      hasNotes: 'any',
+      hasLink: 'any',
+      followUpDateFrom: undefined,
+      followUpDateTo: undefined,
+      lastPaymentDateFrom: undefined,
+      lastPaymentDateTo: undefined,
+    });
     setPage(1);
   };
   
@@ -141,23 +164,9 @@ export function PropertiesView() {
   // Handle upload completion - reset to page 1
   const handleUploadComplete = () => {
     setPage(1);
-    setSelectedStatuses([]);
+    clearAllFilters();
     setSearchQuery('');
     setDebouncedSearchQuery('');
-  };
-  
-  // Get filter button text
-  const getFilterButtonText = () => {
-    if (selectedStatuses.length === 0) {
-      return `All (${totalUnfiltered.toLocaleString()})`;
-    }
-    if (selectedStatuses.length === 1) {
-      const status = selectedStatuses[0];
-      const label = status === 'J' ? 'Judgment' : status === 'A' ? 'Active' : 'Pending';
-      const count = statusCounts[status] || 0;
-      return `${label} (${count.toLocaleString()})`;
-    }
-    return `${selectedStatuses.length} selected`;
   };
 
   return (
