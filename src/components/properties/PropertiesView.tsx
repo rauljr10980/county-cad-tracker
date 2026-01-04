@@ -210,109 +210,55 @@ export function PropertiesView() {
           )}
         </div>
         
-        {/* Status Filter Dropdown */}
+        {/* Advanced Filters */}
         <div className="mt-4 p-3 border border-border rounded-lg bg-card/50">
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2 mr-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Filter by status:</span>
-            </div>
+            <AdvancedFiltersPanel
+              filters={advancedFilters}
+              onFiltersChange={handleFiltersChange}
+              onClear={clearAllFilters}
+              statusCounts={statusCounts}
+              totalUnfiltered={totalUnfiltered}
+              activeFilterCount={useMemo(() => {
+                let count = 0;
+                if (advancedFilters.statuses.length > 0) count += advancedFilters.statuses.length;
+                if (advancedFilters.amountDueMin !== undefined) count++;
+                if (advancedFilters.amountDueMax !== undefined) count++;
+                if (advancedFilters.marketValueMin !== undefined) count++;
+                if (advancedFilters.marketValueMax !== undefined) count++;
+                if (advancedFilters.taxYear) count++;
+                if (advancedFilters.hasNotes !== 'any') count++;
+                if (advancedFilters.hasLink !== 'any') count++;
+                if (advancedFilters.followUpDateFrom) count++;
+                if (advancedFilters.followUpDateTo) count++;
+                if (advancedFilters.lastPaymentDateFrom) count++;
+                if (advancedFilters.lastPaymentDateTo) count++;
+                return count;
+              }, [advancedFilters])}
+            />
             
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant={selectedStatuses.length > 0 ? "default" : "outline"}
-                  size="sm"
-                  className="min-w-[140px] justify-between"
-                >
-                  <span>{getFilterButtonText()}</span>
-                  <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Select Status</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem
-                checked={selectedStatuses.length === 0}
-                onCheckedChange={(checked) => {
-                  clearStatusFilters();
-                }}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span>All</span>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    ({totalUnfiltered.toLocaleString()})
-                  </span>
-                </div>
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem
-                checked={selectedStatuses.includes('P')}
-                onCheckedChange={() => toggleStatusFilter('P')}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-yellow-500" />
-                    <span>Pending</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    ({statusCounts.P.toLocaleString()})
-                  </span>
-                </div>
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={selectedStatuses.includes('A')}
-                onCheckedChange={() => toggleStatusFilter('A')}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-green-500" />
-                    <span>Active</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    ({statusCounts.A.toLocaleString()})
-                  </span>
-                </div>
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={selectedStatuses.includes('J')}
-                onCheckedChange={() => toggleStatusFilter('J')}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-red-500" />
-                    <span>Judgment</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    ({statusCounts.J.toLocaleString()})
-                  </span>
-                </div>
-              </DropdownMenuCheckboxItem>
-              {selectedStatuses.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      clearStatusFilters();
-                    }}
-                    className="text-primary cursor-pointer"
-                  >
-                    Clear all filters
-                  </DropdownMenuCheckboxItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-            {selectedStatuses.length > 0 && (
+            {useMemo(() => {
+                let count = 0;
+                if (advancedFilters.statuses.length > 0) count += advancedFilters.statuses.length;
+                if (advancedFilters.amountDueMin !== undefined) count++;
+                if (advancedFilters.amountDueMax !== undefined) count++;
+                if (advancedFilters.marketValueMin !== undefined) count++;
+                if (advancedFilters.marketValueMax !== undefined) count++;
+                if (advancedFilters.taxYear) count++;
+                if (advancedFilters.hasNotes !== 'any') count++;
+                if (advancedFilters.hasLink !== 'any') count++;
+                if (advancedFilters.followUpDateFrom) count++;
+                if (advancedFilters.followUpDateTo) count++;
+                if (advancedFilters.lastPaymentDateFrom) count++;
+                if (advancedFilters.lastPaymentDateTo) count++;
+                return count;
+              }, [advancedFilters]) > 0 && (
               <span className="text-sm text-muted-foreground">
-                Showing {total.toLocaleString()} {selectedStatuses.length === 1 
-                  ? selectedStatuses[0] === 'J' ? 'Judgment' : selectedStatuses[0] === 'A' ? 'Active' : 'Pending'
-                  : 'filtered'} properties
+                Showing {total.toLocaleString()} filtered {total === 1 ? 'property' : 'properties'}
               </span>
             )}
           </div>
+        </div>
         </div>
       </div>
 
