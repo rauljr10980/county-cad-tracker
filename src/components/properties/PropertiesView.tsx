@@ -276,17 +276,16 @@ export function PropertiesView() {
     if (advancedFilters.lastPaymentDateTo) count++;
     return count;
   }, [advancedFilters]);
-  
+
   const startItem = total > 0 ? (page - 1) * ITEMS_PER_PAGE + 1 : 0;
   const endItem = Math.min(page * ITEMS_PER_PAGE, total);
-  
+
   // Handle advanced filters change
   const handleFiltersChange = (filters: AdvancedFilters) => {
     setAdvancedFilters(filters);
     setPage(1);
   };
-  
-  // Clear all filters
+
   const clearAllFilters = () => {
     setAdvancedFilters({
       statuses: [],
@@ -304,20 +303,15 @@ export function PropertiesView() {
     });
     setPage(1);
   };
-  
-  // Clear search
+
   const handleClearSearch = () => {
     setSearchQuery('');
     setDebouncedSearchQuery('');
-    setPage(1);
   };
 
-  // Handle upload completion - reset to page 1
   const handleUploadComplete = () => {
-    setPage(1);
-    clearAllFilters();
-    setSearchQuery('');
-    setDebouncedSearchQuery('');
+    // Refresh data after upload
+    window.location.reload();
   };
 
   return (
@@ -380,7 +374,6 @@ export function PropertiesView() {
             )}
           </div>
         </div>
-        </div>
       </div>
 
       {/* Drag and Drop File Upload Zone */}
@@ -410,14 +403,6 @@ export function PropertiesView() {
             Retry
           </button>
         </div>
-      ) : properties.length === 0 ? (
-        <div className="bg-secondary/30 rounded-lg p-12 text-center">
-          <FileSpreadsheet className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Properties to Display</h3>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Upload an Excel file from the Upload tab to start tracking tax-delinquent properties. Your uploaded data will appear here.
-          </p>
-        </div>
       ) : (
         <>
           <PropertyTable
@@ -432,66 +417,45 @@ export function PropertiesView() {
             }}
           />
           
-          {/* Pagination Controls */}
+          {/* Pagination */}
           {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-between bg-card border border-border rounded-lg p-4">
+            <div className="mt-6 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                Showing <span className="font-medium text-foreground">{startItem.toLocaleString()}</span> to{' '}
-                <span className="font-medium text-foreground">{endItem.toLocaleString()}</span> of{' '}
-                <span className="font-medium text-foreground">{total.toLocaleString()}</span> properties
+                Showing {startItem.toLocaleString()} to {endItem.toLocaleString()} of {total.toLocaleString()} properties
               </div>
-              
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage(1)}
-                  disabled={page === 1 || isLoading}
-                  title="First page"
+                  disabled={page === 1}
                 >
                   <ChevronsLeft className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1 || isLoading}
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  <span className="ml-1">Previous</span>
                 </Button>
-                
-                <div className="flex items-center gap-2 px-3">
-                  <span className="text-sm">Page</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={totalPages}
-                    value={page}
-                    onChange={(e) => {
-                      const newPage = parseInt(e.target.value) || 1;
-                      setPage(Math.max(1, Math.min(totalPages, newPage)));
-                    }}
-                    className="w-16 px-2 py-1 text-center text-sm border border-border rounded bg-background"
-                  />
-                  <span className="text-sm text-muted-foreground">of {totalPages.toLocaleString()}</span>
-                </div>
-                
+                <span className="text-sm font-medium">
+                  Page {page} of {totalPages}
+                </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages || isLoading}
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === totalPages}
                 >
-                  <span className="mr-1">Next</span>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage(totalPages)}
-                  disabled={page === totalPages || isLoading}
-                  title="Last page"
+                  disabled={page === totalPages}
                 >
                   <ChevronsRight className="h-4 w-4" />
                 </Button>
