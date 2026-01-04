@@ -98,33 +98,145 @@ export function PropertiesView() {
     console.error('[PropertiesView] Error parsing data:', e);
   }
   
-  // Apply frontend filtering if multiple statuses are selected
-  if (selectedStatuses.length > 1) {
-    // Calculate total from status counts for selected statuses
-    const selectedTotal = selectedStatuses.reduce((sum, status) => {
-      return sum + (statusCounts[status] || 0);
-    }, 0);
+  // Helper function to check if any advanced filters are active (excluding status)
+  const hasActiveAdvancedFilters = useMemo(() => {
+    return (
+      (advancedFilters.amountDueMin !== undefined) ||
+      (advancedFilters.amountDueMax !== undefined) ||
+      (advancedFilters.marketValueMin !== undefined) ||
+      (advancedFilters.marketValueMax !== undefined) ||
+      (advancedFilters.taxYear !== undefined) ||
+      (advancedFilters.hasNotes !== 'any') ||
+      (advancedFilters.hasLink !== 'any') ||
+      (advancedFilters.followUpDateFrom !== undefined) ||
+      (advancedFilters.followUpDateTo !== undefined) ||
+      (advancedFilters.lastPaymentDateFrom !== undefined) ||
+      (advancedFilters.lastPaymentDateTo !== undefined)
+    );
+  }, [advancedFilters]);
+  
+  // Apply advanced filtering logic
+  const filteredProperties = useMemo(() => {
+    let filtered = [...properties];
     
-    // Filter properties to only show selected statuses
-    const allFilteredProperties = properties.filter(p => selectedStatuses.includes(p.status));
+    // Status filter
+    if (advancedFilters.statuses.length > 0) {
+      filtered = filtered.filter(p => advancedFilters.statuses.includes(p.status));
+    }
     
-    // Use the calculated total from status counts
-    total = selectedTotal;
+    // Amount Due range
+    if (advancedFilters.amountDueMin !== undefined) {
+      filtered = filtered.filter(p => p.totalAmountDue >= advancedFilters.amountDueMin!);
+    }
+    if (advancedFilters.amountDueMax !== undefined) {
+      filtered = filtered.filter(p => p.totalAmountDue <= advancedFilters.amountDueMax!);
+    }
+    
+    // Market Value range
+    if (advancedFilters.marketValueMin !== undefined) {
+      filtered = filtered.filter(p => p.marketValue !== undefined && p.marketValue >= advancedFilters.marketValueMin!);
+    }
+    if (advancedFilters.marketValueMax !== undefined) {
+      filtered = filtered.filter(p => p.marketValue !== undefined && p.marketValue <= advancedFilters.marketValueMax!);
+    }
+    
+    // Tax Year
+    if (advancedFilters.taxYear) {
+      filtered = filtered.filter(p => p.taxYear === advancedFilters.taxYear);
+    }
+    
+    // Has Notes
+    if (advancedFilters.hasNotes === 'yes') {
+      filtered = filtered.filter(p => p.notes && p.notes.trim() !== '');
+    } else if (advancedFilters.hasNotes === 'no') {
+      filtered = filtered.filter(p => !p.notes || p.notes.trim() === '');
+    }
+    
+    // Has Link
+    if (advancedFilters.hasLink === 'yes') {
+      filtered = filtered.filter(p => p.link && p.link.trim() !== '');
+    } else if (advancedFilters.hasLink === 'no') {
+      filtered = filtered.filter(p => !p.link || p.link.trim() === '');
+    }
+    
+    // Follow-up Date range
+    if (advancedFilters.followUpDateFrom) {
+      const fromDate = new Date(advancedFilters.followUpDateFrom);
+      filtered = filtered.filter(p => {
+        if (!p.lastFollowUp) return false;
+        const followUpDate = new Date(p.lastFollowUp);
+        return followUpDate >= fromDate;
+      });
+    }
+    if (advancedFilters.followUpDateTo) {
+      const toDate = new Date(advancedFilters.followUpDateTo);
+      toDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(p => {
+        if (!p.lastFollowUp) return false;
+        const followUpDate = new Date(p.lastFollowUp);
+        return followUpDate <= toDate;
+      });
+    }
+    
+    // Last Payment Date range
+    if (advancedFilters.lastPaymentDateFrom) {
+      const fromDate = new Date(advancedFilters.lastPaymentDateFrom);
+      filtered = filtered.filter(p => {
+        if (!p.lastPaymentDate) return false;
+        const paymentDate = new Date(p.lastPaymentDate);
+        return paymentDate >= fromDate;
+      });
+    }
+    if (advancedFilters.lastPaymentDateTo) {
+      const toDate = new Date(advancedFilters.lastPaymentDateTo);
+      toDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(p => {
+        if (!p.lastPaymentDate) return false;
+        const paymentDate = new Date(p.lastPaymentDate);
+        return paymentDate <= toDate;
+      });
+    }
+    
+    return filtered;
+  }, [properties, advancedFilters]);
+  
+  // Calculate totals and pagination
+  if (selectedStatuses.length > 1 || hasActiveAdvancedFilters) {
+    // Multiple filters applied - use filtered results
+    total = filteredProperties.length;
     totalPages = Math.ceil(total / ITEMS_PER_PAGE);
     
-    // Apply pagination to filtered results
+    // Apply pagination
     const startIndex = (page - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
-    properties = allFilteredProperties.slice(startIndex, endIndex);
+    properties = filteredProperties.slice(startIndex, endIndex);
   } else if (selectedStatuses.length === 1) {
     // Single status selected - use the count from statusCounts
     total = statusCounts[selectedStatuses[0]] || 0;
     totalPages = Math.ceil(total / ITEMS_PER_PAGE);
-  } else if (selectedStatuses.length === 0) {
-    // All selected - no filtering needed, use totalUnfiltered
+  } else {
+    // No filters - use totalUnfiltered
     total = totalUnfiltered;
     totalPages = Math.ceil(total / ITEMS_PER_PAGE);
   }
+  
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (advancedFilters.statuses.length > 0) count += advancedFilters.statuses.length;
+    if (advancedFilters.amountDueMin !== undefined) count++;
+    if (advancedFilters.amountDueMax !== undefined) count++;
+    if (advancedFilters.marketValueMin !== undefined) count++;
+    if (advancedFilters.marketValueMax !== undefined) count++;
+    if (advancedFilters.taxYear) count++;
+    if (advancedFilters.hasNotes !== 'any') count++;
+    if (advancedFilters.hasLink !== 'any') count++;
+    if (advancedFilters.followUpDateFrom) count++;
+    if (advancedFilters.followUpDateTo) count++;
+    if (advancedFilters.lastPaymentDateFrom) count++;
+    if (advancedFilters.lastPaymentDateTo) count++;
+    return count;
+  }, [advancedFilters]);
   
   const startItem = total > 0 ? (page - 1) * ITEMS_PER_PAGE + 1 : 0;
   const endItem = Math.min(page * ITEMS_PER_PAGE, total);
