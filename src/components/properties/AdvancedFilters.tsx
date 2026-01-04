@@ -85,7 +85,7 @@ export function AdvancedFiltersPanel({
   const hasActiveFilters = activeFilterCount > 0;
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+    <Sheet>
       <SheetTrigger asChild>
         <Button
           variant={hasActiveFilters ? "default" : "outline"}
