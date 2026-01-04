@@ -182,12 +182,6 @@ export function PropertyTable({
           <thead>
             <tr>
               <th className="w-24">Status</th>
-              <th 
-                className="cursor-pointer hover:bg-secondary"
-                onClick={() => handleSort('accountNumber')}
-              >
-                Account #
-              </th>
               <th>Owner</th>
               <th>Property Address</th>
               <th 
@@ -235,7 +229,6 @@ export function PropertyTable({
                       )}
                     </div>
                   </td>
-                  <td className="font-mono text-sm">{property.accountNumber}</td>
                   <td className="max-w-[180px] truncate">
                     {(() => {
                       const parsed = parsePropertyAddress(property.propertyAddress);
