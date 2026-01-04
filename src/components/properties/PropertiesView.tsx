@@ -35,16 +35,21 @@ export function PropertiesView() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Convert selectedStatuses array to single status for API (use first selected, or undefined if none/all)
-  // For now, we'll filter on frontend if multiple statuses are selected
+  // Convert selectedStatuses array to single status for API
+  // If multiple statuses selected, fetch all (no filter) and filter on frontend
+  // If single status, use API filtering for efficiency
   const apiStatusFilter = selectedStatuses.length === 1 ? selectedStatuses[0] : undefined;
+  
+  // When multiple statuses are selected, we need to fetch more items to properly filter
+  // Increase limit when multiple statuses selected to get better results
+  const fetchLimit = selectedStatuses.length > 1 ? ITEMS_PER_PAGE * 10 : ITEMS_PER_PAGE;
   
   // Fetch properties from API with status filter and search
   const { data, isLoading, error } = useProperties({
     status: apiStatusFilter,
     search: debouncedSearchQuery,
-    page,
-    limit: ITEMS_PER_PAGE,
+    page: selectedStatuses.length > 1 ? 1 : page, // Always page 1 when multiple statuses (we'll paginate filtered results)
+    limit: fetchLimit,
   });
   
   // Safely extract properties with fallbacks
@@ -78,11 +83,30 @@ export function PropertiesView() {
   
   // Apply frontend filtering if multiple statuses are selected
   if (selectedStatuses.length > 1) {
-    properties = properties.filter(p => selectedStatuses.includes(p.status));
-    total = properties.length;
+    // Calculate total from status counts for selected statuses
+    const selectedTotal = selectedStatuses.reduce((sum, status) => {
+      return sum + (statusCounts[status] || 0);
+    }, 0);
+    
+    // Filter properties to only show selected statuses
+    const allFilteredProperties = properties.filter(p => selectedStatuses.includes(p.status));
+    
+    // Use the calculated total from status counts
+    total = selectedTotal;
+    totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+    
+    // Apply pagination to filtered results
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    properties = allFilteredProperties.slice(startIndex, endIndex);
+  } else if (selectedStatuses.length === 1) {
+    // Single status selected - use the count from statusCounts
+    total = statusCounts[selectedStatuses[0]] || 0;
     totalPages = Math.ceil(total / ITEMS_PER_PAGE);
   } else if (selectedStatuses.length === 0) {
-    // All selected - no filtering needed
+    // All selected - no filtering needed, use totalUnfiltered
+    total = totalUnfiltered;
+    totalPages = Math.ceil(total / ITEMS_PER_PAGE);
   }
   
   const startItem = total > 0 ? (page - 1) * ITEMS_PER_PAGE + 1 : 0;
