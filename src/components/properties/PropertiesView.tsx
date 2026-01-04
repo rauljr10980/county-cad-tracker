@@ -373,22 +373,7 @@ export function PropertiesView() {
               activeFilterCount={activeFilterCount}
             />
             
-            {useMemo(() => {
-                let count = 0;
-                if (advancedFilters.statuses.length > 0) count += advancedFilters.statuses.length;
-                if (advancedFilters.amountDueMin !== undefined) count++;
-                if (advancedFilters.amountDueMax !== undefined) count++;
-                if (advancedFilters.marketValueMin !== undefined) count++;
-                if (advancedFilters.marketValueMax !== undefined) count++;
-                if (advancedFilters.taxYear) count++;
-                if (advancedFilters.hasNotes !== 'any') count++;
-                if (advancedFilters.hasLink !== 'any') count++;
-                if (advancedFilters.followUpDateFrom) count++;
-                if (advancedFilters.followUpDateTo) count++;
-                if (advancedFilters.lastPaymentDateFrom) count++;
-                if (advancedFilters.lastPaymentDateTo) count++;
-                return count;
-              }, [advancedFilters]) > 0 && (
+            {activeFilterCount > 0 && (
               <span className="text-sm text-muted-foreground">
                 Showing {total.toLocaleString()} filtered {total === 1 ? 'property' : 'properties'}
               </span>
