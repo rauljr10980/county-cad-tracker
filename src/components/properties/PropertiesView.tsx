@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown } from 'lucide-react';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { Property, PropertyStatus } from '@/types/property';
@@ -8,12 +8,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { FileDropZone } from '@/components/upload/FileDropZone';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const ITEMS_PER_PAGE = 100;
 
 export function PropertiesView() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [statusFilter, setStatusFilter] = useState<PropertyStatus | undefined>();
+  const [selectedStatuses, setSelectedStatuses] = useState<PropertyStatus[]>([]);
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -27,9 +35,13 @@ export function PropertiesView() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Convert selectedStatuses array to single status for API (use first selected, or undefined if none/all)
+  // For now, we'll filter on frontend if multiple statuses are selected
+  const apiStatusFilter = selectedStatuses.length === 1 ? selectedStatuses[0] : undefined;
+  
   // Fetch properties from API with status filter and search
   const { data, isLoading, error } = useProperties({
-    status: statusFilter,
+    status: apiStatusFilter,
     search: debouncedSearchQuery,
     page,
     limit: ITEMS_PER_PAGE,
@@ -64,12 +76,34 @@ export function PropertiesView() {
     console.error('[PropertiesView] Error parsing data:', e);
   }
   
+  // Apply frontend filtering if multiple statuses are selected
+  if (selectedStatuses.length > 1) {
+    properties = properties.filter(p => selectedStatuses.includes(p.status));
+    total = properties.length;
+    totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+  } else if (selectedStatuses.length === 0) {
+    // All selected - no filtering needed
+  }
+  
   const startItem = total > 0 ? (page - 1) * ITEMS_PER_PAGE + 1 : 0;
   const endItem = Math.min(page * ITEMS_PER_PAGE, total);
   
-  // Handle status filter change - reset to page 1
-  const handleStatusFilter = (status: PropertyStatus | undefined) => {
-    setStatusFilter(status);
+  // Handle status filter toggle - reset to page 1
+  const toggleStatusFilter = (status: PropertyStatus) => {
+    setSelectedStatuses(prev => {
+      const isSelected = prev.includes(status);
+      if (isSelected) {
+        return prev.filter(s => s !== status);
+      } else {
+        return [...prev, status];
+      }
+    });
+    setPage(1);
+  };
+  
+  // Clear all status filters
+  const clearStatusFilters = () => {
+    setSelectedStatuses([]);
     setPage(1);
   };
   
@@ -83,9 +117,23 @@ export function PropertiesView() {
   // Handle upload completion - reset to page 1
   const handleUploadComplete = () => {
     setPage(1);
-    setStatusFilter(undefined);
+    setSelectedStatuses([]);
     setSearchQuery('');
     setDebouncedSearchQuery('');
+  };
+  
+  // Get filter button text
+  const getFilterButtonText = () => {
+    if (selectedStatuses.length === 0) {
+      return `All (${totalUnfiltered.toLocaleString()})`;
+    }
+    if (selectedStatuses.length === 1) {
+      const status = selectedStatuses[0];
+      const label = status === 'J' ? 'Judgment' : status === 'A' ? 'Active' : 'Pending';
+      const count = statusCounts[status] || 0;
+      return `${label} (${count.toLocaleString()})`;
+    }
+    return `${selectedStatuses.length} selected`;
   };
 
   return (
@@ -129,73 +177,105 @@ export function PropertiesView() {
           )}
         </div>
         
-        {/* Status Filter Buttons */}
+        {/* Status Filter Dropdown */}
         <div className="mt-4 flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 mr-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">Filter by status:</span>
           </div>
           
-          <Button
-            variant={statusFilter === undefined ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleStatusFilter(undefined)}
-            className="min-w-[80px]"
-          >
-            All
-            {totalUnfiltered > 0 && (
-              <span className="ml-1 text-xs opacity-70">({totalUnfiltered.toLocaleString()})</span>
-            )}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant={selectedStatuses.length > 0 ? "default" : "outline"}
+                size="sm"
+                className="min-w-[140px] justify-between"
+              >
+                <span>{getFilterButtonText()}</span>
+                <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Select Status</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={selectedStatuses.length === 0}
+                onCheckedChange={(checked) => {
+                  clearStatusFilters();
+                }}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span>All</span>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({totalUnfiltered.toLocaleString()})
+                  </span>
+                </div>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={selectedStatuses.includes('P')}
+                onCheckedChange={() => toggleStatusFilter('P')}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-yellow-500" />
+                    <span>Pending</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({statusCounts.P.toLocaleString()})
+                  </span>
+                </div>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={selectedStatuses.includes('A')}
+                onCheckedChange={() => toggleStatusFilter('A')}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                    <span>Active</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({statusCounts.A.toLocaleString()})
+                  </span>
+                </div>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={selectedStatuses.includes('J')}
+                onCheckedChange={() => toggleStatusFilter('J')}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-red-500" />
+                    <span>Judgment</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({statusCounts.J.toLocaleString()})
+                  </span>
+                </div>
+              </DropdownMenuCheckboxItem>
+              {selectedStatuses.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      clearStatusFilters();
+                    }}
+                    className="text-primary cursor-pointer"
+                  >
+                    Clear all filters
+                  </DropdownMenuCheckboxItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           
-          <Button
-            variant={statusFilter === 'P' ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleStatusFilter('P')}
-            className={cn(
-              "min-w-[100px]",
-              statusFilter !== 'P' && "border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
-            )}
-          >
-            Pending
-            {statusCounts.P > 0 && (
-              <span className="ml-1 text-xs opacity-70">({statusCounts.P.toLocaleString()})</span>
-            )}
-          </Button>
-          
-          <Button
-            variant={statusFilter === 'A' ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleStatusFilter('A')}
-            className={cn(
-              "min-w-[100px]",
-              statusFilter !== 'A' && "border-green-500/50 text-green-500 hover:bg-green-500/10"
-            )}
-          >
-            Active
-            {statusCounts.A > 0 && (
-              <span className="ml-1 text-xs opacity-70">({statusCounts.A.toLocaleString()})</span>
-            )}
-          </Button>
-          
-          <Button
-            variant={statusFilter === 'J' ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleStatusFilter('J')}
-            className={cn(
-              "min-w-[100px]",
-              statusFilter !== 'J' && "border-red-500/50 text-red-500 hover:bg-red-500/10"
-            )}
-          >
-            Judgment
-            {statusCounts.J > 0 && (
-              <span className="ml-1 text-xs opacity-70">({statusCounts.J.toLocaleString()})</span>
-            )}
-          </Button>
-          
-          {statusFilter && (
-            <span className="text-sm text-muted-foreground ml-2">
-              Showing {total.toLocaleString()} {statusFilter === 'J' ? 'Judgment' : statusFilter === 'A' ? 'Active' : 'Pending'} properties
+          {selectedStatuses.length > 0 && (
+            <span className="text-sm text-muted-foreground">
+              Showing {total.toLocaleString()} {selectedStatuses.length === 1 
+                ? selectedStatuses[0] === 'J' ? 'Judgment' : selectedStatuses[0] === 'A' ? 'Active' : 'Pending'
+                : 'filtered'} properties
             </span>
           )}
         </div>
@@ -241,8 +321,14 @@ export function PropertiesView() {
           <PropertyTable
             properties={properties}
             onViewProperty={setSelectedProperty}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
+            statusFilter={selectedStatuses.length === 1 ? selectedStatuses[0] : undefined}
+            onStatusFilterChange={(status) => {
+              if (status) {
+                setSelectedStatuses([status]);
+              } else {
+                setSelectedStatuses([]);
+              }
+            }}
           />
           
           {/* Pagination Controls */}
