@@ -54,7 +54,6 @@ export function AdvancedFiltersPanel({
   totalUnfiltered,
   activeFilterCount,
 }: AdvancedFiltersProps) {
-  const [isOpen, setIsOpen] = useState(false);
 
   const updateFilter = <K extends keyof AdvancedFilters>(
     key: K,
