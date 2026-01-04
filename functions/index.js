@@ -745,6 +745,24 @@ async function processFile(fileId, storagePath, filename) {
     await updateProgress(fileId, 'extracting', `Extracting properties from ${data.length} rows...`, 50);
     const properties = extractProperties(data);
     console.log(`[PROCESS] Extracted ${properties.length} properties`);
+    
+    // Verify data transfer - check if NEW- columns were extracted
+    if (properties.length > 0) {
+      const sampleProp = properties[0];
+      const newFieldsExtracted = Object.keys(sampleProp).filter(key => 
+        ['marketValue', 'landValue', 'improvementValue', 'cappedValue', 'agriculturalValue',
+         'legalDescription', 'lastPaymentDate', 'lastPayer', 'delinquentAfter', 'taxYear',
+         'link', 'ownerAddress', 'exemptions', 'jurisdictions', 'lastPaymentAmount',
+         'halfPaymentOptionAmount', 'priorYearsAmountDue', 'yearAmountDue', 'yearTaxLevy'].includes(key)
+      );
+      console.log(`[PROCESS] Data transfer verification: Sample property has ${newFieldsExtracted.length} NEW- fields extracted`);
+      const fieldsWithData = newFieldsExtracted.filter(key => {
+        const val = sampleProp[key];
+        return val !== undefined && val !== null && val !== '';
+      });
+      console.log(`[PROCESS] Data transfer verification: ${fieldsWithData.length} NEW- fields have actual data`);
+    }
+    
     await updateProgress(fileId, 'extracting', `Extracted ${properties.length} properties successfully`, 60);
     
     // Save properties to Cloud Storage
@@ -1116,43 +1134,83 @@ function extractProperties(data) {
       });
     }
 
-    // Build property object with all NEW- columns
+    // Helper to safely get NEW- column value with multiple fallback strategies
+    const getNewColumnValue = (fieldName) => {
+      // Strategy 1: Use getNewColumn function (handles case variations)
+      let value = getNewColumn(fieldName);
+      if (value !== null && value !== undefined && value !== '') {
+        return value;
+      }
+      
+      // Strategy 2: Direct row access with exact column name
+      value = row[`NEW-${fieldName}`];
+      if (value !== undefined && value !== null && value !== '') {
+        return value;
+      }
+      
+      // Strategy 3: Search all headers for case-insensitive match
+      for (const header of headers) {
+        if (header && header.toUpperCase() === `NEW-${fieldName.toUpperCase()}`) {
+          value = row[header];
+          if (value !== undefined && value !== null && value !== '') {
+            return value;
+          }
+        }
+      }
+      
+      return null;
+    };
+
+    // Build property object with all NEW- columns - ensure data transfer
     const property = {
       id: `${Date.now()}_${index}`,
       accountNumber: finalAccountNumber || accountNumber || `ROW_${index}`,
-      ownerName: getValue('ownerName') || getNewColumn('Owner Name') || '',
-      propertyAddress: finalPropertyAddress || propertyAddress || getNewColumn('Property Site Address') || '',
-      mailingAddress: getValue('mailingAddress') || getNewColumn('Owner Address') || '',
+      ownerName: getValue('ownerName') || getNewColumnValue('Owner Name') || '',
+      propertyAddress: finalPropertyAddress || propertyAddress || getNewColumnValue('Property Site Address') || '',
+      mailingAddress: getValue('mailingAddress') || getNewColumnValue('Owner Address') || '',
       status: statusValue || 'U', // U = Unknown (blank LEGALSTATUS)
-      totalAmountDue: parseFloat(totalAmountDue || '0') || parseNumeric(getNewColumn('Total Amount Due')) || 0,
+      totalAmountDue: parseFloat(totalAmountDue || '0') || parseNumeric(getNewColumnValue('Total Amount Due')) || 0,
       totalPercentage: parseFloat(getValue('totalPercentage') || '0') || 0,
-      // NEW- columns - use direct row access as fallback
-      legalDescription: getNewColumn('Legal Description') || row['NEW-Legal Description'] || '',
-      marketValue: parseNumeric(getNewColumn('Total Market Value')) || parseNumeric(row['NEW-Total Market Value']),
-      landValue: parseNumeric(getNewColumn('Land Value')) || parseNumeric(row['NEW-Land Value']),
-      improvementValue: parseNumeric(getNewColumn('Improvement Value')) || parseNumeric(row['NEW-Improvement Value']),
-      cappedValue: parseNumeric(getNewColumn('Capped Value')) || parseNumeric(row['NEW-Capped Value']),
-      agriculturalValue: parseNumeric(getNewColumn('Agricultural Value')) || parseNumeric(row['NEW-Agricultural Value']),
+      // NEW- columns - ensure all are included for data transfer
+      legalDescription: getNewColumnValue('Legal Description') || '',
+      marketValue: parseNumeric(getNewColumnValue('Total Market Value')),
+      landValue: parseNumeric(getNewColumnValue('Land Value')),
+      improvementValue: parseNumeric(getNewColumnValue('Improvement Value')),
+      cappedValue: parseNumeric(getNewColumnValue('Capped Value')),
+      agriculturalValue: parseNumeric(getNewColumnValue('Agricultural Value')),
       exemptions: (() => {
-        const val = getNewColumn('Exemptions') || row['NEW-Exemptions'];
+        const val = getNewColumnValue('Exemptions');
         return val ? String(val).split(',').map(e => e.trim()).filter(e => e) : undefined;
       })(),
       jurisdictions: (() => {
-        const val = getNewColumn('Jurisdictions') || row['NEW-Jurisdictions'];
+        const val = getNewColumnValue('Jurisdictions');
         return val ? String(val).split(',').map(j => j.trim()).filter(j => j) : undefined;
       })(),
-      lastPaymentDate: getNewColumn('Last Payment Date') || row['NEW-Last Payment Date'] || undefined,
-      lastPaymentAmount: parseNumeric(getNewColumn('Last Payment Amount Received')) || parseNumeric(row['NEW-Last Payment Amount Received']),
-      lastPayer: getNewColumn('Last Payer') || row['NEW-Last Payer'] || undefined,
-      delinquentAfter: getNewColumn('Delinquent After') || row['NEW-Delinquent After'] || undefined,
-      halfPaymentOptionAmount: parseNumeric(getNewColumn('Half Payment Option Amount')) || parseNumeric(row['NEW-Half Payment Option Amount']),
-      priorYearsAmountDue: parseNumeric(getNewColumn('Prior Years Amount Due')) || parseNumeric(row['NEW-Prior Years Amount Due']),
-      taxYear: getNewColumn('Tax Year') || row['NEW-Tax Year'] || undefined,
-      yearAmountDue: parseNumeric(getNewColumn('Year Amount Due')) || parseNumeric(row['NEW-Year Amount Due']),
-      yearTaxLevy: parseNumeric(getNewColumn('Year Tax Levy')) || parseNumeric(row['NEW-Year Tax Levy']),
-      link: getNewColumn('Link') || row['NEW-Link'] || undefined,
-      ownerAddress: getNewColumn('Owner Address') || row['NEW-Owner Address'] || undefined,
+      lastPaymentDate: getNewColumnValue('Last Payment Date') || undefined,
+      lastPaymentAmount: parseNumeric(getNewColumnValue('Last Payment Amount Received')),
+      lastPayer: getNewColumnValue('Last Payer') || undefined,
+      delinquentAfter: getNewColumnValue('Delinquent After') || undefined,
+      halfPaymentOptionAmount: parseNumeric(getNewColumnValue('Half Payment Option Amount')),
+      priorYearsAmountDue: parseNumeric(getNewColumnValue('Prior Years Amount Due')),
+      taxYear: getNewColumnValue('Tax Year') || undefined,
+      yearAmountDue: parseNumeric(getNewColumnValue('Year Amount Due')),
+      yearTaxLevy: parseNumeric(getNewColumnValue('Year Tax Levy')),
+      link: getNewColumnValue('Link') || undefined,
+      ownerAddress: getNewColumnValue('Owner Address') || undefined,
     };
+
+    // Log first property to verify data transfer
+    if (index === 0) {
+      const newFieldsWithData = Object.keys(property).filter(key => {
+        const value = property[key];
+        return ['marketValue', 'landValue', 'improvementValue', 'cappedValue', 'agriculturalValue',
+                'legalDescription', 'lastPaymentDate', 'lastPayer', 'delinquentAfter', 'taxYear',
+                'link', 'ownerAddress', 'exemptions', 'jurisdictions', 'lastPaymentAmount',
+                'halfPaymentOptionAmount', 'priorYearsAmountDue', 'yearAmountDue', 'yearTaxLevy'].includes(key)
+               && value !== undefined && value !== null && value !== '';
+      });
+      console.log(`[EXTRACT] First property has ${newFieldsWithData.length} NEW- fields with data:`, newFieldsWithData);
+    }
 
     return property;
   }).filter(p => {
@@ -1737,34 +1795,56 @@ app.get('/api/properties', async (req, res) => {
         const start = (page - 1) * limit;
         
         // Ensure all properties include all fields (no filtering of fields)
-        const propertiesToReturn = filteredProperties.slice(start, start + limit).map(p => {
-          // Return property with all fields intact
-          return {
+        // This ensures data transfer from backend to frontend
+        const propertiesToReturn = filteredProperties.slice(start, start + limit).map((p, idx) => {
+          // Return property with all fields intact - ensure data transfer
+          const propertyWithAllFields = {
             ...p,
-            // Explicitly include all NEW- fields to ensure they're sent
-            legalDescription: p.legalDescription,
-            marketValue: p.marketValue,
-            landValue: p.landValue,
-            improvementValue: p.improvementValue,
-            cappedValue: p.cappedValue,
-            agriculturalValue: p.agriculturalValue,
-            exemptions: p.exemptions,
-            jurisdictions: p.jurisdictions,
-            lastPaymentDate: p.lastPaymentDate,
-            lastPaymentAmount: p.lastPaymentAmount,
-            lastPayer: p.lastPayer,
-            delinquentAfter: p.delinquentAfter,
-            halfPaymentOptionAmount: p.halfPaymentOptionAmount,
-            priorYearsAmountDue: p.priorYearsAmountDue,
-            taxYear: p.taxYear,
-            yearAmountDue: p.yearAmountDue,
-            yearTaxLevy: p.yearTaxLevy,
-            link: p.link,
-            ownerAddress: p.ownerAddress,
+            // Explicitly include all NEW- fields to ensure they're sent to frontend
+            legalDescription: p.legalDescription || undefined,
+            marketValue: p.marketValue !== undefined && p.marketValue !== null ? p.marketValue : undefined,
+            landValue: p.landValue !== undefined && p.landValue !== null ? p.landValue : undefined,
+            improvementValue: p.improvementValue !== undefined && p.improvementValue !== null ? p.improvementValue : undefined,
+            cappedValue: p.cappedValue !== undefined && p.cappedValue !== null ? p.cappedValue : undefined,
+            agriculturalValue: p.agriculturalValue !== undefined && p.agriculturalValue !== null ? p.agriculturalValue : undefined,
+            exemptions: p.exemptions || undefined,
+            jurisdictions: p.jurisdictions || undefined,
+            lastPaymentDate: p.lastPaymentDate || undefined,
+            lastPaymentAmount: p.lastPaymentAmount !== undefined && p.lastPaymentAmount !== null ? p.lastPaymentAmount : undefined,
+            lastPayer: p.lastPayer || undefined,
+            delinquentAfter: p.delinquentAfter || undefined,
+            halfPaymentOptionAmount: p.halfPaymentOptionAmount !== undefined && p.halfPaymentOptionAmount !== null ? p.halfPaymentOptionAmount : undefined,
+            priorYearsAmountDue: p.priorYearsAmountDue !== undefined && p.priorYearsAmountDue !== null ? p.priorYearsAmountDue : undefined,
+            taxYear: p.taxYear || undefined,
+            yearAmountDue: p.yearAmountDue !== undefined && p.yearAmountDue !== null ? p.yearAmountDue : undefined,
+            yearTaxLevy: p.yearTaxLevy !== undefined && p.yearTaxLevy !== null ? p.yearTaxLevy : undefined,
+            link: p.link || undefined,
+            ownerAddress: p.ownerAddress || undefined,
           };
+          
+          // Verify data transfer for first property in response
+          if (idx === 0) {
+            const newFieldsCount = Object.keys(propertyWithAllFields).filter(key => 
+              ['marketValue', 'landValue', 'improvementValue', 'cappedValue', 'agriculturalValue',
+               'legalDescription', 'lastPaymentDate', 'lastPayer', 'delinquentAfter', 'taxYear',
+               'link', 'ownerAddress', 'exemptions', 'jurisdictions', 'lastPaymentAmount',
+               'halfPaymentOptionAmount', 'priorYearsAmountDue', 'yearAmountDue', 'yearTaxLevy'].includes(key)
+            ).length;
+            const fieldsWithData = Object.keys(propertyWithAllFields).filter(key => {
+              const val = propertyWithAllFields[key];
+              return ['marketValue', 'landValue', 'improvementValue', 'cappedValue', 'agriculturalValue',
+                      'legalDescription', 'lastPaymentDate', 'lastPayer', 'delinquentAfter', 'taxYear',
+                      'link', 'ownerAddress', 'exemptions', 'jurisdictions', 'lastPaymentAmount',
+                      'halfPaymentOptionAmount', 'priorYearsAmountDue', 'yearAmountDue', 'yearTaxLevy'].includes(key)
+                     && val !== undefined && val !== null && val !== '';
+            });
+            console.log(`[PROPERTIES] Data transfer: Sample property has ${newFieldsCount} NEW- fields, ${fieldsWithData.length} with data`);
+          }
+          
+          return propertyWithAllFields;
         });
         
-        console.log(`[PROPERTIES] Returning ${propertiesToReturn.length} properties with all fields`);
+        console.log(`[PROPERTIES] Returning ${propertiesToReturn.length} properties with all NEW- fields included for data transfer`);
         
         return res.json({
           properties: propertiesToReturn,
@@ -2015,32 +2095,32 @@ app.put('/api/properties/:propertyId/task-done', async (req, res) => {
   try {
     const { propertyId } = req.params;
     const { outcome, nextAction } = req.body;
-
+    
     console.log(`[TASK-DONE] Marking task done for property ${propertyId}: ${outcome}, nextAction: ${nextAction}`);
-
+    
     const bucket = storage.bucket(BUCKET_NAME);
-
+    
     // Find the file containing this property
     const fileList = await listFiles(bucket, 'metadata/files/');
     const fileIds = fileList
       .map(f => f.replace('metadata/files/', '').replace('.json', ''))
       .sort((a, b) => parseInt(b) - parseInt(a));
-
+    
     for (const fileId of fileIds.slice(0, 5)) {
       const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
       if (fileDoc && fileDoc.status === 'completed') {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
-
+        
         // Find and update the property
         const propertyIndex = properties.findIndex(p => p.id === propertyId);
         if (propertyIndex !== -1) {
           const property = properties[propertyIndex];
-
+          
           // Update outcome
           property.lastOutcome = outcome;
           property.lastOutcomeDate = new Date().toISOString();
           property.attempts = (property.attempts || 0) + 1;
-
+          
           // Create next action if specified
           if (nextAction) {
             property.actionType = nextAction;
@@ -2054,79 +2134,19 @@ app.put('/api/properties/:propertyId/task-done', async (req, res) => {
             property.actionType = undefined;
             property.dueTime = undefined;
           }
-
+          
           // Save updated properties
           await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
-
+          
           console.log(`[TASK-DONE] Updated property ${propertyId} in file ${fileId}`);
           return res.json({ success: true, propertyId, outcome, nextAction });
         }
       }
     }
-
+    
     res.status(404).json({ error: 'Property not found' });
   } catch (error) {
     console.error('[TASK-DONE] Error:', error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * Update property deal stage
- */
-app.put('/api/properties/:propertyId/deal-stage', async (req, res) => {
-  try {
-    const { propertyId } = req.params;
-    const { dealStage, estimatedDealValue, offerAmount, expectedCloseDate } = req.body;
-
-    console.log(`[DEAL-STAGE] Updating deal stage for property ${propertyId}: ${dealStage}`);
-
-    const bucket = storage.bucket(BUCKET_NAME);
-
-    // Find the file containing this property
-    const fileList = await listFiles(bucket, 'metadata/files/');
-    const fileIds = fileList
-      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
-      .sort((a, b) => parseInt(b) - parseInt(a));
-
-    for (const fileId of fileIds.slice(0, 5)) {
-      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
-      if (fileDoc && fileDoc.status === 'completed') {
-        const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
-
-        // Find and update the property
-        const propertyIndex = properties.findIndex(p => p.id === propertyId);
-        if (propertyIndex !== -1) {
-          properties[propertyIndex].dealStage = dealStage;
-          if (estimatedDealValue !== undefined) {
-            properties[propertyIndex].estimatedDealValue = estimatedDealValue;
-          }
-          if (offerAmount !== undefined) {
-            properties[propertyIndex].offerAmount = offerAmount;
-          }
-          if (expectedCloseDate !== undefined) {
-            properties[propertyIndex].expectedCloseDate = expectedCloseDate;
-          }
-
-          // Save updated properties
-          await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
-
-          console.log(`[DEAL-STAGE] Updated property ${propertyId} in file ${fileId}`);
-          return res.json({
-            success: true,
-            propertyId,
-            dealStage,
-            estimatedDealValue,
-            offerAmount,
-            expectedCloseDate
-          });
-        }
-      }
-    }
-
-    res.status(404).json({ error: 'Property not found' });
-  } catch (error) {
-    console.error('[DEAL-STAGE] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -2265,75 +2285,7 @@ app.get('/api/dashboard', async (req, res) => {
         }
       }
 
-      // Calculate pipeline metrics from actual property data
-      const pipelineByStage = {
-        new_lead: properties.filter(p => p.dealStage === 'new_lead').length,
-        contacted: properties.filter(p => p.dealStage === 'contacted').length,
-        interested: properties.filter(p => p.dealStage === 'interested').length,
-        offer_sent: properties.filter(p => p.dealStage === 'offer_sent').length,
-        negotiating: properties.filter(p => p.dealStage === 'negotiating').length,
-        under_contract: properties.filter(p => p.dealStage === 'under_contract').length,
-        closed: properties.filter(p => p.dealStage === 'closed').length,
-        dead: properties.filter(p => p.dealStage === 'dead').length,
-      };
-
-      const activeDealsProps = properties.filter(p =>
-        p.dealStage &&
-        p.dealStage !== 'dead' &&
-        p.dealStage !== 'closed'
-      );
-
-      const totalPipelineValue = activeDealsProps.reduce((sum, p) =>
-        sum + (p.estimatedDealValue || 0), 0
-      );
-
-      const closedDeals = pipelineByStage.closed;
-      const totalLeads = properties.filter(p => p.dealStage).length;
-      const conversionRate = totalLeads > 0 ? ((closedDeals / totalLeads) * 100).toFixed(1) : 0;
-
-      const avgDealValue = activeDealsProps.length > 0
-        ? Math.round(totalPipelineValue / activeDealsProps.length)
-        : 0;
-
-      // Calculate task/action metrics from actual property data
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(today);
-      todayEnd.setHours(23, 59, 59, 999);
-
-      const weekFromNow = new Date(today);
-      weekFromNow.setDate(weekFromNow.getDate() + 7);
-
-      const taskMetrics = {
-        callsDueToday: properties.filter(p =>
-          p.actionType === 'call' &&
-          p.dueTime &&
-          new Date(p.dueTime) >= today &&
-          new Date(p.dueTime) <= todayEnd
-        ).length,
-        followUpsThisWeek: properties.filter(p =>
-          p.dueTime &&
-          new Date(p.dueTime) >= today &&
-          new Date(p.dueTime) <= weekFromNow
-        ).length,
-        textsScheduled: properties.filter(p =>
-          p.actionType === 'text' &&
-          p.dueTime &&
-          new Date(p.dueTime) >= today
-        ).length,
-        mailCampaignActive: properties.filter(p =>
-          p.actionType === 'mail' &&
-          p.dueTime &&
-          new Date(p.dueTime) >= today
-        ).length,
-        drivebyPlanned: properties.filter(p =>
-          p.actionType === 'driveby' &&
-          p.dueTime &&
-          new Date(p.dueTime) >= today
-        ).length,
-      };
-
-      console.log('[DASHBOARD] Returning dashboard stats with pipeline and task metrics');
+      console.log('[DASHBOARD] Returning dashboard stats');
       return {
         totalProperties: properties.length,
         byStatus,
@@ -2342,14 +2294,6 @@ app.get('/api/dashboard', async (req, res) => {
         newThisMonth,
         removedThisMonth,
         deadLeads: removedThisMonth,
-        pipeline: {
-          totalValue: totalPipelineValue,
-          activeDeals: activeDealsProps.length,
-          byStage: pipelineByStage,
-          conversionRate: parseFloat(conversionRate),
-          avgDealValue,
-        },
-        tasks: taskMetrics,
       };
     })();
 
