@@ -57,6 +57,23 @@ export function PropertiesView() {
   // If single status, use API filtering for efficiency
   const apiStatusFilter = selectedStatuses.length === 1 ? selectedStatuses[0] : undefined;
   
+  // Helper function to check if any advanced filters are active (excluding status)
+  const hasActiveAdvancedFilters = useMemo(() => {
+    return (
+      (advancedFilters.amountDueMin !== undefined) ||
+      (advancedFilters.amountDueMax !== undefined) ||
+      (advancedFilters.marketValueMin !== undefined) ||
+      (advancedFilters.marketValueMax !== undefined) ||
+      (advancedFilters.taxYear !== undefined) ||
+      (advancedFilters.hasNotes !== 'any') ||
+      (advancedFilters.hasLink !== 'any') ||
+      (advancedFilters.followUpDateFrom !== undefined) ||
+      (advancedFilters.followUpDateTo !== undefined) ||
+      (advancedFilters.lastPaymentDateFrom !== undefined) ||
+      (advancedFilters.lastPaymentDateTo !== undefined)
+    );
+  }, [advancedFilters]);
+  
   // When multiple statuses are selected, we need to fetch more items to properly filter
   // Increase limit when multiple statuses selected to get better results
   const fetchLimit = selectedStatuses.length > 1 ? ITEMS_PER_PAGE * 10 : ITEMS_PER_PAGE;
@@ -116,23 +133,6 @@ export function PropertiesView() {
     }
     return 0;
   }, [data]);
-  
-  // Helper function to check if any advanced filters are active (excluding status)
-  const hasActiveAdvancedFilters = useMemo(() => {
-    return (
-      (advancedFilters.amountDueMin !== undefined) ||
-      (advancedFilters.amountDueMax !== undefined) ||
-      (advancedFilters.marketValueMin !== undefined) ||
-      (advancedFilters.marketValueMax !== undefined) ||
-      (advancedFilters.taxYear !== undefined) ||
-      (advancedFilters.hasNotes !== 'any') ||
-      (advancedFilters.hasLink !== 'any') ||
-      (advancedFilters.followUpDateFrom !== undefined) ||
-      (advancedFilters.followUpDateTo !== undefined) ||
-      (advancedFilters.lastPaymentDateFrom !== undefined) ||
-      (advancedFilters.lastPaymentDateTo !== undefined)
-    );
-  }, [advancedFilters]);
   
   // Apply advanced filtering logic
   const filteredProperties = useMemo(() => {
