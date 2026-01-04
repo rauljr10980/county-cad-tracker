@@ -1,15 +1,37 @@
-import { Download, Trash2, FileSpreadsheet, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { Download, Trash2, FileSpreadsheet, CheckCircle2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useFiles, useDeleteFile } from '@/hooks/useFiles';
+import { useFiles, useDeleteFile, useReprocessFile } from '@/hooks/useFiles';
+import { toast } from '@/hooks/use-toast';
 
 export function FileHistory() {
   const { data: files = [], isLoading, error } = useFiles();
   const deleteMutation = useDeleteFile();
+  const reprocessMutation = useReprocessFile();
 
   const handleDelete = (fileId: string, filename: string) => {
     if (confirm(`Are you sure you want to delete "${filename}"?`)) {
       deleteMutation.mutate(fileId);
+    }
+  };
+
+  const handleReprocess = (fileId: string, filename: string) => {
+    if (confirm(`Reprocess "${filename}" with the latest parsing logic? This will extract all NEW- columns.`)) {
+      reprocessMutation.mutate(fileId, {
+        onSuccess: () => {
+          toast({
+            title: "Reprocessing Started",
+            description: `"${filename}" is being reprocessed. This may take a few minutes.`,
+          });
+        },
+        onError: (error: Error) => {
+          toast({
+            title: "Reprocessing Failed",
+            description: error.message,
+            variant: "destructive",
+          });
+        },
+      });
     }
   };
 
@@ -114,6 +136,22 @@ export function FileHistory() {
                     <Button variant="ghost" size="icon" className="h-7 w-7">
                       <Download className="h-4 w-4" />
                     </Button>
+                    {file.status === 'completed' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-primary hover:text-primary"
+                        onClick={() => handleReprocess(file.id, file.filename)}
+                        disabled={reprocessMutation.isPending}
+                        title="Reprocess file to extract all NEW- columns"
+                      >
+                        {reprocessMutation.isPending && reprocessMutation.variables === file.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"

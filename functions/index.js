@@ -938,6 +938,11 @@ function extractProperties(data) {
     console.log(`[EXTRACT] Column names (first 20):`, headers.slice(0, 20).join(', '));
     console.log(`[EXTRACT] Looking for: CAN, ADDRSTRING, LEGALSTATUS`);
     console.log(`[EXTRACT] Column map result:`, columnMap);
+    
+    // Log NEW- columns found
+    const newColumns = headers.filter(h => h && h.toUpperCase().startsWith('NEW-'));
+    console.log(`[EXTRACT] NEW- columns found (${newColumns.length}):`, newColumns.join(', '));
+    
     console.log(`[EXTRACT] First row sample (first 5 columns):`, 
       Object.keys(data[0]).slice(0, 5).reduce((acc, key) => {
         acc[key] = data[0][key];
@@ -1057,16 +1062,99 @@ function extractProperties(data) {
       }
     }
     
-    return {
+    // Helper to get NEW- column values
+    const getNewColumn = (fieldName) => {
+      // Try exact match first (e.g., "NEW-Account Number")
+      const exactMatch = row[`NEW-${fieldName}`];
+      if (exactMatch !== undefined && exactMatch !== null && exactMatch !== '') {
+        return exactMatch;
+      }
+      // Try case-insensitive search with exact match
+      for (const header of headers) {
+        if (header) {
+          const headerUpper = header.toUpperCase().trim();
+          const targetUpper = `NEW-${fieldName.toUpperCase()}`.trim();
+          // Exact match (case-insensitive)
+          if (headerUpper === targetUpper) {
+            const value = row[header];
+            if (value !== undefined && value !== null && value !== '') {
+              return value;
+            }
+          }
+          // Also try partial match (handles spaces, special chars)
+          const headerNormalized = headerUpper.replace(/[^A-Z0-9]/g, '');
+          const targetNormalized = targetUpper.replace(/[^A-Z0-9]/g, '');
+          if (headerNormalized === targetNormalized) {
+            const value = row[header];
+            if (value !== undefined && value !== null && value !== '') {
+              return value;
+            }
+          }
+        }
+      }
+      return null;
+    };
+
+    // Parse numeric values from NEW- columns
+    const parseNumeric = (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      const num = parseFloat(String(value).replace(/[$,]/g, ''));
+      return isNaN(num) ? null : num;
+    };
+
+    // Get all NEW- column values (for debugging and to ensure we capture everything)
+    const newColumnValues = {};
+    if (index === 0) {
+      // Log available NEW- columns for first row only
+      const availableNewColumns = headers.filter(h => h && h.toUpperCase().startsWith('NEW-'));
+      console.log(`[EXTRACT] Available NEW- columns:`, availableNewColumns);
+      availableNewColumns.forEach(col => {
+        const val = row[col];
+        if (val !== undefined && val !== null && val !== '') {
+          console.log(`[EXTRACT]   ${col} = ${String(val).substring(0, 50)}`);
+        }
+      });
+    }
+
+    // Build property object with all NEW- columns
+    const property = {
       id: `${Date.now()}_${index}`,
       accountNumber: finalAccountNumber || accountNumber || `ROW_${index}`,
-      ownerName: getValue('ownerName') || '',
-      propertyAddress: finalPropertyAddress || propertyAddress || '',
-      mailingAddress: getValue('mailingAddress') || '',
+      ownerName: getValue('ownerName') || getNewColumn('Owner Name') || '',
+      propertyAddress: finalPropertyAddress || propertyAddress || getNewColumn('Property Site Address') || '',
+      mailingAddress: getValue('mailingAddress') || getNewColumn('Owner Address') || '',
       status: statusValue || 'U', // U = Unknown (blank LEGALSTATUS)
-      totalAmountDue: parseFloat(totalAmountDue || '0') || 0,
+      totalAmountDue: parseFloat(totalAmountDue || '0') || parseNumeric(getNewColumn('Total Amount Due')) || 0,
       totalPercentage: parseFloat(getValue('totalPercentage') || '0') || 0,
+      // NEW- columns - use direct row access as fallback
+      legalDescription: getNewColumn('Legal Description') || row['NEW-Legal Description'] || '',
+      marketValue: parseNumeric(getNewColumn('Total Market Value')) || parseNumeric(row['NEW-Total Market Value']),
+      landValue: parseNumeric(getNewColumn('Land Value')) || parseNumeric(row['NEW-Land Value']),
+      improvementValue: parseNumeric(getNewColumn('Improvement Value')) || parseNumeric(row['NEW-Improvement Value']),
+      cappedValue: parseNumeric(getNewColumn('Capped Value')) || parseNumeric(row['NEW-Capped Value']),
+      agriculturalValue: parseNumeric(getNewColumn('Agricultural Value')) || parseNumeric(row['NEW-Agricultural Value']),
+      exemptions: (() => {
+        const val = getNewColumn('Exemptions') || row['NEW-Exemptions'];
+        return val ? String(val).split(',').map(e => e.trim()).filter(e => e) : undefined;
+      })(),
+      jurisdictions: (() => {
+        const val = getNewColumn('Jurisdictions') || row['NEW-Jurisdictions'];
+        return val ? String(val).split(',').map(j => j.trim()).filter(j => j) : undefined;
+      })(),
+      lastPaymentDate: getNewColumn('Last Payment Date') || row['NEW-Last Payment Date'] || undefined,
+      lastPaymentAmount: parseNumeric(getNewColumn('Last Payment Amount Received')) || parseNumeric(row['NEW-Last Payment Amount Received']),
+      lastPayer: getNewColumn('Last Payer') || row['NEW-Last Payer'] || undefined,
+      delinquentAfter: getNewColumn('Delinquent After') || row['NEW-Delinquent After'] || undefined,
+      halfPaymentOptionAmount: parseNumeric(getNewColumn('Half Payment Option Amount')) || parseNumeric(row['NEW-Half Payment Option Amount']),
+      priorYearsAmountDue: parseNumeric(getNewColumn('Prior Years Amount Due')) || parseNumeric(row['NEW-Prior Years Amount Due']),
+      taxYear: getNewColumn('Tax Year') || row['NEW-Tax Year'] || undefined,
+      yearAmountDue: parseNumeric(getNewColumn('Year Amount Due')) || parseNumeric(row['NEW-Year Amount Due']),
+      yearTaxLevy: parseNumeric(getNewColumn('Year Tax Levy')) || parseNumeric(row['NEW-Year Tax Levy']),
+      link: getNewColumn('Link') || row['NEW-Link'] || undefined,
+      ownerAddress: getNewColumn('Owner Address') || row['NEW-Owner Address'] || undefined,
     };
+
+    return property;
   }).filter(p => {
     // Only filter out completely empty rows (no account number and no address)
     const hasData = p.accountNumber && 
@@ -1586,6 +1674,25 @@ app.get('/api/properties', async (req, res) => {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
         console.log(`[PROPERTIES] Returning ${properties.length} properties`);
         
+        // Log sample property to verify NEW- columns are included
+        if (properties.length > 0) {
+          const sample = properties[0];
+          const newFields = Object.keys(sample).filter(k => 
+            ['marketValue', 'landValue', 'improvementValue', 'cappedValue', 'agriculturalValue',
+             'legalDescription', 'lastPaymentDate', 'lastPayer', 'delinquentAfter', 'taxYear',
+             'link', 'ownerAddress', 'exemptions', 'jurisdictions'].includes(k)
+          );
+          console.log(`[PROPERTIES] Sample property has ${newFields.length} NEW- fields:`, newFields);
+          if (newFields.length > 0) {
+            console.log(`[PROPERTIES] Sample NEW- field values:`, 
+              newFields.slice(0, 5).reduce((acc, key) => {
+                acc[key] = sample[key];
+                return acc;
+              }, {})
+            );
+          }
+        }
+        
         // Log status breakdown (U = Unknown/blank LEGALSTATUS)
         const statusCounts = { J: 0, A: 0, P: 0, U: 0 };
         properties.forEach(p => {
@@ -1629,8 +1736,38 @@ app.get('/api/properties', async (req, res) => {
         const limit = parseInt(req.query.limit) || 100;
         const start = (page - 1) * limit;
         
+        // Ensure all properties include all fields (no filtering of fields)
+        const propertiesToReturn = filteredProperties.slice(start, start + limit).map(p => {
+          // Return property with all fields intact
+          return {
+            ...p,
+            // Explicitly include all NEW- fields to ensure they're sent
+            legalDescription: p.legalDescription,
+            marketValue: p.marketValue,
+            landValue: p.landValue,
+            improvementValue: p.improvementValue,
+            cappedValue: p.cappedValue,
+            agriculturalValue: p.agriculturalValue,
+            exemptions: p.exemptions,
+            jurisdictions: p.jurisdictions,
+            lastPaymentDate: p.lastPaymentDate,
+            lastPaymentAmount: p.lastPaymentAmount,
+            lastPayer: p.lastPayer,
+            delinquentAfter: p.delinquentAfter,
+            halfPaymentOptionAmount: p.halfPaymentOptionAmount,
+            priorYearsAmountDue: p.priorYearsAmountDue,
+            taxYear: p.taxYear,
+            yearAmountDue: p.yearAmountDue,
+            yearTaxLevy: p.yearTaxLevy,
+            link: p.link,
+            ownerAddress: p.ownerAddress,
+          };
+        });
+        
+        console.log(`[PROPERTIES] Returning ${propertiesToReturn.length} properties with all fields`);
+        
         return res.json({
-          properties: filteredProperties.slice(start, start + limit),
+          properties: propertiesToReturn,
           total: filteredProperties.length,
           totalUnfiltered: properties.length,
           statusCounts,

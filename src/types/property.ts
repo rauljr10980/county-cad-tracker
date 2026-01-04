@@ -15,10 +15,20 @@ export interface Property {
   landValue?: number;
   improvementValue?: number;
   cappedValue?: number;
+  agriculturalValue?: number; // NEW-Agricultural Value
   exemptions?: string[];
   jurisdictions?: string[];
   lastPaymentDate?: string;
   lastPaymentAmount?: number;
+  lastPayer?: string; // NEW-Last Payer
+  delinquentAfter?: string; // NEW-Delinquent After
+  halfPaymentOptionAmount?: number; // NEW-Half Payment Option Amount
+  priorYearsAmountDue?: number; // NEW-Prior Years Amount Due
+  taxYear?: string; // NEW-Tax Year
+  yearAmountDue?: number; // NEW-Year Amount Due
+  yearTaxLevy?: number; // NEW-Year Tax Levy
+  link?: string; // NEW-Link (URL to property detail page)
+  ownerAddress?: string; // NEW-Owner Address (separate from mailingAddress)
   lastFollowUp?: string;
   notes?: string;
   phoneNumbers?: string[];

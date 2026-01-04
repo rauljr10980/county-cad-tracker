@@ -129,6 +129,20 @@ export async function deleteFile(fileId: string) {
 }
 
 /**
+ * Reprocess an existing file with current parsing logic
+ */
+export async function reprocessFile(fileId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/files/${fileId}/reprocess`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to reprocess file');
+  }
+  return response.json();
+}
+
+/**
  * Get properties from latest completed file
  */
 export async function getProperties(page = 1, limit = 100, status?: string, search?: string) {

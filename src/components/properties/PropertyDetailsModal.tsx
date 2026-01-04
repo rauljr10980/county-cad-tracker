@@ -250,6 +250,42 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       {property.improvementValue ? formatCurrency(property.improvementValue) : 'N/A'}
                     </p>
                   </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Capped Value</p>
+                    <p className="font-mono">
+                      {property.cappedValue ? formatCurrency(property.cappedValue) : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Agricultural Value</p>
+                    <p className="font-mono">
+                      {property.agriculturalValue && property.agriculturalValue > 0 ? formatCurrency(property.agriculturalValue) : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Prior Years Amount Due</p>
+                    <p className="font-mono">
+                      {property.priorYearsAmountDue && property.priorYearsAmountDue > 0 ? formatCurrency(property.priorYearsAmountDue) : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Year Amount Due</p>
+                    <p className="font-mono">
+                      {property.yearAmountDue && property.yearAmountDue > 0 ? formatCurrency(property.yearAmountDue) : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Year Tax Levy</p>
+                    <p className="font-mono">
+                      {property.yearTaxLevy && property.yearTaxLevy > 0 ? formatCurrency(property.yearTaxLevy) : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Half Payment Option</p>
+                    <p className="font-mono">
+                      {property.halfPaymentOptionAmount && property.halfPaymentOptionAmount > 0 ? formatCurrency(property.halfPaymentOptionAmount) : 'N/A'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -265,8 +301,93 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   <span className="font-mono text-sm">{property.totalPercentage}%</span>
                 </div>
               </div>
+              
+              {/* Additional Payment Information - Always show */}
+              <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="h-3 w-3 text-primary" />
+                  <p className="text-xs font-medium text-muted-foreground">Payment & Tax Information</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex justify-between">
+                    <span className="text-xs text-muted-foreground">Tax Year:</span>
+                    <span className="text-xs font-mono font-medium">{property.taxYear || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-muted-foreground">Last Payment Date:</span>
+                    <span className="text-xs font-mono font-medium">{property.lastPaymentDate || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-muted-foreground">Last Payment Amount:</span>
+                    <span className="text-xs font-mono font-medium">
+                      {property.lastPaymentAmount ? formatCurrency(property.lastPaymentAmount) : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between col-span-2">
+                    <span className="text-xs text-muted-foreground">Last Payer:</span>
+                    <span className="text-xs text-right flex-1 ml-2">{property.lastPayer || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between col-span-2">
+                    <span className="text-xs text-muted-foreground">Delinquent After:</span>
+                    <span className="text-xs font-mono font-medium">{property.delinquentAfter || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Exemptions & Jurisdictions - Always show */}
+              <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Exemptions & Jurisdictions</p>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Exemptions:</p>
+                  <p className="text-xs">
+                    {property.exemptions && property.exemptions.length > 0 
+                      ? property.exemptions.join(', ') 
+                      : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Jurisdictions:</p>
+                  <p className="text-xs">
+                    {property.jurisdictions && property.jurisdictions.length > 0 
+                      ? property.jurisdictions.join(', ') 
+                      : 'N/A'}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
+          
+          {/* Additional Details Section */}
+          {(property.link || property.ownerAddress) && (
+            <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Additional Details</p>
+              {property.link && (
+                <div className="flex items-start gap-2">
+                  <ExternalLink className="h-3 w-3 text-primary mt-1 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Property Link:</p>
+                    <a 
+                      href={property.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline break-all"
+                    >
+                      {property.link}
+                    </a>
+                  </div>
+                </div>
+              )}
+              {property.ownerAddress && (
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-3 w-3 text-primary mt-1 shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Owner Address:</p>
+                    <p className="text-xs">{property.ownerAddress}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Payment History Chart */}
           {paymentChartData.length > 0 && (
@@ -449,16 +570,29 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>
-            <Button asChild>
-              <a 
-                href="https://bexar.acttax.com/act_webdev/bexar/index.jsp"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                View on Bexar County
-              </a>
-            </Button>
+            {property.link ? (
+              <Button asChild>
+                <a 
+                  href={property.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Property Details
+                </a>
+              </Button>
+            ) : (
+              <Button asChild>
+                <a 
+                  href="https://bexar.acttax.com/act_webdev/bexar/index.jsp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View on Bexar County
+                </a>
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
