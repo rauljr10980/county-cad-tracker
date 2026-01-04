@@ -245,14 +245,20 @@ export function PropertiesView() {
       const endIndex = startIndex + ITEMS_PER_PAGE;
       finalProperties = statusFiltered.slice(startIndex, endIndex);
     } else {
-      // No filters - use totalUnfiltered
+      // No filters - use API pagination directly (API already returns the correct page)
+      finalProperties = rawProperties;
       finalTotal = totalUnfiltered;
-      finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
       
-      // Apply pagination to raw properties
-      const startIndex = (page - 1) * ITEMS_PER_PAGE;
-      const endIndex = startIndex + ITEMS_PER_PAGE;
-      finalProperties = rawProperties.slice(startIndex, endIndex);
+      // Extract totalPages from API response if available
+      try {
+        if (data && !Array.isArray(data) && 'totalPages' in data) {
+          finalTotalPages = data.totalPages || Math.ceil(finalTotal / ITEMS_PER_PAGE);
+        } else {
+          finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
+        }
+      } catch (e) {
+        finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
+      }
     }
     
     return {
@@ -260,7 +266,7 @@ export function PropertiesView() {
       total: finalTotal,
       totalPages: finalTotalPages,
     };
-  }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, statusCounts, totalUnfiltered, rawProperties, page]);
+  }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, statusCounts, totalUnfiltered, rawProperties, page, data]);
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
