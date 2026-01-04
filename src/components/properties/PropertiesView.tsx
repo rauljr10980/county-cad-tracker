@@ -70,33 +70,49 @@ export function PropertiesView() {
   });
   
   // Safely extract properties with fallbacks
-  let properties: Property[] = [];
-  let total = 0;
-  let totalUnfiltered = 0;
-  let totalPages = 1;
-  let statusCounts = { J: 0, A: 0, P: 0, other: 0 };
-  
-  try {
-    if (data) {
-      // Handle both array and object response formats
-      if (Array.isArray(data)) {
-        properties = data;
-        total = data.length;
-        totalUnfiltered = data.length;
-        totalPages = 1;
-      } else if ('properties' in data && Array.isArray(data.properties)) {
-        properties = data.properties;
-        total = data.total || data.properties.length;
-        totalUnfiltered = data.totalUnfiltered || total;
-        totalPages = data.totalPages || Math.ceil(total / ITEMS_PER_PAGE);
-        if (data.statusCounts) {
-          statusCounts = data.statusCounts;
+  const rawProperties: Property[] = useMemo(() => {
+    try {
+      if (data) {
+        // Handle both array and object response formats
+        if (Array.isArray(data)) {
+          return data;
+        } else if ('properties' in data && Array.isArray(data.properties)) {
+          return data.properties;
         }
       }
+    } catch (e) {
+      console.error('[PropertiesView] Error parsing data:', e);
     }
-  } catch (e) {
-    console.error('[PropertiesView] Error parsing data:', e);
-  }
+    return [];
+  }, [data]);
+  
+  const statusCounts = useMemo(() => {
+    try {
+      if (data && !Array.isArray(data) && 'statusCounts' in data) {
+        return data.statusCounts || { J: 0, A: 0, P: 0, other: 0 };
+      }
+    } catch (e) {
+      console.error('[PropertiesView] Error parsing statusCounts:', e);
+    }
+    return { J: 0, A: 0, P: 0, other: 0 };
+  }, [data]);
+  
+  const totalUnfiltered = useMemo(() => {
+    try {
+      if (data) {
+        if (Array.isArray(data)) {
+          return data.length;
+        } else if ('totalUnfiltered' in data) {
+          return data.totalUnfiltered || 0;
+        } else if ('total' in data) {
+          return data.total || 0;
+        }
+      }
+    } catch (e) {
+      console.error('[PropertiesView] Error parsing totalUnfiltered:', e);
+    }
+    return 0;
+  }, [data]);
   
   // Helper function to check if any advanced filters are active (excluding status)
   const hasActiveAdvancedFilters = useMemo(() => {
@@ -117,7 +133,7 @@ export function PropertiesView() {
   
   // Apply advanced filtering logic
   const filteredProperties = useMemo(() => {
-    let filtered = [...properties];
+    let filtered = [...rawProperties];
     
     // Status filter
     if (advancedFilters.statuses.length > 0) {
@@ -198,27 +214,50 @@ export function PropertiesView() {
     }
     
     return filtered;
-  }, [properties, advancedFilters]);
+  }, [rawProperties, advancedFilters]);
   
   // Calculate totals and pagination
-  if (selectedStatuses.length > 1 || hasActiveAdvancedFilters) {
-    // Multiple filters applied - use filtered results
-    total = filteredProperties.length;
-    totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+  const { properties, total, totalPages } = useMemo(() => {
+    let finalProperties: Property[] = [];
+    let finalTotal = 0;
+    let finalTotalPages = 1;
     
-    // Apply pagination
-    const startIndex = (page - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    properties = filteredProperties.slice(startIndex, endIndex);
-  } else if (selectedStatuses.length === 1) {
-    // Single status selected - use the count from statusCounts
-    total = statusCounts[selectedStatuses[0]] || 0;
-    totalPages = Math.ceil(total / ITEMS_PER_PAGE);
-  } else {
-    // No filters - use totalUnfiltered
-    total = totalUnfiltered;
-    totalPages = Math.ceil(total / ITEMS_PER_PAGE);
-  }
+    if (selectedStatuses.length > 1 || hasActiveAdvancedFilters) {
+      // Multiple filters applied - use filtered results
+      finalTotal = filteredProperties.length;
+      finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
+      
+      // Apply pagination
+      const startIndex = (page - 1) * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      finalProperties = filteredProperties.slice(startIndex, endIndex);
+    } else if (selectedStatuses.length === 1) {
+      // Single status selected - use the count from statusCounts
+      finalTotal = statusCounts[selectedStatuses[0]] || 0;
+      finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
+      
+      // Apply pagination to raw properties filtered by status
+      const statusFiltered = rawProperties.filter(p => p.status === selectedStatuses[0]);
+      const startIndex = (page - 1) * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      finalProperties = statusFiltered.slice(startIndex, endIndex);
+    } else {
+      // No filters - use totalUnfiltered
+      finalTotal = totalUnfiltered;
+      finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
+      
+      // Apply pagination to raw properties
+      const startIndex = (page - 1) * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      finalProperties = rawProperties.slice(startIndex, endIndex);
+    }
+    
+    return {
+      properties: finalProperties,
+      total: finalTotal,
+      totalPages: finalTotalPages,
+    };
+  }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, statusCounts, totalUnfiltered, rawProperties, page]);
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -331,22 +370,7 @@ export function PropertiesView() {
               onClear={clearAllFilters}
               statusCounts={statusCounts}
               totalUnfiltered={totalUnfiltered}
-              activeFilterCount={useMemo(() => {
-                let count = 0;
-                if (advancedFilters.statuses.length > 0) count += advancedFilters.statuses.length;
-                if (advancedFilters.amountDueMin !== undefined) count++;
-                if (advancedFilters.amountDueMax !== undefined) count++;
-                if (advancedFilters.marketValueMin !== undefined) count++;
-                if (advancedFilters.marketValueMax !== undefined) count++;
-                if (advancedFilters.taxYear) count++;
-                if (advancedFilters.hasNotes !== 'any') count++;
-                if (advancedFilters.hasLink !== 'any') count++;
-                if (advancedFilters.followUpDateFrom) count++;
-                if (advancedFilters.followUpDateTo) count++;
-                if (advancedFilters.lastPaymentDateFrom) count++;
-                if (advancedFilters.lastPaymentDateTo) count++;
-                return count;
-              }, [advancedFilters])}
+              activeFilterCount={activeFilterCount}
             />
             
             {useMemo(() => {
