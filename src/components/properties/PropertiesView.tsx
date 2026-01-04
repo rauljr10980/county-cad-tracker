@@ -62,11 +62,14 @@ export function PropertiesView() {
   const fetchLimit = selectedStatuses.length > 1 ? ITEMS_PER_PAGE * 10 : ITEMS_PER_PAGE;
   
   // Fetch properties from API with status filter and search
+  // When no filters or single status: use API pagination
+  // When multiple statuses or advanced filters: fetch all and paginate on frontend
+  const shouldUseApiPagination = selectedStatuses.length <= 1 && !hasActiveAdvancedFilters;
   const { data, isLoading, error } = useProperties({
     status: apiStatusFilter,
     search: debouncedSearchQuery,
-    page: selectedStatuses.length > 1 ? 1 : page, // Always page 1 when multiple statuses (we'll paginate filtered results)
-    limit: fetchLimit,
+    page: shouldUseApiPagination ? page : 1, // Use API pagination when no frontend filtering needed
+    limit: shouldUseApiPagination ? ITEMS_PER_PAGE : fetchLimit,
   });
   
   // Safely extract properties with fallbacks
