@@ -416,11 +416,10 @@ export function PropertiesView() {
             onViewProperty={setSelectedProperty}
             statusFilter={selectedStatuses.length === 1 ? selectedStatuses[0] : undefined}
             onStatusFilterChange={(status) => {
-              if (status) {
-                setSelectedStatuses([status]);
-              } else {
-                setSelectedStatuses([]);
-              }
+              handleFiltersChange({
+                ...advancedFilters,
+                statuses: status ? [status] : [],
+              });
             }}
           />
           
