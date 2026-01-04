@@ -178,23 +178,24 @@ export function PropertiesView() {
         </div>
         
         {/* Status Filter Dropdown */}
-        <div className="mt-4 flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 mr-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Filter by status:</span>
-          </div>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant={selectedStatuses.length > 0 ? "default" : "outline"}
-                size="sm"
-                className="min-w-[140px] justify-between"
-              >
-                <span>{getFilterButtonText()}</span>
-                <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
+        <div className="mt-4 p-3 border border-border rounded-lg bg-card/50">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 mr-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Filter by status:</span>
+            </div>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant={selectedStatuses.length > 0 ? "default" : "outline"}
+                  size="sm"
+                  className="min-w-[140px] justify-between"
+                >
+                  <span>{getFilterButtonText()}</span>
+                  <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
               <DropdownMenuLabel>Select Status</DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -271,13 +272,14 @@ export function PropertiesView() {
             </DropdownMenuContent>
           </DropdownMenu>
           
-          {selectedStatuses.length > 0 && (
-            <span className="text-sm text-muted-foreground">
-              Showing {total.toLocaleString()} {selectedStatuses.length === 1 
-                ? selectedStatuses[0] === 'J' ? 'Judgment' : selectedStatuses[0] === 'A' ? 'Active' : 'Pending'
-                : 'filtered'} properties
-            </span>
-          )}
+            {selectedStatuses.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                Showing {total.toLocaleString()} {selectedStatuses.length === 1 
+                  ? selectedStatuses[0] === 'J' ? 'Judgment' : selectedStatuses[0] === 'A' ? 'Active' : 'Pending'
+                  : 'filtered'} properties
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
