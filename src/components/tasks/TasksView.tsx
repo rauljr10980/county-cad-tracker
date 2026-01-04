@@ -17,7 +17,7 @@ import { toast } from '@/hooks/use-toast';
 type ActionType = 'call' | 'text' | 'mail' | 'driveby';
 type Priority = 'high' | 'med' | 'low';
 type Outcome = 'no_answer' | 'voicemail' | 'text_sent' | 'spoke_owner' | 'wrong_number' | 'not_interested' | 'new_owner' | 'call_back_later';
-type FilterMode = 'all' | 'calls_only' | 'hot_today' | 'overdue';
+type FilterMode = 'all' | 'call' | 'text' | 'mail' | 'driveby' | 'hot_today' | 'overdue';
 
 const ACTION_ICONS = {
   call: Phone,
@@ -27,16 +27,16 @@ const ACTION_ICONS = {
 };
 
 const ACTION_LABELS = {
-  call: 'Call',
-  text: 'Text',
-  mail: 'Mail',
-  driveby: 'Drive by',
+  call: '📞 Call',
+  text: '💬 Text',
+  mail: '✉️ Mail',
+  driveby: '🚗 Drive-by',
 };
 
 const PRIORITY_COLORS = {
   high: 'bg-red-500/20 text-red-500 border-red-500/30',
   med: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30',
-  low: 'bg-blue-500/20 text-blue-500 border-blue-500/30',
+  low: 'bg-green-500/20 text-green-500 border-green-500/30',
 };
 
 const OUTCOME_OPTIONS: { value: Outcome; label: string; nextAction?: ActionType }[] = [
@@ -144,8 +144,8 @@ export function TasksView() {
     let filtered = [...tasksData];
 
     // Apply filters
-    if (filterMode === 'calls_only') {
-      filtered = filtered.filter(p => p.actionType === 'call');
+    if (filterMode === 'call' || filterMode === 'text' || filterMode === 'mail' || filterMode === 'driveby') {
+      filtered = filtered.filter(p => p.actionType === filterMode);
     } else if (filterMode === 'hot_today') {
       filtered = filtered.filter(p => {
         if (!p.dueTime) return false;
@@ -196,12 +196,52 @@ export function TasksView() {
     return filtered;
   }, [data, filterMode, sortBy]);
 
-  // End-of-day stats
+  // Task summary stats (matching dashboard)
+  const taskStats = useMemo(() => {
+    const tasksData = data || [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+    const weekFromNow = new Date(today);
+    weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+    return {
+      callsDueToday: tasksData.filter(p =>
+        p.actionType === 'call' &&
+        p.dueTime &&
+        new Date(p.dueTime) >= today &&
+        new Date(p.dueTime) <= todayEnd
+      ).length,
+      followUpsThisWeek: tasksData.filter(p =>
+        p.dueTime &&
+        new Date(p.dueTime) >= today &&
+        new Date(p.dueTime) <= weekFromNow
+      ).length,
+      textsScheduled: tasksData.filter(p =>
+        p.actionType === 'text' &&
+        p.dueTime &&
+        new Date(p.dueTime) >= today
+      ).length,
+      mailCampaignActive: tasksData.filter(p =>
+        p.actionType === 'mail' &&
+        p.dueTime &&
+        new Date(p.dueTime) >= today
+      ).length,
+      drivebyPlanned: tasksData.filter(p =>
+        p.actionType === 'driveby' &&
+        p.dueTime &&
+        new Date(p.dueTime) >= today
+      ).length,
+    };
+  }, [data]);
+
+  // End-of-day stats (performance tracking)
   const todayStats = useMemo(() => {
     const tasksData = data || [];
     const today = new Date();
     const todayStart = startOfDay(today);
-    
+
     return {
       completed: tasksData.filter(p => {
         if (!p.lastOutcomeDate) return false;
@@ -343,8 +383,44 @@ export function TasksView() {
 
   return (
     <div className="p-6">
-      {/* End-of-Day Stats */}
+      {/* Task Summary Cards (matching dashboard) */}
       <div className="mb-6 bg-card border border-border rounded-lg p-4">
+        <h3 className="text-sm font-semibold mb-4">Tasks & Actions Overview</h3>
+        <div className="space-y-4">
+          {[
+            { action: 'Calls Due Today', count: taskStats.callsDueToday, color: '#EF4444', icon: '📞' },
+            { action: 'Follow-ups This Week', count: taskStats.followUpsThisWeek, color: '#F59E0B', icon: '📅' },
+            { action: 'Texts Scheduled', count: taskStats.textsScheduled, color: '#8B5CF6', icon: '💬' },
+            { action: 'Mail Campaign Active', count: taskStats.mailCampaignActive, color: '#3B82F6', icon: '✉️' },
+            { action: 'Drive-bys Planned', count: taskStats.drivebyPlanned, color: '#10B981', icon: '🚗' },
+          ].map((task, index) => (
+            <div key={index} className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{task.icon}</span>
+                  <span className="text-muted-foreground">{task.action}</span>
+                </div>
+                <span className="font-bold" style={{ color: task.color }}>
+                  {task.count}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                <div
+                  className="h-1.5 rounded-full transition-all"
+                  style={{
+                    backgroundColor: task.color,
+                    width: `${Math.min((task.count / 250) * 100, 100)}%`
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Performance Stats */}
+      <div className="mb-6 bg-card border border-border rounded-lg p-4">
+        <h3 className="text-sm font-semibold mb-4">Today's Performance</h3>
         <div className="grid grid-cols-4 gap-4 text-center">
           <div>
             <p className="text-2xl font-bold text-primary">{todayStats.completed}</p>
@@ -382,7 +458,10 @@ export function TasksView() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Tasks</SelectItem>
-              <SelectItem value="calls_only">Calls Only</SelectItem>
+              <SelectItem value="call">📞 Calls</SelectItem>
+              <SelectItem value="text">💬 Texts</SelectItem>
+              <SelectItem value="mail">✉️ Mail</SelectItem>
+              <SelectItem value="driveby">🚗 Drive-bys</SelectItem>
               <SelectItem value="hot_today">Hot Today</SelectItem>
               <SelectItem value="overdue">Overdue</SelectItem>
             </SelectContent>
@@ -448,12 +527,9 @@ export function TasksView() {
                   </div>
                 )}
 
-                {/* Action Type Icon */}
+                {/* Action Type */}
                 <div className="shrink-0 pt-1">
-                  <div className="flex items-center gap-2">
-                    <ActionIcon className="h-5 w-5 text-primary" />
-                    <span className="text-sm font-medium">{actionLabel}</span>
-                  </div>
+                  <span className="text-sm font-medium">{actionLabel}</span>
                 </div>
 
                 {/* Main Content */}
@@ -502,19 +578,19 @@ export function TasksView() {
                               <button
                                 className={cn(
                                   "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                  priority === 'med' 
-                                    ? "bg-yellow-500/20 text-yellow-500 font-medium" 
+                                  priority === 'med'
+                                    ? "bg-yellow-500/20 text-yellow-500 font-medium"
                                     : "hover:bg-secondary"
                                 )}
                                 onClick={() => handlePriorityChange(property, 'med')}
                               >
-                                Medium
+                                Med
                               </button>
                               <button
                                 className={cn(
                                   "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                  priority === 'low' 
-                                    ? "bg-blue-500/20 text-blue-500 font-medium" 
+                                  priority === 'low'
+                                    ? "bg-green-500/20 text-green-500 font-medium"
                                     : "hover:bg-secondary"
                                 )}
                                 onClick={() => handlePriorityChange(property, 'low')}

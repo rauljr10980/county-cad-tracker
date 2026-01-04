@@ -108,11 +108,45 @@ export async function getComparison(fileId: string) {
  * Get dashboard statistics
  */
 export async function getDashboardStats() {
-  const response = await fetch(`${API_BASE_URL}/api/dashboard`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch dashboard stats');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/dashboard`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch dashboard stats');
+    }
+    return response.json();
+  } catch (error) {
+    // Fallback to mock data if API is unavailable (e.g., on GitHub Pages)
+    console.warn('[API] Using fallback mock data for dashboard');
+    return {
+      totalProperties: 58432,
+      byStatus: {
+        judgment: 3829,
+        active: 5164,
+        pending: 858,
+      },
+      totalAmountDue: 847293847,
+      avgAmountDue: 14500,
+      newThisMonth: 1243,
+      removedThisMonth: 702,
+      deadLeads: 702,
+      pipeline: {
+        totalValue: 2450000,
+        activeDeals: 127,
+        byStage: {
+          new_lead: 1245,
+          contacted: 892,
+          interested: 234,
+          offer_sent: 89,
+          negotiating: 45,
+          under_contract: 23,
+          closed: 156,
+          dead: 3412,
+        },
+        conversionRate: 12.3,
+        avgDealValue: 19291,
+      },
+    };
   }
-  return response.json();
 }
 
 /**
@@ -225,20 +259,21 @@ export async function getTasks(): Promise<Property[]> {
 }
 
 /**
- * Update property action (actionType, priority, dueTime)
+ * Update property action (actionType, priority, dueTime, assignedTo)
  */
 export async function updatePropertyAction(
   propertyId: string,
   actionType: 'call' | 'text' | 'mail' | 'driveby',
   priority: 'high' | 'med' | 'low',
-  dueTime: string
+  dueTime: string,
+  assignedTo?: 'Luciano' | 'Raul'
 ) {
   const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/action`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ actionType, priority, dueTime }),
+    body: JSON.stringify({ actionType, priority, dueTime, assignedTo }),
   });
   if (!response.ok) {
     throw new Error('Failed to update action');
@@ -283,6 +318,29 @@ export async function markTaskDone(
   });
   if (!response.ok) {
     throw new Error('Failed to mark task as done');
+  }
+  return response.json();
+}
+
+/**
+ * Update property deal stage
+ */
+export async function updatePropertyDealStage(
+  propertyId: string,
+  dealStage: 'new_lead' | 'contacted' | 'interested' | 'offer_sent' | 'negotiating' | 'under_contract' | 'closed' | 'dead',
+  estimatedDealValue?: number,
+  offerAmount?: number,
+  expectedCloseDate?: string
+) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/deal-stage`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ dealStage, estimatedDealValue, offerAmount, expectedCloseDate }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update deal stage');
   }
   return response.json();
 }

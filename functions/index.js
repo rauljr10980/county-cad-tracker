@@ -2015,32 +2015,32 @@ app.put('/api/properties/:propertyId/task-done', async (req, res) => {
   try {
     const { propertyId } = req.params;
     const { outcome, nextAction } = req.body;
-    
+
     console.log(`[TASK-DONE] Marking task done for property ${propertyId}: ${outcome}, nextAction: ${nextAction}`);
-    
+
     const bucket = storage.bucket(BUCKET_NAME);
-    
+
     // Find the file containing this property
     const fileList = await listFiles(bucket, 'metadata/files/');
     const fileIds = fileList
       .map(f => f.replace('metadata/files/', '').replace('.json', ''))
       .sort((a, b) => parseInt(b) - parseInt(a));
-    
+
     for (const fileId of fileIds.slice(0, 5)) {
       const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
       if (fileDoc && fileDoc.status === 'completed') {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
-        
+
         // Find and update the property
         const propertyIndex = properties.findIndex(p => p.id === propertyId);
         if (propertyIndex !== -1) {
           const property = properties[propertyIndex];
-          
+
           // Update outcome
           property.lastOutcome = outcome;
           property.lastOutcomeDate = new Date().toISOString();
           property.attempts = (property.attempts || 0) + 1;
-          
+
           // Create next action if specified
           if (nextAction) {
             property.actionType = nextAction;
@@ -2054,19 +2054,79 @@ app.put('/api/properties/:propertyId/task-done', async (req, res) => {
             property.actionType = undefined;
             property.dueTime = undefined;
           }
-          
+
           // Save updated properties
           await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
-          
+
           console.log(`[TASK-DONE] Updated property ${propertyId} in file ${fileId}`);
           return res.json({ success: true, propertyId, outcome, nextAction });
         }
       }
     }
-    
+
     res.status(404).json({ error: 'Property not found' });
   } catch (error) {
     console.error('[TASK-DONE] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Update property deal stage
+ */
+app.put('/api/properties/:propertyId/deal-stage', async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { dealStage, estimatedDealValue, offerAmount, expectedCloseDate } = req.body;
+
+    console.log(`[DEAL-STAGE] Updating deal stage for property ${propertyId}: ${dealStage}`);
+
+    const bucket = storage.bucket(BUCKET_NAME);
+
+    // Find the file containing this property
+    const fileList = await listFiles(bucket, 'metadata/files/');
+    const fileIds = fileList
+      .map(f => f.replace('metadata/files/', '').replace('.json', ''))
+      .sort((a, b) => parseInt(b) - parseInt(a));
+
+    for (const fileId of fileIds.slice(0, 5)) {
+      const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+      if (fileDoc && fileDoc.status === 'completed') {
+        const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
+
+        // Find and update the property
+        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        if (propertyIndex !== -1) {
+          properties[propertyIndex].dealStage = dealStage;
+          if (estimatedDealValue !== undefined) {
+            properties[propertyIndex].estimatedDealValue = estimatedDealValue;
+          }
+          if (offerAmount !== undefined) {
+            properties[propertyIndex].offerAmount = offerAmount;
+          }
+          if (expectedCloseDate !== undefined) {
+            properties[propertyIndex].expectedCloseDate = expectedCloseDate;
+          }
+
+          // Save updated properties
+          await saveJSON(bucket, `data/properties/${fileId}.json`, properties);
+
+          console.log(`[DEAL-STAGE] Updated property ${propertyId} in file ${fileId}`);
+          return res.json({
+            success: true,
+            propertyId,
+            dealStage,
+            estimatedDealValue,
+            offerAmount,
+            expectedCloseDate
+          });
+        }
+      }
+    }
+
+    res.status(404).json({ error: 'Property not found' });
+  } catch (error) {
+    console.error('[DEAL-STAGE] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -2205,7 +2265,75 @@ app.get('/api/dashboard', async (req, res) => {
         }
       }
 
-      console.log('[DASHBOARD] Returning dashboard stats');
+      // Calculate pipeline metrics from actual property data
+      const pipelineByStage = {
+        new_lead: properties.filter(p => p.dealStage === 'new_lead').length,
+        contacted: properties.filter(p => p.dealStage === 'contacted').length,
+        interested: properties.filter(p => p.dealStage === 'interested').length,
+        offer_sent: properties.filter(p => p.dealStage === 'offer_sent').length,
+        negotiating: properties.filter(p => p.dealStage === 'negotiating').length,
+        under_contract: properties.filter(p => p.dealStage === 'under_contract').length,
+        closed: properties.filter(p => p.dealStage === 'closed').length,
+        dead: properties.filter(p => p.dealStage === 'dead').length,
+      };
+
+      const activeDealsProps = properties.filter(p =>
+        p.dealStage &&
+        p.dealStage !== 'dead' &&
+        p.dealStage !== 'closed'
+      );
+
+      const totalPipelineValue = activeDealsProps.reduce((sum, p) =>
+        sum + (p.estimatedDealValue || 0), 0
+      );
+
+      const closedDeals = pipelineByStage.closed;
+      const totalLeads = properties.filter(p => p.dealStage).length;
+      const conversionRate = totalLeads > 0 ? ((closedDeals / totalLeads) * 100).toFixed(1) : 0;
+
+      const avgDealValue = activeDealsProps.length > 0
+        ? Math.round(totalPipelineValue / activeDealsProps.length)
+        : 0;
+
+      // Calculate task/action metrics from actual property data
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(today);
+      todayEnd.setHours(23, 59, 59, 999);
+
+      const weekFromNow = new Date(today);
+      weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+      const taskMetrics = {
+        callsDueToday: properties.filter(p =>
+          p.actionType === 'call' &&
+          p.dueTime &&
+          new Date(p.dueTime) >= today &&
+          new Date(p.dueTime) <= todayEnd
+        ).length,
+        followUpsThisWeek: properties.filter(p =>
+          p.dueTime &&
+          new Date(p.dueTime) >= today &&
+          new Date(p.dueTime) <= weekFromNow
+        ).length,
+        textsScheduled: properties.filter(p =>
+          p.actionType === 'text' &&
+          p.dueTime &&
+          new Date(p.dueTime) >= today
+        ).length,
+        mailCampaignActive: properties.filter(p =>
+          p.actionType === 'mail' &&
+          p.dueTime &&
+          new Date(p.dueTime) >= today
+        ).length,
+        drivebyPlanned: properties.filter(p =>
+          p.actionType === 'driveby' &&
+          p.dueTime &&
+          new Date(p.dueTime) >= today
+        ).length,
+      };
+
+      console.log('[DASHBOARD] Returning dashboard stats with pipeline and task metrics');
       return {
         totalProperties: properties.length,
         byStatus,
@@ -2214,6 +2342,14 @@ app.get('/api/dashboard', async (req, res) => {
         newThisMonth,
         removedThisMonth,
         deadLeads: removedThisMonth,
+        pipeline: {
+          totalValue: totalPipelineValue,
+          activeDeals: activeDealsProps.length,
+          byStage: pipelineByStage,
+          conversionRate: parseFloat(conversionRate),
+          avgDealValue,
+        },
+        tasks: taskMetrics,
       };
     })();
 

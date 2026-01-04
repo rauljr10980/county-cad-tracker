@@ -37,10 +37,16 @@ export interface Property {
   actionType?: 'call' | 'text' | 'mail' | 'driveby';
   priority?: 'high' | 'med' | 'low';
   dueTime?: string; // ISO datetime string
+  assignedTo?: 'Luciano' | 'Raul'; // Task assignment
   attempts?: number; // Number of contact attempts
   lastOutcome?: 'no_answer' | 'voicemail' | 'text_sent' | 'spoke_owner' | 'wrong_number' | 'not_interested' | 'new_owner' | 'call_back_later';
   lastOutcomeDate?: string;
   snoozedUntil?: string;
+  // Pipeline/Deal fields
+  dealStage?: 'new_lead' | 'contacted' | 'interested' | 'offer_sent' | 'negotiating' | 'under_contract' | 'closed' | 'dead';
+  estimatedDealValue?: number;
+  offerAmount?: number;
+  expectedCloseDate?: string;
   paymentHistory?: PaymentRecord[];
   cadData?: CADData;
   isNew?: boolean;
@@ -118,6 +124,31 @@ export interface DashboardStats {
   newThisMonth: number;
   removedThisMonth: number;
   deadLeads: number;
+  // Pipeline metrics
+  pipeline?: {
+    totalValue: number;
+    activeDeals: number;
+    byStage: {
+      new_lead: number;
+      contacted: number;
+      interested: number;
+      offer_sent: number;
+      negotiating: number;
+      under_contract: number;
+      closed: number;
+      dead: number;
+    };
+    conversionRate: number;
+    avgDealValue: number;
+  };
+  // Task/Action metrics
+  tasks?: {
+    callsDueToday: number;
+    followUpsThisWeek: number;
+    textsScheduled: number;
+    mailCampaignActive: number;
+    drivebyPlanned: number;
+  };
 }
 
 export interface ProcessingStatus {
