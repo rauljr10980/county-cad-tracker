@@ -307,10 +307,10 @@ export function PropertyTable({
                         size="icon" 
                         className="h-7 w-7"
                         asChild
-                        title="View on Bexar County Tax Office"
+                        title={property.link ? "View Property Details" : "View on Bexar County Tax Office"}
                       >
                         <a 
-                          href="https://bexar.acttax.com/act_webdev/bexar/index.jsp"
+                          href={property.link || "https://bexar.acttax.com/act_webdev/bexar/index.jsp"}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
