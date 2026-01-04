@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar, CalendarPlus, StickyNote } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Property, PropertyStatus } from '@/types/property';
@@ -8,9 +8,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { updatePropertyFollowUp, updatePropertyNotes } from '@/lib/api';
+import { updatePropertyFollowUp } from '@/lib/api';
 
 interface PropertyTableProps {
   properties: Property[];
@@ -34,9 +32,6 @@ export function PropertyTable({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [savingFollowUp, setSavingFollowUp] = useState<string | null>(null);
   const [localFollowUps, setLocalFollowUps] = useState<Record<string, string>>({});
-  const [notesDialogOpen, setNotesDialogOpen] = useState<string | null>(null);
-  const [localNotes, setLocalNotes] = useState<Record<string, string>>({});
-  const [savingNotes, setSavingNotes] = useState<string | null>(null);
 
   const handleSetFollowUp = async (property: Property, date: Date | undefined) => {
     if (!date) return;
@@ -60,26 +55,6 @@ export function PropertyTable({
     }
   };
 
-  const handleSaveNotes = async (property: Property, notes: string) => {
-    setSavingNotes(property.id);
-    try {
-      await updatePropertyNotes(property.id, notes);
-      setLocalNotes(prev => ({ ...prev, [property.id]: notes }));
-      toast({
-        title: "Notes Saved",
-        description: `Notes saved for ${property.accountNumber}`,
-      });
-      setNotesDialogOpen(null);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save notes",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingNotes(null);
-    }
-  };
 
   const filteredProperties = statusFilter 
     ? properties.filter(p => p.status === statusFilter)
@@ -316,64 +291,15 @@ export function PropertyTable({
                   </td>
                   <td>
                     <div className="flex items-center gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-7 w-7"
                         onClick={() => onViewProperty(property)}
                         title="View details"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Dialog open={notesDialogOpen === property.id} onOpenChange={(open) => setNotesDialogOpen(open ? property.id : null)}>
-                        <DialogTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className={cn(
-                              "h-7 w-7",
-                              (localNotes[property.id] || property.notes) && "text-primary"
-                            )}
-                            title="Add notes"
-                          >
-                            <StickyNote className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Notes for {property.accountNumber}</DialogTitle>
-                            <DialogDescription>
-                              {property.propertyAddress}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <Textarea
-                              placeholder="Add your notes here..."
-                              defaultValue={localNotes[property.id] || property.notes || ''}
-                              className="min-h-[200px]"
-                              id={`notes-${property.id}`}
-                            />
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                onClick={() => setNotesDialogOpen(null)}
-                                disabled={savingNotes === property.id}
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                onClick={() => {
-                                  const textarea = document.getElementById(`notes-${property.id}`) as HTMLTextAreaElement;
-                                  handleSaveNotes(property, textarea.value);
-                                }}
-                                disabled={savingNotes === property.id}
-                              >
-                                {savingNotes === property.id ? 'Saving...' : 'Save Notes'}
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
                       <Button 
                         variant="ghost" 
                         size="icon" 
