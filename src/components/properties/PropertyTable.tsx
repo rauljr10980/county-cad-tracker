@@ -86,7 +86,7 @@ export function PropertyTable({
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      setSortDirection('asc'); // Start with ascending (lowest to highest)
     }
   };
 
@@ -185,13 +185,31 @@ export function PropertyTable({
                 className="cursor-pointer hover:bg-secondary text-right"
                 onClick={() => handleSort('totalAmountDue')}
               >
-                Amount Due
+                <div className="flex items-center justify-end gap-1">
+                  Amount Due
+                  {sortField === 'totalAmountDue' && (
+                    sortDirection === 'asc' ? (
+                      <ArrowUp className="h-3 w-3" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3" />
+                    )
+                  )}
+                </div>
               </th>
               <th 
                 className="cursor-pointer hover:bg-secondary text-right"
                 onClick={() => handleSort('marketValue')}
               >
-                Market Value
+                <div className="flex items-center justify-end gap-1">
+                  Market Value
+                  {sortField === 'marketValue' && (
+                    sortDirection === 'asc' ? (
+                      <ArrowUp className="h-3 w-3" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3" />
+                    )
+                  )}
+                </div>
               </th>
               <th 
                 className="cursor-pointer hover:bg-secondary"
