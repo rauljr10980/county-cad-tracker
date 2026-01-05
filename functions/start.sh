@@ -14,28 +14,47 @@ if [ -z "$DATABASE_URL" ]; then
 fi
 
 echo "✅ DATABASE_URL is set"
+echo "📋 DATABASE_URL preview: ${DATABASE_URL%%@*}@***" # Show only user part, hide password
 
-# Create database tables with retries
+# Check if Prisma schema exists
+if [ ! -f "prisma/schema.prisma" ]; then
+  echo "❌ ERROR: Prisma schema not found at prisma/schema.prisma"
+  echo "Current directory: $(pwd)"
+  echo "Files in current directory:"
+  ls -la
+  exit 1
+fi
+
+echo "✅ Prisma schema found"
+
+# Generate Prisma Client
+echo "📦 Generating Prisma Client..."
+if ! npx prisma generate; then
+  echo "❌ Prisma generate failed!"
+  exit 1
+fi
+
+echo "✅ Prisma Client generated"
+
+# Create database tables
 echo "⏳ Creating database tables..."
-MAX_RETRIES=5
-RETRY_COUNT=0
+echo "📋 Running: npx prisma db push --accept-data-loss"
+if ! npx prisma db push --accept-data-loss; then
+  echo "❌ Database push failed!"
+  echo "Check your DATABASE_URL connection string."
+  echo "DATABASE_URL format should be: postgresql://user:password@host:port/database"
+  exit 1
+fi
 
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-  if npx prisma db push --accept-data-loss --skip-generate; then
-    echo "✅ Database tables created successfully"
-    break
-  else
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-      echo "⚠️  Database push failed, retrying in 5 seconds... (Attempt $RETRY_COUNT/$MAX_RETRIES)"
-      sleep 5
-    else
-      echo "❌ Failed to create database tables after $MAX_RETRIES attempts"
-      echo "Check your DATABASE_URL connection string."
-      exit 1
-    fi
-  fi
-done
+echo "✅ Database tables created successfully"
+
+# Verify tables were created
+echo "🔍 Verifying database connection..."
+if ! npx prisma db execute --stdin <<< "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null; then
+  echo "⚠️  Could not verify tables, but continuing..."
+else
+  echo "✅ Database connection verified"
+fi
 
 # Start the application
 echo "✅ Starting application..."

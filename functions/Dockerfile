@@ -13,8 +13,14 @@ RUN npm ci
 # Generate Prisma Client
 RUN npx prisma generate
 
+# Copy Prisma schema first (needed for generate)
+COPY prisma ./prisma
+
 # Copy application code
 COPY . .
+
+# Make start.sh executable
+RUN chmod +x start.sh
 
 # Expose port (Cloud Run sets PORT env var)
 EXPOSE 8080
