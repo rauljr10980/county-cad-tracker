@@ -283,7 +283,7 @@ export function PropertiesView() {
         ? String(aVal).localeCompare(String(bVal))
         : String(bVal).localeCompare(String(aVal));
     });
-  }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, rawProperties, sortField, sortDirection]);
+  }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, rawProperties, sortField, sortDirection, isSortingActive]);
   
   // Calculate totals and pagination
   const { properties, total, totalPages } = useMemo(() => {
@@ -382,6 +382,7 @@ export function PropertiesView() {
       taxYear: undefined,
       hasNotes: 'any',
       hasLink: 'any',
+      hasExemptions: 'any',
       followUpDateFrom: undefined,
       followUpDateTo: undefined,
       lastPaymentDateFrom: undefined,
