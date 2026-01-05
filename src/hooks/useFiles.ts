@@ -94,6 +94,6 @@ export function useProperties(filters?: {
     refetchOnWindowFocus: false,
     refetchInterval: false,
     staleTime: 30000, // Consider data fresh for 30 seconds
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes (React Query v5)
   });
 }
