@@ -18,7 +18,6 @@ interface PropertyTableProps {
   onStatusFilterChange?: (status: PropertyStatus | undefined) => void;
 }
 
-const ITEMS_PER_PAGE = 25;
 
 export function PropertyTable({ 
   properties, 
@@ -27,7 +26,6 @@ export function PropertyTable({
   statusFilter,
   onStatusFilterChange 
 }: PropertyTableProps) {
-  const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<keyof Property>('totalAmountDue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [savingFollowUp, setSavingFollowUp] = useState<string | null>(null);
@@ -72,9 +70,8 @@ export function PropertyTable({
       : String(bVal).localeCompare(String(aVal));
   });
 
-  const totalPages = Math.ceil(sortedProperties.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedProperties = sortedProperties.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  // Properties are already paginated by PropertiesView, so display all received properties
+  const displayProperties = sortedProperties;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -206,7 +203,7 @@ export function PropertyTable({
             </tr>
           </thead>
           <tbody>
-            {paginatedProperties.map((property) => {
+            {displayProperties.map((property) => {
               const followUpDate = localFollowUps[property.id] || property.lastFollowUp;
               const followUp = formatFollowUp(followUpDate);
               
