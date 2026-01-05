@@ -35,6 +35,11 @@ const upload = multer({
 
 router.post('/', optionalAuth, async (req, res) => {
   try {
+    // Validate request body exists
+    if (!req.body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
+
     const { filename, fileData } = req.body;
     
     if (!filename || !fileData) {
