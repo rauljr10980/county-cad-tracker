@@ -20,8 +20,12 @@ COPY functions/prisma ./prisma/
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Copy application code
+# Copy application code and startup script
 COPY functions/src ./src/
+COPY functions/start.sh ./start.sh
+
+# Make startup script executable
+RUN chmod +x ./start.sh
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -37,5 +41,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 8080) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start command with migration
-CMD ["sh", "-c", "npx prisma migrate deploy && exec node src/index.js"]
+# Start command
+CMD ["./start.sh"]
