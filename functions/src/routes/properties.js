@@ -5,10 +5,11 @@
 
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
+const { PrismaClient } = require('@prisma/client');
 const { optionalAuth, authenticateToken } = require('../middleware/auth');
-const prisma = require('../lib/prisma');
 
 const router = express.Router();
+const prisma = new PrismaClient();
 
 // ============================================================================
 // GET ALL PROPERTIES (with filtering and pagination)
