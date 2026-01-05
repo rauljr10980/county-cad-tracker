@@ -340,6 +340,37 @@ export function AdvancedFiltersPanel({
             </div>
           </div>
 
+          {/* Has Exemptions */}
+          <div className="space-y-3">
+            <Label>Has Exemptions</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={filters.hasExemptions === 'any' || !filters.hasExemptions ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('hasExemptions', 'any')}
+                className="flex-1"
+              >
+                Any
+              </Button>
+              <Button
+                variant={filters.hasExemptions === 'yes' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('hasExemptions', 'yes')}
+                className="flex-1"
+              >
+                Yes
+              </Button>
+              <Button
+                variant={filters.hasExemptions === 'no' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('hasExemptions', 'no')}
+                className="flex-1"
+              >
+                No
+              </Button>
+            </div>
+          </div>
+
           {/* Follow-up Date Range */}
           <div className="space-y-3">
             <Label>Follow-up Date</Label>
