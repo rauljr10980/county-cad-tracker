@@ -1,10 +1,10 @@
-# Simple, bulletproof Dockerfile for Railway
+# Dockerfile for Railway - County CAD Tracker API
 FROM node:18-slim
 
 # Install OpenSSL for Prisma
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
-# Set working directory to functions
+# Set working directory
 WORKDIR /app
 
 # Copy package files first for better caching
