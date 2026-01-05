@@ -95,6 +95,14 @@ export function PropertyTable({
     }).format(amount);
   };
 
+  const calculatePercentage = (amountDue: number, marketValue: number | undefined): string => {
+    if (!marketValue || marketValue === 0) {
+      return '—';
+    }
+    const percentage = (amountDue / marketValue) * 100;
+    return `${percentage.toFixed(1)}%`;
+  };
+
 
   const openGoogleMaps = (property: Property) => {
     const address = encodeURIComponent(property.propertyAddress);
@@ -217,6 +225,9 @@ export function PropertyTable({
                   )}
                 </div>
               </th>
+              <th className="text-right text-muted-foreground">
+                Ratio
+              </th>
               <th 
                 className="cursor-pointer hover:bg-secondary"
                 onClick={() => handleSort('lastFollowUp')}
@@ -267,6 +278,9 @@ export function PropertyTable({
                   </td>
                   <td className="text-right font-mono text-muted-foreground">
                     {property.marketValue ? formatCurrency(property.marketValue) : '—'}
+                  </td>
+                  <td className="text-right font-mono text-muted-foreground">
+                    {calculatePercentage(property.totalAmountDue, property.marketValue)}
                   </td>
                   <td>
                     <Popover>
