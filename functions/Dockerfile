@@ -7,8 +7,11 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (including dev dependencies for Prisma)
+RUN npm ci
+
+# Generate Prisma Client
+RUN npx prisma generate
 
 # Copy application code
 COPY . .
@@ -16,6 +19,6 @@ COPY . .
 # Expose port (Cloud Run sets PORT env var)
 EXPOSE 8080
 
-# Start the server
-CMD ["node", "index.js"]
+# Start the server (Procfile handles migrations)
+CMD ["node", "src/index.js"]
 
