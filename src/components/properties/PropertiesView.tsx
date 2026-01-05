@@ -356,6 +356,7 @@ export function PropertiesView() {
     if (advancedFilters.taxYear) count++;
     if (advancedFilters.hasNotes !== 'any') count++;
     if (advancedFilters.hasLink !== 'any') count++;
+    if (advancedFilters.hasExemptions !== 'any') count++;
     if (advancedFilters.followUpDateFrom) count++;
     if (advancedFilters.followUpDateTo) count++;
     if (advancedFilters.lastPaymentDateFrom) count++;
