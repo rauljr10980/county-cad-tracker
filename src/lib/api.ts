@@ -1,11 +1,28 @@
 import { Property } from '@/types/property';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+// Determine API URL based on environment
+// In production (GitHub Pages), use Railway backend
+// In development, use localhost or VITE_API_URL if set
+const getApiBaseUrl = () => {
+  // Check if VITE_API_URL is explicitly set
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // In production (deployed), use Railway backend
+  if (import.meta.env.PROD) {
+    // Default Railway URL - update this with your actual Railway backend URL
+    return 'https://county-cad-tracker-production.up.railway.app';
+  }
+  
+  // In development, use localhost
+  return 'http://localhost:8080';
+};
 
-// Debug: Log API URL in production
-if (import.meta.env.PROD) {
-  console.log('[API] Using API URL:', API_BASE_URL);
-}
+const API_BASE_URL = getApiBaseUrl();
+
+// Debug: Log API URL
+console.log('[API] Using API URL:', API_BASE_URL);
 
 // Helper function to get auth token
 function getAuthToken(): string | null {
