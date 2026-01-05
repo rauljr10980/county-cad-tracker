@@ -82,7 +82,7 @@ export function PropertiesView() {
   const isSortingActive = sortField !== 'totalAmountDue' || sortDirection !== 'asc';
   
   // Check if search query is active
-  const hasSearchQuery = debouncedSearchQuery && debouncedSearchQuery.trim().length > 0;
+  const hasSearchQuery = debouncedSearchQuery && typeof debouncedSearchQuery === 'string' && debouncedSearchQuery.trim().length > 0;
   
   // When any filter is active (multiple statuses, advanced filters, search, or sorting), 
   // fetch all properties to enable proper filtering across all 33k+ properties
@@ -110,7 +110,7 @@ export function PropertiesView() {
         // Handle both array and object response formats
         if (Array.isArray(data)) {
           return data;
-        } else if ('properties' in data && Array.isArray(data.properties)) {
+        } else if (data && typeof data === 'object' && 'properties' in data && Array.isArray(data.properties)) {
           return data.properties;
         }
       }
@@ -180,32 +180,40 @@ export function PropertiesView() {
     
     // Has Notes
     if (advancedFilters.hasNotes === 'yes') {
-      filtered = filtered.filter(p => p.notes && p.notes.trim() !== '');
+      filtered = filtered.filter(p => p.notes && typeof p.notes === 'string' && p.notes.trim() !== '');
     } else if (advancedFilters.hasNotes === 'no') {
-      filtered = filtered.filter(p => !p.notes || p.notes.trim() === '');
+      filtered = filtered.filter(p => !p.notes || typeof p.notes !== 'string' || p.notes.trim() === '');
     }
     
     // Has Link
     if (advancedFilters.hasLink === 'yes') {
-      filtered = filtered.filter(p => p.link && p.link.trim() !== '');
+      filtered = filtered.filter(p => p.link && typeof p.link === 'string' && p.link.trim() !== '');
     } else if (advancedFilters.hasLink === 'no') {
-      filtered = filtered.filter(p => !p.link || p.link.trim() === '');
+      filtered = filtered.filter(p => !p.link || typeof p.link !== 'string' || p.link.trim() === '');
     }
     
     // Has Exemptions
     if (advancedFilters.hasExemptions === 'yes') {
       filtered = filtered.filter(p => {
-        if (!p.exemptions || p.exemptions.length === 0) return false;
+        if (!p.exemptions || !Array.isArray(p.exemptions) || p.exemptions.length === 0) return false;
         // Filter out arrays that only contain "None" or empty strings
-        const validExemptions = p.exemptions.filter(e => e && e.trim() && e.trim().toLowerCase() !== 'none');
+        const validExemptions = p.exemptions.filter(e => {
+          if (!e || typeof e !== 'string') return false;
+          const trimmed = e.trim();
+          return trimmed && trimmed.toLowerCase() !== 'none';
+        });
         return validExemptions.length > 0;
       });
     } else if (advancedFilters.hasExemptions === 'no') {
       filtered = filtered.filter(p => {
         // No exemptions means: undefined, empty array, or only "None"/empty strings
-        if (!p.exemptions || p.exemptions.length === 0) return true;
+        if (!p.exemptions || !Array.isArray(p.exemptions) || p.exemptions.length === 0) return true;
         // Check if all exemptions are "None" or empty
-        const validExemptions = p.exemptions.filter(e => e && e.trim() && e.trim().toLowerCase() !== 'none');
+        const validExemptions = p.exemptions.filter(e => {
+          if (!e || typeof e !== 'string') return false;
+          const trimmed = e.trim();
+          return trimmed && trimmed.toLowerCase() !== 'none';
+        });
         return validExemptions.length === 0;
       });
     }
