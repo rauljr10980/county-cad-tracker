@@ -371,7 +371,7 @@ function extractProperties(data) {
       return null; // Skip rows without account number
     }
 
-    // Extract all property data
+    // Extract property data - ONLY fields that exist in Property model
     const propertyData = {
       accountNumber,
       ownerName: String(
@@ -382,10 +382,13 @@ function extractProperties(data) {
         getValue('ADDRSTRING', ['Property Address', 'PROPERTY ADDRESS', 'propertyAddress', 'Address', 'ADDRESS']) ||
         getNewColumn('Property Address') || ''
       ).trim() || 'Unknown',
-      mailingAddress: String(
-        getValue('Mailing Address', ['MAILING ADDRESS', 'mailingAddress']) ||
-        getNewColumn('Mailing Address') || ''
-      ).trim() || null,
+      mailingAddress: (() => {
+        const val = String(
+          getValue('Mailing Address', ['MAILING ADDRESS', 'mailingAddress']) ||
+          getNewColumn('Mailing Address') || ''
+        ).trim();
+        return val || null;
+      })(),
       totalDue: parseNumeric(
         getNewColumn('Total') ||
         getValue('Total Due', ['TOTAL DUE', 'totalDue', 'tot_percan', 'Total', 'TOTAL']) ||
@@ -397,16 +400,22 @@ function extractProperties(data) {
       status: parseStatus(
         getValue('LEGALSTATUS', ['Status', 'STATUS', 'status', 'Legal Status', 'LEGAL STATUS']) || 'A'
       ),
-      taxYear: parseInt(
-        getNewColumn('Tax Year') ||
-        getValue('Tax Year', ['TAX YEAR', 'taxYear']) ||
-        new Date().getFullYear()
-      ) || new Date().getFullYear(),
-      legalDescription: String(
-        getNewColumn('Legal Description') ||
-        getValue('Legal Description', ['LEGAL DESCRIPTION', 'legalDescription']) || ''
-      ).trim() || null,
-      phoneNumbers: [],
+      taxYear: (() => {
+        const val = parseInt(
+          getNewColumn('Tax Year') ||
+          getValue('Tax Year', ['TAX YEAR', 'taxYear']) ||
+          new Date().getFullYear()
+        );
+        return isNaN(val) ? new Date().getFullYear() : val;
+      })(),
+      legalDescription: (() => {
+        const val = String(
+          getNewColumn('Legal Description') ||
+          getValue('Legal Description', ['LEGAL DESCRIPTION', 'legalDescription']) || ''
+        ).trim();
+        return val || null;
+      })(),
+      phoneNumbers: [], // Empty array by default
       isNew: false,
       isRemoved: false,
       statusChanged: false,
