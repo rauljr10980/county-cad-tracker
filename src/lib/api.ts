@@ -69,12 +69,12 @@ export async function uploadFile(file: File): Promise<{ fileId: string }> {
     reader.onload = async (e) => {
       clearTimeout(timeout);
       try {
-        const result = e.target?.result as string;
-        if (!result) {
+        const fileResult = e.target?.result as string;
+        if (!fileResult) {
           throw new Error('Failed to read file - no data returned');
         }
 
-        const base64 = result.split(',')[1];
+        const base64 = fileResult.split(',')[1];
         if (!base64) {
           throw new Error('Failed to extract base64 data from file');
         }
@@ -103,11 +103,11 @@ export async function uploadFile(file: File): Promise<{ fileId: string }> {
           throw new Error(errorMessage);
         }
 
-        const result = await response.json();
-        if (!result.fileId) {
+        const uploadResult = await response.json() as { fileId?: string };
+        if (!uploadResult.fileId) {
           throw new Error('Upload succeeded but no fileId returned');
         }
-        resolve({ fileId: result.fileId });
+        resolve({ fileId: uploadResult.fileId });
       } catch (error) {
         reject(error instanceof Error ? error : new Error('Unknown upload error'));
       }
