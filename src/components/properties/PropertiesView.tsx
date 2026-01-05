@@ -39,6 +39,8 @@ export function PropertiesView() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<keyof Property>('totalAmountDue');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
   // Convert advancedFilters.statuses to legacy format for API
   const selectedStatuses = advancedFilters.statuses;
@@ -219,6 +221,35 @@ export function PropertiesView() {
     return filtered;
   }, [rawProperties, advancedFilters]);
   
+  // Apply sorting to all properties before pagination (only for filtered cases)
+  const sortedProperties = useMemo(() => {
+    let propertiesToSort: Property[] = [];
+    
+    if (selectedStatuses.length > 1 || hasActiveAdvancedFilters) {
+      // Multiple filters applied - use filtered results
+      propertiesToSort = filteredProperties;
+    } else if (selectedStatuses.length === 1) {
+      // Single status selected - filter by status
+      propertiesToSort = rawProperties.filter(p => p.status === selectedStatuses[0]);
+    } else {
+      // No filters - can't sort (using API pagination, only have one page)
+      return rawProperties;
+    }
+    
+    // Apply sorting
+    return [...propertiesToSort].sort((a, b) => {
+      const aVal = a[sortField];
+      const bVal = b[sortField];
+      if (aVal === undefined || bVal === undefined) return 0;
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      return sortDirection === 'asc' 
+        ? String(aVal).localeCompare(String(bVal))
+        : String(bVal).localeCompare(String(aVal));
+    });
+  }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, rawProperties, sortField, sortDirection]);
+  
   // Calculate totals and pagination
   const { properties, total, totalPages } = useMemo(() => {
     let finalProperties: Property[] = [];
@@ -226,24 +257,23 @@ export function PropertiesView() {
     let finalTotalPages = 1;
     
     if (selectedStatuses.length > 1 || hasActiveAdvancedFilters) {
-      // Multiple filters applied - use filtered results
-      finalTotal = filteredProperties.length;
+      // Multiple filters applied - use sorted filtered results
+      finalTotal = sortedProperties.length;
       finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
       
       // Apply pagination
       const startIndex = (page - 1) * ITEMS_PER_PAGE;
       const endIndex = startIndex + ITEMS_PER_PAGE;
-      finalProperties = filteredProperties.slice(startIndex, endIndex);
+      finalProperties = sortedProperties.slice(startIndex, endIndex);
     } else if (selectedStatuses.length === 1) {
-      // Single status selected - use the count from statusCounts
-      finalTotal = statusCounts[selectedStatuses[0]] || 0;
+      // Single status selected - use sorted properties
+      finalTotal = sortedProperties.length;
       finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
       
-      // Apply pagination to raw properties filtered by status
-      const statusFiltered = rawProperties.filter(p => p.status === selectedStatuses[0]);
+      // Apply pagination
       const startIndex = (page - 1) * ITEMS_PER_PAGE;
       const endIndex = startIndex + ITEMS_PER_PAGE;
-      finalProperties = statusFiltered.slice(startIndex, endIndex);
+      finalProperties = sortedProperties.slice(startIndex, endIndex);
     } else {
       // No filters - use API pagination directly (API already returns the correct page)
       finalProperties = rawProperties;
@@ -266,7 +296,7 @@ export function PropertiesView() {
       total: finalTotal,
       totalPages: finalTotalPages,
     };
-  }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, statusCounts, totalUnfiltered, rawProperties, page, data]);
+  }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data]);
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -316,6 +346,16 @@ export function PropertiesView() {
   const handleClearSearch = () => {
     setSearchQuery('');
     setDebouncedSearchQuery('');
+  };
+
+  const handleSort = (field: keyof Property) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc'); // Start with ascending (lowest to highest)
+    }
+    setPage(1); // Reset to first page when sorting changes
   };
 
   const handleUploadComplete = () => {

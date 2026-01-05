@@ -16,6 +16,9 @@ interface PropertyTableProps {
   onFollowUp?: (property: Property) => void;
   statusFilter?: PropertyStatus;
   onStatusFilterChange?: (status: PropertyStatus | undefined) => void;
+  sortField?: keyof Property;
+  sortDirection?: 'asc' | 'desc';
+  onSort?: (field: keyof Property) => void;
 }
 
 
@@ -58,20 +61,23 @@ export function PropertyTable({
     ? properties.filter(p => p.status === statusFilter)
     : properties;
 
-  const sortedProperties = [...filteredProperties].sort((a, b) => {
-    const aVal = a[sortField];
-    const bVal = b[sortField];
-    if (aVal === undefined || bVal === undefined) return 0;
-    if (typeof aVal === 'number' && typeof bVal === 'number') {
-      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+  // Properties are already sorted and paginated by PropertiesView, so just display them
+  const displayProperties = filteredProperties;
+  
+  const handleSort = (field: keyof Property) => {
+    if (onSort) {
+      // Use external sort handler (from PropertiesView)
+      onSort(field);
+    } else {
+      // Use internal sort handler (fallback)
+      if (internalSortField === field) {
+        setInternalSortDirection(internalSortDirection === 'asc' ? 'desc' : 'asc');
+      } else {
+        setInternalSortField(field);
+        setInternalSortDirection('asc');
+      }
     }
-    return sortDirection === 'asc' 
-      ? String(aVal).localeCompare(String(bVal))
-      : String(bVal).localeCompare(String(aVal));
-  });
-
-  // Properties are already paginated by PropertiesView, so display all received properties
-  const displayProperties = sortedProperties;
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -81,14 +87,6 @@ export function PropertyTable({
     }).format(amount);
   };
 
-  const handleSort = (field: keyof Property) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc'); // Start with ascending (lowest to highest)
-    }
-  };
 
   const openGoogleMaps = (property: Property) => {
     const address = encodeURIComponent(property.propertyAddress);
