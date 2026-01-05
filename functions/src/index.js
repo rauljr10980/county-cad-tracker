@@ -47,13 +47,19 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : [
       'http://localhost:5173',
       'http://localhost:8081',
-      'https://rauljr10980.github.io'
+      'https://rauljr10980.github.io',
+      'https://rauljr10980.github.io/county-cad-tracker'
     ];
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, curl, Postman, etc.)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('[CORS] Request with no origin - allowing');
+      return callback(null, true);
+    }
+
+    console.log(`[CORS] Checking origin: ${origin}`);
 
     // Check if origin matches any allowed origin
     const isAllowed = allowedOrigins.some(allowed => {
@@ -63,9 +69,11 @@ app.use(cors({
     });
 
     if (isAllowed) {
+      console.log(`[CORS] Allowing origin: ${origin}`);
       callback(null, true);
     } else {
-      console.log('CORS blocked origin:', origin);
+      console.log(`[CORS] Blocked origin: ${origin}`);
+      console.log(`[CORS] Allowed origins:`, allowedOrigins);
       callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
@@ -74,9 +82,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Body parsing
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Body parsing - increased limit for large Excel files
+app.use(express.json({ limit: '150mb' }));
+app.use(express.urlencoded({ extended: true, limit: '150mb' }));
 
 // Rate limiting
 const limiter = rateLimit({

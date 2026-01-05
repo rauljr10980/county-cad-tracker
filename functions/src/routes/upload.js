@@ -35,18 +35,24 @@ const upload = multer({
 
 router.post('/', optionalAuth, async (req, res) => {
   try {
+    console.log(`[UPLOAD] Received upload request`);
+    console.log(`[UPLOAD] Request headers:`, JSON.stringify(req.headers, null, 2));
+    console.log(`[UPLOAD] Request body keys:`, req.body ? Object.keys(req.body) : 'no body');
+    
     // Validate request body exists
     if (!req.body) {
+      console.error('[UPLOAD] No request body received');
       return res.status(400).json({ error: 'Request body is required' });
     }
 
     const { filename, fileData } = req.body;
     
     if (!filename || !fileData) {
+      console.error(`[UPLOAD] Missing required fields - filename: ${!!filename}, fileData: ${!!fileData}`);
       return res.status(400).json({ error: 'Filename and fileData are required' });
     }
 
-    console.log(`[UPLOAD] Starting upload for: ${filename}`);
+    console.log(`[UPLOAD] Starting upload for: ${filename}, fileData length: ${fileData ? fileData.length : 0}`);
 
     // Validate file size (100MB limit)
     const base64Size = fileData.length;
