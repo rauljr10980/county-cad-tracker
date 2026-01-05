@@ -2,6 +2,10 @@
 # Updated: Jan 5, 2026 - Fixed path issue
 FROM node:18-slim
 
+# Build argument to force cache invalidation
+ARG CACHE_BUST=2026-01-05-v3
+RUN echo "Cache bust: $CACHE_BUST"
+
 # Install OpenSSL for Prisma
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
