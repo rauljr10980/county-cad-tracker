@@ -86,7 +86,7 @@ export function PropertiesView() {
   
   // When any filter is active (multiple statuses, advanced filters, search, or sorting), 
   // fetch all properties to enable proper filtering across all 33k+ properties
-  const hasAnyFilter = selectedStatuses.length > 1 || hasActiveAdvancedFilters || hasSearchQuery || isSortingActive;
+  const hasAnyFilter = selectedStatuses.length > 1 || (hasActiveAdvancedFilters ?? false) || hasSearchQuery || isSortingActive;
   
   // Reduce fetch limit to improve performance - fetch in chunks if needed
   // Start with smaller limit and only increase if needed
@@ -153,7 +153,8 @@ export function PropertiesView() {
   // Apply advanced filtering logic - optimized to combine filters in single pass
   const filteredProperties = useMemo(() => {
     // Early return if no filters
-    if (!hasActiveAdvancedFilters && advancedFilters.statuses.length === 0) {
+    const hasActiveFilters = hasActiveAdvancedFilters ?? false;
+    if (!hasActiveFilters && advancedFilters.statuses.length === 0) {
       return rawProperties;
     }
     
