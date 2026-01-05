@@ -88,8 +88,9 @@ export function PropertiesView() {
   // fetch all properties to enable proper filtering across all 33k+ properties
   const hasAnyFilter = selectedStatuses.length > 1 || hasActiveAdvancedFilters || hasSearchQuery || isSortingActive;
   
+  // Reduce fetch limit to improve performance - fetch in chunks if needed
   const fetchLimit = hasAnyFilter
-    ? 50000  // Fetch all 33k+ properties when any filter is active
+    ? 10000  // Fetch 10k properties when filters are active (more manageable)
     : ITEMS_PER_PAGE;
   
   // Fetch properties from API with status filter and search
