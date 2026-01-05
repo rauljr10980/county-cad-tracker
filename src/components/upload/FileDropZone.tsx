@@ -30,9 +30,14 @@ export function FileDropZone({ onUploadComplete, compact = false }: FileDropZone
       setError('Please upload an Excel file (.xlsx or .xls)');
       return false;
     }
+    const fileSizeMB = file.size / 1024 / 1024;
     if (file.size > 100 * 1024 * 1024) {
-      setError('File size must be less than 100MB');
+      setError(`File size (${fileSizeMB.toFixed(1)}MB) exceeds 100MB limit. Please split the file into smaller batches.`);
       return false;
+    }
+    // Warn for very large files (but still allow)
+    if (file.size > 50 * 1024 * 1024) {
+      console.warn(`Large file detected: ${fileSizeMB.toFixed(1)}MB - upload may take several minutes`);
     }
     return true;
   };
