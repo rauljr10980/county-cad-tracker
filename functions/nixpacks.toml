@@ -10,5 +10,5 @@ cmds = [
 ]
 
 [start]
-cmd = "node index.js"
+cmd = "node src/index.js"
 

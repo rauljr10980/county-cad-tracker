@@ -31,4 +31,5 @@ RUN npx prisma generate
 EXPOSE 8080
 
 # Use startup script for robust initialization
+# The start.sh script will run: node src/index.js
 CMD ["sh", "start.sh"]
