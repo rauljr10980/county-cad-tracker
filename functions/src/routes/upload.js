@@ -297,77 +297,59 @@ async function processFileAsync(fileId, buffer, filename) {
             continue;
           }
 
+          // Ensure status is valid Prisma enum value
+          const validStatus = ['JUDGMENT', 'ACTIVE', 'PENDING', 'PAID', 'REMOVED'].includes(prop.status) 
+            ? prop.status 
+            : 'ACTIVE';
+
           // Upsert property - include all fields from Property model including NEW- columns
+          // Build update object with only defined values to avoid Prisma errors
+          const updateData = {
+            ownerName: prop.ownerName || 'Unknown',
+            propertyAddress: prop.propertyAddress || 'Unknown',
+            mailingAddress: prop.mailingAddress,
+            totalDue: prop.totalDue || 0,
+            percentageDue: prop.percentageDue || 0,
+            status: validStatus,
+            taxYear: prop.taxYear,
+            legalDescription: prop.legalDescription,
+            phoneNumbers: prop.phoneNumbers || [],
+            isNew: prop.isNew || false,
+            isRemoved: prop.isRemoved || false,
+            statusChanged: prop.statusChanged || false,
+            percentageChanged: prop.percentageChanged || false,
+            updatedAt: new Date()
+          };
+
+          // Add NEW- columns only if they exist (to avoid errors if columns don't exist yet)
+          if (prop.marketValue !== undefined && prop.marketValue !== null) updateData.marketValue = prop.marketValue;
+          if (prop.landValue !== undefined && prop.landValue !== null) updateData.landValue = prop.landValue;
+          if (prop.improvementValue !== undefined && prop.improvementValue !== null) updateData.improvementValue = prop.improvementValue;
+          if (prop.cappedValue !== undefined && prop.cappedValue !== null) updateData.cappedValue = prop.cappedValue;
+          if (prop.agriculturalValue !== undefined && prop.agriculturalValue !== null) updateData.agriculturalValue = prop.agriculturalValue;
+          if (prop.exemptions && Array.isArray(prop.exemptions)) updateData.exemptions = prop.exemptions;
+          if (prop.jurisdictions && Array.isArray(prop.jurisdictions)) updateData.jurisdictions = prop.jurisdictions;
+          if (prop.lastPaymentDate) updateData.lastPaymentDate = prop.lastPaymentDate;
+          if (prop.lastPaymentAmount !== undefined && prop.lastPaymentAmount !== null) updateData.lastPaymentAmount = prop.lastPaymentAmount;
+          if (prop.lastPayer) updateData.lastPayer = prop.lastPayer;
+          if (prop.delinquentAfter) updateData.delinquentAfter = prop.delinquentAfter;
+          if (prop.halfPaymentOptionAmount !== undefined && prop.halfPaymentOptionAmount !== null) updateData.halfPaymentOptionAmount = prop.halfPaymentOptionAmount;
+          if (prop.priorYearsAmountDue !== undefined && prop.priorYearsAmountDue !== null) updateData.priorYearsAmountDue = prop.priorYearsAmountDue;
+          if (prop.yearAmountDue !== undefined && prop.yearAmountDue !== null) updateData.yearAmountDue = prop.yearAmountDue;
+          if (prop.yearTaxLevy !== undefined && prop.yearTaxLevy !== null) updateData.yearTaxLevy = prop.yearTaxLevy;
+          if (prop.link) updateData.link = prop.link;
+          if (prop.ownerAddress) updateData.ownerAddress = prop.ownerAddress;
+
+          const createData = {
+            accountNumber: prop.accountNumber,
+            ...updateData
+          };
+          delete createData.updatedAt; // Remove updatedAt from create
+
           const property = await prisma.property.upsert({
             where: { accountNumber: prop.accountNumber },
-            update: {
-              ownerName: prop.ownerName,
-              propertyAddress: prop.propertyAddress,
-              mailingAddress: prop.mailingAddress,
-              totalDue: prop.totalDue,
-              percentageDue: prop.percentageDue,
-              status: prop.status,
-              taxYear: prop.taxYear,
-              legalDescription: prop.legalDescription,
-              // NEW- columns (scraped data)
-              marketValue: prop.marketValue,
-              landValue: prop.landValue,
-              improvementValue: prop.improvementValue,
-              cappedValue: prop.cappedValue,
-              agriculturalValue: prop.agriculturalValue,
-              exemptions: prop.exemptions || [],
-              jurisdictions: prop.jurisdictions || [],
-              lastPaymentDate: prop.lastPaymentDate,
-              lastPaymentAmount: prop.lastPaymentAmount,
-              lastPayer: prop.lastPayer,
-              delinquentAfter: prop.delinquentAfter,
-              halfPaymentOptionAmount: prop.halfPaymentOptionAmount,
-              priorYearsAmountDue: prop.priorYearsAmountDue,
-              yearAmountDue: prop.yearAmountDue,
-              yearTaxLevy: prop.yearTaxLevy,
-              link: prop.link,
-              ownerAddress: prop.ownerAddress,
-              phoneNumbers: prop.phoneNumbers || [],
-              isNew: prop.isNew,
-              isRemoved: prop.isRemoved,
-              statusChanged: prop.statusChanged,
-              percentageChanged: prop.percentageChanged,
-              updatedAt: new Date()
-            },
-            create: {
-              accountNumber: prop.accountNumber,
-              ownerName: prop.ownerName,
-              propertyAddress: prop.propertyAddress,
-              mailingAddress: prop.mailingAddress,
-              totalDue: prop.totalDue,
-              percentageDue: prop.percentageDue,
-              status: prop.status,
-              taxYear: prop.taxYear,
-              legalDescription: prop.legalDescription,
-              // NEW- columns (scraped data)
-              marketValue: prop.marketValue,
-              landValue: prop.landValue,
-              improvementValue: prop.improvementValue,
-              cappedValue: prop.cappedValue,
-              agriculturalValue: prop.agriculturalValue,
-              exemptions: prop.exemptions || [],
-              jurisdictions: prop.jurisdictions || [],
-              lastPaymentDate: prop.lastPaymentDate,
-              lastPaymentAmount: prop.lastPaymentAmount,
-              lastPayer: prop.lastPayer,
-              delinquentAfter: prop.delinquentAfter,
-              halfPaymentOptionAmount: prop.halfPaymentOptionAmount,
-              priorYearsAmountDue: prop.priorYearsAmountDue,
-              yearAmountDue: prop.yearAmountDue,
-              yearTaxLevy: prop.yearTaxLevy,
-              link: prop.link,
-              ownerAddress: prop.ownerAddress,
-              phoneNumbers: prop.phoneNumbers || [],
-              isNew: prop.isNew,
-              isRemoved: prop.isRemoved,
-              statusChanged: prop.statusChanged,
-              percentageChanged: prop.percentageChanged
-            }
+            update: updateData,
+            create: createData
           });
 
           if (property.createdAt.getTime() === property.updatedAt.getTime()) {
@@ -376,6 +358,7 @@ async function processFileAsync(fileId, buffer, filename) {
             updated++;
           }
         } catch (error) {
+          console.error(`[PROCESS] Error upserting property ${prop.accountNumber}:`, error.message);
           errors.push({
             accountNumber: prop.accountNumber || 'Unknown',
             error: error.message
@@ -541,13 +524,14 @@ function extractProperties(data) {
       }
     }
     
-    // Determine status value
-    let statusValue = 'ACTIVE';
+    // Determine status value - must match Prisma enum: JUDGMENT, ACTIVE, PENDING, PAID, REMOVED
+    let statusValue = 'ACTIVE'; // Default to ACTIVE
     if (finalStatus) {
       const firstChar = finalStatus.charAt(0).toUpperCase();
       if (firstChar === 'P') statusValue = 'PENDING';
       else if (firstChar === 'J') statusValue = 'JUDGMENT';
       else if (firstChar === 'A') statusValue = 'ACTIVE';
+      // Default to ACTIVE for any other value
     }
 
     // Helper to get NEW- column values
