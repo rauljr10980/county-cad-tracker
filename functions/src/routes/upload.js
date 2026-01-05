@@ -215,14 +215,41 @@ async function processFileAsync(fileId, buffer, filename) {
             continue;
           }
 
-          // Upsert property
+          // Upsert property - only include valid Property model fields
           const property = await prisma.property.upsert({
             where: { accountNumber: prop.accountNumber },
             update: {
-              ...prop,
+              ownerName: prop.ownerName,
+              propertyAddress: prop.propertyAddress,
+              mailingAddress: prop.mailingAddress,
+              totalDue: prop.totalDue,
+              percentageDue: prop.percentageDue,
+              status: prop.status,
+              taxYear: prop.taxYear,
+              legalDescription: prop.legalDescription,
+              phoneNumbers: prop.phoneNumbers,
+              isNew: prop.isNew,
+              isRemoved: prop.isRemoved,
+              statusChanged: prop.statusChanged,
+              percentageChanged: prop.percentageChanged,
               updatedAt: new Date()
             },
-            create: prop
+            create: {
+              accountNumber: prop.accountNumber,
+              ownerName: prop.ownerName,
+              propertyAddress: prop.propertyAddress,
+              mailingAddress: prop.mailingAddress,
+              totalDue: prop.totalDue,
+              percentageDue: prop.percentageDue,
+              status: prop.status,
+              taxYear: prop.taxYear,
+              legalDescription: prop.legalDescription,
+              phoneNumbers: prop.phoneNumbers,
+              isNew: prop.isNew,
+              isRemoved: prop.isRemoved,
+              statusChanged: prop.statusChanged,
+              percentageChanged: prop.percentageChanged
+            }
           });
 
           if (property.createdAt.getTime() === property.updatedAt.getTime()) {
