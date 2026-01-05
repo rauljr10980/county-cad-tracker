@@ -27,10 +27,18 @@ export function PropertyTable({
   onViewProperty,
   onFollowUp,
   statusFilter,
-  onStatusFilterChange 
+  onStatusFilterChange,
+  sortField: externalSortField = 'totalAmountDue',
+  sortDirection: externalSortDirection = 'asc',
+  onSort
 }: PropertyTableProps) {
-  const [sortField, setSortField] = useState<keyof Property>('totalAmountDue');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  // Use external sort state if provided, otherwise use internal state (fallback)
+  const [internalSortField, setInternalSortField] = useState<keyof Property>('totalAmountDue');
+  const [internalSortDirection, setInternalSortDirection] = useState<'asc' | 'desc'>('asc');
+  
+  const sortField = onSort ? externalSortField : internalSortField;
+  const sortDirection = onSort ? externalSortDirection : internalSortDirection;
+  
   const [savingFollowUp, setSavingFollowUp] = useState<string | null>(null);
   const [localFollowUps, setLocalFollowUps] = useState<Record<string, string>>({});
 
