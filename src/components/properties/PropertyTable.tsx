@@ -106,7 +106,8 @@ export function PropertyTable({
 
   const openGoogleMaps = (property: Property) => {
     const address = encodeURIComponent(property.propertyAddress);
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, '_blank');
+    // Open Google Maps with property location view (shows Street View, details, etc.)
+    window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
     
     // Trigger follow-up callback if provided
     if (onFollowUp) {
@@ -114,8 +115,8 @@ export function PropertyTable({
     }
     
     toast({
-      title: "Navigation Started",
-      description: `Opening directions to ${property.propertyAddress}`,
+      title: "Opening Google Maps",
+      description: `Viewing ${property.propertyAddress} on Google Maps`,
     });
   };
 
