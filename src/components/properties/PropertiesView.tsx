@@ -82,12 +82,11 @@ export function PropertiesView() {
   const isSortingActive = sortField !== 'totalAmountDue' || sortDirection !== 'asc';
   
   // When multiple statuses are selected, we need to fetch more items to properly filter
-  // Increase limit when multiple statuses selected to get better results
-  // When sorting is active, fetch all properties to enable proper sorting across all 33k+ properties
+  // When advanced filters or sorting is active, fetch all properties to enable proper filtering/sorting across all 33k+ properties
   const fetchLimit = selectedStatuses.length > 1 
     ? ITEMS_PER_PAGE * 10 
-    : isSortingActive 
-      ? 50000  // Fetch all 33k+ properties when sorting is active
+    : (isSortingActive || hasActiveAdvancedFilters)
+      ? 50000  // Fetch all 33k+ properties when sorting or advanced filters are active
       : ITEMS_PER_PAGE;
   
   // Fetch properties from API with status filter and search
