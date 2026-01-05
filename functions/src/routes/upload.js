@@ -6,11 +6,10 @@
 const express = require('express');
 const multer = require('multer');
 const XLSX = require('xlsx');
-const { PrismaClient } = require('@prisma/client');
 const { authenticateToken } = require('../middleware/auth');
+const prisma = require('../lib/prisma');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Configure multer for memory storage
 const upload = multer({

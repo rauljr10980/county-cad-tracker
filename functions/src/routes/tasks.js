@@ -5,11 +5,10 @@
 
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
-const { PrismaClient } = require('@prisma/client');
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
+const prisma = require('../lib/prisma');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // ============================================================================
 // GET ALL TASKS (with filtering and pagination)

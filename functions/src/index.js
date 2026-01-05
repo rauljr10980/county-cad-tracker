@@ -11,10 +11,9 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const { PrismaClient } = require('@prisma/client');
 
-// Initialize Prisma Client
-const prisma = new PrismaClient();
+// Use shared Prisma instance to prevent connection pool exhaustion
+const prisma = require('./lib/prisma');
 
 // Import routes
 const propertyRoutes = require('./routes/properties');
