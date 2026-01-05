@@ -2,10 +2,10 @@
 nixPkgs = ["nodejs-18_x"]
 
 [phases.install]
-cmds = ["cd functions && npm ci"]
+cmds = ["cd functions && npm install --production=false"]
 
 [phases.build]
-cmds = ["cd functions && npm run build"]
+cmds = ["cd functions && npx prisma generate"]
 
 [start]
 cmd = "cd functions && npx prisma migrate deploy && node src/index.js"
