@@ -1,80 +1,52 @@
-# Ready to Deploy! 🚀
+# 🚀 Deploy to Railway NOW - Quick Start Guide
 
-## ✅ What's Done
+Your code is ready to deploy! Follow these steps:
 
-- ✅ Service account created: `county-cad-tracker`
-- ✅ Storage Admin role granted
-- ✅ Config file created: `functions/.env`
-- ✅ Project ID: `tax-delinquent-software`
+## Step 1: Go to Railway
+https://railway.app → Login with GitHub
 
-## ⏳ What's Left
+## Step 2: New Project
+- Click "New Project"
+- Select "Deploy from GitHub repo"
+- Choose "rauljr10980/county-cad-tracker"
 
-### 1. Create Storage Bucket (2 min)
+## Step 3: Add PostgreSQL
+- Click "New" → "Database" → "PostgreSQL"
+- Railway auto-sets DATABASE_URL
 
-**Go to:** https://console.cloud.google.com/storage
+## Step 4: Set Environment Variables
+In your service → Variables:
+```
+JWT_SECRET=c4f3e2d1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1
+NODE_ENV=production
+PORT=8080
+ALLOWED_ORIGINS=https://rauljr10980.github.io
+```
 
-1. Click **"Create Bucket"**
-2. **Name:** `county-cad-tracker-files`
-3. **Location:** `us-central1`
-4. Click **"Create"**
+## Step 5: Configure Build
+Settings → Build Command:
+```
+cd functions && npm install && npm run build
+```
 
-### 2. Deploy Backend
+Settings → Start Command:
+```
+cd functions && npm run prisma:migrate && npm start
+```
 
+## Step 6: Generate Domain
+Settings → Networking → Generate Domain
+
+## Step 7: Test
 ```bash
-cd functions
-firebase deploy --only functions
+curl https://your-service.railway.app/health
 ```
 
-**You'll get a URL like:**
-```
-https://us-central1-tax-delinquent-software.cloudfunctions.net/api
-```
-
-### 3. Update Production API URL
-
-**Create `.env.production` in project root:**
-```env
-VITE_API_URL=https://us-central1-tax-delinquent-software.cloudfunctions.net/api
-```
-
-(Replace with the actual URL from step 2)
-
-### 4. Rebuild and Push
-
+## Step 8: Create Admin User
 ```bash
-npm run build
-git add .
-git commit -m "Add production API URL"
-git push
+curl -X POST https://your-service.railway.app/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"raul","email":"raul@example.com","password":"YourPassword123!"}'
 ```
 
-## Your Live Site
-
-After deployment, your site at:
-**https://rauljr10980.github.io/county-cad-tracker/**
-
-Will be able to upload files! 🎉
-
-## Quick Commands
-
-```bash
-# 1. Create bucket (via console, then...)
-# 2. Deploy backend
-cd functions
-firebase deploy --only functions
-
-# 3. Create .env.production (with the URL from step 2)
-# 4. Rebuild
-cd ..
-npm run build
-
-# 5. Push to GitHub
-git add .
-git commit -m "Deploy backend and update API URL"
-git push
-```
-
-## Almost There! 🎯
-
-Just create the bucket and deploy!
-
+Full guide: README_RAILWAY_DEPLOY.md
