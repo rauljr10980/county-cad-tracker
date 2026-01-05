@@ -1,4 +1,5 @@
 # Dockerfile for Railway - County CAD Tracker API
+# Updated: Jan 5, 2026 - Fixed path issue
 FROM node:18-slim
 
 # Install OpenSSL for Prisma
