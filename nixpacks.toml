@@ -2,12 +2,10 @@
 nixPkgs = ["nodejs-18_x"]
 
 [phases.install]
-cmds = [
-  "cd functions",
-  "npm install",
-  "echo 'Dependencies installed in functions directory'"
-]
+cmds = ["cd functions && npm ci"]
+
+[phases.build]
+cmds = ["cd functions && npm run build"]
 
 [start]
-cmd = "cd functions && node index.js"
-
+cmd = "cd functions && npx prisma migrate deploy && node src/index.js"
