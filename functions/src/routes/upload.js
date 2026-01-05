@@ -95,15 +95,20 @@ router.post('/', optionalAuth, async (req, res) => {
     // Process file asynchronously (don't block response)
     processFileAsync(fileId, buffer, filename).catch(error => {
       console.error(`[UPLOAD] Error processing file ${fileId}:`, error);
-      prisma.fileUpload.update({
-        where: { id: fileUpload.id },
-        data: {
-          status: 'FAILED',
-          errorMessage: error.message || 'Unknown error during processing'
-        }
-      }).catch(updateError => {
-        console.error(`[UPLOAD] Failed to update error status:`, updateError);
-      });
+      // Use fileUpload.id instead of fileUpload.id (ensure it exists)
+      if (fileUpload && fileUpload.id) {
+        prisma.fileUpload.update({
+          where: { id: fileUpload.id },
+          data: {
+            status: 'FAILED',
+            errorMessage: (error && error.message) ? error.message : 'Unknown error during processing'
+          }
+        }).catch(updateError => {
+          console.error(`[UPLOAD] Failed to update error status:`, updateError);
+        });
+      } else {
+        console.error(`[UPLOAD] Cannot update error status - fileUpload record missing`);
+      }
     });
 
     // Return immediately
