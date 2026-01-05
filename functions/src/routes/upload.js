@@ -297,7 +297,7 @@ async function processFileAsync(fileId, buffer, filename) {
             continue;
           }
 
-          // Upsert property - only include valid Property model fields
+          // Upsert property - include all fields from Property model including NEW- columns
           const property = await prisma.property.upsert({
             where: { accountNumber: prop.accountNumber },
             update: {
@@ -309,7 +309,25 @@ async function processFileAsync(fileId, buffer, filename) {
               status: prop.status,
               taxYear: prop.taxYear,
               legalDescription: prop.legalDescription,
-              phoneNumbers: prop.phoneNumbers,
+              // NEW- columns (scraped data)
+              marketValue: prop.marketValue,
+              landValue: prop.landValue,
+              improvementValue: prop.improvementValue,
+              cappedValue: prop.cappedValue,
+              agriculturalValue: prop.agriculturalValue,
+              exemptions: prop.exemptions || [],
+              jurisdictions: prop.jurisdictions || [],
+              lastPaymentDate: prop.lastPaymentDate,
+              lastPaymentAmount: prop.lastPaymentAmount,
+              lastPayer: prop.lastPayer,
+              delinquentAfter: prop.delinquentAfter,
+              halfPaymentOptionAmount: prop.halfPaymentOptionAmount,
+              priorYearsAmountDue: prop.priorYearsAmountDue,
+              yearAmountDue: prop.yearAmountDue,
+              yearTaxLevy: prop.yearTaxLevy,
+              link: prop.link,
+              ownerAddress: prop.ownerAddress,
+              phoneNumbers: prop.phoneNumbers || [],
               isNew: prop.isNew,
               isRemoved: prop.isRemoved,
               statusChanged: prop.statusChanged,
@@ -326,7 +344,25 @@ async function processFileAsync(fileId, buffer, filename) {
               status: prop.status,
               taxYear: prop.taxYear,
               legalDescription: prop.legalDescription,
-              phoneNumbers: prop.phoneNumbers,
+              // NEW- columns (scraped data)
+              marketValue: prop.marketValue,
+              landValue: prop.landValue,
+              improvementValue: prop.improvementValue,
+              cappedValue: prop.cappedValue,
+              agriculturalValue: prop.agriculturalValue,
+              exemptions: prop.exemptions || [],
+              jurisdictions: prop.jurisdictions || [],
+              lastPaymentDate: prop.lastPaymentDate,
+              lastPaymentAmount: prop.lastPaymentAmount,
+              lastPayer: prop.lastPayer,
+              delinquentAfter: prop.delinquentAfter,
+              halfPaymentOptionAmount: prop.halfPaymentOptionAmount,
+              priorYearsAmountDue: prop.priorYearsAmountDue,
+              yearAmountDue: prop.yearAmountDue,
+              yearTaxLevy: prop.yearTaxLevy,
+              link: prop.link,
+              ownerAddress: prop.ownerAddress,
+              phoneNumbers: prop.phoneNumbers || [],
               isNew: prop.isNew,
               isRemoved: prop.isRemoved,
               statusChanged: prop.statusChanged,
@@ -391,54 +427,135 @@ async function processFileAsync(fileId, buffer, filename) {
 }
 
 // ============================================================================
-// EXTRACT PROPERTIES FROM EXCEL DATA (with NEW- columns support)
+// EXTRACT PROPERTIES FROM EXCEL DATA (with comprehensive NEW- columns support)
 // ============================================================================
 
 function extractProperties(data) {
   if (!data || data.length === 0) {
+    console.log('[EXTRACT] No data to extract');
     return [];
   }
   
   const headers = Object.keys(data[0] || {});
-  console.log(`[EXTRACT] Extracting from ${data.length} rows with ${headers.length} columns`);
+  console.log(`[EXTRACT] Extracting from ${data.length} rows with headers:`, headers.slice(0, 10).join(', '), '...');
   
-  // Find NEW- columns
-  const newColumns = headers.filter(h => h && h.toUpperCase().startsWith('NEW-'));
-  console.log(`[EXTRACT] Found ${newColumns.length} NEW- columns:`, newColumns.join(', '));
+  const mappings = {
+    accountNumber: ['can', 'account', 'account number', 'account_number', 'acct', 'acct no'],
+    ownerName: ['owner', 'owner name', 'owner_name', 'name'],
+    propertyAddress: ['addrstring', 'property address', 'property_address', 'address', 'property'],
+    mailingAddress: ['mailing address', 'mailing_address', 'mailing'],
+    status: ['legalstatus', 'legal_status', 'legal status'],
+    totalAmountDue: ['tot_percan', 'total', 'amount due', 'amount_due', 'due', 'balance', 'levy_balance'],
+    totalPercentage: ['percentage', 'percent', 'pct'],
+  };
 
-  const properties = data.map((row) => {
-    // Helper to get column value
-    const getValue = (columnName, fallbacks = []) => {
-      // Try exact match first
-      if (row[columnName] !== undefined && row[columnName] !== null && row[columnName] !== '') {
-        return row[columnName];
-      }
-      // Try fallbacks
-      for (const fallback of fallbacks) {
-        if (row[fallback] !== undefined && row[fallback] !== null && row[fallback] !== '') {
-          return row[fallback];
+  const columnMap = {};
+  headers.forEach(header => {
+    const trimmedHeader = header.trim();
+    const lowerHeader = trimmedHeader.toLowerCase();
+    const normalizedHeader = lowerHeader.replace(/[^a-z0-9]/g, '');
+    
+    Object.entries(mappings).forEach(([key, aliases]) => {
+      if (columnMap[key]) return;
+      
+      for (const alias of aliases) {
+        if (lowerHeader === alias || normalizedHeader === alias.replace(/[^a-z0-9]/g, '')) {
+          columnMap[key] = trimmedHeader;
+          console.log(`[EXTRACT] Matched "${trimmedHeader}" → ${key}`);
+          return;
         }
       }
-      // Try case-insensitive search
-      for (const header of headers) {
-        if (header && header.toUpperCase() === columnName.toUpperCase()) {
-          const val = row[header];
-          if (val !== undefined && val !== null && val !== '') {
-            return val;
+      
+      for (const alias of aliases) {
+        const normalizedAlias = alias.replace(/[^a-z0-9]/g, '');
+        if (lowerHeader.includes(alias) || normalizedHeader.includes(normalizedAlias)) {
+          columnMap[key] = trimmedHeader;
+          console.log(`[EXTRACT] Matched "${trimmedHeader}" → ${key} (partial)`);
+          return;
+        }
+      }
+    });
+  });
+  
+  console.log(`[EXTRACT] Column mapping:`, columnMap);
+  
+  // Log NEW- columns found
+  const newColumns = headers.filter(h => h && h.toUpperCase().startsWith('NEW-'));
+  console.log(`[EXTRACT] NEW- columns found (${newColumns.length}):`, newColumns.join(', '));
+
+  const properties = data.map((row, index) => {
+    const getValue = (key) => {
+      const col = columnMap[key];
+      if (!col) {
+        const rowKeys = Object.keys(row);
+        const lowerKey = key.toLowerCase();
+        for (const rowKey of rowKeys) {
+          if (rowKey.toLowerCase() === lowerKey || 
+              rowKey.toLowerCase().includes(lowerKey) ||
+              lowerKey.includes(rowKey.toLowerCase())) {
+            return (row[rowKey] || '').toString().trim();
           }
         }
+        return '';
       }
-      return null;
+      const value = row[col];
+      if (value === undefined || value === null) return '';
+      return value.toString().trim();
     };
 
-    // Helper to get NEW- column value
+    // Find account number (CAN)
+    let finalAccountNumber = getValue('accountNumber');
+    if (!finalAccountNumber) {
+      for (const header of headers) {
+        const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (normalizedHeader === 'CAN' || normalizedHeader.includes('CAN')) {
+          finalAccountNumber = (row[header] || '').toString().trim();
+          break;
+        }
+      }
+    }
+    
+    if (!finalAccountNumber) {
+      return null; // Skip rows without account number
+    }
+
+    // Find property address (ADDRSTRING)
+    let finalPropertyAddress = getValue('propertyAddress');
+    if (!finalPropertyAddress) {
+      for (const header of headers) {
+        const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (normalizedHeader === 'ADDRSTRING' || normalizedHeader.includes('ADDRSTRING') || 
+            normalizedHeader.includes('ADDRESS')) {
+          finalPropertyAddress = (row[header] || '').toString().trim();
+          break;
+        }
+      }
+    }
+
+    // Find status (LEGALSTATUS) - must be exact match
+    let finalStatus = '';
+    for (const header of headers) {
+      if (header.trim().toUpperCase() === 'LEGALSTATUS') {
+        finalStatus = (row[header] || '').toString().trim();
+        break;
+      }
+    }
+    
+    // Determine status value
+    let statusValue = 'ACTIVE';
+    if (finalStatus) {
+      const firstChar = finalStatus.charAt(0).toUpperCase();
+      if (firstChar === 'P') statusValue = 'PENDING';
+      else if (firstChar === 'J') statusValue = 'JUDGMENT';
+      else if (firstChar === 'A') statusValue = 'ACTIVE';
+    }
+
+    // Helper to get NEW- column values
     const getNewColumn = (fieldName) => {
-      // Try exact match
       const exactMatch = row[`NEW-${fieldName}`];
       if (exactMatch !== undefined && exactMatch !== null && exactMatch !== '') {
         return exactMatch;
       }
-      // Try case-insensitive search
       for (const header of headers) {
         if (header) {
           const headerUpper = header.toUpperCase().trim();
@@ -449,91 +566,120 @@ function extractProperties(data) {
               return value;
             }
           }
+          const headerNormalized = headerUpper.replace(/[^A-Z0-9]/g, '');
+          const targetNormalized = targetUpper.replace(/[^A-Z0-9]/g, '');
+          if (headerNormalized === targetNormalized) {
+            const value = row[header];
+            if (value !== undefined && value !== null && value !== '') {
+              return value;
+            }
+          }
         }
       }
       return null;
     };
 
-    // Parse numeric values
+    // Helper to safely get NEW- column value with multiple fallback strategies
+    const getNewColumnValue = (fieldName) => {
+      let value = getNewColumn(fieldName);
+      if (value !== null && value !== undefined && value !== '') {
+        return value;
+      }
+      value = row[`NEW-${fieldName}`];
+      if (value !== undefined && value !== null && value !== '') {
+        return value;
+      }
+      for (const header of headers) {
+        if (header && header.toUpperCase() === `NEW-${fieldName.toUpperCase()}`) {
+          value = row[header];
+          if (value !== undefined && value !== null && value !== '') {
+            return value;
+          }
+        }
+      }
+      return null;
+    };
+
+    // Parse numeric values from NEW- columns
     const parseNumeric = (value) => {
-      if (value === null || value === undefined || value === '') return 0;
+      if (value === null || value === undefined || value === '') return null;
       const num = parseFloat(String(value).replace(/[$,]/g, ''));
-      return isNaN(num) ? 0 : num;
+      return isNaN(num) ? null : num;
     };
 
-    // Parse status
-    const parseStatus = (value) => {
-      if (!value) return 'ACTIVE';
-      const firstChar = String(value).charAt(0).toUpperCase();
-      if (firstChar === 'P') return 'PENDING';
-      if (firstChar === 'J') return 'JUDGMENT';
-      if (firstChar === 'A') return 'ACTIVE';
-      return 'ACTIVE';
-    };
-
-    // Get account number (CAN column)
-    const accountNumber = String(
-      getValue('CAN', ['Account Number', 'ACCOUNT NUMBER', 'accountNumber', 'Account', 'ACCOUNT']) || ''
-    ).trim();
-
-    if (!accountNumber) {
-      return null; // Skip rows without account number
+    // Log first row for debugging
+    if (index === 0) {
+      const availableNewColumns = headers.filter(h => h && h.toUpperCase().startsWith('NEW-'));
+      console.log(`[EXTRACT] Available NEW- columns:`, availableNewColumns);
     }
 
-    // Extract property data - ONLY fields that exist in Property model
-    const propertyData = {
-      accountNumber,
-      ownerName: String(
-        getValue('Owner Name', ['OWNER NAME', 'ownerName', 'Owner', 'OWNER']) || 
-        getNewColumn('Owner Name') || ''
-      ).trim() || 'Unknown',
-      propertyAddress: String(
-        getValue('ADDRSTRING', ['Property Address', 'PROPERTY ADDRESS', 'propertyAddress', 'Address', 'ADDRESS']) ||
-        getNewColumn('Property Address') || ''
-      ).trim() || 'Unknown',
-      mailingAddress: (() => {
-        const val = String(
-          getValue('Mailing Address', ['MAILING ADDRESS', 'mailingAddress']) ||
-          getNewColumn('Mailing Address') || ''
-        ).trim();
-        return val || null;
+    // Build property object with all NEW- columns
+    const property = {
+      accountNumber: finalAccountNumber,
+      ownerName: getValue('ownerName') || getNewColumnValue('Owner Name') || 'Unknown',
+      propertyAddress: finalPropertyAddress || getValue('propertyAddress') || getNewColumnValue('Property Site Address') || 'Unknown',
+      mailingAddress: getValue('mailingAddress') || getNewColumnValue('Owner Address') || null,
+      status: statusValue,
+      totalDue: parseNumeric(getNewColumnValue('Total')) || parseNumeric(getNewColumnValue('Total Amount Due')) || parseFloat(getValue('totalAmountDue') || '0') || 0,
+      percentageDue: parseFloat(getValue('totalPercentage') || '0') || 0,
+      // NEW- columns - all scraped data fields
+      legalDescription: getNewColumnValue('Legal Description') || null,
+      marketValue: parseNumeric(getNewColumnValue('Total Market Value')),
+      landValue: parseNumeric(getNewColumnValue('Land Value')),
+      improvementValue: parseNumeric(getNewColumnValue('Improvement Value')),
+      cappedValue: parseNumeric(getNewColumnValue('Capped Value')),
+      agriculturalValue: parseNumeric(getNewColumnValue('Agricultural Value')),
+      exemptions: (() => {
+        const val = getNewColumnValue('Exemptions');
+        return val ? String(val).split(',').map(e => e.trim()).filter(e => e) : [];
       })(),
-      totalDue: parseNumeric(
-        getNewColumn('Total') ||
-        getValue('Total Due', ['TOTAL DUE', 'totalDue', 'tot_percan', 'Total', 'TOTAL']) ||
-        0
-      ),
-      percentageDue: parseNumeric(
-        getValue('Percentage Due', ['PERCENTAGE DUE', 'percentageDue', 'Percentage', 'PERCENTAGE']) || 0
-      ),
-      status: parseStatus(
-        getValue('LEGALSTATUS', ['Status', 'STATUS', 'status', 'Legal Status', 'LEGAL STATUS']) || 'A'
-      ),
+      jurisdictions: (() => {
+        const val = getNewColumnValue('Jurisdictions');
+        return val ? String(val).split(',').map(j => j.trim()).filter(j => j) : [];
+      })(),
+      lastPaymentDate: getNewColumnValue('Last Payment Date') || null,
+      lastPaymentAmount: parseNumeric(getNewColumnValue('Last Payment Amount Received')),
+      lastPayer: getNewColumnValue('Last Payer') || null,
+      delinquentAfter: getNewColumnValue('Delinquent After') || null,
+      halfPaymentOptionAmount: parseNumeric(getNewColumnValue('Half Payment Option Amount')),
+      priorYearsAmountDue: parseNumeric(getNewColumnValue('Prior Years Amount Due')),
       taxYear: (() => {
-        const val = parseInt(
-          getNewColumn('Tax Year') ||
-          getValue('Tax Year', ['TAX YEAR', 'taxYear']) ||
-          new Date().getFullYear()
-        );
-        return isNaN(val) ? new Date().getFullYear() : val;
+        const val = getNewColumnValue('Tax Year');
+        if (val) {
+          const year = parseInt(String(val));
+          return isNaN(year) ? null : year;
+        }
+        return null;
       })(),
-      legalDescription: (() => {
-        const val = String(
-          getNewColumn('Legal Description') ||
-          getValue('Legal Description', ['LEGAL DESCRIPTION', 'legalDescription']) || ''
-        ).trim();
-        return val || null;
-      })(),
-      phoneNumbers: [], // Empty array by default
+      yearAmountDue: parseNumeric(getNewColumnValue('Year Amount Due')),
+      yearTaxLevy: parseNumeric(getNewColumnValue('Year Tax Levy')),
+      link: getNewColumnValue('Link') || null,
+      ownerAddress: getNewColumnValue('Owner Address') || null,
+      phoneNumbers: [],
       isNew: false,
       isRemoved: false,
       statusChanged: false,
       percentageChanged: false
     };
 
-    return propertyData;
-  }).filter(p => p !== null); // Remove null entries
+    return property;
+  }).filter(p => p !== null && p.accountNumber);
 
+  console.log(`[EXTRACT] Extracted ${properties.length} properties (filtered from ${data.length} rows)`);
+  
+  if (properties.length > 0) {
+    const sample = properties[0];
+    const newFieldsWithData = Object.keys(sample).filter(key => {
+      const value = sample[key];
+      return ['marketValue', 'landValue', 'improvementValue', 'cappedValue', 'agriculturalValue',
+              'legalDescription', 'lastPaymentDate', 'lastPayer', 'delinquentAfter', 'taxYear',
+              'link', 'ownerAddress', 'exemptions', 'jurisdictions', 'lastPaymentAmount',
+              'halfPaymentOptionAmount', 'priorYearsAmountDue', 'yearAmountDue', 'yearTaxLevy'].includes(key)
+             && value !== undefined && value !== null && value !== '' && value !== 0;
+    });
+    console.log(`[EXTRACT] Sample property has ${newFieldsWithData.length} NEW- fields with data:`, newFieldsWithData);
+  }
+  
   return properties;
 }
 

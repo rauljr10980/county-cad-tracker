@@ -64,6 +64,25 @@ model Property {
   taxYear           Int?
   legalDescription  String?
 
+  // Scraped Data (NEW- columns from Excel)
+  marketValue              Float?
+  landValue                Float?
+  improvementValue         Float?
+  cappedValue              Float?
+  agriculturalValue        Float?
+  exemptions               String[]  // Array of exemption types
+  jurisdictions            String[]  // Array of jurisdiction names
+  lastPaymentDate          String?   // Date as string (e.g., "12/16/2025")
+  lastPaymentAmount        Float?
+  lastPayer                String?
+  delinquentAfter          String?   // Date as string
+  halfPaymentOptionAmount  Float?
+  priorYearsAmountDue      Float?
+  yearAmountDue            Float?
+  yearTaxLevy              Float?
+  link                     String?   // URL to property detail page
+  ownerAddress             String?   // Owner mailing address
+
   // Contact Information
   phoneNumbers      String[]  // Array of phone numbers
   ownerPhoneIndex   Int?      // Index of owner's primary phone
