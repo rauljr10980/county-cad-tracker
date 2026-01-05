@@ -15,10 +15,6 @@ fi
 
 echo "✅ DATABASE_URL is set"
 
-# Generate Prisma Client (in case it wasn't generated during build)
-echo "📦 Generating Prisma Client..."
-npx prisma generate || echo "⚠️  Prisma generate failed, continuing..."
-
 # Create database tables with retries
 echo "⏳ Creating database tables..."
 MAX_RETRIES=5
