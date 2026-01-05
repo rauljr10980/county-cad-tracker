@@ -464,6 +464,9 @@ export function PropertiesView() {
                 statuses: status ? [status] : [],
               });
             }}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
           />
           
           {/* Pagination */}
