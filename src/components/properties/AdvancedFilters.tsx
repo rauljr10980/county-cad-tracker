@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PropertyStatus } from '@/types/property';
-import { Filter, ChevronDown, X } from 'lucide-react';
+import { Filter, ChevronDown, X, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface AdvancedFilters {
@@ -54,6 +54,7 @@ export function AdvancedFiltersPanel({
   totalUnfiltered,
   activeFilterCount,
 }: AdvancedFiltersProps) {
+  const [open, setOpen] = useState(false);
 
   const updateFilter = <K extends keyof AdvancedFilters>(
     key: K,
@@ -84,8 +85,13 @@ export function AdvancedFiltersPanel({
 
   const hasActiveFilters = activeFilterCount > 0;
 
+  const handleSearch = () => {
+    // Close the sheet when search is clicked
+    setOpen(false);
+  };
+
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button
           variant={hasActiveFilters ? "default" : "outline"}
@@ -391,9 +397,17 @@ export function AdvancedFiltersPanel({
             </div>
           </div>
 
-          {/* Clear Filters Button */}
-          {hasActiveFilters && (
-            <div className="pt-4 border-t">
+          {/* Footer Buttons */}
+          <div className="pt-4 border-t space-y-2">
+            <Button
+              variant="default"
+              onClick={handleSearch}
+              className="w-full"
+            >
+              <Search className="h-4 w-4 mr-2" />
+              Search
+            </Button>
+            {hasActiveFilters && (
               <Button
                 variant="outline"
                 onClick={onClear}
@@ -402,8 +416,8 @@ export function AdvancedFiltersPanel({
                 <X className="h-4 w-4 mr-2" />
                 Clear All Filters
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>
