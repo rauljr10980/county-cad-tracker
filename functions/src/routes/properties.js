@@ -53,8 +53,14 @@ router.get('/',
         ];
       }
 
-      // Get total count
-      const total = await prisma.property.count({ where });
+      // Get total count and status counts in parallel for better performance
+      const [total, statusCountsResult] = await Promise.all([
+        prisma.property.count({ where }),
+        prisma.property.groupBy({
+          by: ['status'],
+          _count: { status: true }
+        })
+      ]);
 
       // Get properties
       const properties = await prisma.property.findMany({
@@ -72,14 +78,32 @@ router.get('/',
         orderBy: { [sortBy]: sortOrder }
       });
 
+      // Format status counts to match frontend expectations
+      const statusCounts = {
+        J: 0,
+        A: 0,
+        P: 0,
+        other: 0
+      };
+      statusCountsResult.forEach(item => {
+        const status = item.status?.toUpperCase();
+        if (status === 'JUDGMENT' || status === 'J') {
+          statusCounts.J = item._count.status;
+        } else if (status === 'ACTIVE' || status === 'A') {
+          statusCounts.A = item._count.status;
+        } else if (status === 'PENDING' || status === 'P') {
+          statusCounts.P = item._count.status;
+        } else {
+          statusCounts.other += item._count.status;
+        }
+      });
+
       res.json({
         properties,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit)
-        }
+        total,
+        totalUnfiltered: total, // For now, same as total (can be optimized later)
+        totalPages: Math.ceil(total / limit),
+        statusCounts
       });
     } catch (error) {
       console.error('[PROPERTIES] Fetch error:', error);
