@@ -192,9 +192,20 @@ export function PropertiesView() {
     
     // Has Exemptions
     if (advancedFilters.hasExemptions === 'yes') {
-      filtered = filtered.filter(p => p.exemptions && p.exemptions.length > 0);
+      filtered = filtered.filter(p => {
+        if (!p.exemptions || p.exemptions.length === 0) return false;
+        // Filter out arrays that only contain "None" or empty strings
+        const validExemptions = p.exemptions.filter(e => e && e.trim() && e.trim().toLowerCase() !== 'none');
+        return validExemptions.length > 0;
+      });
     } else if (advancedFilters.hasExemptions === 'no') {
-      filtered = filtered.filter(p => !p.exemptions || p.exemptions.length === 0);
+      filtered = filtered.filter(p => {
+        // No exemptions means: undefined, empty array, or only "None"/empty strings
+        if (!p.exemptions || p.exemptions.length === 0) return true;
+        // Check if all exemptions are "None" or empty
+        const validExemptions = p.exemptions.filter(e => e && e.trim() && e.trim().toLowerCase() !== 'none');
+        return validExemptions.length === 0;
+      });
     }
     
     // Follow-up Date range
