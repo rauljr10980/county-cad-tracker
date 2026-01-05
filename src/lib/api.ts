@@ -35,11 +35,34 @@ export interface ApiResponse<T> {
  */
 export async function uploadFile(file: File): Promise<{ fileId: string }> {
   return new Promise((resolve, reject) => {
+    // Validate file size before reading
+    if (file.size > 100 * 1024 * 1024) {
+      reject(new Error(`File size (${Math.round(file.size / 1024 / 1024)}MB) exceeds 100MB limit`));
+      return;
+    }
+
     const reader = new FileReader();
     
+    // Set timeout for large files (5 minutes)
+    const timeout = setTimeout(() => {
+      reader.abort();
+      reject(new Error('File read timeout - file may be too large. Please try a smaller file or split it into batches.'));
+    }, 5 * 60 * 1000);
+    
     reader.onload = async (e) => {
+      clearTimeout(timeout);
       try {
-        const base64 = (e.target?.result as string).split(',')[1];
+        const result = e.target?.result as string;
+        if (!result) {
+          throw new Error('Failed to read file - no data returned');
+        }
+
+        const base64 = result.split(',')[1];
+        if (!base64) {
+          throw new Error('Failed to extract base64 data from file');
+        }
+
+        console.log(`[UPLOAD] Sending file: ${file.name}, size: ${Math.round(file.size / 1024 / 1024)}MB, base64 length: ${base64.length}`);
         
         const response = await fetch(`${API_BASE_URL}/api/upload`, {
           method: 'POST',
@@ -53,19 +76,42 @@ export async function uploadFile(file: File): Promise<{ fileId: string }> {
         });
 
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Upload failed');
+          let errorMessage = 'Upload failed';
+          try {
+            const error = await response.json();
+            errorMessage = error.error || error.message || errorMessage;
+          } catch (parseError) {
+            errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
 
         const result = await response.json();
+        if (!result.fileId) {
+          throw new Error('Upload succeeded but no fileId returned');
+        }
         resolve({ fileId: result.fileId });
       } catch (error) {
-        reject(error);
+        reject(error instanceof Error ? error : new Error('Unknown upload error'));
       }
     };
 
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
+    reader.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error('Failed to read file - file may be corrupted or too large'));
+    };
+
+    reader.onabort = () => {
+      clearTimeout(timeout);
+      reject(new Error('File read was aborted - file may be too large'));
+    };
+
+    try {
+      reader.readAsDataURL(file);
+    } catch (error) {
+      clearTimeout(timeout);
+      reject(new Error(`Failed to start file read: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
   });
 }
 
