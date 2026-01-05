@@ -17,11 +17,14 @@ RUN npm install
 # Copy the rest of the application
 COPY functions/ ./
 
+# Make start script executable
+RUN chmod +x start.sh
+
 # Generate Prisma Client
 RUN npx prisma generate
 
 # Expose port
 EXPOSE 8080
 
-# Use db push for initial schema, then start server
-CMD npx prisma db push --accept-data-loss && node src/index.js
+# Use startup script for robust initialization
+CMD ["sh", "start.sh"]

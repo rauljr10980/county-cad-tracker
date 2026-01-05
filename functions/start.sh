@@ -19,15 +19,27 @@ echo "✅ DATABASE_URL is set"
 echo "📦 Generating Prisma Client..."
 npx prisma generate || echo "⚠️  Prisma generate failed, continuing..."
 
-# Create database tables
+# Create database tables with retries
 echo "⏳ Creating database tables..."
-npx prisma db push --accept-data-loss || {
-  echo "❌ Database push failed!"
-  echo "Check your DATABASE_URL connection string."
-  exit 1
-}
+MAX_RETRIES=5
+RETRY_COUNT=0
 
-echo "✅ Database tables created successfully"
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  if npx prisma db push --accept-data-loss --skip-generate; then
+    echo "✅ Database tables created successfully"
+    break
+  else
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+      echo "⚠️  Database push failed, retrying in 5 seconds... (Attempt $RETRY_COUNT/$MAX_RETRIES)"
+      sleep 5
+    else
+      echo "❌ Failed to create database tables after $MAX_RETRIES attempts"
+      echo "Check your DATABASE_URL connection string."
+      exit 1
+    fi
+  fi
+done
 
 # Start the application
 echo "✅ Starting application..."
