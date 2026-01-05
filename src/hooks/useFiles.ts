@@ -90,8 +90,10 @@ export function useProperties(filters?: {
       filters?.status,
       filters?.search
     ),
-    refetchOnMount: true,
+    refetchOnMount: false, // Don't refetch on mount if we have cached data
     refetchOnWindowFocus: false,
     refetchInterval: false,
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 }
