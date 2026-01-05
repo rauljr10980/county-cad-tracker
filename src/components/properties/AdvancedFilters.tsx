@@ -31,6 +31,7 @@ export interface AdvancedFilters {
   taxYear?: string;
   hasNotes?: 'yes' | 'no' | 'any';
   hasLink?: 'yes' | 'no' | 'any';
+  hasExemptions?: 'yes' | 'no' | 'any';
   followUpDateFrom?: string;
   followUpDateTo?: string;
   lastPaymentDateFrom?: string;

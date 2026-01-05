@@ -31,6 +31,7 @@ export function PropertiesView() {
     taxYear: undefined,
     hasNotes: 'any',
     hasLink: 'any',
+    hasExemptions: 'any',
     followUpDateFrom: undefined,
     followUpDateTo: undefined,
     lastPaymentDateFrom: undefined,
@@ -69,6 +70,7 @@ export function PropertiesView() {
       (advancedFilters.taxYear !== undefined) ||
       (advancedFilters.hasNotes !== 'any') ||
       (advancedFilters.hasLink !== 'any') ||
+      (advancedFilters.hasExemptions !== 'any') ||
       (advancedFilters.followUpDateFrom !== undefined) ||
       (advancedFilters.followUpDateTo !== undefined) ||
       (advancedFilters.lastPaymentDateFrom !== undefined) ||
