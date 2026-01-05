@@ -41,23 +41,37 @@ app.use(compression());
 // Logging
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// CORS configuration
+// CORS configuration - Allow GitHub Pages and localhost
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:8081', 'https://rauljr10980.github.io'];
+  : [
+      'http://localhost:5173',
+      'http://localhost:8081',
+      'https://rauljr10980.github.io'
+    ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
+    // Allow requests with no origin (mobile apps, curl, Postman, etc.)
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+    // Check if origin matches any allowed origin
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (origin === allowed) return true;
+      if (origin.startsWith(allowed)) return true;
+      return false;
+    });
+
+    if (isAllowed) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      console.log('CORS blocked origin:', origin);
+      callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Body parsing
