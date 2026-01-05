@@ -1,45 +1,23 @@
-# Use Node.js 18 (Railway compatible)
-FROM node:18-alpine
+# Simple, bulletproof Dockerfile for Railway
+FROM node:18-slim
 
-# Install dependencies for Prisma
-RUN apk add --no-cache openssl
+# Install OpenSSL for Prisma
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
-WORKDIR /app/functions
+WORKDIR /app
 
-# Copy package files
-COPY functions/package*.json ./
+# Copy everything from functions folder
+COPY functions ./
 
-# Install dependencies
-RUN npm install --production && \
-    npm cache clean --force
-
-# Copy Prisma schema
-COPY functions/prisma ./prisma/
+# Install ALL dependencies (including devDependencies for Prisma)
+RUN npm install
 
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Copy application code and startup script
-COPY functions/src ./src/
-COPY functions/start.sh ./start.sh
-
-# Make startup script executable
-RUN chmod +x ./start.sh
-
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app
-
-USER nodejs
-
 # Expose port
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 8080) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
-# Start command
-CMD ["./start.sh"]
+# Simple start command
+CMD npx prisma migrate deploy && node src/index.js
