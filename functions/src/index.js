@@ -149,6 +149,14 @@ app.use((err, req, res, next) => {
 
 async function startServer() {
   try {
+    // Check if DATABASE_URL is set
+    if (!process.env.DATABASE_URL) {
+      console.error('❌ ERROR: DATABASE_URL is not set!');
+      console.error('Please add DATABASE_URL to your Railway service variables.');
+      console.error('Get it from: PostgreSQL service → Variables → DATABASE_URL');
+      process.exit(1);
+    }
+
     // Test database connection
     console.log('🔌 Testing database connection...');
     await prisma.$connect();

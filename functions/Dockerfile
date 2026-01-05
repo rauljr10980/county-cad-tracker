@@ -19,6 +19,6 @@ COPY . .
 # Expose port (Cloud Run sets PORT env var)
 EXPOSE 8080
 
-# Start the server (Procfile handles migrations)
-CMD ["node", "src/index.js"]
+# Use start script that handles database setup
+CMD ["sh", "start.sh"]
 
