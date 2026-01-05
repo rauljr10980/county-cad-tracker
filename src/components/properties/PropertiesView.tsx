@@ -343,7 +343,7 @@ export function PropertiesView() {
       total: finalTotal,
       totalPages: finalTotalPages,
     };
-  }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data]);
+  }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data, isSortingActive]);
   
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
