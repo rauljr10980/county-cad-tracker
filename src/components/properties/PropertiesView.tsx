@@ -81,18 +81,21 @@ export function PropertiesView() {
   // Check if sorting is active (not default state)
   const isSortingActive = sortField !== 'totalAmountDue' || sortDirection !== 'asc';
   
-  // When multiple statuses are selected, we need to fetch more items to properly filter
-  // When advanced filters or sorting is active, fetch all properties to enable proper filtering/sorting across all 33k+ properties
-  const fetchLimit = selectedStatuses.length > 1 
-    ? ITEMS_PER_PAGE * 10 
-    : (isSortingActive || hasActiveAdvancedFilters)
-      ? 50000  // Fetch all 33k+ properties when sorting or advanced filters are active
-      : ITEMS_PER_PAGE;
+  // Check if search query is active
+  const hasSearchQuery = debouncedSearchQuery && debouncedSearchQuery.trim().length > 0;
+  
+  // When any filter is active (multiple statuses, advanced filters, search, or sorting), 
+  // fetch all properties to enable proper filtering across all 33k+ properties
+  const hasAnyFilter = selectedStatuses.length > 1 || hasActiveAdvancedFilters || hasSearchQuery || isSortingActive;
+  
+  const fetchLimit = hasAnyFilter
+    ? 50000  // Fetch all 33k+ properties when any filter is active
+    : ITEMS_PER_PAGE;
   
   // Fetch properties from API with status filter and search
-  // When no filters or single status: use API pagination (unless sorting is active)
-  // When multiple statuses or advanced filters: fetch all and paginate on frontend
-  const shouldUseApiPagination = selectedStatuses.length <= 1 && !hasActiveAdvancedFilters && !isSortingActive;
+  // When no filters: use API pagination
+  // When any filter is active: fetch all and paginate on frontend
+  const shouldUseApiPagination = !hasAnyFilter;
   const { data, isLoading, error } = useProperties({
     status: apiStatusFilter,
     search: debouncedSearchQuery,
