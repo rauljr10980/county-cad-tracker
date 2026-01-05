@@ -149,116 +149,108 @@ export function PropertiesView() {
     return 0;
   }, [data]);
   
-  // Apply advanced filtering logic
+  // Apply advanced filtering logic - optimized to combine filters in single pass
   const filteredProperties = useMemo(() => {
-    let filtered = [...rawProperties];
-    
-    // Status filter
-    if (advancedFilters.statuses.length > 0) {
-      filtered = filtered.filter(p => advancedFilters.statuses.includes(p.status));
+    // Early return if no filters
+    if (!hasActiveAdvancedFilters && advancedFilters.statuses.length === 0) {
+      return rawProperties;
     }
     
-    // Amount Due range
-    if (advancedFilters.amountDueMin !== undefined) {
-      filtered = filtered.filter(p => p.totalAmountDue >= advancedFilters.amountDueMin!);
-    }
-    if (advancedFilters.amountDueMax !== undefined) {
-      filtered = filtered.filter(p => p.totalAmountDue <= advancedFilters.amountDueMax!);
-    }
-    
-    // Market Value range
-    if (advancedFilters.marketValueMin !== undefined) {
-      filtered = filtered.filter(p => p.marketValue !== undefined && p.marketValue >= advancedFilters.marketValueMin!);
-    }
-    if (advancedFilters.marketValueMax !== undefined) {
-      filtered = filtered.filter(p => p.marketValue !== undefined && p.marketValue <= advancedFilters.marketValueMax!);
-    }
-    
-    // Tax Year
-    if (advancedFilters.taxYear) {
-      filtered = filtered.filter(p => p.taxYear === advancedFilters.taxYear);
-    }
-    
-    // Has Notes
-    if (advancedFilters.hasNotes === 'yes') {
-      filtered = filtered.filter(p => p.notes && typeof p.notes === 'string' && p.notes.trim() !== '');
-    } else if (advancedFilters.hasNotes === 'no') {
-      filtered = filtered.filter(p => !p.notes || typeof p.notes !== 'string' || p.notes.trim() === '');
-    }
-    
-    // Has Link
-    if (advancedFilters.hasLink === 'yes') {
-      filtered = filtered.filter(p => p.link && typeof p.link === 'string' && p.link.trim() !== '');
-    } else if (advancedFilters.hasLink === 'no') {
-      filtered = filtered.filter(p => !p.link || typeof p.link !== 'string' || p.link.trim() === '');
-    }
-    
-    // Has Exemptions
-    if (advancedFilters.hasExemptions === 'yes') {
-      filtered = filtered.filter(p => {
+    // Single pass filtering for better performance
+    return rawProperties.filter(p => {
+      // Status filter
+      if (advancedFilters.statuses.length > 0 && !advancedFilters.statuses.includes(p.status)) {
+        return false;
+      }
+      
+      // Amount Due range
+      if (advancedFilters.amountDueMin !== undefined && p.totalAmountDue < advancedFilters.amountDueMin) {
+        return false;
+      }
+      if (advancedFilters.amountDueMax !== undefined && p.totalAmountDue > advancedFilters.amountDueMax) {
+        return false;
+      }
+      
+      // Market Value range
+      if (advancedFilters.marketValueMin !== undefined && (p.marketValue === undefined || p.marketValue < advancedFilters.marketValueMin)) {
+        return false;
+      }
+      if (advancedFilters.marketValueMax !== undefined && (p.marketValue === undefined || p.marketValue > advancedFilters.marketValueMax)) {
+        return false;
+      }
+      
+      // Tax Year
+      if (advancedFilters.taxYear && p.taxYear !== advancedFilters.taxYear) {
+        return false;
+      }
+      
+      // Has Notes
+      if (advancedFilters.hasNotes === 'yes') {
+        if (!p.notes || typeof p.notes !== 'string' || p.notes.trim() === '') return false;
+      } else if (advancedFilters.hasNotes === 'no') {
+        if (p.notes && typeof p.notes === 'string' && p.notes.trim() !== '') return false;
+      }
+      
+      // Has Link
+      if (advancedFilters.hasLink === 'yes') {
+        if (!p.link || typeof p.link !== 'string' || p.link.trim() === '') return false;
+      } else if (advancedFilters.hasLink === 'no') {
+        if (p.link && typeof p.link === 'string' && p.link.trim() !== '') return false;
+      }
+      
+      // Has Exemptions
+      if (advancedFilters.hasExemptions === 'yes') {
         if (!p.exemptions || !Array.isArray(p.exemptions) || p.exemptions.length === 0) return false;
-        // Filter out arrays that only contain "None" or empty strings
         const validExemptions = p.exemptions.filter(e => {
           if (!e || typeof e !== 'string') return false;
           const trimmed = e.trim();
           return trimmed && trimmed.toLowerCase() !== 'none';
         });
-        return validExemptions.length > 0;
-      });
-    } else if (advancedFilters.hasExemptions === 'no') {
-      filtered = filtered.filter(p => {
-        // No exemptions means: undefined, empty array, or only "None"/empty strings
-        if (!p.exemptions || !Array.isArray(p.exemptions) || p.exemptions.length === 0) return true;
-        // Check if all exemptions are "None" or empty
-        const validExemptions = p.exemptions.filter(e => {
-          if (!e || typeof e !== 'string') return false;
-          const trimmed = e.trim();
-          return trimmed && trimmed.toLowerCase() !== 'none';
-        });
-        return validExemptions.length === 0;
-      });
-    }
-    
-    // Follow-up Date range
-    if (advancedFilters.followUpDateFrom) {
-      const fromDate = new Date(advancedFilters.followUpDateFrom);
-      filtered = filtered.filter(p => {
+        if (validExemptions.length === 0) return false;
+      } else if (advancedFilters.hasExemptions === 'no') {
+        if (p.exemptions && Array.isArray(p.exemptions) && p.exemptions.length > 0) {
+          const validExemptions = p.exemptions.filter(e => {
+            if (!e || typeof e !== 'string') return false;
+            const trimmed = e.trim();
+            return trimmed && trimmed.toLowerCase() !== 'none';
+          });
+          if (validExemptions.length > 0) return false;
+        }
+      }
+      
+      // Follow-up Date range
+      if (advancedFilters.followUpDateFrom) {
         if (!p.lastFollowUp) return false;
+        const fromDate = new Date(advancedFilters.followUpDateFrom);
         const followUpDate = new Date(p.lastFollowUp);
-        return followUpDate >= fromDate;
-      });
-    }
-    if (advancedFilters.followUpDateTo) {
-      const toDate = new Date(advancedFilters.followUpDateTo);
-      toDate.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(p => {
+        if (followUpDate < fromDate) return false;
+      }
+      if (advancedFilters.followUpDateTo) {
         if (!p.lastFollowUp) return false;
+        const toDate = new Date(advancedFilters.followUpDateTo);
+        toDate.setHours(23, 59, 59, 999);
         const followUpDate = new Date(p.lastFollowUp);
-        return followUpDate <= toDate;
-      });
-    }
-    
-    // Last Payment Date range
-    if (advancedFilters.lastPaymentDateFrom) {
-      const fromDate = new Date(advancedFilters.lastPaymentDateFrom);
-      filtered = filtered.filter(p => {
+        if (followUpDate > toDate) return false;
+      }
+      
+      // Last Payment Date range
+      if (advancedFilters.lastPaymentDateFrom) {
         if (!p.lastPaymentDate) return false;
+        const fromDate = new Date(advancedFilters.lastPaymentDateFrom);
         const paymentDate = new Date(p.lastPaymentDate);
-        return paymentDate >= fromDate;
-      });
-    }
-    if (advancedFilters.lastPaymentDateTo) {
-      const toDate = new Date(advancedFilters.lastPaymentDateTo);
-      toDate.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(p => {
+        if (paymentDate < fromDate) return false;
+      }
+      if (advancedFilters.lastPaymentDateTo) {
         if (!p.lastPaymentDate) return false;
+        const toDate = new Date(advancedFilters.lastPaymentDateTo);
+        toDate.setHours(23, 59, 59, 999);
         const paymentDate = new Date(p.lastPaymentDate);
-        return paymentDate <= toDate;
-      });
-    }
-    
-    return filtered;
-  }, [rawProperties, advancedFilters]);
+        if (paymentDate > toDate) return false;
+      }
+      
+      return true;
+    });
+  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters]);
   
   // Apply sorting to all properties before pagination (only for filtered cases)
   const sortedProperties = useMemo(() => {
