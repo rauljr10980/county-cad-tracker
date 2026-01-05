@@ -76,14 +76,22 @@ export function PropertiesView() {
     );
   }, [advancedFilters]);
   
+  // Check if sorting is active (not default state)
+  const isSortingActive = sortField !== 'totalAmountDue' || sortDirection !== 'asc';
+  
   // When multiple statuses are selected, we need to fetch more items to properly filter
   // Increase limit when multiple statuses selected to get better results
-  const fetchLimit = selectedStatuses.length > 1 ? ITEMS_PER_PAGE * 10 : ITEMS_PER_PAGE;
+  // When sorting is active, fetch more properties to enable proper sorting
+  const fetchLimit = selectedStatuses.length > 1 
+    ? ITEMS_PER_PAGE * 10 
+    : isSortingActive 
+      ? ITEMS_PER_PAGE * 50  // Fetch 5000 properties when sorting is active
+      : ITEMS_PER_PAGE;
   
   // Fetch properties from API with status filter and search
-  // When no filters or single status: use API pagination
+  // When no filters or single status: use API pagination (unless sorting is active)
   // When multiple statuses or advanced filters: fetch all and paginate on frontend
-  const shouldUseApiPagination = selectedStatuses.length <= 1 && !hasActiveAdvancedFilters;
+  const shouldUseApiPagination = selectedStatuses.length <= 1 && !hasActiveAdvancedFilters && !isSortingActive;
   const { data, isLoading, error } = useProperties({
     status: apiStatusFilter,
     search: debouncedSearchQuery,
@@ -232,8 +240,13 @@ export function PropertiesView() {
       // Single status selected - filter by status
       propertiesToSort = rawProperties.filter(p => p.status === selectedStatuses[0]);
     } else {
-      // No filters - can't sort (using API pagination, only have one page)
-      return rawProperties;
+      // No filters - but if sorting is active, we have more properties
+      // If sorting is not active, return raw (using API pagination)
+      if (!isSortingActive) {
+        return rawProperties;
+      }
+      // Sorting is active, so we have more properties to sort
+      propertiesToSort = rawProperties;
     }
     
     // Apply sorting
@@ -275,19 +288,31 @@ export function PropertiesView() {
       const endIndex = startIndex + ITEMS_PER_PAGE;
       finalProperties = sortedProperties.slice(startIndex, endIndex);
     } else {
-      // No filters - use API pagination directly (API already returns the correct page)
-      finalProperties = rawProperties;
-      finalTotal = totalUnfiltered;
-      
-      // Extract totalPages from API response if available
-      try {
-        if (data && !Array.isArray(data) && 'totalPages' in data) {
-          finalTotalPages = data.totalPages || Math.ceil(finalTotal / ITEMS_PER_PAGE);
-        } else {
+      // No filters
+      if (isSortingActive) {
+        // Sorting is active - use sorted properties
+        finalTotal = sortedProperties.length;
+        finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
+        
+        // Apply pagination
+        const startIndex = (page - 1) * ITEMS_PER_PAGE;
+        const endIndex = startIndex + ITEMS_PER_PAGE;
+        finalProperties = sortedProperties.slice(startIndex, endIndex);
+      } else {
+        // No sorting - use API pagination directly (API already returns the correct page)
+        finalProperties = rawProperties;
+        finalTotal = totalUnfiltered;
+        
+        // Extract totalPages from API response if available
+        try {
+          if (data && !Array.isArray(data) && 'totalPages' in data) {
+            finalTotalPages = data.totalPages || Math.ceil(finalTotal / ITEMS_PER_PAGE);
+          } else {
+            finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
+          }
+        } catch (e) {
           finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
         }
-      } catch (e) {
-        finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
       }
     }
     
