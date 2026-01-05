@@ -11,7 +11,7 @@ const getApiBaseUrl = () => {
   
   // In production (deployed), use Railway backend
   if (import.meta.env.PROD) {
-    // Default Railway URL - update this with your actual Railway backend URL
+    // Railway backend URL
     return 'https://county-cad-tracker-production.up.railway.app';
   }
   
