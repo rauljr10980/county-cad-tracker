@@ -1169,7 +1169,7 @@ function extractProperties(data) {
       propertyAddress: finalPropertyAddress || propertyAddress || getNewColumnValue('Property Site Address') || '',
       mailingAddress: getValue('mailingAddress') || getNewColumnValue('Owner Address') || '',
       status: statusValue || 'U', // U = Unknown (blank LEGALSTATUS)
-      totalAmountDue: parseFloat(totalAmountDue || '0') || parseNumeric(getNewColumnValue('Total Amount Due')) || 0,
+      totalAmountDue: parseFloat(totalAmountDue || '0') || parseNumeric(getNewColumnValue('Total Amount Due')) || parseNumeric(getNewColumnValue('Total')) || 0,
       totalPercentage: parseFloat(getValue('totalPercentage') || '0') || 0,
       // NEW- columns - ensure all are included for data transfer
       legalDescription: getNewColumnValue('Legal Description') || '',
