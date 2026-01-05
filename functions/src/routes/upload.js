@@ -43,21 +43,54 @@ router.post('/', optionalAuth, async (req, res) => {
 
     console.log(`[UPLOAD] Starting upload for: ${filename}`);
 
+    // Validate file size (100MB limit)
+    const base64Size = fileData.length;
+    const estimatedSize = (base64Size * 3) / 4; // Base64 is ~33% larger
+    if (estimatedSize > 100 * 1024 * 1024) {
+      return res.status(400).json({ 
+        error: 'File too large', 
+        message: `File size (${Math.round(estimatedSize / 1024 / 1024)}MB) exceeds 100MB limit` 
+      });
+    }
+
     // Decode base64 file data
-    const buffer = Buffer.from(fileData, 'base64');
-    console.log(`[UPLOAD] Decoded file, size: ${buffer.length} bytes`);
+    let buffer;
+    try {
+      buffer = Buffer.from(fileData, 'base64');
+      console.log(`[UPLOAD] Decoded file, size: ${buffer.length} bytes (${Math.round(buffer.length / 1024 / 1024)}MB)`);
+    } catch (decodeError) {
+      console.error('[UPLOAD] Base64 decode error:', decodeError);
+      return res.status(400).json({ 
+        error: 'Invalid file data', 
+        message: 'Failed to decode base64 file data' 
+      });
+    }
+
+    // Validate it's an Excel file
+    if (buffer.length < 4) {
+      return res.status(400).json({ error: 'Invalid file', message: 'File is too small to be a valid Excel file' });
+    }
 
     // Create file upload record
     const fileId = Date.now().toString();
-    const fileUpload = await prisma.fileUpload.create({
-      data: {
-        fileId,
-        filename,
-        status: 'PROCESSING',
-        totalRecords: 0,
-        processedRecords: 0
-      }
-    });
+    let fileUpload;
+    try {
+      fileUpload = await prisma.fileUpload.create({
+        data: {
+          fileId,
+          filename,
+          status: 'PROCESSING',
+          totalRecords: 0,
+          processedRecords: 0
+        }
+      });
+    } catch (dbError) {
+      console.error('[UPLOAD] Database error:', dbError);
+      return res.status(500).json({ 
+        error: 'Database error', 
+        message: 'Failed to create file upload record' 
+      });
+    }
 
     // Process file asynchronously (don't block response)
     processFileAsync(fileId, buffer, filename).catch(error => {
@@ -66,9 +99,11 @@ router.post('/', optionalAuth, async (req, res) => {
         where: { id: fileUpload.id },
         data: {
           status: 'FAILED',
-          errorMessage: error.message
+          errorMessage: error.message || 'Unknown error during processing'
         }
-      }).catch(console.error);
+      }).catch(updateError => {
+        console.error(`[UPLOAD] Failed to update error status:`, updateError);
+      });
     });
 
     // Return immediately
@@ -82,7 +117,7 @@ router.post('/', optionalAuth, async (req, res) => {
     console.error('[UPLOAD] Error:', error);
     res.status(500).json({
       error: 'Failed to upload file',
-      message: error.message
+      message: error.message || 'Unknown error occurred'
     });
   }
 });
@@ -147,34 +182,71 @@ async function processFileAsync(fileId, buffer, filename) {
     console.log(`[PROCESS] Starting processing for fileId: ${fileId}, filename: ${filename}`);
 
     // Parse Excel file
-    const workbook = XLSX.read(buffer, {
-      type: 'buffer',
-      cellDates: false,
-      cellStyles: false,
-      sheetStubs: false,
-    });
+    let workbook;
+    try {
+      workbook = XLSX.read(buffer, {
+        type: 'buffer',
+        cellDates: false,
+        cellStyles: false,
+        sheetStubs: false,
+      });
+    } catch (parseError) {
+      throw new Error(`Failed to parse Excel file: ${parseError.message}`);
+    }
+
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error('Excel file has no sheets');
+    }
+
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
-    // Extract headers from Row 3 (0-indexed row 2)
-    const headerRow = [];
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellAddress = XLSX.utils.encode_cell({ r: 2, c: col }); // Row 3 is 0-indexed row 2
-      const cell = worksheet[cellAddress];
-      headerRow.push(cell ? cell.v.toString().trim() : `__EMPTY_${col}`);
+    if (!worksheet) {
+      throw new Error(`Sheet "${sheetName}" not found or is empty`);
     }
 
-    // Convert to JSON starting from Row 4 (0-indexed row 3)
+    // Try to find headers - check row 3 first, then row 1, then row 2
+    let headerRow = [];
+    let dataStartRow = 3; // Default: data starts at row 4
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    
+    // Try row 3 first (0-indexed row 2)
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 2, c: col });
+      const cell = worksheet[cellAddress];
+      if (cell && cell.v) {
+        headerRow.push(cell.v.toString().trim());
+      } else {
+        headerRow.push(`__EMPTY_${col}`);
+      }
+    }
+
+    // If row 3 is empty, try row 1 (0-indexed row 0)
+    if (headerRow.every(h => h.startsWith('__EMPTY') || !h)) {
+      console.log(`[PROCESS] Row 3 empty, trying row 1 for headers`);
+      headerRow = [];
+      dataStartRow = 1; // Data starts at row 2
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+        const cell = worksheet[cellAddress];
+        if (cell && cell.v) {
+          headerRow.push(cell.v.toString().trim());
+        } else {
+          headerRow.push(`__EMPTY_${col}`);
+        }
+      }
+    }
+
+    // Convert to JSON
     const data = XLSX.utils.sheet_to_json(worksheet, {
       raw: false,
       header: headerRow,
-      range: 3, // Start reading data from row 4
+      range: dataStartRow, // Start reading data from the row after headers
       defval: '',
       blankrows: false,
     });
 
-    console.log(`[PROCESS] Found ${data.length} rows in Excel file`);
+    console.log(`[PROCESS] Found ${data.length} rows in Excel file with ${headerRow.length} columns`);
 
     if (data.length === 0) {
       throw new Error('Excel file is empty');
