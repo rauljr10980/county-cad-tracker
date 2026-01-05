@@ -190,6 +190,13 @@ export function PropertiesView() {
       filtered = filtered.filter(p => !p.link || p.link.trim() === '');
     }
     
+    // Has Exemptions
+    if (advancedFilters.hasExemptions === 'yes') {
+      filtered = filtered.filter(p => p.exemptions && p.exemptions.length > 0);
+    } else if (advancedFilters.hasExemptions === 'no') {
+      filtered = filtered.filter(p => !p.exemptions || p.exemptions.length === 0);
+    }
+    
     // Follow-up Date range
     if (advancedFilters.followUpDateFrom) {
       const fromDate = new Date(advancedFilters.followUpDateFrom);
