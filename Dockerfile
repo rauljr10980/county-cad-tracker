@@ -19,5 +19,5 @@ RUN npx prisma generate
 # Expose port
 EXPOSE 8080
 
-# Simple start command
-CMD npx prisma migrate deploy && node src/index.js
+# Use db push for initial schema, then start server
+CMD npx prisma db push --accept-data-loss && node src/index.js

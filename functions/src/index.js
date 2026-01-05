@@ -11,6 +11,10 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const { PrismaClient } = require('@prisma/client');
+
+// Initialize Prisma Client
+const prisma = new PrismaClient();
 
 // Import routes
 const propertyRoutes = require('./routes/properties');
@@ -127,22 +131,45 @@ app.use((err, req, res, next) => {
 // START SERVER
 // ============================================================================
 
-app.listen(PORT, () => {
-  console.log(`
+async function startServer() {
+  try {
+    // Test database connection
+    console.log('🔌 Testing database connection...');
+    await prisma.$connect();
+    console.log('✅ Database connected successfully');
+
+    // Start Express server
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║   County CAD Tracker API v3.0                             ║
 ║   PostgreSQL + Prisma + Express                           ║
 ╠═══════════════════════════════════════════════════════════╣
-║   Server: http://localhost:${PORT}                         ║
+║   Server: http://0.0.0.0:${PORT}                          ║
 ║   Environment: ${process.env.NODE_ENV || 'development'}                              ║
-║   Database: PostgreSQL (Prisma)                           ║
+║   Database: PostgreSQL (Prisma) - Connected               ║
 ╚═══════════════════════════════════════════════════════════╝
-  `);
-});
+      `);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    console.error('Database URL exists:', !!process.env.DATABASE_URL);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  await prisma.$disconnect();
   process.exit(0);
 });
 
