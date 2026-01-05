@@ -611,6 +611,11 @@ export function TasksView() {
                             Last: {OUTCOME_OPTIONS.find(o => o.value === property.lastOutcome)?.label}
                           </span>
                         )}
+                        {property.assignedTo && (
+                          <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/30">
+                            👤 {property.assignedTo}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate">
                         {address || property.propertyAddress}
