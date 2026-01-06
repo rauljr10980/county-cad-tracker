@@ -417,8 +417,8 @@ export function PropertiesView() {
     return count;
   }, [advancedFilters]);
 
-  const startItem = total > 0 ? (page - 1) * ITEMS_PER_PAGE + 1 : 0;
-  const endItem = Math.min(page * ITEMS_PER_PAGE, total);
+  const startItem = (total && total > 0) ? (page - 1) * ITEMS_PER_PAGE + 1 : 0;
+  const endItem = total ? Math.min(page * ITEMS_PER_PAGE, total) : 0;
 
   // Handle advanced filters change
   const handleFiltersChange = (filters: AdvancedFilters) => {
@@ -501,7 +501,7 @@ export function PropertiesView() {
           </div>
           {debouncedSearchQuery && (
             <p className="text-sm text-muted-foreground mt-2">
-              Searching for "{debouncedSearchQuery}"... {total > 0 && `Found ${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
+              Searching for "{debouncedSearchQuery}"... {total && total > 0 && `Found ${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
             </p>
           )}
         </div>
@@ -520,7 +520,7 @@ export function PropertiesView() {
             
             {activeFilterCount > 0 && (
               <span className="text-sm text-muted-foreground">
-                Showing {total.toLocaleString()} filtered {total === 1 ? 'property' : 'properties'}
+                Showing {total ? total.toLocaleString() : 0} filtered {total === 1 ? 'property' : 'properties'}
               </span>
             )}
           </div>
@@ -585,7 +585,7 @@ export function PropertiesView() {
           {totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                Showing {startItem.toLocaleString()} to {endItem.toLocaleString()} of {total.toLocaleString()} properties
+                Showing {(startItem || 0).toLocaleString()} to {(endItem || 0).toLocaleString()} of {(total || 0).toLocaleString()} properties
               </div>
               <div className="flex items-center gap-2">
                 <Button
