@@ -242,25 +242,41 @@ export async function deleteFile(fileId: string) {
  * Reprocess an existing file with current parsing logic
  */
 export async function reprocessFile(fileId: string) {
-  const response = await fetch(`${API_BASE_URL}/api/files/${fileId}/reprocess`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-  });
-  if (!response.ok) {
-    // Try to extract error message from response
-    let errorMessage = 'Failed to reprocess file';
-    try {
-      const errorData = await response.json();
-      if (errorData.error) {
-        errorMessage = errorData.error;
+  try {
+    console.log(`[API] Reprocessing file: ${fileId}`);
+    const response = await fetch(`${API_BASE_URL}/api/files/${fileId}/reprocess`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    
+    console.log(`[API] Reprocess response status: ${response.status}`);
+    
+    if (!response.ok) {
+      // Try to extract error message from response
+      let errorMessage = 'Failed to reprocess file';
+      try {
+        const errorData = await response.json();
+        console.error(`[API] Reprocess error data:`, errorData);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } catch (parseError) {
+        // If response is not JSON, use status text
+        console.error(`[API] Failed to parse error response:`, parseError);
+        errorMessage = response.statusText || errorMessage;
       }
-    } catch {
-      // If response is not JSON, use status text
-      errorMessage = response.statusText || errorMessage;
+      throw new Error(errorMessage);
     }
-    throw new Error(errorMessage);
+    
+    const result = await response.json();
+    console.log(`[API] Reprocess started successfully:`, result);
+    return result;
+  } catch (error) {
+    console.error(`[API] Reprocess error:`, error);
+    throw error;
   }
-  return response.json();
 }
 
 /**
