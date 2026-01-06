@@ -383,11 +383,17 @@ export function PropertiesView() {
         page
       });
       
-      return {
-        properties: finalProperties || [],
-        total: finalTotal || 0,
-        totalPages: finalTotalPages || 1,
-      };
+    const result = {
+      properties: finalProperties || [],
+      total: finalTotal || 0,
+      totalPages: finalTotalPages || 1,
+    };
+    
+    // Ensure all values are numbers, not undefined
+    if (typeof result.total !== 'number') result.total = 0;
+    if (typeof result.totalPages !== 'number') result.totalPages = 1;
+    
+    return result;
     } catch (err) {
       console.error('[PropertiesView] Error in pagination calculation:', err);
       return {
@@ -417,8 +423,16 @@ export function PropertiesView() {
     return count;
   }, [advancedFilters]);
 
-  const startItem = (total && total > 0) ? (page - 1) * ITEMS_PER_PAGE + 1 : 0;
-  const endItem = total ? Math.min(page * ITEMS_PER_PAGE, total) : 0;
+  // Safely calculate start and end items with null checks
+  const startItem = useMemo(() => {
+    if (!total || total === 0) return 0;
+    return (page - 1) * ITEMS_PER_PAGE + 1;
+  }, [total, page]);
+  
+  const endItem = useMemo(() => {
+    if (!total || total === 0) return 0;
+    return Math.min(page * ITEMS_PER_PAGE, total);
+  }, [total, page]);
 
   // Handle advanced filters change
   const handleFiltersChange = (filters: AdvancedFilters) => {
