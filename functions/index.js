@@ -2072,10 +2072,28 @@ app.get('/api/properties', async (req, res) => {
       }
     }
     
-    res.json({ properties: [], total: 0, page: 1, totalPages: 0 });
+    // No completed file found
+    console.log('[PROPERTIES] No completed file found');
+    res.json({ 
+      properties: [], 
+      total: 0,
+      totalUnfiltered: 0,
+      statusCounts: { J: 0, A: 0, P: 0, U: 0 },
+      page: 1, 
+      totalPages: 0,
+      filter: null
+    });
   } catch (error) {
-    console.error('[PROPERTIES] Error:', error.message);
-    res.status(500).json({ error: error.message });
+    console.error('[PROPERTIES] Error:', error);
+    console.error('[PROPERTIES] Error stack:', error.stack);
+    console.error('[PROPERTIES] Error details:', {
+      message: error.message,
+      name: error.name
+    });
+    res.status(500).json({ 
+      error: error.message || 'Failed to fetch properties',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
