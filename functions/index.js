@@ -1548,8 +1548,19 @@ app.delete('/api/files/:fileId', async (req, res) => {
   try {
     const { fileId } = req.params;
     console.log(`[DELETE] Deleting file: ${fileId}`);
+    console.log(`[DELETE] Request details:`, {
+      fileId,
+      method: req.method,
+      url: req.url
+    });
+
+    if (!storage) {
+      console.error('[DELETE] ERROR: Storage not initialized');
+      return res.status(500).json({ error: 'Storage not initialized. Check environment variables.' });
+    }
 
     const bucket = storage.bucket(BUCKET_NAME);
+    console.log(`[DELETE] Using bucket: ${BUCKET_NAME}`);
 
     // Load file metadata to get storage path
     const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
@@ -1589,10 +1600,20 @@ app.delete('/api/files/:fileId', async (req, res) => {
     await metadataFile.delete();
     console.log(`[DELETE] Deleted metadata file`);
 
+    console.log(`[DELETE] Successfully deleted file ${fileId} and all associated data`);
     res.json({ success: true, message: 'File deleted successfully' });
   } catch (error) {
     console.error('[DELETE] Error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[DELETE] Error stack:', error.stack);
+    console.error('[DELETE] Error details:', {
+      message: error.message,
+      name: error.name,
+      fileId: req.params?.fileId
+    });
+    res.status(500).json({ 
+      error: error.message || 'Failed to delete file',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

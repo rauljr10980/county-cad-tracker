@@ -253,13 +253,41 @@ export async function getDashboardStats() {
  * Delete a file
  */
 export async function deleteFile(fileId: string) {
-  const response = await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
-    method: 'DELETE',
-  });
-  if (!response.ok) {
-    throw new Error('Failed to delete file');
+  try {
+    console.log(`[API] Deleting file: ${fileId}`);
+    const response = await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    
+    console.log(`[API] Delete response status: ${response.status}`);
+    
+    if (!response.ok) {
+      // Try to extract error message from response
+      let errorMessage = 'Failed to delete file';
+      try {
+        const errorData = await response.json();
+        console.error(`[API] Delete error data:`, errorData);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } catch (parseError) {
+        // If response is not JSON, use status text
+        console.error(`[API] Failed to parse error response:`, parseError);
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+    
+    const result = await response.json();
+    console.log(`[API] File deleted successfully:`, result);
+    return result;
+  } catch (error) {
+    console.error(`[API] Delete error:`, error);
+    throw error;
   }
-  return response.json();
 }
 
 /**

@@ -10,8 +10,24 @@ export function FileHistory() {
   const reprocessMutation = useReprocessFile();
 
   const handleDelete = (fileId: string, filename: string) => {
-    if (confirm(`Are you sure you want to delete "${filename}"?`)) {
-      deleteMutation.mutate(fileId);
+    if (confirm(`Are you sure you want to delete "${filename}"? This will permanently delete the file and all associated data.`)) {
+      deleteMutation.mutate(fileId, {
+        onSuccess: () => {
+          toast({
+            title: "File Deleted",
+            description: `"${filename}" has been deleted successfully.`,
+          });
+          // Refetch files to update the list
+          refetch();
+        },
+        onError: (error: Error) => {
+          toast({
+            title: "Delete Failed",
+            description: error.message || 'Failed to delete file. Please try again.',
+            variant: "destructive",
+          });
+        },
+      });
     }
   };
 
