@@ -108,37 +108,132 @@ router.post('/', optionalAuth, async (req, res) => {
     let skipped = 0;
     const errors = [];
 
+    // Safe parse helpers (defined once before loop)
+    const safeParseFloat = (value) => {
+      if (value === null || value === undefined || value === '') return 0;
+      const parsed = parseFloat(String(value).replace(/[$,]/g, '')); // Remove $ and commas
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    const safeString = (value, defaultValue = '') => {
+      if (value === null || value === undefined || value === '') return defaultValue;
+      return String(value).trim();
+    };
+
+    const normalizeStatus = (value) => {
+      const status = safeString(value, 'ACTIVE').toUpperCase();
+      // Map common status values
+      if (status.includes('JUDG')) return 'JUDGMENT';
+      if (status.includes('ACT')) return 'ACTIVE';
+      if (status.includes('PEND')) return 'PENDING';
+      if (status.includes('PAID')) return 'PAID';
+      if (status.includes('REM')) return 'REMOVED';
+      // If it's a single letter, map: J=JUDGMENT, A=ACTIVE, P=PENDING
+      if (status === 'J') return 'JUDGMENT';
+      if (status === 'A') return 'ACTIVE';
+      if (status === 'P') return 'PENDING';
+      return status;
+    };
+
     for (const row of data) {
       try {
-        // Map Excel columns to database fields
-        const accountNumber = String(row['Account Number'] || row['ACCOUNT NUMBER'] || row['accountNumber'] || '').trim();
+        // Map Excel columns to database fields - try many variations
+        const accountNumber = safeString(
+          row['Account Number'] ||
+          row['ACCOUNT NUMBER'] ||
+          row['accountNumber'] ||
+          row['Account #'] ||
+          row['ACCOUNT #'] ||
+          row['Acct Number'] ||
+          row['ACCT NUMBER'] ||
+          row['AccountNumber']
+        );
 
         if (!accountNumber) {
           skipped++;
           continue;
         }
 
-        // Safe parse helpers
-        const safeParseFloat = (value) => {
-          const parsed = parseFloat(value);
-          return isNaN(parsed) ? 0 : parsed;
-        };
-
-        const safeString = (value, defaultValue = '') => {
-          if (value === null || value === undefined) return defaultValue;
-          return String(value).trim();
-        };
-
         const propertyData = {
           accountNumber,
-          ownerName: safeString(row['Owner Name'] || row['OWNER NAME'] || row['ownerName'] || row['Owner'], 'Unknown'),
-          propertyAddress: safeString(row['Property Address'] || row['PROPERTY ADDRESS'] || row['propertyAddress'] || row['Address'] || row['ADDRESS']),
-          mailingAddress: safeString(row['Mailing Address'] || row['MAILING ADDRESS'] || row['mailingAddress']),
-          totalDue: safeParseFloat(row['Total Due'] || row['TOTAL DUE'] || row['totalDue'] || row['Amount Due'] || row['AMOUNT DUE']),
-          percentageDue: safeParseFloat(row['Percentage Due'] || row['PERCENTAGE DUE'] || row['percentageDue'] || row['Percent'] || row['PERCENT']),
-          status: safeString(row['Status'] || row['STATUS'] || row['status'], 'ACTIVE').toUpperCase(),
-          taxYear: parseInt(row['Tax Year'] || row['TAX YEAR'] || row['taxYear']) || new Date().getFullYear(),
-          legalDescription: safeString(row['Legal Description'] || row['LEGAL DESCRIPTION'] || row['legalDescription']),
+          ownerName: safeString(
+            row['Owner Name'] ||
+            row['OWNER NAME'] ||
+            row['ownerName'] ||
+            row['Owner'] ||
+            row['OWNER'] ||
+            row['Name'] ||
+            row['NAME'],
+            'Unknown'
+          ),
+          propertyAddress: safeString(
+            row['Property Address'] ||
+            row['PROPERTY ADDRESS'] ||
+            row['propertyAddress'] ||
+            row['Address'] ||
+            row['ADDRESS'] ||
+            row['Property Addr'] ||
+            row['PROPERTY ADDR'] ||
+            row['Situs Address'] ||
+            row['SITUS ADDRESS']
+          ),
+          mailingAddress: safeString(
+            row['Mailing Address'] ||
+            row['MAILING ADDRESS'] ||
+            row['mailingAddress'] ||
+            row['Mail Address'] ||
+            row['MAIL ADDRESS'] ||
+            row['Owner Address'] ||
+            row['OWNER ADDRESS'] ||
+            null
+          ),
+          totalDue: safeParseFloat(
+            row['Total Due'] ||
+            row['TOTAL DUE'] ||
+            row['totalDue'] ||
+            row['Amount Due'] ||
+            row['AMOUNT DUE'] ||
+            row['Total Amount'] ||
+            row['TOTAL AMOUNT'] ||
+            row['Balance'] ||
+            row['BALANCE'] ||
+            row['Amount'] ||
+            row['AMOUNT']
+          ),
+          percentageDue: safeParseFloat(
+            row['Percentage Due'] ||
+            row['PERCENTAGE DUE'] ||
+            row['percentageDue'] ||
+            row['Percent'] ||
+            row['PERCENT'] ||
+            row['%'] ||
+            row['Pct'] ||
+            row['PCT']
+          ),
+          status: normalizeStatus(
+            row['Status'] ||
+            row['STATUS'] ||
+            row['status'] ||
+            row['Tax Status'] ||
+            row['TAX STATUS']
+          ),
+          taxYear: parseInt(
+            row['Tax Year'] ||
+            row['TAX YEAR'] ||
+            row['taxYear'] ||
+            row['Year'] ||
+            row['YEAR']
+          ) || new Date().getFullYear(),
+          legalDescription: safeString(
+            row['Legal Description'] ||
+            row['LEGAL DESCRIPTION'] ||
+            row['legalDescription'] ||
+            row['Legal Desc'] ||
+            row['LEGAL DESC'] ||
+            row['Legal'] ||
+            row['LEGAL'] ||
+            null
+          ),
           phoneNumbers: [],
           isNew: false,
           isRemoved: false,
