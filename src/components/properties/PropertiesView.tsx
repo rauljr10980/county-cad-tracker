@@ -105,6 +105,17 @@ export function PropertiesView() {
     limit: shouldUseApiPagination ? ITEMS_PER_PAGE : fetchLimit,
   });
   
+  // Debug: Log query state
+  useEffect(() => {
+    console.log('[PropertiesView] Query state changed:', {
+      isLoading,
+      hasError: !!error,
+      hasData: !!data,
+      dataType: Array.isArray(data) ? 'array' : typeof data,
+      dataKeys: data && typeof data === 'object' ? Object.keys(data) : null,
+    });
+  }, [data, isLoading, error]);
+  
   // Safely extract properties with fallbacks
   const rawProperties: Property[] = useMemo(() => {
     try {
@@ -304,18 +315,19 @@ export function PropertiesView() {
   
   // Calculate totals and pagination
   const { properties, total, totalPages } = useMemo(() => {
-    console.log('[PropertiesView] Calculating pagination:', {
-      selectedStatuses: selectedStatuses.length,
-      hasActiveAdvancedFilters,
-      isSortingActive,
-      rawPropertiesCount: rawProperties.length,
-      sortedPropertiesCount: sortedProperties.length,
-      page
-    });
-    
-    let finalProperties: Property[] = [];
-    let finalTotal = 0;
-    let finalTotalPages = 1;
+    try {
+      console.log('[PropertiesView] Calculating pagination:', {
+        selectedStatuses: selectedStatuses.length,
+        hasActiveAdvancedFilters,
+        isSortingActive,
+        rawPropertiesCount: rawProperties.length,
+        sortedPropertiesCount: sortedProperties.length,
+        page
+      });
+      
+      let finalProperties: Property[] = [];
+      let finalTotal = 0;
+      let finalTotalPages = 1;
     
     if (selectedStatuses.length > 1 || hasActiveAdvancedFilters) {
       // Multiple filters applied - use sorted filtered results
@@ -364,18 +376,26 @@ export function PropertiesView() {
       }
     }
     
-    console.log('[PropertiesView] Pagination result:', {
-      propertiesCount: finalProperties.length,
-      total: finalTotal,
-      totalPages: finalTotalPages,
-      page
-    });
-    
-    return {
-      properties: finalProperties || [],
-      total: finalTotal || 0,
-      totalPages: finalTotalPages || 1,
-    };
+      console.log('[PropertiesView] Pagination result:', {
+        propertiesCount: finalProperties.length,
+        total: finalTotal,
+        totalPages: finalTotalPages,
+        page
+      });
+      
+      return {
+        properties: finalProperties || [],
+        total: finalTotal || 0,
+        totalPages: finalTotalPages || 1,
+      };
+    } catch (err) {
+      console.error('[PropertiesView] Error in pagination calculation:', err);
+      return {
+        properties: [],
+        total: 0,
+        totalPages: 1,
+      };
+    }
   }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data, isSortingActive]);
   
   // Calculate active filter count
