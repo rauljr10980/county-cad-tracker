@@ -1047,6 +1047,8 @@ function extractProperties(data, canHeaderName = null) {
     console.log(`[EXTRACT] ===========================`);
   }
 
+  // Process EVERY row - map all data rows to properties
+  console.log(`[EXTRACT] Processing ${data.length} rows to extract properties...`);
   const properties = data.map((row, index) => {
     const getValue = (key) => {
       const col = columnMap[key];
