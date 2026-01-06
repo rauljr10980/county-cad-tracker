@@ -1563,45 +1563,83 @@ app.delete('/api/files/:fileId', async (req, res) => {
     console.log(`[DELETE] Using bucket: ${BUCKET_NAME}`);
 
     // Load file metadata to get storage path
-    const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+    let fileDoc;
+    try {
+      fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+    } catch (loadError) {
+      console.error(`[DELETE] Error loading file metadata for ${fileId}:`, loadError);
+      // If metadata doesn't exist, we can still try to delete other files
+      fileDoc = null;
+    }
+    
     if (!fileDoc) {
-      return res.status(404).json({ error: 'File not found' });
+      console.log(`[DELETE] File metadata not found for ${fileId}, attempting to delete files anyway`);
+      // Don't return 404 - try to delete files that might exist
+    } else {
+      console.log(`[DELETE] File metadata loaded:`, {
+        filename: fileDoc.filename,
+        storagePath: fileDoc.storagePath
+      });
     }
 
-    // Delete uploaded file
-    try {
-      const uploadedFile = bucket.file(fileDoc.storagePath);
-      await uploadedFile.delete();
-      console.log(`[DELETE] Deleted uploaded file: ${fileDoc.storagePath}`);
-    } catch (err) {
-      console.log(`[DELETE] Upload file not found or already deleted: ${fileDoc.storagePath}`);
+    // Delete uploaded file (if we have metadata with storage path)
+    if (fileDoc && fileDoc.storagePath) {
+      try {
+        const uploadedFile = bucket.file(fileDoc.storagePath);
+        const [exists] = await uploadedFile.exists();
+        if (exists) {
+          await uploadedFile.delete();
+          console.log(`[DELETE] Deleted uploaded file: ${fileDoc.storagePath}`);
+        } else {
+          console.log(`[DELETE] Upload file does not exist: ${fileDoc.storagePath}`);
+        }
+      } catch (err) {
+        console.error(`[DELETE] Error deleting uploaded file ${fileDoc.storagePath}:`, err.message);
+      }
+    } else {
+      console.log(`[DELETE] No storage path available, skipping uploaded file deletion`);
     }
 
     // Delete properties data
     try {
       const propertiesFile = bucket.file(`data/properties/${fileId}.json`);
-      await propertiesFile.delete();
-      console.log(`[DELETE] Deleted properties data`);
+      const [exists] = await propertiesFile.exists();
+      if (exists) {
+        await propertiesFile.delete();
+        console.log(`[DELETE] Deleted properties data: data/properties/${fileId}.json`);
+      } else {
+        console.log(`[DELETE] Properties file does not exist: data/properties/${fileId}.json`);
+      }
     } catch (err) {
-      console.log(`[DELETE] Properties file not found or already deleted`);
+      console.error(`[DELETE] Error deleting properties file:`, err.message);
     }
 
     // Delete comparison data
     try {
       const comparisonFile = bucket.file(`data/comparisons/${fileId}.json`);
-      await comparisonFile.delete();
-      console.log(`[DELETE] Deleted comparison data`);
+      const [exists] = await comparisonFile.exists();
+      if (exists) {
+        await comparisonFile.delete();
+        console.log(`[DELETE] Deleted comparison data: data/comparisons/${fileId}.json`);
+      } else {
+        console.log(`[DELETE] Comparison file does not exist: data/comparisons/${fileId}.json`);
+      }
     } catch (err) {
-      console.log(`[DELETE] Comparison file not found or already deleted`);
+      console.error(`[DELETE] Error deleting comparison file:`, err.message);
     }
 
-    // Delete metadata file
+    // Delete metadata file (always try, even if we couldn't load it)
     try {
       const metadataFile = bucket.file(`metadata/files/${fileId}.json`);
-      await metadataFile.delete();
-      console.log(`[DELETE] Deleted metadata file`);
+      const [exists] = await metadataFile.exists();
+      if (exists) {
+        await metadataFile.delete();
+        console.log(`[DELETE] Deleted metadata file: metadata/files/${fileId}.json`);
+      } else {
+        console.log(`[DELETE] Metadata file does not exist: metadata/files/${fileId}.json`);
+      }
     } catch (err) {
-      console.log(`[DELETE] Metadata file not found or already deleted`);
+      console.error(`[DELETE] Error deleting metadata file:`, err.message);
     }
 
     console.log(`[DELETE] Successfully deleted file ${fileId} and all associated data`);
