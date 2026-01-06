@@ -125,6 +125,7 @@ enum PropertyStatus {
   PENDING
   PAID
   REMOVED
+  UNKNOWN
 }
 
 enum DealStage {

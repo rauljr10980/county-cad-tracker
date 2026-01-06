@@ -15,6 +15,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   PENDING: { label: 'P', className: 'status-pending' },
   PAID: { label: 'PAID', className: 'status-active' },
   REMOVED: { label: 'RMV', className: 'bg-gray-500/20 text-gray-400' },
+  UNKNOWN: { label: 'Unknown', className: 'bg-gray-500/20 text-gray-400' },
 };
 
 // Default config for unknown statuses

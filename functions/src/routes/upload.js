@@ -525,8 +525,8 @@ function extractProperties(data) {
       finalStatus = getValue('status');
     }
 
-    // Determine status value - must match Prisma enum: JUDGMENT, ACTIVE, PENDING, PAID, REMOVED
-    let statusValue = 'ACTIVE'; // Default to ACTIVE
+    // Determine status value - must match Prisma enum: JUDGMENT, ACTIVE, PENDING, PAID, REMOVED, UNKNOWN
+    let statusValue = 'UNKNOWN'; // Default to UNKNOWN for blank values
     if (finalStatus) {
       const upperStatus = finalStatus.toUpperCase();
       const firstChar = upperStatus.charAt(0);
@@ -540,7 +540,7 @@ function extractProperties(data) {
       else if (upperStatus.includes('ACTIVE')) statusValue = 'ACTIVE';
       else if (upperStatus.includes('PAID')) statusValue = 'PAID';
       else if (upperStatus.includes('REMOVED')) statusValue = 'REMOVED';
-      // Default to ACTIVE for any other value
+      else statusValue = 'UNKNOWN'; // Unknown status for unrecognized values
     }
 
     // Debug log for first row
@@ -618,7 +618,7 @@ function extractProperties(data) {
       propertyAddress: finalPropertyAddress || getValue('propertyAddress') || getNewColumnValue('Property Site Address') || 'Unknown',
       mailingAddress: getValue('mailingAddress') || getNewColumnValue('Owner Address') || null,
       status: statusValue,
-      totalDue: parseNumeric(getNewColumnValue('Total')) || parseNumeric(getNewColumnValue('Total Amount Due')) || parseFloat(getValue('totalAmountDue') || '0') || 0,
+      totalDue: parseNumeric(getNewColumnValue('Total Amount Due')) || parseNumeric(getNewColumnValue('Total')) || parseFloat(getValue('totalAmountDue') || '0') || 0,
       percentageDue: parseFloat(getValue('totalPercentage') || '0') || 0,
       // NEW- columns - all scraped data fields
       legalDescription: getNewColumnValue('Legal Description') || null,

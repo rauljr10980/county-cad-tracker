@@ -1,4 +1,4 @@
-export type PropertyStatus = 'J' | 'A' | 'P';
+export type PropertyStatus = 'J' | 'A' | 'P' | 'JUDGMENT' | 'ACTIVE' | 'PENDING' | 'PAID' | 'REMOVED' | 'UNKNOWN';
 
 export interface Property {
   id: string;
