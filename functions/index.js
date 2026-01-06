@@ -1613,11 +1613,28 @@ app.post('/api/files/:fileId/reprocess', async (req, res) => {
     console.log(`[REPROCESS] Using bucket: ${BUCKET_NAME}`);
 
     // Load file metadata to get storage path and filename
-    const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+    let fileDoc;
+    try {
+      fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+    } catch (loadError) {
+      console.error(`[REPROCESS] Error loading file metadata for ${fileId}:`, loadError);
+      console.error(`[REPROCESS] Load error stack:`, loadError.stack);
+      return res.status(500).json({ 
+        error: `Failed to load file metadata: ${loadError.message}` 
+      });
+    }
+    
     if (!fileDoc) {
       console.error(`[REPROCESS] File metadata not found for fileId: ${fileId}`);
       return res.status(404).json({ error: 'File not found' });
     }
+    
+    console.log(`[REPROCESS] File metadata loaded successfully:`, {
+      filename: fileDoc.filename,
+      status: fileDoc.status,
+      hasStoragePath: !!fileDoc.storagePath,
+      propertyCount: fileDoc.propertyCount
+    });
 
     // Validate storagePath exists
     if (!fileDoc.storagePath) {
