@@ -108,17 +108,31 @@ export function PropertiesView() {
   // Safely extract properties with fallbacks
   const rawProperties: Property[] = useMemo(() => {
     try {
+      console.log('[PropertiesView] Processing data:', { 
+        hasData: !!data, 
+        isArray: Array.isArray(data),
+        dataType: typeof data,
+        hasProperties: data && typeof data === 'object' && 'properties' in data
+      });
+      
       if (data) {
         // Handle both array and object response formats
         if (Array.isArray(data)) {
+          console.log('[PropertiesView] Data is array, returning', data.length, 'properties');
           return data;
         } else if (data && typeof data === 'object' && 'properties' in data && Array.isArray(data.properties)) {
+          console.log('[PropertiesView] Data has properties array, returning', data.properties.length, 'properties');
           return data.properties;
+        } else {
+          console.warn('[PropertiesView] Data format not recognized:', Object.keys(data || {}));
         }
+      } else {
+        console.log('[PropertiesView] No data available');
       }
     } catch (e) {
       console.error('[PropertiesView] Error parsing data:', e);
     }
+    console.log('[PropertiesView] Returning empty array');
     return [];
   }, [data]);
   
@@ -290,6 +304,15 @@ export function PropertiesView() {
   
   // Calculate totals and pagination
   const { properties, total, totalPages } = useMemo(() => {
+    console.log('[PropertiesView] Calculating pagination:', {
+      selectedStatuses: selectedStatuses.length,
+      hasActiveAdvancedFilters,
+      isSortingActive,
+      rawPropertiesCount: rawProperties.length,
+      sortedPropertiesCount: sortedProperties.length,
+      page
+    });
+    
     let finalProperties: Property[] = [];
     let finalTotal = 0;
     let finalTotalPages = 1;
@@ -506,8 +529,26 @@ export function PropertiesView() {
         </div>
       ) : (
         <>
-          <PropertyTable
-            properties={properties}
+          {console.log('[PropertiesView] Rendering PropertyTable:', { 
+            propertiesCount: properties.length, 
+            total, 
+            totalPages,
+            isLoading,
+            hasError: !!error
+          })}
+          {properties.length === 0 && !isLoading && !error ? (
+            <div className="bg-secondary/30 rounded-lg p-12 text-center">
+              <FileSpreadsheet className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Properties Found</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                {totalUnfiltered === 0 
+                  ? 'No properties have been uploaded yet. Upload a file to get started.'
+                  : 'No properties match your current filters. Try adjusting your search or filters.'}
+              </p>
+            </div>
+          ) : (
+            <PropertyTable
+              properties={properties}
             onViewProperty={setSelectedProperty}
             statusFilter={selectedStatuses.length === 1 ? selectedStatuses[0] : undefined}
             onStatusFilterChange={(status) => {
@@ -518,8 +559,9 @@ export function PropertiesView() {
             }}
             sortField={sortField}
             sortDirection={sortDirection}
-            onSort={handleSort}
-          />
+              onSort={handleSort}
+            />
+          )}
           
           {/* Pagination */}
           {totalPages > 1 && (
