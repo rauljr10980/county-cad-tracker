@@ -58,21 +58,32 @@ router.delete('/:fileId', optionalAuth, async (req, res) => {
   try {
     const { fileId } = req.params;
 
-    // Find the file upload
-    const fileUpload = await prisma.fileUpload.findUnique({
-      where: { fileId }
+    console.log(`[FILES] Delete request for fileId: ${fileId}`);
+
+    // Try to find by id first (database primary key), then by fileId (unique identifier)
+    let fileUpload = await prisma.fileUpload.findUnique({
+      where: { id: fileId }
     });
 
     if (!fileUpload) {
+      // If not found by id, try by fileId
+      fileUpload = await prisma.fileUpload.findUnique({
+        where: { fileId }
+      });
+    }
+
+    if (!fileUpload) {
+      console.log(`[FILES] File not found: ${fileId}`);
       return res.status(404).json({ error: 'File not found' });
     }
 
-    // Delete the file upload record
+    // Delete the file upload record using the database id
     await prisma.fileUpload.delete({
-      where: { fileId }
+      where: { id: fileUpload.id }
     });
 
-    console.log(`[FILES] Deleted file upload: ${fileId} by user ${req.user.username}`);
+    const username = req.user?.username || 'anonymous';
+    console.log(`[FILES] Deleted file upload: ${fileUpload.filename} (id: ${fileUpload.id}) by user ${username}`);
 
     res.json({
       success: true,
@@ -96,18 +107,28 @@ router.post('/:fileId/reprocess', optionalAuth, async (req, res) => {
   try {
     const { fileId } = req.params;
 
-    // Find the file upload
-    const fileUpload = await prisma.fileUpload.findUnique({
-      where: { fileId }
+    console.log(`[FILES] Reprocess request for fileId: ${fileId}`);
+
+    // Try to find by id first (database primary key), then by fileId (unique identifier)
+    let fileUpload = await prisma.fileUpload.findUnique({
+      where: { id: fileId }
     });
 
     if (!fileUpload) {
+      // If not found by id, try by fileId
+      fileUpload = await prisma.fileUpload.findUnique({
+        where: { fileId }
+      });
+    }
+
+    if (!fileUpload) {
+      console.log(`[FILES] File not found for reprocessing: ${fileId}`);
       return res.status(404).json({ error: 'File not found' });
     }
 
-    // Mark file as processing again
+    // Mark file as processing again using the database id
     await prisma.fileUpload.update({
-      where: { fileId },
+      where: { id: fileUpload.id },
       data: {
         status: 'PROCESSING',
         errorMessage: null,
@@ -116,14 +137,15 @@ router.post('/:fileId/reprocess', optionalAuth, async (req, res) => {
       }
     });
 
-    console.log(`[FILES] Reprocessing file: ${fileId} by user ${req.user.username}`);
+    const username = req.user?.username || 'anonymous';
+    console.log(`[FILES] Reprocessing file: ${fileUpload.filename} (id: ${fileUpload.id}) by user ${username}`);
 
     // Note: In a real implementation, you would trigger the actual file processing here
     // For now, we'll just mark it as processing
     res.json({
       success: true,
       message: 'File reprocessing started',
-      fileId
+      fileId: fileUpload.fileId
     });
 
   } catch (error) {
