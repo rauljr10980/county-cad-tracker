@@ -183,8 +183,14 @@ export function FileHistory() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={() => handleDelete(file.id, file.filename)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('[DELETE] Button clicked directly, fileId:', file.id);
+                        handleDelete(file.id, file.filename);
+                      }}
                       disabled={deleteMutation.isPending}
+                      title="Delete file"
                     >
                       {deleteMutation.isPending && deleteMutation.variables === file.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
