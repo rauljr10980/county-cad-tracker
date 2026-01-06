@@ -526,7 +526,7 @@ export function PropertiesView() {
           </div>
           {debouncedSearchQuery && (
             <p className="text-sm text-muted-foreground mt-2">
-              Searching for "{debouncedSearchQuery}"... {total && total > 0 && `Found ${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
+              Searching for "{debouncedSearchQuery}"... {total && typeof total === 'number' && total > 0 && `Found ${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
             </p>
           )}
         </div>
