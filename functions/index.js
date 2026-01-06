@@ -1596,9 +1596,13 @@ app.delete('/api/files/:fileId', async (req, res) => {
     }
 
     // Delete metadata file
-    const metadataFile = bucket.file(`metadata/files/${fileId}.json`);
-    await metadataFile.delete();
-    console.log(`[DELETE] Deleted metadata file`);
+    try {
+      const metadataFile = bucket.file(`metadata/files/${fileId}.json`);
+      await metadataFile.delete();
+      console.log(`[DELETE] Deleted metadata file`);
+    } catch (err) {
+      console.log(`[DELETE] Metadata file not found or already deleted`);
+    }
 
     console.log(`[DELETE] Successfully deleted file ${fileId} and all associated data`);
     res.json({ success: true, message: 'File deleted successfully' });

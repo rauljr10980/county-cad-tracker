@@ -10,9 +10,12 @@ export function FileHistory() {
   const reprocessMutation = useReprocessFile();
 
   const handleDelete = (fileId: string, filename: string) => {
+    console.log('[DELETE] Delete button clicked for file:', { fileId, filename });
     if (confirm(`Are you sure you want to delete "${filename}"? This will permanently delete the file and all associated data.`)) {
+      console.log('[DELETE] User confirmed deletion, calling mutation...');
       deleteMutation.mutate(fileId, {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          console.log('[DELETE] Delete successful:', data);
           toast({
             title: "File Deleted",
             description: `"${filename}" has been deleted successfully.`,
@@ -21,6 +24,7 @@ export function FileHistory() {
           refetch();
         },
         onError: (error: Error) => {
+          console.error('[DELETE] Delete error:', error);
           toast({
             title: "Delete Failed",
             description: error.message || 'Failed to delete file. Please try again.',
@@ -28,6 +32,8 @@ export function FileHistory() {
           });
         },
       });
+    } else {
+      console.log('[DELETE] User cancelled deletion');
     }
   };
 
