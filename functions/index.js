@@ -1634,10 +1634,32 @@ app.post('/api/files/:fileId/reprocess', async (req, res) => {
     // Update status to processing
     fileDoc.status = 'processing';
     fileDoc.reprocessedAt = new Date().toISOString();
+    fileDoc.processingStep = 'starting';
+    fileDoc.processingMessage = 'Reprocessing started...';
+    fileDoc.processingProgress = 0;
     await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
 
-    // Trigger reprocessing (async)
-    processFile(fileId, fileDoc.storagePath, fileDoc.filename).catch(console.error);
+    // Trigger reprocessing (async) with proper error handling
+    processFile(fileId, fileDoc.storagePath, fileDoc.filename).catch(async (error) => {
+      console.error(`[REPROCESS] Error during async processing for file ${fileId}:`, error);
+      console.error(`[REPROCESS] Error stack:`, error.stack);
+      
+      // Update file status to error
+      try {
+        const errorFileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
+        if (errorFileDoc) {
+          errorFileDoc.status = 'error';
+          errorFileDoc.errorMessage = error.message;
+          errorFileDoc.errorDetails = error.stack;
+          errorFileDoc.processingStep = 'error';
+          errorFileDoc.processingMessage = `Reprocessing failed: ${error.message}`;
+          await saveJSON(bucket, `metadata/files/${fileId}.json`, errorFileDoc);
+          console.log(`[REPROCESS] Updated file status to error for ${fileId}`);
+        }
+      } catch (updateError) {
+        console.error(`[REPROCESS] Failed to update error status:`, updateError);
+      }
+    });
 
     res.json({
       success: true,
