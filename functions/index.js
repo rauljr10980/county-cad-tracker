@@ -1898,13 +1898,32 @@ app.get('/api/comparisons/latest', async (req, res) => {
 app.get('/api/properties', async (req, res) => {
   try {
     console.log('[PROPERTIES] Starting properties request');
+    
+    if (!storage) {
+      console.error('[PROPERTIES] ERROR: Storage not initialized');
+      return res.status(500).json({ 
+        error: 'Storage not initialized. Check environment variables.',
+        properties: [],
+        total: 0
+      });
+    }
+    
     const bucket = storage.bucket(BUCKET_NAME);
     
     // Get list of files and find the latest completed one
     const fileList = await listFiles(bucket, 'metadata/files/');
     
     if (fileList.length === 0) {
-      return res.json([]);
+      console.log('[PROPERTIES] No files found, returning empty properties list');
+      return res.json({
+        properties: [],
+        total: 0,
+        totalUnfiltered: 0,
+        statusCounts: { J: 0, A: 0, P: 0, U: 0 },
+        page: 1,
+        totalPages: 0,
+        filter: null
+      });
     }
     
     // Sort by ID (timestamp) descending
