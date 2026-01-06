@@ -1668,7 +1668,16 @@ app.post('/api/files/:fileId/reprocess', async (req, res) => {
     });
   } catch (error) {
     console.error('[REPROCESS] Error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[REPROCESS] Error stack:', error.stack);
+    console.error('[REPROCESS] Error details:', {
+      message: error.message,
+      name: error.name,
+      fileId: req.params?.fileId
+    });
+    res.status(500).json({ 
+      error: error.message || 'Failed to reprocess file',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
