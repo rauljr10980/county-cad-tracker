@@ -2,9 +2,19 @@
 const { Storage } = require('@google-cloud/storage');
 const fs = require('fs');
 
+if (!process.env.GCP_PROJECT_ID) {
+  console.error('❌ ERROR: GCP_PROJECT_ID environment variable is not set');
+  process.exit(1);
+}
+
 const storageOptions = { projectId: process.env.GCP_PROJECT_ID };
-if (fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
   storageOptions.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+}
+
+if (!process.env.GCS_BUCKET) {
+  console.error('❌ ERROR: GCS_BUCKET environment variable is not set');
+  process.exit(1);
 }
 
 const storage = new Storage(storageOptions);

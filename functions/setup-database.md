@@ -26,3 +26,5 @@ When Railway deploys your service, it automatically runs:
 
 This will create all tables in your PostgreSQL database.
 
+
+

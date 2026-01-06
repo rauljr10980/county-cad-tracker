@@ -638,6 +638,7 @@ async function processFile(fileId, storagePath, filename) {
     console.log(`[PROCESS] Downloaded file, size: ${fileBuffer.length} bytes`);
     
     let data = [];
+    let canHeaderNameForExtract = null; // Will be set for Excel files (column E header name)
     
     // Check file type and parse accordingly
     if (filename.toLowerCase().endsWith('.pdf')) {
@@ -747,9 +748,10 @@ async function processFile(fileId, storagePath, filename) {
         const hasStatus = actualHeaders.some(h => h.toUpperCase() === 'LEGALSTATUS');
         console.log(`[PROCESS] Column check: CAN=${hasCAN}, ADDRSTRING=${hasAddr}, LEGALSTATUS=${hasStatus}`);
         
-        // Log sample values for debugging
+        // Log sample values for debugging - use the canHeaderName we extracted
         const sample = data[0];
-        console.log(`[PROCESS] Sample row - CAN: ${sample['CAN']}, LEGALSTATUS: ${sample['LEGALSTATUS']}, ADDRSTRING: ${(sample['ADDRSTRING'] || '').substring(0, 50)}...`);
+        const canValue = canHeaderName ? (sample[canHeaderName] || '') : '';
+        console.log(`[PROCESS] Sample row - CAN (from column E): ${canValue}, LEGALSTATUS: ${sample['LEGALSTATUS']}, ADDRSTRING: ${(sample['ADDRSTRING'] || '').substring(0, 50)}...`);
       }
 
       const headers = Object.keys(data[0] || {});
@@ -761,18 +763,31 @@ async function processFile(fileId, storagePath, filename) {
       if (data.length > 50000) {
         console.log(`[PROCESS] WARNING: Large file with ${data.length} rows. Processing may be slow or fail due to memory constraints.`);
       }
+      
+      // Store canHeaderName for use in extractProperties
+      canHeaderNameForExtract = canHeaderName;
     }
 
     console.log(`[PROCESS] Parsed ${data.length} rows from file`);
 
     // Extract properties
     await updateProgress(fileId, 'extracting', `Extracting properties from ${data.length} rows...`, 50);
-    // Get the header name from column E (index 4) for CAN extraction
-    const canHeaderName = data.length > 0 ? Object.keys(data[0])[4] : null; // Column E is index 4
-    if (canHeaderName) {
-      console.log(`[PROCESS] CAN header name from column E: "${canHeaderName}"`);
+    // Use the canHeaderName we extracted from headerRow (column E, index 4)
+    if (!canHeaderNameForExtract && data.length > 0) {
+      // Fallback if canHeaderName wasn't set (shouldn't happen for Excel files)
+      // Try to get it from the data object keys (but this is not reliable due to object key order)
+      const headers = Object.keys(data[0]);
+      if (headers.length > 4) {
+        canHeaderNameForExtract = headers[4];
+        console.log(`[PROCESS] WARNING: Using fallback method to get CAN header name: "${canHeaderNameForExtract}"`);
+      }
     }
-    const properties = extractProperties(data, canHeaderName);
+    if (canHeaderNameForExtract) {
+      console.log(`[PROCESS] Using CAN header name from column E: "${canHeaderNameForExtract}"`);
+    } else {
+      console.log(`[PROCESS] WARNING: No CAN header name found for column E`);
+    }
+    const properties = extractProperties(data, canHeaderNameForExtract);
     console.log(`[PROCESS] Extracted ${properties.length} properties from ${data.length} data rows`);
     
     // Warn if no properties were extracted

@@ -1,17 +1,17 @@
 /**
  * File Upload Routes
- * Handle Excel file uploads for property data
+ * Handle Excel file uploads for property data - PostgreSQL version
  */
 
 const express = require('express');
 const multer = require('multer');
 const XLSX = require('xlsx');
-const { authenticateToken, optionalAuth } = require('../middleware/auth');
+const { optionalAuth } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 
 const router = express.Router();
 
-// Configure multer for memory storage
+// Configure multer for memory storage (for /excel endpoint)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -29,322 +29,111 @@ const upload = multer({
   }
 });
 
-// Helper function to generate unique file ID
-function generateFileId() {
-  return `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
 // ============================================================================
-// UPLOAD EXCEL FILE (Base64 JSON format - used by frontend)
+// UPLOAD EXCEL FILE (Base64 JSON format - matches frontend)
 // ============================================================================
 
 router.post('/', optionalAuth, async (req, res) => {
   try {
-    const { filename, fileData } = req.body;
-
-    if (!filename || !fileData) {
-      return res.status(400).json({ error: 'Missing filename or fileData' });
+    console.log(`[UPLOAD] Received upload request`);
+    console.log(`[UPLOAD] Request headers:`, JSON.stringify(req.headers, null, 2));
+    console.log(`[UPLOAD] Request body keys:`, req.body ? Object.keys(req.body) : 'no body');
+    
+    // Validate request body exists
+    if (!req.body) {
+      console.error('[UPLOAD] No request body received');
+      return res.status(400).json({ error: 'Request body is required' });
     }
 
-    console.log(`[UPLOAD] Processing base64 file: ${filename}`);
+    const { filename, fileData } = req.body;
+    
+    if (!filename || !fileData) {
+      console.error(`[UPLOAD] Missing required fields - filename: ${!!filename}, fileData: ${!!fileData}`);
+      return res.status(400).json({ error: 'Filename and fileData are required' });
+    }
 
-    // Generate unique file ID
-    const fileId = generateFileId();
+    console.log(`[UPLOAD] Starting upload for: ${filename}, fileData length: ${fileData ? fileData.length : 0}`);
+
+    // Validate file size (100MB limit)
+    const base64Size = fileData.length;
+    const estimatedSize = (base64Size * 3) / 4; // Base64 is ~33% larger
+    if (estimatedSize > 100 * 1024 * 1024) {
+      return res.status(400).json({ 
+        error: 'File too large', 
+        message: `File size (${Math.round(estimatedSize / 1024 / 1024)}MB) exceeds 100MB limit` 
+      });
+    }
+
+    // Decode base64 file data
+    let buffer;
+    try {
+      buffer = Buffer.from(fileData, 'base64');
+      console.log(`[UPLOAD] Decoded file, size: ${buffer.length} bytes (${Math.round(buffer.length / 1024 / 1024)}MB)`);
+    } catch (decodeError) {
+      console.error('[UPLOAD] Base64 decode error:', decodeError);
+      return res.status(400).json({ 
+        error: 'Invalid file data', 
+        message: 'Failed to decode base64 file data' 
+      });
+    }
+
+    // Validate it's an Excel file
+    if (buffer.length < 4) {
+      return res.status(400).json({ error: 'Invalid file', message: 'File is too small to be a valid Excel file' });
+    }
 
     // Create file upload record
-    const fileUpload = await prisma.fileUpload.create({
-      data: {
-        filename,
-        fileId,
-        status: 'PROCESSING',
-        totalRecords: null,
-        processedRecords: 0,
-        errorCount: 0
-      }
-    });
-
-    console.log(`[UPLOAD] Created file upload record: ${fileId}`);
-
-    // Decode base64 to buffer
-    const buffer = Buffer.from(fileData, 'base64');
-
-    // Parse Excel file
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(worksheet);
-
-    console.log(`[UPLOAD] Found ${data.length} rows in Excel file`);
-
-    // Log first row to see column names
-    if (data.length > 0) {
-      console.log('[UPLOAD] First row columns:', Object.keys(data[0]));
-      console.log('[UPLOAD] First row sample:', JSON.stringify(data[0], null, 2));
-    }
-
-    if (data.length === 0) {
-      await prisma.fileUpload.update({
-        where: { id: fileUpload.id },
+    const fileId = Date.now().toString();
+    let fileUpload;
+    try {
+      fileUpload = await prisma.fileUpload.create({
         data: {
-          status: 'FAILED',
-          errorMessage: 'Excel file is empty',
-          completedAt: new Date()
+          fileId,
+          filename,
+          status: 'PROCESSING',
+          totalRecords: 0,
+          processedRecords: 0
         }
       });
-      return res.status(400).json({ error: 'Excel file is empty' });
+    } catch (dbError) {
+      console.error('[UPLOAD] Database error:', dbError);
+      return res.status(500).json({ 
+        error: 'Database error', 
+        message: 'Failed to create file upload record' 
+      });
     }
 
-    // Update total records
-    await prisma.fileUpload.update({
-      where: { id: fileUpload.id },
-      data: {
-        totalRecords: data.length
+    // Process file asynchronously (don't block response)
+    processFileAsync(fileId, buffer, filename).catch(error => {
+      console.error(`[UPLOAD] Error processing file ${fileId}:`, error);
+      // Use fileUpload.id instead of fileUpload.id (ensure it exists)
+      if (fileUpload && fileUpload.id) {
+        prisma.fileUpload.update({
+          where: { id: fileUpload.id },
+          data: {
+            status: 'FAILED',
+            errorMessage: (error && error.message) ? error.message : 'Unknown error during processing'
+          }
+        }).catch(updateError => {
+          console.error(`[UPLOAD] Failed to update error status:`, updateError);
+        });
+      } else {
+        console.error(`[UPLOAD] Cannot update error status - fileUpload record missing`);
       }
     });
 
-    // Process and insert properties
-    let inserted = 0;
-    let updated = 0;
-    let skipped = 0;
-    const errors = [];
-
-    // Safe parse helpers (defined once before loop)
-    const safeParseFloat = (value) => {
-      if (value === null || value === undefined || value === '') return 0;
-      const parsed = parseFloat(String(value).replace(/[$,]/g, '')); // Remove $ and commas
-      return isNaN(parsed) ? 0 : parsed;
-    };
-
-    const safeString = (value, defaultValue = '') => {
-      if (value === null || value === undefined || value === '') return defaultValue;
-      return String(value).trim();
-    };
-
-    const normalizeStatus = (value) => {
-      const status = safeString(value, 'ACTIVE').toUpperCase();
-      // Map common status values
-      if (status.includes('JUDG')) return 'JUDGMENT';
-      if (status.includes('ACT')) return 'ACTIVE';
-      if (status.includes('PEND')) return 'PENDING';
-      if (status.includes('PAID')) return 'PAID';
-      if (status.includes('REM')) return 'REMOVED';
-      // If it's a single letter, map: J=JUDGMENT, A=ACTIVE, P=PENDING
-      if (status === 'J') return 'JUDGMENT';
-      if (status === 'A') return 'ACTIVE';
-      if (status === 'P') return 'PENDING';
-      return status;
-    };
-
-    // Helper to parse owner name and mailing address from ADDRSTRING
-    const parseAddrString = (addrString) => {
-      if (!addrString) return { ownerName: 'Unknown', mailingAddress: null };
-      const str = String(addrString).trim();
-      // ADDRSTRING format: "OWNER NAME full mailing address"
-      // Extract owner name (first part before address numbers)
-      const parts = str.split(/\s+\d+/); // Split on first number (address starts with number)
-      const ownerName = parts[0] || 'Unknown';
-      const mailingAddress = str || null;
-      return { ownerName, mailingAddress };
-    };
-
-    for (const row of data) {
-      try {
-        // Map Excel columns to database fields - try many variations
-        const accountNumber = safeString(
-          row['CAN'] ||  // DTR Summary format
-          row['Account Number'] ||
-          row['ACCOUNT NUMBER'] ||
-          row['accountNumber'] ||
-          row['Account #'] ||
-          row['ACCOUNT #'] ||
-          row['Acct Number'] ||
-          row['ACCT NUMBER'] ||
-          row['AccountNumber']
-        );
-
-        if (!accountNumber) {
-          skipped++;
-          continue;
-        }
-
-        // Parse ADDRSTRING if available (DTR Summary format)
-        const addrInfo = parseAddrString(row['ADDRSTRING'] || row['addrString']);
-
-        const propertyData = {
-          accountNumber,
-          ownerName: safeString(
-            row['Owner Name'] ||
-            row['OWNER NAME'] ||
-            row['ownerName'] ||
-            row['Owner'] ||
-            row['OWNER'] ||
-            row['Name'] ||
-            row['NAME'] ||
-            addrInfo.ownerName,  // From ADDRSTRING
-            'Unknown'
-          ),
-          propertyAddress: safeString(
-            row['NEW-Property Site Address'] ||  // Scraped data (best quality)
-            row['PSTRNAME'] ||  // DTR Summary property street name
-            row['pstrName'] ||
-            row['Property Address'] ||
-            row['PROPERTY ADDRESS'] ||
-            row['propertyAddress'] ||
-            row['Address'] ||
-            row['ADDRESS'] ||
-            row['Property Addr'] ||
-            row['PROPERTY ADDR'] ||
-            row['Situs Address'] ||
-            row['SITUS ADDRESS']
-          ),
-          mailingAddress: safeString(
-            row['Mailing Address'] ||
-            row['MAILING ADDRESS'] ||
-            row['mailingAddress'] ||
-            row['Mail Address'] ||
-            row['MAIL ADDRESS'] ||
-            row['Owner Address'] ||
-            row['OWNER ADDRESS'] ||
-            addrInfo.mailingAddress ||  // From ADDRSTRING
-            null
-          ),
-          totalDue: safeParseFloat(
-            row['NEW-Total Amount Due'] ||  // Scraped data (most accurate)
-            row['TOT_PERCAN'] ||  // DTR Summary total per account
-            row['LEVY_BALANCE'] ||  // DTR Summary levy balance
-            row['Total Due'] ||
-            row['TOTAL DUE'] ||
-            row['totalDue'] ||
-            row['Amount Due'] ||
-            row['AMOUNT DUE'] ||
-            row['Total Amount'] ||
-            row['TOTAL AMOUNT'] ||
-            row['Balance'] ||
-            row['BALANCE'] ||
-            row['Amount'] ||
-            row['AMOUNT']
-          ),
-          percentageDue: safeParseFloat(
-            row['Percentage Due'] ||
-            row['PERCENTAGE DUE'] ||
-            row['percentageDue'] ||
-            row['Percent'] ||
-            row['PERCENT'] ||
-            row['%'] ||
-            row['Pct'] ||
-            row['PCT']
-          ),
-          status: normalizeStatus(
-            row['LEGALSTATUS'] ||  // DTR Summary legal status (P/A/J)
-            row['legalStatus'] ||
-            row['Status'] ||
-            row['STATUS'] ||
-            row['status'] ||
-            row['Tax Status'] ||
-            row['TAX STATUS']
-          ),
-          taxYear: parseInt(
-            row['NEW-Tax Year'] ||  // Scraped data
-            row['YEAR'] ||  // DTR Summary year
-            row['Tax Year'] ||
-            row['TAX YEAR'] ||
-            row['taxYear'] ||
-            row['Year']
-          ) || new Date().getFullYear(),
-          legalDescription: safeString(
-            row['NEW-Legal Description'] ||  // Scraped data (more detailed)
-            row['LGLSTRING'] ||  // DTR Summary legal string
-            row['lglString'] ||
-            row['Legal Description'] ||
-            row['LEGAL DESCRIPTION'] ||
-            row['legalDescription'] ||
-            row['Legal Desc'] ||
-            row['LEGAL DESC'] ||
-            row['Legal'] ||
-            row['LEGAL'] ||
-            null
-          ),
-          // Scraped data fields (NEW- columns)
-          marketValue: safeParseFloat(row['NEW-Total Market Value']),
-          landValue: safeParseFloat(row['NEW-Land Value']),
-          improvementValue: safeParseFloat(row['NEW-Improvement Value']),
-          cappedValue: safeParseFloat(row['NEW-Capped Value']),
-          agriculturalValue: safeParseFloat(row['NEW-Agricultural Value']),
-          exemptions: row['NEW-Exemptions'] ? String(row['NEW-Exemptions']).split(',').map(s => s.trim()) : [],
-          jurisdictions: row['NEW-Jurisdictions'] ? String(row['NEW-Jurisdictions']).split(',').map(s => s.trim()) : [],
-          lastPaymentDate: safeString(row['NEW-Last Payment Date'] || null),
-          lastPaymentAmount: safeParseFloat(row['NEW-Last Payment Amount Received']),
-          lastPayer: safeString(row['NEW-Last Payer'] || null),
-          halfPaymentOptionAmount: safeParseFloat(row['NEW-Half Payment Option Amount']),
-          priorYearsAmountDue: safeParseFloat(row['NEW-Prior Years Amount Due']),
-          yearAmountDue: safeParseFloat(row['NEW-Year Amount Due']),
-          yearTaxLevy: safeParseFloat(row['NEW-Year Tax Levy']),
-          link: safeString(row['NEW-Link'] || null),
-          phoneNumbers: [],
-          isNew: false,
-          isRemoved: false,
-          statusChanged: false,
-          percentageChanged: false
-        };
-
-        // Upsert property (insert or update if exists)
-        const property = await prisma.property.upsert({
-          where: { accountNumber },
-          update: {
-            ...propertyData,
-            updatedAt: new Date()
-          },
-          create: propertyData
-        });
-
-        if (property.createdAt.getTime() === property.updatedAt.getTime()) {
-          inserted++;
-        } else {
-          updated++;
-        }
-
-      } catch (error) {
-        errors.push({
-          accountNumber: row['Account Number'] || 'Unknown',
-          error: error.message
-        });
-        skipped++;
-      }
-    }
-
-    // Update file upload record with results
-    await prisma.fileUpload.update({
-      where: { id: fileUpload.id },
-      data: {
-        status: 'COMPLETED',
-        processedRecords: inserted + updated,
-        errorCount: errors.length,
-        errorMessage: errors.length > 0 ? `${errors.length} errors encountered` : null,
-        completedAt: new Date()
-      }
-    });
-
-    console.log(`[UPLOAD] Complete - File ID: ${fileId}, Inserted: ${inserted}, Updated: ${updated}, Skipped: ${skipped}`);
-
+    // Return immediately
     res.json({
       success: true,
       fileId,
-      message: 'File uploaded and processed successfully',
-      stats: {
-        totalRows: data.length,
-        inserted,
-        updated,
-        skipped,
-        errors: errors.length
-      },
-      errors: errors.slice(0, 10) // Return first 10 errors only
+      message: 'File upload started. Processing in background.'
     });
 
   } catch (error) {
     console.error('[UPLOAD] Error:', error);
     res.status(500).json({
-      error: 'Failed to process file',
-      message: error.message
+      error: 'Failed to upload file',
+      message: error.message || 'Unknown error occurred'
     });
   }
 });
@@ -353,7 +142,7 @@ router.post('/', optionalAuth, async (req, res) => {
 // UPLOAD EXCEL FILE (Multipart form-data format)
 // ============================================================================
 
-router.post('/excel', authenticateToken, upload.single('file'), async (req, res) => {
+router.post('/excel', optionalAuth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -361,100 +150,36 @@ router.post('/excel', authenticateToken, upload.single('file'), async (req, res)
 
     console.log(`[UPLOAD] Processing file: ${req.file.originalname}, size: ${req.file.size} bytes`);
 
-    // Parse Excel file
-    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(worksheet);
-
-    console.log(`[UPLOAD] Found ${data.length} rows in Excel file`);
-
-    if (data.length === 0) {
-      return res.status(400).json({ error: 'Excel file is empty' });
-    }
-
-    // Process and insert properties
-    let inserted = 0;
-    let updated = 0;
-    let skipped = 0;
-    const errors = [];
-
-    for (const row of data) {
-      try {
-        // Map Excel columns to database fields
-        const accountNumber = String(row['Account Number'] || row['ACCOUNT NUMBER'] || row['accountNumber'] || '').trim();
-
-        if (!accountNumber) {
-          skipped++;
-          continue;
-        }
-
-        // Safe parse helpers
-        const safeParseFloat = (value) => {
-          const parsed = parseFloat(value);
-          return isNaN(parsed) ? 0 : parsed;
-        };
-
-        const safeString = (value, defaultValue = '') => {
-          if (value === null || value === undefined) return defaultValue;
-          return String(value).trim();
-        };
-
-        const propertyData = {
-          accountNumber,
-          ownerName: safeString(row['Owner Name'] || row['OWNER NAME'] || row['ownerName'] || row['Owner'], 'Unknown'),
-          propertyAddress: safeString(row['Property Address'] || row['PROPERTY ADDRESS'] || row['propertyAddress'] || row['Address'] || row['ADDRESS']),
-          mailingAddress: safeString(row['Mailing Address'] || row['MAILING ADDRESS'] || row['mailingAddress']),
-          totalDue: safeParseFloat(row['Total Due'] || row['TOTAL DUE'] || row['totalDue'] || row['Amount Due'] || row['AMOUNT DUE']),
-          percentageDue: safeParseFloat(row['Percentage Due'] || row['PERCENTAGE DUE'] || row['percentageDue'] || row['Percent'] || row['PERCENT']),
-          status: safeString(row['Status'] || row['STATUS'] || row['status'], 'ACTIVE').toUpperCase(),
-          taxYear: parseInt(row['Tax Year'] || row['TAX YEAR'] || row['taxYear']) || new Date().getFullYear(),
-          legalDescription: safeString(row['Legal Description'] || row['LEGAL DESCRIPTION'] || row['legalDescription']),
-          phoneNumbers: [],
-          isNew: false,
-          isRemoved: false,
-          statusChanged: false,
-          percentageChanged: false
-        };
-
-        // Upsert property (insert or update if exists)
-        const property = await prisma.property.upsert({
-          where: { accountNumber },
-          update: {
-            ...propertyData,
-            updatedAt: new Date()
-          },
-          create: propertyData
-        });
-
-        if (property.createdAt.getTime() === property.updatedAt.getTime()) {
-          inserted++;
-        } else {
-          updated++;
-        }
-
-      } catch (error) {
-        errors.push({
-          accountNumber: row['Account Number'] || 'Unknown',
-          error: error.message
-        });
-        skipped++;
+    // Create file upload record
+    const fileId = Date.now().toString();
+    const fileUpload = await prisma.fileUpload.create({
+      data: {
+        fileId,
+        filename: req.file.originalname,
+        status: 'PROCESSING',
+        totalRecords: 0,
+        processedRecords: 0
       }
-    }
+    });
 
-    console.log(`[UPLOAD] Complete - Inserted: ${inserted}, Updated: ${updated}, Skipped: ${skipped}`);
+    // Process file asynchronously
+    processFileAsync(fileId, req.file.buffer, req.file.originalname).catch(error => {
+      console.error(`[UPLOAD] Error processing file ${fileId}:`, error);
+      prisma.fileUpload.update({
+        where: { id: fileUpload.id },
+        data: {
+          status: 'FAILED',
+          errorMessage: error?.message || 'Unknown error during processing'
+        }
+      }).catch(updateError => {
+        console.error(`[UPLOAD] Failed to update error status:`, updateError);
+      });
+    });
 
     res.json({
       success: true,
-      message: 'File uploaded and processed successfully',
-      stats: {
-        totalRows: data.length,
-        inserted,
-        updated,
-        skipped,
-        errors: errors.length
-      },
-      errors: errors.slice(0, 10) // Return first 10 errors only
+      fileId,
+      message: 'File upload started. Processing in background.'
     });
 
   } catch (error) {
@@ -467,19 +192,543 @@ router.post('/excel', authenticateToken, upload.single('file'), async (req, res)
 });
 
 // ============================================================================
+// ASYNC FILE PROCESSING
+// ============================================================================
+
+async function processFileAsync(fileId, buffer, filename) {
+  try {
+    console.log(`[PROCESS] Starting processing for fileId: ${fileId}, filename: ${filename}`);
+
+    // Parse Excel file
+    let workbook;
+    try {
+      workbook = XLSX.read(buffer, {
+        type: 'buffer',
+        cellDates: false,
+        cellStyles: false,
+        sheetStubs: false,
+      });
+    } catch (parseError) {
+      throw new Error(`Failed to parse Excel file: ${parseError.message}`);
+    }
+
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error('Excel file has no sheets');
+    }
+
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+
+    if (!worksheet) {
+      throw new Error(`Sheet "${sheetName}" not found or is empty`);
+    }
+
+    // Try to find headers - check row 3 first, then row 1, then row 2
+    let headerRow = [];
+    let dataStartRow = 3; // Default: data starts at row 4
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    
+    // Try row 3 first (0-indexed row 2)
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 2, c: col });
+      const cell = worksheet[cellAddress];
+      if (cell && cell.v) {
+        headerRow.push(cell.v.toString().trim());
+      } else {
+        headerRow.push(`__EMPTY_${col}`);
+      }
+    }
+
+    // If row 3 is empty, try row 1 (0-indexed row 0)
+    if (headerRow.every(h => h.startsWith('__EMPTY') || !h)) {
+      console.log(`[PROCESS] Row 3 empty, trying row 1 for headers`);
+      headerRow = [];
+      dataStartRow = 1; // Data starts at row 2
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+        const cell = worksheet[cellAddress];
+        if (cell && cell.v) {
+          headerRow.push(cell.v.toString().trim());
+        } else {
+          headerRow.push(`__EMPTY_${col}`);
+        }
+      }
+    }
+
+    // Convert to JSON
+    const data = XLSX.utils.sheet_to_json(worksheet, {
+      raw: false,
+      header: headerRow,
+      range: dataStartRow, // Start reading data from the row after headers
+      defval: '',
+      blankrows: false,
+    });
+
+    console.log(`[PROCESS] Found ${data.length} rows in Excel file with ${headerRow.length} columns`);
+
+    if (data.length === 0) {
+      throw new Error('Excel file is empty');
+    }
+
+    // Update file upload record (use fileId, not id)
+    const fileUploadRecord = await prisma.fileUpload.findUnique({
+      where: { fileId }
+    });
+    
+    if (!fileUploadRecord) {
+      throw new Error(`File upload record not found for fileId: ${fileId}`);
+    }
+
+    await prisma.fileUpload.update({
+      where: { id: fileUploadRecord.id },
+      data: { totalRecords: data.length }
+    });
+
+    // Extract properties
+    const properties = extractProperties(data);
+    console.log(`[PROCESS] Extracted ${properties.length} properties`);
+
+    // Process properties in batches
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+    const BATCH_SIZE = 100;
+
+    for (let i = 0; i < properties.length; i += BATCH_SIZE) {
+      const batch = properties.slice(i, i + BATCH_SIZE);
+      
+      for (const prop of batch) {
+        try {
+          if (!prop.accountNumber) {
+            skipped++;
+            continue;
+          }
+
+          // Ensure status is valid Prisma enum value
+          const validStatus = ['JUDGMENT', 'ACTIVE', 'PENDING', 'PAID', 'REMOVED'].includes(prop.status) 
+            ? prop.status 
+            : 'ACTIVE';
+
+          // Upsert property - include all fields from Property model including NEW- columns
+          // Build update object with only defined values to avoid Prisma errors
+          const updateData = {
+            ownerName: prop.ownerName || 'Unknown',
+            propertyAddress: prop.propertyAddress || 'Unknown',
+            mailingAddress: prop.mailingAddress,
+            totalDue: prop.totalDue || 0,
+            percentageDue: prop.percentageDue || 0,
+            status: validStatus,
+            taxYear: prop.taxYear,
+            legalDescription: prop.legalDescription,
+            phoneNumbers: prop.phoneNumbers || [],
+            isNew: prop.isNew || false,
+            isRemoved: prop.isRemoved || false,
+            statusChanged: prop.statusChanged || false,
+            percentageChanged: prop.percentageChanged || false,
+            updatedAt: new Date()
+          };
+
+          // Add NEW- columns only if they exist (to avoid errors if columns don't exist yet)
+          if (prop.marketValue !== undefined && prop.marketValue !== null) updateData.marketValue = prop.marketValue;
+          if (prop.landValue !== undefined && prop.landValue !== null) updateData.landValue = prop.landValue;
+          if (prop.improvementValue !== undefined && prop.improvementValue !== null) updateData.improvementValue = prop.improvementValue;
+          if (prop.cappedValue !== undefined && prop.cappedValue !== null) updateData.cappedValue = prop.cappedValue;
+          if (prop.agriculturalValue !== undefined && prop.agriculturalValue !== null) updateData.agriculturalValue = prop.agriculturalValue;
+          if (prop.exemptions && Array.isArray(prop.exemptions)) updateData.exemptions = prop.exemptions;
+          if (prop.jurisdictions && Array.isArray(prop.jurisdictions)) updateData.jurisdictions = prop.jurisdictions;
+          if (prop.lastPaymentDate) updateData.lastPaymentDate = prop.lastPaymentDate;
+          if (prop.lastPaymentAmount !== undefined && prop.lastPaymentAmount !== null) updateData.lastPaymentAmount = prop.lastPaymentAmount;
+          if (prop.lastPayer) updateData.lastPayer = prop.lastPayer;
+          if (prop.delinquentAfter) updateData.delinquentAfter = prop.delinquentAfter;
+          if (prop.halfPaymentOptionAmount !== undefined && prop.halfPaymentOptionAmount !== null) updateData.halfPaymentOptionAmount = prop.halfPaymentOptionAmount;
+          if (prop.priorYearsAmountDue !== undefined && prop.priorYearsAmountDue !== null) updateData.priorYearsAmountDue = prop.priorYearsAmountDue;
+          if (prop.yearAmountDue !== undefined && prop.yearAmountDue !== null) updateData.yearAmountDue = prop.yearAmountDue;
+          if (prop.yearTaxLevy !== undefined && prop.yearTaxLevy !== null) updateData.yearTaxLevy = prop.yearTaxLevy;
+          if (prop.link) updateData.link = prop.link;
+          if (prop.ownerAddress) updateData.ownerAddress = prop.ownerAddress;
+
+          const createData = {
+            accountNumber: prop.accountNumber,
+            ...updateData
+          };
+          delete createData.updatedAt; // Remove updatedAt from create
+
+          const property = await prisma.property.upsert({
+            where: { accountNumber: prop.accountNumber },
+            update: updateData,
+            create: createData
+          });
+
+          if (property.createdAt.getTime() === property.updatedAt.getTime()) {
+            inserted++;
+          } else {
+            updated++;
+          }
+        } catch (error) {
+          console.error(`[PROCESS] Error upserting property ${prop.accountNumber}:`, error.message);
+          errors.push({
+            accountNumber: prop.accountNumber || 'Unknown',
+            error: error.message
+          });
+          skipped++;
+        }
+      }
+
+      // Update progress
+      await prisma.fileUpload.update({
+        where: { id: fileUploadRecord.id },
+        data: { processedRecords: Math.min(i + BATCH_SIZE, properties.length) }
+      });
+    }
+
+    // Mark as completed
+    await prisma.fileUpload.update({
+      where: { id: fileUploadRecord.id },
+      data: {
+        status: 'COMPLETED',
+        processedRecords: properties.length,
+        errorCount: errors.length,
+        completedAt: new Date()
+      }
+    });
+
+    console.log(`[PROCESS] Complete - Inserted: ${inserted}, Updated: ${updated}, Skipped: ${skipped}`);
+
+  } catch (error) {
+    console.error(`[PROCESS] Error processing file ${fileId}:`, error);
+    try {
+      const fileUploadRecord = await prisma.fileUpload.findUnique({
+        where: { fileId }
+      });
+      if (fileUploadRecord) {
+        await prisma.fileUpload.update({
+          where: { id: fileUploadRecord.id },
+          data: {
+            status: 'FAILED',
+            errorMessage: error.message
+          }
+        });
+      }
+    } catch (updateError) {
+      console.error(`[PROCESS] Failed to update error status:`, updateError);
+    }
+    throw error;
+  }
+}
+
+// ============================================================================
+// EXTRACT PROPERTIES FROM EXCEL DATA (with comprehensive NEW- columns support)
+// ============================================================================
+
+function extractProperties(data) {
+  if (!data || data.length === 0) {
+    console.log('[EXTRACT] No data to extract');
+    return [];
+  }
+  
+  const headers = Object.keys(data[0] || {});
+  console.log(`[EXTRACT] Extracting from ${data.length} rows with headers:`, headers.slice(0, 10).join(', '), '...');
+  
+  const mappings = {
+    accountNumber: ['can', 'account', 'account number', 'account_number', 'acct', 'acct no'],
+    ownerName: ['owner', 'owner name', 'owner_name', 'name'],
+    propertyAddress: ['addrstring', 'property address', 'property_address', 'address', 'property'],
+    mailingAddress: ['mailing address', 'mailing_address', 'mailing'],
+    status: ['legalstatus', 'legal_status', 'legal status'],
+    totalAmountDue: ['tot_percan', 'total', 'amount due', 'amount_due', 'due', 'balance', 'levy_balance'],
+    totalPercentage: ['percentage', 'percent', 'pct'],
+  };
+
+  const columnMap = {};
+  headers.forEach(header => {
+    const trimmedHeader = header.trim();
+    const lowerHeader = trimmedHeader.toLowerCase();
+    const normalizedHeader = lowerHeader.replace(/[^a-z0-9]/g, '');
+    
+    Object.entries(mappings).forEach(([key, aliases]) => {
+      if (columnMap[key]) return;
+      
+      for (const alias of aliases) {
+        if (lowerHeader === alias || normalizedHeader === alias.replace(/[^a-z0-9]/g, '')) {
+          columnMap[key] = trimmedHeader;
+          console.log(`[EXTRACT] Matched "${trimmedHeader}" → ${key}`);
+          return;
+        }
+      }
+      
+      for (const alias of aliases) {
+        const normalizedAlias = alias.replace(/[^a-z0-9]/g, '');
+        if (lowerHeader.includes(alias) || normalizedHeader.includes(normalizedAlias)) {
+          columnMap[key] = trimmedHeader;
+          console.log(`[EXTRACT] Matched "${trimmedHeader}" → ${key} (partial)`);
+          return;
+        }
+      }
+    });
+  });
+  
+  console.log(`[EXTRACT] Column mapping:`, columnMap);
+  
+  // Log NEW- columns found
+  const newColumns = headers.filter(h => h && h.toUpperCase().startsWith('NEW-'));
+  console.log(`[EXTRACT] NEW- columns found (${newColumns.length}):`, newColumns.join(', '));
+
+  const properties = data.map((row, index) => {
+    const getValue = (key) => {
+      const col = columnMap[key];
+      if (!col) {
+        const rowKeys = Object.keys(row);
+        const lowerKey = key.toLowerCase();
+        for (const rowKey of rowKeys) {
+          if (rowKey.toLowerCase() === lowerKey || 
+              rowKey.toLowerCase().includes(lowerKey) ||
+              lowerKey.includes(rowKey.toLowerCase())) {
+            return (row[rowKey] || '').toString().trim();
+          }
+        }
+        return '';
+      }
+      const value = row[col];
+      if (value === undefined || value === null) return '';
+      return value.toString().trim();
+    };
+
+    // Find account number (CAN)
+    let finalAccountNumber = getValue('accountNumber');
+    if (!finalAccountNumber) {
+      for (const header of headers) {
+        const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (normalizedHeader === 'CAN' || normalizedHeader.includes('CAN')) {
+          finalAccountNumber = (row[header] || '').toString().trim();
+          break;
+        }
+      }
+    }
+    
+    if (!finalAccountNumber) {
+      return null; // Skip rows without account number
+    }
+
+    // Find property address (ADDRSTRING)
+    let finalPropertyAddress = getValue('propertyAddress');
+    if (!finalPropertyAddress) {
+      for (const header of headers) {
+        const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (normalizedHeader === 'ADDRSTRING' || normalizedHeader.includes('ADDRSTRING') || 
+            normalizedHeader.includes('ADDRESS')) {
+          finalPropertyAddress = (row[header] || '').toString().trim();
+          break;
+        }
+      }
+    }
+
+    // Find status (LEGALSTATUS) - must be exact match
+    let finalStatus = '';
+    for (const header of headers) {
+      if (header.trim().toUpperCase() === 'LEGALSTATUS') {
+        finalStatus = (row[header] || '').toString().trim();
+        break;
+      }
+    }
+    
+    // Determine status value - must match Prisma enum: JUDGMENT, ACTIVE, PENDING, PAID, REMOVED
+    let statusValue = 'ACTIVE'; // Default to ACTIVE
+    if (finalStatus) {
+      const firstChar = finalStatus.charAt(0).toUpperCase();
+      if (firstChar === 'P') statusValue = 'PENDING';
+      else if (firstChar === 'J') statusValue = 'JUDGMENT';
+      else if (firstChar === 'A') statusValue = 'ACTIVE';
+      // Default to ACTIVE for any other value
+    }
+
+    // Helper to get NEW- column values
+    const getNewColumn = (fieldName) => {
+      const exactMatch = row[`NEW-${fieldName}`];
+      if (exactMatch !== undefined && exactMatch !== null && exactMatch !== '') {
+        return exactMatch;
+      }
+      for (const header of headers) {
+        if (header) {
+          const headerUpper = header.toUpperCase().trim();
+          const targetUpper = `NEW-${fieldName.toUpperCase()}`.trim();
+          if (headerUpper === targetUpper) {
+            const value = row[header];
+            if (value !== undefined && value !== null && value !== '') {
+              return value;
+            }
+          }
+          const headerNormalized = headerUpper.replace(/[^A-Z0-9]/g, '');
+          const targetNormalized = targetUpper.replace(/[^A-Z0-9]/g, '');
+          if (headerNormalized === targetNormalized) {
+            const value = row[header];
+            if (value !== undefined && value !== null && value !== '') {
+              return value;
+            }
+          }
+        }
+      }
+      return null;
+    };
+
+    // Helper to safely get NEW- column value with multiple fallback strategies
+    const getNewColumnValue = (fieldName) => {
+      let value = getNewColumn(fieldName);
+      if (value !== null && value !== undefined && value !== '') {
+        return value;
+      }
+      value = row[`NEW-${fieldName}`];
+      if (value !== undefined && value !== null && value !== '') {
+        return value;
+      }
+      for (const header of headers) {
+        if (header && header.toUpperCase() === `NEW-${fieldName.toUpperCase()}`) {
+          value = row[header];
+          if (value !== undefined && value !== null && value !== '') {
+            return value;
+          }
+        }
+      }
+      return null;
+    };
+
+    // Parse numeric values from NEW- columns
+    const parseNumeric = (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      const num = parseFloat(String(value).replace(/[$,]/g, ''));
+      return isNaN(num) ? null : num;
+    };
+
+    // Log first row for debugging
+    if (index === 0) {
+      const availableNewColumns = headers.filter(h => h && h.toUpperCase().startsWith('NEW-'));
+      console.log(`[EXTRACT] Available NEW- columns:`, availableNewColumns);
+    }
+
+    // Build property object with all NEW- columns
+    const property = {
+      accountNumber: finalAccountNumber,
+      ownerName: getValue('ownerName') || getNewColumnValue('Owner Name') || 'Unknown',
+      propertyAddress: finalPropertyAddress || getValue('propertyAddress') || getNewColumnValue('Property Site Address') || 'Unknown',
+      mailingAddress: getValue('mailingAddress') || getNewColumnValue('Owner Address') || null,
+      status: statusValue,
+      totalDue: parseNumeric(getNewColumnValue('Total')) || parseNumeric(getNewColumnValue('Total Amount Due')) || parseFloat(getValue('totalAmountDue') || '0') || 0,
+      percentageDue: parseFloat(getValue('totalPercentage') || '0') || 0,
+      // NEW- columns - all scraped data fields
+      legalDescription: getNewColumnValue('Legal Description') || null,
+      marketValue: parseNumeric(getNewColumnValue('Total Market Value')),
+      landValue: parseNumeric(getNewColumnValue('Land Value')),
+      improvementValue: parseNumeric(getNewColumnValue('Improvement Value')),
+      cappedValue: parseNumeric(getNewColumnValue('Capped Value')),
+      agriculturalValue: parseNumeric(getNewColumnValue('Agricultural Value')),
+      exemptions: (() => {
+        const val = getNewColumnValue('Exemptions');
+        return val ? String(val).split(',').map(e => e.trim()).filter(e => e) : [];
+      })(),
+      jurisdictions: (() => {
+        const val = getNewColumnValue('Jurisdictions');
+        return val ? String(val).split(',').map(j => j.trim()).filter(j => j) : [];
+      })(),
+      lastPaymentDate: getNewColumnValue('Last Payment Date') || null,
+      lastPaymentAmount: parseNumeric(getNewColumnValue('Last Payment Amount Received')),
+      lastPayer: getNewColumnValue('Last Payer') || null,
+      delinquentAfter: getNewColumnValue('Delinquent After') || null,
+      halfPaymentOptionAmount: parseNumeric(getNewColumnValue('Half Payment Option Amount')),
+      priorYearsAmountDue: parseNumeric(getNewColumnValue('Prior Years Amount Due')),
+      taxYear: (() => {
+        const val = getNewColumnValue('Tax Year');
+        if (val) {
+          const year = parseInt(String(val));
+          return isNaN(year) ? null : year;
+        }
+        return null;
+      })(),
+      yearAmountDue: parseNumeric(getNewColumnValue('Year Amount Due')),
+      yearTaxLevy: parseNumeric(getNewColumnValue('Year Tax Levy')),
+      link: getNewColumnValue('Link') || null,
+      ownerAddress: getNewColumnValue('Owner Address') || null,
+      phoneNumbers: [],
+      isNew: false,
+      isRemoved: false,
+      statusChanged: false,
+      percentageChanged: false
+    };
+
+    return property;
+  }).filter(p => p !== null && p.accountNumber);
+
+  console.log(`[EXTRACT] Extracted ${properties.length} properties (filtered from ${data.length} rows)`);
+  
+  if (properties.length > 0) {
+    const sample = properties[0];
+    const newFieldsWithData = Object.keys(sample).filter(key => {
+      const value = sample[key];
+      return ['marketValue', 'landValue', 'improvementValue', 'cappedValue', 'agriculturalValue',
+              'legalDescription', 'lastPaymentDate', 'lastPayer', 'delinquentAfter', 'taxYear',
+              'link', 'ownerAddress', 'exemptions', 'jurisdictions', 'lastPaymentAmount',
+              'halfPaymentOptionAmount', 'priorYearsAmountDue', 'yearAmountDue', 'yearTaxLevy'].includes(key)
+             && value !== undefined && value !== null && value !== '' && value !== 0;
+    });
+    console.log(`[EXTRACT] Sample property has ${newFieldsWithData.length} NEW- fields with data:`, newFieldsWithData);
+  }
+  
+  return properties;
+}
+
+// ============================================================================
+// GET FILE UPLOAD STATUS
+// ============================================================================
+
+router.get('/:fileId/status', optionalAuth, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    const fileUpload = await prisma.fileUpload.findUnique({
+      where: { fileId }
+    });
+
+    if (!fileUpload) {
+      return res.status(404).json({ error: 'File upload not found' });
+    }
+
+    res.json(fileUpload);
+  } catch (error) {
+    console.error('[UPLOAD] Status error:', error);
+    res.status(500).json({ error: 'Failed to get file status' });
+  }
+});
+
+// ============================================================================
+// GET ALL FILE UPLOADS
+// ============================================================================
+
+router.get('/', optionalAuth, async (req, res) => {
+  try {
+    const files = await prisma.fileUpload.findMany({
+      orderBy: { uploadedAt: 'desc' },
+      take: 50
+    });
+
+    res.json(files);
+  } catch (error) {
+    console.error('[UPLOAD] List error:', error);
+    res.status(500).json({ error: 'Failed to list files' });
+  }
+});
+
+// ============================================================================
 // CLEAR ALL PROPERTIES (Admin only)
 // ============================================================================
 
-router.delete('/properties/all', authenticateToken, async (req, res) => {
+router.delete('/properties/all', optionalAuth, async (req, res) => {
   try {
-    // Check if user is admin
-    if (req.user.role !== 'ADMIN') {
+    // Check if user is admin (if authenticated)
+    if (req.user && req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     const count = await prisma.property.deleteMany({});
 
-    console.log(`[UPLOAD] Deleted ${count.count} properties by admin ${req.user.username}`);
+    console.log(`[UPLOAD] Deleted ${count.count} properties`);
 
     res.json({
       success: true,
