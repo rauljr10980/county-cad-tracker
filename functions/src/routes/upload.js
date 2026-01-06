@@ -306,9 +306,9 @@ async function processFileAsync(fileId, buffer, filename) {
           }
 
           // Ensure status is valid Prisma enum value
-          const validStatus = ['JUDGMENT', 'ACTIVE', 'PENDING', 'PAID', 'REMOVED'].includes(prop.status)
+          const validStatus = ['JUDGMENT', 'ACTIVE', 'PENDING', 'PAID', 'REMOVED', 'UNKNOWN'].includes(prop.status)
             ? prop.status
-            : 'ACTIVE';
+            : 'UNKNOWN';
 
           // Build data object with all fields
           const propertyData = {
