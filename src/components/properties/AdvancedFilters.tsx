@@ -73,7 +73,7 @@ export function AdvancedFiltersPanel({
 
   const getStatusButtonText = () => {
     if (filters.statuses.length === 0) {
-      return `All (${totalUnfiltered.toLocaleString()})`;
+      return `All (${(totalUnfiltered || 0).toLocaleString()})`;
     }
     if (filters.statuses.length === 1) {
       const status = filters.statuses[0];
@@ -87,7 +87,7 @@ export function AdvancedFiltersPanel({
       };
       const label = statusLabels[status] || status;
       const count = statusCounts[status as keyof typeof statusCounts] || 0;
-      return `${label} (${count.toLocaleString()})`;
+      return `${label} (${(count || 0).toLocaleString()})`;
     }
     return `${filters.statuses.length} selected`;
   };
@@ -149,7 +149,7 @@ export function AdvancedFiltersPanel({
                   <div className="flex items-center justify-between w-full">
                     <span>All</span>
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({totalUnfiltered.toLocaleString()})
+                      ({(totalUnfiltered || 0).toLocaleString()})
                     </span>
                   </div>
                 </DropdownMenuCheckboxItem>
@@ -164,7 +164,7 @@ export function AdvancedFiltersPanel({
                       <span>Pending</span>
                     </div>
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({statusCounts.PENDING.toLocaleString()})
+                      ({((statusCounts?.PENDING) || 0).toLocaleString()})
                     </span>
                   </div>
                 </DropdownMenuCheckboxItem>
@@ -178,7 +178,7 @@ export function AdvancedFiltersPanel({
                       <span>Active</span>
                     </div>
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({statusCounts.ACTIVE.toLocaleString()})
+                      ({((statusCounts?.ACTIVE) || 0).toLocaleString()})
                     </span>
                   </div>
                 </DropdownMenuCheckboxItem>
@@ -192,7 +192,7 @@ export function AdvancedFiltersPanel({
                       <span>Judgment</span>
                     </div>
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({statusCounts.JUDGMENT.toLocaleString()})
+                      ({((statusCounts?.JUDGMENT) || 0).toLocaleString()})
                     </span>
                   </div>
                 </DropdownMenuCheckboxItem>
@@ -206,7 +206,7 @@ export function AdvancedFiltersPanel({
                       <span>Unknown</span>
                     </div>
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({statusCounts.UNKNOWN.toLocaleString()})
+                      ({((statusCounts?.UNKNOWN) || 0).toLocaleString()})
                     </span>
                   </div>
                 </DropdownMenuCheckboxItem>
