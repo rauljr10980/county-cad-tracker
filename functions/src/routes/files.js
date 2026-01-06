@@ -4,7 +4,7 @@
  */
 
 const express = require('express');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 
 const router = express.Router();
@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
 // DELETE /api/files/:fileId - Delete a file upload record
 // ============================================================================
 
-router.delete('/:fileId', authenticateToken, async (req, res) => {
+router.delete('/:fileId', optionalAuth, async (req, res) => {
   try {
     const { fileId } = req.params;
 
@@ -92,7 +92,7 @@ router.delete('/:fileId', authenticateToken, async (req, res) => {
 // POST /api/files/:fileId/reprocess - Reprocess a file
 // ============================================================================
 
-router.post('/:fileId/reprocess', authenticateToken, async (req, res) => {
+router.post('/:fileId/reprocess', optionalAuth, async (req, res) => {
   try {
     const { fileId } = req.params;
 
