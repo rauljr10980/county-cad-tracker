@@ -42,7 +42,7 @@ interface AdvancedFiltersProps {
   filters: AdvancedFilters;
   onFiltersChange: (filters: AdvancedFilters) => void;
   onClear: () => void;
-  statusCounts: { J: number; A: number; P: number; other: number };
+  statusCounts: { JUDGMENT: number; ACTIVE: number; PENDING: number; UNKNOWN: number; PAID: number; REMOVED: number };
   totalUnfiltered: number;
   activeFilterCount: number;
 }
@@ -77,8 +77,16 @@ export function AdvancedFiltersPanel({
     }
     if (filters.statuses.length === 1) {
       const status = filters.statuses[0];
-      const label = status === 'J' ? 'Judgment' : status === 'A' ? 'Active' : 'Pending';
-      const count = statusCounts[status] || 0;
+      const statusLabels: Record<string, string> = {
+        'JUDGMENT': 'Judgment',
+        'ACTIVE': 'Active',
+        'PENDING': 'Pending',
+        'UNKNOWN': 'Unknown',
+        'PAID': 'Paid',
+        'REMOVED': 'Removed'
+      };
+      const label = statusLabels[status] || status;
+      const count = statusCounts[status as keyof typeof statusCounts] || 0;
       return `${label} (${count.toLocaleString()})`;
     }
     return `${filters.statuses.length} selected`;
@@ -147,8 +155,8 @@ export function AdvancedFiltersPanel({
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuCheckboxItem
-                  checked={filters.statuses.includes('P')}
-                  onCheckedChange={() => toggleStatus('P')}
+                  checked={filters.statuses.includes('PENDING')}
+                  onCheckedChange={() => toggleStatus('PENDING')}
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
@@ -156,13 +164,13 @@ export function AdvancedFiltersPanel({
                       <span>Pending</span>
                     </div>
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({statusCounts.P.toLocaleString()})
+                      ({statusCounts.PENDING.toLocaleString()})
                     </span>
                   </div>
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
-                  checked={filters.statuses.includes('A')}
-                  onCheckedChange={() => toggleStatus('A')}
+                  checked={filters.statuses.includes('ACTIVE')}
+                  onCheckedChange={() => toggleStatus('ACTIVE')}
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
@@ -170,13 +178,13 @@ export function AdvancedFiltersPanel({
                       <span>Active</span>
                     </div>
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({statusCounts.A.toLocaleString()})
+                      ({statusCounts.ACTIVE.toLocaleString()})
                     </span>
                   </div>
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
-                  checked={filters.statuses.includes('J')}
-                  onCheckedChange={() => toggleStatus('J')}
+                  checked={filters.statuses.includes('JUDGMENT')}
+                  onCheckedChange={() => toggleStatus('JUDGMENT')}
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
@@ -184,7 +192,21 @@ export function AdvancedFiltersPanel({
                       <span>Judgment</span>
                     </div>
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({statusCounts.J.toLocaleString()})
+                      ({statusCounts.JUDGMENT.toLocaleString()})
+                    </span>
+                  </div>
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filters.statuses.includes('UNKNOWN')}
+                  onCheckedChange={() => toggleStatus('UNKNOWN')}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-gray-500" />
+                      <span>Unknown</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({statusCounts.UNKNOWN.toLocaleString()})
                     </span>
                   </div>
                 </DropdownMenuCheckboxItem>

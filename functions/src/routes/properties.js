@@ -79,23 +79,29 @@ router.get('/',
         orderBy: { [sortBy]: sortOrder }
       });
 
-      // Format status counts to match frontend expectations
+      // Format status counts to match frontend expectations (use full enum names)
       const statusCounts = {
-        J: 0,
-        A: 0,
-        P: 0,
-        other: 0
+        JUDGMENT: 0,
+        ACTIVE: 0,
+        PENDING: 0,
+        UNKNOWN: 0,
+        PAID: 0,
+        REMOVED: 0
       };
       statusCountsResult.forEach(item => {
         const status = item.status?.toUpperCase();
-        if (status === 'JUDGMENT' || status === 'J') {
-          statusCounts.J = item._count.status;
-        } else if (status === 'ACTIVE' || status === 'A') {
-          statusCounts.A = item._count.status;
-        } else if (status === 'PENDING' || status === 'P') {
-          statusCounts.P = item._count.status;
-        } else {
-          statusCounts.other += item._count.status;
+        if (status === 'JUDGMENT') {
+          statusCounts.JUDGMENT = item._count.status;
+        } else if (status === 'ACTIVE') {
+          statusCounts.ACTIVE = item._count.status;
+        } else if (status === 'PENDING') {
+          statusCounts.PENDING = item._count.status;
+        } else if (status === 'UNKNOWN') {
+          statusCounts.UNKNOWN = item._count.status;
+        } else if (status === 'PAID') {
+          statusCounts.PAID = item._count.status;
+        } else if (status === 'REMOVED') {
+          statusCounts.REMOVED = item._count.status;
         }
       });
 

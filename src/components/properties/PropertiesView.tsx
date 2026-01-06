@@ -125,12 +125,12 @@ export function PropertiesView() {
   const statusCounts = useMemo(() => {
     try {
       if (data && !Array.isArray(data) && 'statusCounts' in data) {
-        return data.statusCounts || { J: 0, A: 0, P: 0, other: 0 };
+        return data.statusCounts || { JUDGMENT: 0, ACTIVE: 0, PENDING: 0, UNKNOWN: 0, PAID: 0, REMOVED: 0 };
       }
     } catch (e) {
       console.error('[PropertiesView] Error parsing statusCounts:', e);
     }
-    return { J: 0, A: 0, P: 0, other: 0 };
+    return { JUDGMENT: 0, ACTIVE: 0, PENDING: 0, UNKNOWN: 0, PAID: 0, REMOVED: 0 };
   }, [data]);
   
   const totalUnfiltered = useMemo(() => {
