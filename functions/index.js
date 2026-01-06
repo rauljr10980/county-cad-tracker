@@ -1158,14 +1158,19 @@ function extractProperties(data, canHeaderName = null) {
       });
     }
     
-    // Determine final status: P, A, J, or blank (unknown)
+    // Determine final status: P, A, J, or U (unknown)
     // finalStatus comes ONLY from LEGALSTATUS column
-    let statusValue = '';
+    let statusValue = 'U'; // Default to Unknown
     if (finalStatus) {
       const firstChar = finalStatus.charAt(0).toUpperCase();
-      // Only accept P, A, or J - anything else is unknown
+      // Only accept P, A, or J - anything else is unknown (U)
       if (firstChar === 'P' || firstChar === 'A' || firstChar === 'J') {
         statusValue = firstChar;
+      } else {
+        // Log if we get unexpected status values (for debugging)
+        if (index === 0 || Math.random() < 0.001) {
+          console.log(`[EXTRACT] LEGALSTATUS value "${finalStatus}" converted to Unknown (U), first char: "${firstChar}"`);
+        }
       }
     }
     
@@ -1307,17 +1312,25 @@ function extractProperties(data, canHeaderName = null) {
 
     return property;
   }).filter(p => {
-    // Only filter out completely empty rows (no account number AND no address)
-    // A row has data if it has EITHER an accountNumber OR a propertyAddress
+    // Include ALL properties - only filter out completely empty rows
+    // A row has data if it has ANY of: accountNumber, propertyAddress, ownerName, or status
+    // This ensures we get all properties including those with P, A, J status
     const hasAccountNumber = p.accountNumber && p.accountNumber.trim() !== '';
     const hasPropertyAddress = p.propertyAddress && p.propertyAddress.trim() !== '';
-    const hasData = hasAccountNumber || hasPropertyAddress;
+    const hasOwnerName = p.ownerName && p.ownerName.trim() !== '';
+    const hasStatus = p.status && p.status !== 'U'; // Has a valid status (P, A, or J)
+    const hasData = hasAccountNumber || hasPropertyAddress || hasOwnerName || hasStatus;
     
     if (!hasData) {
-      console.log(`[EXTRACT] Filtering out empty row (no account number and no address):`, {
-        accountNumber: p.accountNumber,
-        propertyAddress: p.propertyAddress
-      });
+      // Only log occasionally to avoid spam
+      if (Math.random() < 0.01) {
+        console.log(`[EXTRACT] Filtering out completely empty row:`, {
+          accountNumber: p.accountNumber,
+          propertyAddress: p.propertyAddress,
+          ownerName: p.ownerName,
+          status: p.status
+        });
+      }
     }
     return hasData;
   });
@@ -1348,15 +1361,17 @@ function extractProperties(data, canHeaderName = null) {
     console.log(`[EXTRACT] WARNING: Found ${duplicateCANs.length} duplicate CAN values (first 10):`, duplicateCANs.slice(0, 10));
   }
   
-  // Log status breakdown
-  const statusCounts = { J: 0, A: 0, P: 0, other: 0 };
+  // Log status breakdown - track P, A, J, and U (Unknown)
+  const statusCounts = { J: 0, A: 0, P: 0, U: 0, other: 0 };
   properties.forEach(p => {
     if (p.status === 'J') statusCounts.J++;
     else if (p.status === 'A') statusCounts.A++;
     else if (p.status === 'P') statusCounts.P++;
+    else if (p.status === 'U' || !p.status) statusCounts.U++;
     else statusCounts.other++;
   });
-  console.log(`[EXTRACT] Status breakdown: J=${statusCounts.J}, A=${statusCounts.A}, P=${statusCounts.P}, other=${statusCounts.other}`);
+  console.log(`[EXTRACT] Status breakdown: P=${statusCounts.P}, A=${statusCounts.A}, J=${statusCounts.J}, U=${statusCounts.U}, other=${statusCounts.other}`);
+  console.log(`[EXTRACT] Total properties with P/A/J status: ${statusCounts.P + statusCounts.A + statusCounts.J}`);
   
   if (properties.length > 0) {
     console.log(`[EXTRACT] Sample property:`, {
