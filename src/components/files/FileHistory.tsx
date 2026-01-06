@@ -5,7 +5,7 @@ import { useFiles, useDeleteFile, useReprocessFile } from '@/hooks/useFiles';
 import { toast } from '@/hooks/use-toast';
 
 export function FileHistory() {
-  const { data: files = [], isLoading, error } = useFiles();
+  const { data: files = [], isLoading, error, refetch } = useFiles();
   const deleteMutation = useDeleteFile();
   const reprocessMutation = useReprocessFile();
 
