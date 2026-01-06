@@ -23,7 +23,24 @@ router.get('/', async (req, res) => {
 
     console.log(`[FILES] Retrieved ${files.length} file uploads`);
 
-    res.json(files);
+    // Transform to match frontend expectations
+    const transformedFiles = files.map(file => {
+      // Map database status to frontend status
+      let status = file.status.toLowerCase();
+      if (status === 'failed') status = 'error';
+
+      return {
+        id: file.id,
+        filename: file.filename,
+        uploadedAt: file.uploadedAt.toISOString(),
+        processedAt: file.completedAt?.toISOString(),
+        propertyCount: file.processedRecords || 0,
+        status,
+        errorMessage: file.errorMessage,
+      };
+    });
+
+    res.json(transformedFiles);
   } catch (error) {
     console.error('[FILES] Error fetching files:', error);
     res.status(500).json({
