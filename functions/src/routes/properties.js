@@ -79,8 +79,14 @@ router.get('/',
         orderBy: { [sortBy]: sortOrder }
       });
 
-      // Format status counts to match frontend expectations (use full enum names)
+      // Format status counts to match BOTH old and new frontend (backward compatible)
       const statusCounts = {
+        // Old format for cached frontend
+        J: 0,
+        A: 0,
+        P: 0,
+        other: 0,
+        // New format for updated frontend
         JUDGMENT: 0,
         ACTIVE: 0,
         PENDING: 0,
@@ -92,16 +98,22 @@ router.get('/',
         const status = item.status?.toUpperCase();
         if (status === 'JUDGMENT') {
           statusCounts.JUDGMENT = item._count.status;
+          statusCounts.J = item._count.status; // Backward compat
         } else if (status === 'ACTIVE') {
           statusCounts.ACTIVE = item._count.status;
+          statusCounts.A = item._count.status; // Backward compat
         } else if (status === 'PENDING') {
           statusCounts.PENDING = item._count.status;
+          statusCounts.P = item._count.status; // Backward compat
         } else if (status === 'UNKNOWN') {
           statusCounts.UNKNOWN = item._count.status;
+          statusCounts.other += item._count.status; // Backward compat
         } else if (status === 'PAID') {
           statusCounts.PAID = item._count.status;
+          statusCounts.other += item._count.status; // Backward compat
         } else if (status === 'REMOVED') {
           statusCounts.REMOVED = item._count.status;
+          statusCounts.other += item._count.status; // Backward compat
         }
       });
 
