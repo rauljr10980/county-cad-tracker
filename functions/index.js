@@ -1597,6 +1597,12 @@ app.post('/api/files/:fileId/reprocess', async (req, res) => {
   try {
     const { fileId } = req.params;
     console.log(`[REPROCESS] Starting reprocess for file: ${fileId}`);
+    console.log(`[REPROCESS] Request details:`, {
+      fileId,
+      method: req.method,
+      url: req.url,
+      headers: Object.keys(req.headers)
+    });
 
     if (!storage) {
       console.error('[REPROCESS] ERROR: Storage not initialized');
@@ -1604,6 +1610,7 @@ app.post('/api/files/:fileId/reprocess', async (req, res) => {
     }
 
     const bucket = storage.bucket(BUCKET_NAME);
+    console.log(`[REPROCESS] Using bucket: ${BUCKET_NAME}`);
 
     // Load file metadata to get storage path and filename
     const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
