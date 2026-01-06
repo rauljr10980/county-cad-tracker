@@ -150,7 +150,16 @@ export function PropertiesView() {
   const statusCounts = useMemo(() => {
     try {
       if (data && !Array.isArray(data) && 'statusCounts' in data) {
-        return data.statusCounts || { JUDGMENT: 0, ACTIVE: 0, PENDING: 0, UNKNOWN: 0, PAID: 0, REMOVED: 0 };
+        const apiCounts = data.statusCounts || {};
+        // API returns { J, A, P, U } - map to frontend format { JUDGMENT, ACTIVE, PENDING, UNKNOWN }
+        return {
+          JUDGMENT: (typeof apiCounts.J === 'number' ? apiCounts.J : 0) || 0,
+          ACTIVE: (typeof apiCounts.A === 'number' ? apiCounts.A : 0) || 0,
+          PENDING: (typeof apiCounts.P === 'number' ? apiCounts.P : 0) || 0,
+          UNKNOWN: (typeof apiCounts.U === 'number' ? apiCounts.U : 0) || 0,
+          PAID: (typeof apiCounts.PAID === 'number' ? apiCounts.PAID : 0) || 0,
+          REMOVED: (typeof apiCounts.REMOVED === 'number' ? apiCounts.REMOVED : 0) || 0,
+        };
       }
     } catch (e) {
       console.error('[PropertiesView] Error parsing statusCounts:', e);
@@ -489,7 +498,7 @@ export function PropertiesView() {
             <h2 className="text-xl font-semibold">Property List</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Browse and filter tax-delinquent properties. Click on a property to view details.
-              {totalUnfiltered && totalUnfiltered > 0 && ` ${(totalUnfiltered || 0).toLocaleString()} total properties.`}
+              {totalUnfiltered && typeof totalUnfiltered === 'number' && totalUnfiltered > 0 && ` ${totalUnfiltered.toLocaleString()} total properties.`}
             </p>
           </div>
         </div>
@@ -536,7 +545,7 @@ export function PropertiesView() {
             
             {activeFilterCount > 0 && (
               <span className="text-sm text-muted-foreground">
-                Showing {total ? total.toLocaleString() : 0} filtered {total === 1 ? 'property' : 'properties'}
+                Showing {total && typeof total === 'number' ? total.toLocaleString() : 0} filtered {total === 1 ? 'property' : 'properties'}
               </span>
             )}
           </div>
