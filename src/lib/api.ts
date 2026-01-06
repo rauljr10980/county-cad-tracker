@@ -335,18 +335,51 @@ export async function reprocessFile(fileId: string) {
  * Get properties from latest completed file
  */
 export async function getProperties(page = 1, limit = 100, status?: string, search?: string) {
-  let url = `${API_BASE_URL}/api/properties?page=${page}&limit=${limit}`;
-  if (status) {
-    url += `&status=${status}`;
+  try {
+    console.log(`[API] Fetching properties: page=${page}, limit=${limit}, status=${status}, search=${search}`);
+    let url = `${API_BASE_URL}/api/properties?page=${page}&limit=${limit}`;
+    if (status) {
+      url += `&status=${status}`;
+    }
+    if (search && search.trim()) {
+      url += `&search=${encodeURIComponent(search.trim())}`;
+    }
+    
+    console.log(`[API] Properties URL: ${url}`);
+    const response = await fetch(url);
+    
+    console.log(`[API] Properties response status: ${response.status}`);
+    
+    if (!response.ok) {
+      // Try to extract error message from response
+      let errorMessage = 'Failed to fetch properties';
+      try {
+        const errorData = await response.json();
+        console.error(`[API] Properties error data:`, errorData);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } catch (parseError) {
+        // If response is not JSON, use status text
+        console.error(`[API] Failed to parse error response:`, parseError);
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+    
+    const result = await response.json();
+    console.log(`[API] Properties response:`, {
+      propertiesCount: Array.isArray(result) ? result.length : result.properties?.length || 0,
+      total: result.total || (Array.isArray(result) ? result.length : 0),
+      hasStatusCounts: !!(result.statusCounts)
+    });
+    return result;
+  } catch (error) {
+    console.error(`[API] Properties fetch error:`, error);
+    throw error;
   }
-  if (search && search.trim()) {
-    url += `&search=${encodeURIComponent(search.trim())}`;
-  }
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch properties');
-  }
-  return response.json();
 }
 
 /**
