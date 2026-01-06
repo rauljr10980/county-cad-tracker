@@ -135,10 +135,23 @@ router.post('/', optionalAuth, async (req, res) => {
       return status;
     };
 
+    // Helper to parse owner name and mailing address from ADDRSTRING
+    const parseAddrString = (addrString) => {
+      if (!addrString) return { ownerName: 'Unknown', mailingAddress: null };
+      const str = String(addrString).trim();
+      // ADDRSTRING format: "OWNER NAME full mailing address"
+      // Extract owner name (first part before address numbers)
+      const parts = str.split(/\s+\d+/); // Split on first number (address starts with number)
+      const ownerName = parts[0] || 'Unknown';
+      const mailingAddress = str || null;
+      return { ownerName, mailingAddress };
+    };
+
     for (const row of data) {
       try {
         // Map Excel columns to database fields - try many variations
         const accountNumber = safeString(
+          row['CAN'] ||  // DTR Summary format
           row['Account Number'] ||
           row['ACCOUNT NUMBER'] ||
           row['accountNumber'] ||
@@ -154,6 +167,9 @@ router.post('/', optionalAuth, async (req, res) => {
           continue;
         }
 
+        // Parse ADDRSTRING if available (DTR Summary format)
+        const addrInfo = parseAddrString(row['ADDRSTRING'] || row['addrString']);
+
         const propertyData = {
           accountNumber,
           ownerName: safeString(
@@ -163,10 +179,13 @@ router.post('/', optionalAuth, async (req, res) => {
             row['Owner'] ||
             row['OWNER'] ||
             row['Name'] ||
-            row['NAME'],
+            row['NAME'] ||
+            addrInfo.ownerName,  // From ADDRSTRING
             'Unknown'
           ),
           propertyAddress: safeString(
+            row['PSTRNAME'] ||  // DTR Summary property street name
+            row['pstrName'] ||
             row['Property Address'] ||
             row['PROPERTY ADDRESS'] ||
             row['propertyAddress'] ||
@@ -185,9 +204,12 @@ router.post('/', optionalAuth, async (req, res) => {
             row['MAIL ADDRESS'] ||
             row['Owner Address'] ||
             row['OWNER ADDRESS'] ||
+            addrInfo.mailingAddress ||  // From ADDRSTRING
             null
           ),
           totalDue: safeParseFloat(
+            row['TOT_PERCAN'] ||  // DTR Summary total per account
+            row['LEVY_BALANCE'] ||  // DTR Summary levy balance
             row['Total Due'] ||
             row['TOTAL DUE'] ||
             row['totalDue'] ||
@@ -211,6 +233,8 @@ router.post('/', optionalAuth, async (req, res) => {
             row['PCT']
           ),
           status: normalizeStatus(
+            row['LEGALSTATUS'] ||  // DTR Summary legal status (P/A/J)
+            row['legalStatus'] ||
             row['Status'] ||
             row['STATUS'] ||
             row['status'] ||
@@ -218,13 +242,15 @@ router.post('/', optionalAuth, async (req, res) => {
             row['TAX STATUS']
           ),
           taxYear: parseInt(
+            row['YEAR'] ||  // DTR Summary year
             row['Tax Year'] ||
             row['TAX YEAR'] ||
             row['taxYear'] ||
-            row['Year'] ||
-            row['YEAR']
+            row['Year']
           ) || new Date().getFullYear(),
           legalDescription: safeString(
+            row['LGLSTRING'] ||  // DTR Summary legal string
+            row['lglString'] ||
             row['Legal Description'] ||
             row['LEGAL DESCRIPTION'] ||
             row['legalDescription'] ||
