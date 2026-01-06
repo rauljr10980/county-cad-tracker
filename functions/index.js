@@ -1106,8 +1106,11 @@ function extractProperties(data, canHeaderName = null) {
     }
     
     // Use accountNumber from mapping as fallback only if column E is empty
+    // But don't use ROW_${index} fallback - if CAN from column E is empty, leave it empty
+    // This ensures we only match by CAN from column E
     if (!finalAccountNumber) {
       finalAccountNumber = accountNumber || '';
+      // Don't use ROW_${index} fallback - we want to match by CAN only
     }
     
     // Also try to find ADDRSTRING and LEGALSTATUS if not found
@@ -1249,11 +1252,12 @@ function extractProperties(data, canHeaderName = null) {
 
     // Build property object with all NEW- columns - ensure data transfer
     // Use accountNumber as the ID since that's the unique identifier in the database
-    // If accountNumber is missing, generate a fallback ID
-    const accountNum = finalAccountNumber || accountNumber || `ROW_${index}`;
+    // Only use CAN from column E - don't create fallback IDs
+    // If CAN is empty, use empty string (will be filtered out if no address either)
+    const accountNum = finalAccountNumber || accountNumber || '';
     const property = {
-      id: accountNum, // Use accountNumber as ID since that's how properties are identified
-      accountNumber: accountNum,
+      id: accountNum || `TEMP_${index}`, // Use accountNumber as ID, or temp ID if missing (for matching)
+      accountNumber: accountNum, // CAN from column E only - empty if not found
       ownerName: getValue('ownerName') || getNewColumnValue('Owner Name') || '',
       propertyAddress: finalPropertyAddress || propertyAddress || getNewColumnValue('Property Site Address') || '',
       mailingAddress: getValue('mailingAddress') || getNewColumnValue('Owner Address') || '',
@@ -1319,6 +1323,30 @@ function extractProperties(data, canHeaderName = null) {
   });
   
   console.log(`[EXTRACT] Extracted ${properties.length} properties (filtered from ${data.length} rows)`);
+  
+  // Check for duplicate CAN values (accountNumbers)
+  const canCounts = {};
+  const duplicateCANs = [];
+  properties.forEach(p => {
+    if (p.accountNumber && p.accountNumber.trim() !== '') {
+      const can = p.accountNumber.trim();
+      if (!canCounts[can]) {
+        canCounts[can] = 0;
+      }
+      canCounts[can]++;
+      if (canCounts[can] === 2) {
+        duplicateCANs.push(can);
+      }
+    }
+  });
+  const uniqueCANs = Object.keys(canCounts).length;
+  const propertiesWithCAN = properties.filter(p => p.accountNumber && p.accountNumber.trim() !== '').length;
+  const propertiesWithoutCAN = properties.length - propertiesWithCAN;
+  
+  console.log(`[EXTRACT] CAN analysis: ${uniqueCANs} unique CANs, ${propertiesWithCAN} properties with CAN, ${propertiesWithoutCAN} without CAN`);
+  if (duplicateCANs.length > 0) {
+    console.log(`[EXTRACT] WARNING: Found ${duplicateCANs.length} duplicate CAN values (first 10):`, duplicateCANs.slice(0, 10));
+  }
   
   // Log status breakdown
   const statusCounts = { J: 0, A: 0, P: 0, other: 0 };
@@ -1844,7 +1872,14 @@ app.get('/api/properties', async (req, res) => {
       if (fileDoc && fileDoc.status === 'completed') {
         console.log(`[PROPERTIES] Loading properties from file: ${fileId}`);
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
-        console.log(`[PROPERTIES] Returning ${properties.length} properties`);
+        console.log(`[PROPERTIES] Loaded ${properties.length} properties from file ${fileId}`);
+        
+        // Count properties with valid CAN (accountNumber from column E)
+        const propertiesWithCAN = properties.filter(p => p.accountNumber && p.accountNumber.trim() !== '' && !p.accountNumber.startsWith('TEMP_') && !p.accountNumber.startsWith('ROW_')).length;
+        const propertiesWithoutCAN = properties.length - propertiesWithCAN;
+        console.log(`[PROPERTIES] Properties breakdown: ${propertiesWithCAN} with valid CAN, ${propertiesWithoutCAN} without valid CAN`);
+        
+        console.log(`[PROPERTIES] Returning ${properties.length} total properties`);
         
         // Log sample property to verify NEW- columns are included
         if (properties.length > 0) {
