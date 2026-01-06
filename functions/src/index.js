@@ -22,6 +22,7 @@ const noteRoutes = require('./routes/notes');
 const userRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
 const uploadRoutes = require('./routes/upload');
+const fileRoutes = require('./routes/files');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -125,6 +126,7 @@ app.use('/api/properties', propertyRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/files', fileRoutes);
 
 // ============================================================================
 // ERROR HANDLING

@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
+    "start:mock": "node src/index-mock.js",
+    "dev:mock": "nodemon src/index-mock.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
