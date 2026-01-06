@@ -272,10 +272,12 @@ app.get('/api/properties', (req, res) => {
     total: filtered.length,
     totalPages: Math.ceil(filtered.length / limit),
     statusCounts: {
-      J: mockData.properties.filter(p => p.status === 'JUDGMENT').length,
-      A: mockData.properties.filter(p => p.status === 'ACTIVE').length,
-      P: mockData.properties.filter(p => p.status === 'PENDING').length,
-      other: mockData.properties.filter(p => !['JUDGMENT', 'ACTIVE', 'PENDING'].includes(p.status)).length
+      JUDGMENT: mockData.properties.filter(p => p.status === 'JUDGMENT').length,
+      ACTIVE: mockData.properties.filter(p => p.status === 'ACTIVE').length,
+      PENDING: mockData.properties.filter(p => p.status === 'PENDING').length,
+      UNKNOWN: mockData.properties.filter(p => p.status === 'UNKNOWN').length,
+      PAID: mockData.properties.filter(p => p.status === 'PAID').length,
+      REMOVED: mockData.properties.filter(p => p.status === 'REMOVED').length
     }
   });
 });
