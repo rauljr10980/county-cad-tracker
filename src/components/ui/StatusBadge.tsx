@@ -7,9 +7,14 @@ interface StatusBadgeProps {
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-  J: { label: 'Judgment', className: 'status-judgment' },
-  A: { label: 'Active', className: 'status-active' },
-  P: { label: 'Pending', className: 'status-pending' },
+  J: { label: 'J', className: 'status-judgment' },
+  A: { label: 'A', className: 'status-active' },
+  P: { label: 'P', className: 'status-pending' },
+  JUDGMENT: { label: 'J', className: 'status-judgment' },
+  ACTIVE: { label: 'A', className: 'status-active' },
+  PENDING: { label: 'P', className: 'status-pending' },
+  PAID: { label: 'PAID', className: 'status-active' },
+  REMOVED: { label: 'RMV', className: 'bg-gray-500/20 text-gray-400' },
 };
 
 // Default config for unknown statuses
@@ -17,7 +22,9 @@ const defaultConfig = { label: 'Unknown', className: 'bg-gray-500/20 text-gray-4
 
 export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
   // Safely get config with fallback for invalid/unknown statuses
-  const config = statusConfig[status] || defaultConfig;
+  // Convert status to uppercase for case-insensitive matching
+  const upperStatus = status?.toString().toUpperCase();
+  const config = statusConfig[upperStatus] || defaultConfig;
   
   return (
     <span 

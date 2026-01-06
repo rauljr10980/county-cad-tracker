@@ -510,23 +510,42 @@ function extractProperties(data) {
       }
     }
 
-    // Find status (LEGALSTATUS) - must be exact match
+    // Find status (LEGALSTATUS) - check multiple variations
     let finalStatus = '';
     for (const header of headers) {
-      if (header.trim().toUpperCase() === 'LEGALSTATUS') {
+      const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (normalizedHeader === 'LEGALSTATUS' || normalizedHeader === 'LEGAL_STATUS' || normalizedHeader === 'STATUS') {
         finalStatus = (row[header] || '').toString().trim();
-        break;
+        if (finalStatus) break; // Only break if we found a non-empty value
       }
     }
-    
+
+    // If still not found, try looking in the mapped columns
+    if (!finalStatus) {
+      finalStatus = getValue('status');
+    }
+
     // Determine status value - must match Prisma enum: JUDGMENT, ACTIVE, PENDING, PAID, REMOVED
     let statusValue = 'ACTIVE'; // Default to ACTIVE
     if (finalStatus) {
-      const firstChar = finalStatus.charAt(0).toUpperCase();
+      const upperStatus = finalStatus.toUpperCase();
+      const firstChar = upperStatus.charAt(0);
+
+      // Map single character codes to full status names
       if (firstChar === 'P') statusValue = 'PENDING';
       else if (firstChar === 'J') statusValue = 'JUDGMENT';
       else if (firstChar === 'A') statusValue = 'ACTIVE';
+      else if (upperStatus.includes('JUDGMENT')) statusValue = 'JUDGMENT';
+      else if (upperStatus.includes('PENDING')) statusValue = 'PENDING';
+      else if (upperStatus.includes('ACTIVE')) statusValue = 'ACTIVE';
+      else if (upperStatus.includes('PAID')) statusValue = 'PAID';
+      else if (upperStatus.includes('REMOVED')) statusValue = 'REMOVED';
       // Default to ACTIVE for any other value
+    }
+
+    // Debug log for first row
+    if (index === 0) {
+      console.log(`[EXTRACT] First row status - Raw: "${finalStatus}", Mapped: "${statusValue}"`);
     }
 
     // Helper to get NEW- column values
