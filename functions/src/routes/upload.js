@@ -6,7 +6,7 @@
 const express = require('express');
 const multer = require('multer');
 const XLSX = require('xlsx');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 
 const router = express.Router();
@@ -38,7 +38,7 @@ function generateFileId() {
 // UPLOAD EXCEL FILE (Base64 JSON format - used by frontend)
 // ============================================================================
 
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', optionalAuth, async (req, res) => {
   try {
     const { filename, fileData } = req.body;
 
@@ -76,6 +76,12 @@ router.post('/', authenticateToken, async (req, res) => {
 
     console.log(`[UPLOAD] Found ${data.length} rows in Excel file`);
 
+    // Log first row to see column names
+    if (data.length > 0) {
+      console.log('[UPLOAD] First row columns:', Object.keys(data[0]));
+      console.log('[UPLOAD] First row sample:', JSON.stringify(data[0], null, 2));
+    }
+
     if (data.length === 0) {
       await prisma.fileUpload.update({
         where: { id: fileUpload.id },
@@ -112,16 +118,27 @@ router.post('/', authenticateToken, async (req, res) => {
           continue;
         }
 
+        // Safe parse helpers
+        const safeParseFloat = (value) => {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 0 : parsed;
+        };
+
+        const safeString = (value, defaultValue = '') => {
+          if (value === null || value === undefined) return defaultValue;
+          return String(value).trim();
+        };
+
         const propertyData = {
           accountNumber,
-          ownerName: String(row['Owner Name'] || row['OWNER NAME'] || row['ownerName'] || '').trim(),
-          propertyAddress: String(row['Property Address'] || row['PROPERTY ADDRESS'] || row['propertyAddress'] || '').trim(),
-          mailingAddress: String(row['Mailing Address'] || row['MAILING ADDRESS'] || row['mailingAddress'] || null),
-          totalDue: parseFloat(row['Total Due'] || row['TOTAL DUE'] || row['totalDue'] || 0),
-          percentageDue: parseFloat(row['Percentage Due'] || row['PERCENTAGE DUE'] || row['percentageDue'] || 0),
-          status: String(row['Status'] || row['STATUS'] || row['status'] || 'ACTIVE').toUpperCase(),
-          taxYear: parseInt(row['Tax Year'] || row['TAX YEAR'] || row['taxYear'] || new Date().getFullYear()),
-          legalDescription: String(row['Legal Description'] || row['LEGAL DESCRIPTION'] || row['legalDescription'] || null),
+          ownerName: safeString(row['Owner Name'] || row['OWNER NAME'] || row['ownerName'] || row['Owner'], 'Unknown'),
+          propertyAddress: safeString(row['Property Address'] || row['PROPERTY ADDRESS'] || row['propertyAddress'] || row['Address'] || row['ADDRESS']),
+          mailingAddress: safeString(row['Mailing Address'] || row['MAILING ADDRESS'] || row['mailingAddress']),
+          totalDue: safeParseFloat(row['Total Due'] || row['TOTAL DUE'] || row['totalDue'] || row['Amount Due'] || row['AMOUNT DUE']),
+          percentageDue: safeParseFloat(row['Percentage Due'] || row['PERCENTAGE DUE'] || row['percentageDue'] || row['Percent'] || row['PERCENT']),
+          status: safeString(row['Status'] || row['STATUS'] || row['status'], 'ACTIVE').toUpperCase(),
+          taxYear: parseInt(row['Tax Year'] || row['TAX YEAR'] || row['taxYear']) || new Date().getFullYear(),
+          legalDescription: safeString(row['Legal Description'] || row['LEGAL DESCRIPTION'] || row['legalDescription']),
           phoneNumbers: [],
           isNew: false,
           isRemoved: false,
@@ -231,16 +248,27 @@ router.post('/excel', authenticateToken, upload.single('file'), async (req, res)
           continue;
         }
 
+        // Safe parse helpers
+        const safeParseFloat = (value) => {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 0 : parsed;
+        };
+
+        const safeString = (value, defaultValue = '') => {
+          if (value === null || value === undefined) return defaultValue;
+          return String(value).trim();
+        };
+
         const propertyData = {
           accountNumber,
-          ownerName: String(row['Owner Name'] || row['OWNER NAME'] || row['ownerName'] || '').trim(),
-          propertyAddress: String(row['Property Address'] || row['PROPERTY ADDRESS'] || row['propertyAddress'] || '').trim(),
-          mailingAddress: String(row['Mailing Address'] || row['MAILING ADDRESS'] || row['mailingAddress'] || null),
-          totalDue: parseFloat(row['Total Due'] || row['TOTAL DUE'] || row['totalDue'] || 0),
-          percentageDue: parseFloat(row['Percentage Due'] || row['PERCENTAGE DUE'] || row['percentageDue'] || 0),
-          status: String(row['Status'] || row['STATUS'] || row['status'] || 'ACTIVE').toUpperCase(),
-          taxYear: parseInt(row['Tax Year'] || row['TAX YEAR'] || row['taxYear'] || new Date().getFullYear()),
-          legalDescription: String(row['Legal Description'] || row['LEGAL DESCRIPTION'] || row['legalDescription'] || null),
+          ownerName: safeString(row['Owner Name'] || row['OWNER NAME'] || row['ownerName'] || row['Owner'], 'Unknown'),
+          propertyAddress: safeString(row['Property Address'] || row['PROPERTY ADDRESS'] || row['propertyAddress'] || row['Address'] || row['ADDRESS']),
+          mailingAddress: safeString(row['Mailing Address'] || row['MAILING ADDRESS'] || row['mailingAddress']),
+          totalDue: safeParseFloat(row['Total Due'] || row['TOTAL DUE'] || row['totalDue'] || row['Amount Due'] || row['AMOUNT DUE']),
+          percentageDue: safeParseFloat(row['Percentage Due'] || row['PERCENTAGE DUE'] || row['percentageDue'] || row['Percent'] || row['PERCENT']),
+          status: safeString(row['Status'] || row['STATUS'] || row['status'], 'ACTIVE').toUpperCase(),
+          taxYear: parseInt(row['Tax Year'] || row['TAX YEAR'] || row['taxYear']) || new Date().getFullYear(),
+          legalDescription: safeString(row['Legal Description'] || row['LEGAL DESCRIPTION'] || row['legalDescription']),
           phoneNumbers: [],
           isNew: false,
           isRemoved: false,
