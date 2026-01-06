@@ -1312,23 +1312,31 @@ function extractProperties(data, canHeaderName = null) {
 
     return property;
   }).filter(p => {
-    // Include ALL properties - only filter out completely empty rows
-    // A row has data if it has ANY of: accountNumber, propertyAddress, ownerName, or status
-    // This ensures we get all properties including those with P, A, J status
+    // Process ALL rows - only filter out rows that are completely empty
+    // Check if row has ANY data at all (any field with a value)
     const hasAccountNumber = p.accountNumber && p.accountNumber.trim() !== '';
     const hasPropertyAddress = p.propertyAddress && p.propertyAddress.trim() !== '';
     const hasOwnerName = p.ownerName && p.ownerName.trim() !== '';
-    const hasStatus = p.status && p.status !== 'U'; // Has a valid status (P, A, or J)
-    const hasData = hasAccountNumber || hasPropertyAddress || hasOwnerName || hasStatus;
+    const hasMailingAddress = p.mailingAddress && p.mailingAddress.trim() !== '';
+    const hasStatus = p.status && p.status.trim() !== ''; // Any status value (P, A, J, U, or empty)
+    const hasTotalAmountDue = p.totalAmountDue !== undefined && p.totalAmountDue !== null && p.totalAmountDue !== 0;
+    const hasMarketValue = p.marketValue !== undefined && p.marketValue !== null;
+    const hasLandValue = p.landValue !== undefined && p.landValue !== null;
+    const hasLegalDescription = p.legalDescription && p.legalDescription.trim() !== '';
+    
+    // Include row if it has ANY data field populated
+    const hasData = hasAccountNumber || hasPropertyAddress || hasOwnerName || hasMailingAddress || 
+                    hasStatus || hasTotalAmountDue || hasMarketValue || hasLandValue || hasLegalDescription;
     
     if (!hasData) {
       // Only log occasionally to avoid spam
       if (Math.random() < 0.01) {
-        console.log(`[EXTRACT] Filtering out completely empty row:`, {
+        console.log(`[EXTRACT] Filtering out completely empty row ${p.id || 'unknown'}:`, {
           accountNumber: p.accountNumber,
           propertyAddress: p.propertyAddress,
           ownerName: p.ownerName,
-          status: p.status
+          status: p.status,
+          totalAmountDue: p.totalAmountDue
         });
       }
     }
