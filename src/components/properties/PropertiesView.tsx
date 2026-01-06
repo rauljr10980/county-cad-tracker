@@ -364,10 +364,17 @@ export function PropertiesView() {
       }
     }
     
-    return {
-      properties: finalProperties,
+    console.log('[PropertiesView] Pagination result:', {
+      propertiesCount: finalProperties.length,
       total: finalTotal,
       totalPages: finalTotalPages,
+      page
+    });
+    
+    return {
+      properties: finalProperties || [],
+      total: finalTotal || 0,
+      totalPages: finalTotalPages || 1,
     };
   }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data, isSortingActive]);
   
