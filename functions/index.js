@@ -2205,8 +2205,16 @@ app.get('/api/properties', async (req, res) => {
       message: error.message,
       name: error.name
     });
+    // Return a consistent structure even on error
     res.status(500).json({ 
       error: error.message || 'Failed to fetch properties',
+      properties: [],
+      total: 0,
+      totalUnfiltered: 0,
+      statusCounts: { J: 0, A: 0, P: 0, U: 0 },
+      page: 1,
+      totalPages: 0,
+      filter: null,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
