@@ -50,7 +50,7 @@ echo "✅ Database tables created successfully"
 
 # Verify tables were created
 echo "🔍 Verifying database connection..."
-if ! npx prisma db execute --stdin <<< "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null; then
+if ! echo "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';" | npx prisma db execute --stdin 2>/dev/null; then
   echo "⚠️  Could not verify tables, but continuing..."
 else
   echo "✅ Database connection verified"
