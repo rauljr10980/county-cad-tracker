@@ -151,12 +151,14 @@ export function PropertiesView() {
     try {
       if (data && !Array.isArray(data) && 'statusCounts' in data) {
         const apiCounts = data.statusCounts || {};
-        // API returns { J, A, P, U } - map to frontend format { JUDGMENT, ACTIVE, PENDING, UNKNOWN }
+        console.log('[PropertiesView] Raw statusCounts from API:', apiCounts);
+
+        // API now returns full enum names { JUDGMENT, ACTIVE, PENDING, UNKNOWN, PAID, REMOVED }
         return {
-          JUDGMENT: (typeof apiCounts.J === 'number' ? apiCounts.J : 0) || 0,
-          ACTIVE: (typeof apiCounts.A === 'number' ? apiCounts.A : 0) || 0,
-          PENDING: (typeof apiCounts.P === 'number' ? apiCounts.P : 0) || 0,
-          UNKNOWN: (typeof apiCounts.U === 'number' ? apiCounts.U : 0) || 0,
+          JUDGMENT: (typeof apiCounts.JUDGMENT === 'number' ? apiCounts.JUDGMENT : 0) || 0,
+          ACTIVE: (typeof apiCounts.ACTIVE === 'number' ? apiCounts.ACTIVE : 0) || 0,
+          PENDING: (typeof apiCounts.PENDING === 'number' ? apiCounts.PENDING : 0) || 0,
+          UNKNOWN: (typeof apiCounts.UNKNOWN === 'number' ? apiCounts.UNKNOWN : 0) || 0,
           PAID: (typeof apiCounts.PAID === 'number' ? apiCounts.PAID : 0) || 0,
           REMOVED: (typeof apiCounts.REMOVED === 'number' ? apiCounts.REMOVED : 0) || 0,
         };
