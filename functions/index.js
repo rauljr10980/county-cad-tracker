@@ -126,7 +126,9 @@ async function saveUsers() {
 
 // Initialize users on startup (after storage is ready)
 setTimeout(() => {
-  loadUsers();
+  loadUsers().catch(error => {
+    console.error('[AUTH] Failed to load users on startup:', error);
+  });
 }, 1000);
 
 // Simple token generation (in production, use proper JWT library)
@@ -397,6 +399,9 @@ app.get('/api/auth/session', authenticateToken, (req, res) => {
 // Debug endpoint to check last processed file's raw data
 app.get('/api/debug/sample', async (req, res) => {
   try {
+    if (!storage) {
+      return res.status(500).json({ error: 'Storage not initialized' });
+    }
     const bucket = storage.bucket(BUCKET_NAME);
     const fileList = await listFiles(bucket, 'metadata/files/');
     const fileIds = fileList
@@ -693,15 +698,28 @@ async function processFile(fileId, storagePath, filename) {
       // Row 4+: Data rows - PROCESS
       
       // Step 1: Manually extract headers from Row 3 (0-indexed row 2)
+      // Column E is index 4 (A=0, B=1, C=2, D=3, E=4)
       const headerRow = [];
       const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+      
       for (let col = range.s.c; col <= range.e.c; col++) {
         const cellAddress = XLSX.utils.encode_cell({ r: 2, c: col }); // Row 3 is 0-indexed row 2
         const cell = worksheet[cellAddress];
-        headerRow.push(cell ? cell.v.toString().trim() : `__EMPTY_${col}`);
+        const headerValue = cell ? cell.v.toString().trim() : `__EMPTY_${col}`;
+        headerRow.push(headerValue);
+        
+        // Check if this is column E (index 4) and verify it contains CAN
+        if (col === 4) { // Column E is index 4
+          const normalizedHeader = headerValue.toUpperCase().replace(/[^A-Z0-9]/g, '');
+          if (normalizedHeader === 'CAN') {
+            console.log(`[PROCESS] ✓ Found CAN in column E (index ${col}): "${headerValue}"`);
+          } else {
+            console.log(`[PROCESS] ⚠ WARNING: Column E (index ${col}) contains "${headerValue}", expected "CAN"`);
+          }
+        }
       }
       console.log(`[PROCESS] EXPLICIT Row 3 headers:`, headerRow.slice(0, 15).join(', '));
-      console.log(`[PROCESS] Looking for: CAN at E3, ADDRSTRING at H3, LEGALSTATUS at AE3`);
+      console.log(`[PROCESS] Looking for: CAN at E3 (index 4), ADDRSTRING at H3, LEGALSTATUS at AE3`);
       
       // Step 2: Convert to JSON starting from Row 4 (0-indexed row 3), using explicit headers
       data = XLSX.utils.sheet_to_json(worksheet, {
@@ -711,6 +729,12 @@ async function processFile(fileId, storagePath, filename) {
         defval: '', // Default value for empty cells
         blankrows: false, // Skip blank rows to save memory
       });
+      
+      // Get the header name from column E (index 4) - this is what we'll use to extract CAN
+      // This ensures we ONLY use CAN from column E, not from any other column
+      const CAN_COLUMN_INDEX = 4; // Column E
+      const canHeaderName = headerRow[CAN_COLUMN_INDEX] || '';
+      console.log(`[PROCESS] CAN column (E, index ${CAN_COLUMN_INDEX}) header: "${canHeaderName}"`);
       
       // Log what we got
       if (data.length > 0) {
@@ -743,8 +767,44 @@ async function processFile(fileId, storagePath, filename) {
 
     // Extract properties
     await updateProgress(fileId, 'extracting', `Extracting properties from ${data.length} rows...`, 50);
-    const properties = extractProperties(data);
-    console.log(`[PROCESS] Extracted ${properties.length} properties`);
+    // Get the header name from column E (index 4) for CAN extraction
+    const canHeaderName = data.length > 0 ? Object.keys(data[0])[4] : null; // Column E is index 4
+    if (canHeaderName) {
+      console.log(`[PROCESS] CAN header name from column E: "${canHeaderName}"`);
+    }
+    const properties = extractProperties(data, canHeaderName);
+    console.log(`[PROCESS] Extracted ${properties.length} properties from ${data.length} data rows`);
+    
+    // Warn if no properties were extracted
+    if (properties.length === 0) {
+      console.error(`[PROCESS] WARNING: No properties extracted from file!`);
+      console.error(`[PROCESS] Data rows parsed: ${data.length}`);
+      if (data.length > 0) {
+        console.error(`[PROCESS] Sample data row keys:`, Object.keys(data[0] || {}).slice(0, 10).join(', '));
+        console.error(`[PROCESS] Sample data row (first 5 columns):`, 
+          Object.keys(data[0] || {}).slice(0, 5).reduce((acc, key) => {
+            acc[key] = data[0][key];
+            return acc;
+          }, {})
+        );
+      }
+      // Still mark as completed but with a warning message
+      const fileDoc = {
+        id: fileId,
+        filename,
+        uploadedAt: (await loadJSON(bucket, `metadata/files/${fileId}.json`))?.uploadedAt || new Date().toISOString(),
+        status: 'completed',
+        processedAt: new Date().toISOString(),
+        propertyCount: 0,
+        storagePath,
+        processingStep: 'completed',
+        processingMessage: `WARNING: No properties extracted. File parsed ${data.length} rows but no valid properties found. Check column headers (CAN, ADDRSTRING, LEGALSTATUS).`,
+        processingProgress: 100,
+      };
+      await saveJSON(bucket, `metadata/files/${fileId}.json`, fileDoc);
+      console.log(`[PROCESS] File marked as completed with 0 properties and warning message`);
+      return; // Exit early since there's nothing to save or compare
+    }
     
     // Verify data transfer - check if NEW- columns were extracted
     if (properties.length > 0) {
@@ -883,8 +943,10 @@ async function processFile(fileId, storagePath, filename) {
 
 /**
  * Extract properties from Excel data
+ * @param {Array} data - Array of row objects from Excel
+ * @param {string} canHeaderName - The header name from column E (for CAN extraction)
  */
-function extractProperties(data) {
+function extractProperties(data, canHeaderName = null) {
   if (!data || data.length === 0) {
     console.log('[EXTRACT] No data to extract');
     return [];
@@ -997,31 +1059,40 @@ function extractProperties(data) {
     const status = getValue('status');
     const totalAmountDue = getValue('totalAmountDue');
     
-    // Use first non-empty column value as accountNumber if CAN not found
-    let finalAccountNumber = accountNumber;
-    if (!finalAccountNumber || finalAccountNumber === '') {
-      // Try to find CAN column by searching all headers (case-insensitive, handles spaces/special chars)
-      for (const header of headers) {
-        const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-        if (normalizedHeader === 'CAN' || normalizedHeader.includes('CAN')) {
-          finalAccountNumber = (row[header] || '').toString().trim();
-          if (finalAccountNumber && index === 0) {
-            console.log(`[EXTRACT] ✓ Found CAN column: "${header}" = ${finalAccountNumber}`);
-          }
-          break;
+    // Extract CAN ONLY from column E - this is the unique identifier for matching
+    // Use the header name passed from column E (index 4)
+    let finalAccountNumber = '';
+    
+    if (canHeaderName && row[canHeaderName] !== undefined) {
+      // Extract CAN value directly from column E using the header name
+      finalAccountNumber = (row[canHeaderName] || '').toString().trim();
+      
+      if (index === 0) {
+        console.log(`[EXTRACT] CAN from column E (header: "${canHeaderName}"): "${finalAccountNumber}"`);
+      }
+    } else {
+      // Fallback: try to get value from column E by index if header name not available
+      // Get headers in order and access index 4 (column E)
+      const headerArray = Object.keys(row);
+      if (headerArray.length > 4) {
+        const columnEHeader = headerArray[4]; // Column E is index 4
+        finalAccountNumber = (row[columnEHeader] || '').toString().trim();
+        if (index === 0) {
+          console.log(`[EXTRACT] CAN from column E (index 4, header: "${columnEHeader}"): "${finalAccountNumber}"`);
         }
       }
-      // If still not found, try first column (but only log once)
-      if (!finalAccountNumber) {
-        const firstCol = headers[0];
-        if (firstCol && row[firstCol]) {
-          finalAccountNumber = row[firstCol].toString().trim();
-          if (index === 0) {
-            console.log(`[EXTRACT] ⚠ WARNING: CAN column not found! Using first column "${firstCol}" = ${finalAccountNumber}`);
-            console.log(`[EXTRACT] Available columns:`, headers.slice(0, 15).join(', '));
-          }
-        }
-      }
+    }
+    
+    // If still no CAN found, log warning
+    if (!finalAccountNumber && index === 0) {
+      console.log(`[EXTRACT] ⚠ WARNING: No CAN value found in column E`);
+      console.log(`[EXTRACT] Column E header name: "${canHeaderName || 'NOT PROVIDED'}"`);
+      console.log(`[EXTRACT] Available headers:`, headers.slice(0, 10).join(', '));
+    }
+    
+    // Use accountNumber from mapping as fallback only if column E is empty
+    if (!finalAccountNumber) {
+      finalAccountNumber = accountNumber || '';
     }
     
     // Also try to find ADDRSTRING and LEGALSTATUS if not found
@@ -1162,9 +1233,12 @@ function extractProperties(data) {
     };
 
     // Build property object with all NEW- columns - ensure data transfer
+    // Use accountNumber as the ID since that's the unique identifier in the database
+    // If accountNumber is missing, generate a fallback ID
+    const accountNum = finalAccountNumber || accountNumber || `ROW_${index}`;
     const property = {
-      id: `${Date.now()}_${index}`,
-      accountNumber: finalAccountNumber || accountNumber || `ROW_${index}`,
+      id: accountNum, // Use accountNumber as ID since that's how properties are identified
+      accountNumber: accountNum,
       ownerName: getValue('ownerName') || getNewColumnValue('Owner Name') || '',
       propertyAddress: finalPropertyAddress || propertyAddress || getNewColumnValue('Property Site Address') || '',
       mailingAddress: getValue('mailingAddress') || getNewColumnValue('Owner Address') || '',
@@ -1214,11 +1288,17 @@ function extractProperties(data) {
 
     return property;
   }).filter(p => {
-    // Only filter out completely empty rows (no account number and no address)
-    const hasData = p.accountNumber && 
-                    (p.accountNumber !== '' || p.propertyAddress !== '');
+    // Only filter out completely empty rows (no account number AND no address)
+    // A row has data if it has EITHER an accountNumber OR a propertyAddress
+    const hasAccountNumber = p.accountNumber && p.accountNumber.trim() !== '';
+    const hasPropertyAddress = p.propertyAddress && p.propertyAddress.trim() !== '';
+    const hasData = hasAccountNumber || hasPropertyAddress;
+    
     if (!hasData) {
-      console.log(`[EXTRACT] Filtering out empty row:`, p);
+      console.log(`[EXTRACT] Filtering out empty row (no account number and no address):`, {
+        accountNumber: p.accountNumber,
+        propertyAddress: p.propertyAddress
+      });
     }
     return hasData;
   });
@@ -1460,13 +1540,32 @@ app.post('/api/files/:fileId/reprocess', async (req, res) => {
     // Load file metadata to get storage path and filename
     const fileDoc = await loadJSON(bucket, `metadata/files/${fileId}.json`);
     if (!fileDoc) {
+      console.error(`[REPROCESS] File metadata not found for fileId: ${fileId}`);
       return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Validate storagePath exists
+    if (!fileDoc.storagePath) {
+      console.error(`[REPROCESS] File metadata missing storagePath for fileId: ${fileId}`, fileDoc);
+      return res.status(400).json({ 
+        error: 'File metadata is missing storage path. Cannot reprocess file.' 
+      });
     }
 
     // Check if original file exists
     const originalFile = bucket.file(fileDoc.storagePath);
-    const [exists] = await originalFile.exists();
+    let exists = false;
+    try {
+      [exists] = await originalFile.exists();
+    } catch (error) {
+      console.error(`[REPROCESS] Error checking file existence:`, error);
+      return res.status(500).json({ 
+        error: `Error checking file existence: ${error.message}` 
+      });
+    }
+    
     if (!exists) {
+      console.error(`[REPROCESS] Original file not found at path: ${fileDoc.storagePath}`);
       return res.status(404).json({
         error: 'Original file not found in storage. File may have been deleted.'
       });
@@ -1889,7 +1988,10 @@ app.put('/api/properties/:propertyId/followup', async (req, res) => {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
         
         // Find and update the property
-        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        // Try matching by ID first (which is now accountNumber), then fallback to accountNumber field
+        const propertyIndex = properties.findIndex(p => 
+          p.id === propertyId || p.accountNumber === propertyId
+        );
         if (propertyIndex !== -1) {
           properties[propertyIndex].lastFollowUp = followUpDate;
           
@@ -1933,7 +2035,10 @@ app.put('/api/properties/:propertyId/notes', async (req, res) => {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
         
         // Find and update the property
-        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        // Try matching by ID first (which is now accountNumber), then fallback to accountNumber field
+        const propertyIndex = properties.findIndex(p => 
+          p.id === propertyId || p.accountNumber === propertyId
+        );
         if (propertyIndex !== -1) {
           properties[propertyIndex].notes = notes || '';
           
@@ -1977,7 +2082,10 @@ app.put('/api/properties/:propertyId/phones', async (req, res) => {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
         
         // Find and update the property
-        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        // Try matching by ID first (which is now accountNumber), then fallback to accountNumber field
+        const propertyIndex = properties.findIndex(p => 
+          p.id === propertyId || p.accountNumber === propertyId
+        );
         if (propertyIndex !== -1) {
           properties[propertyIndex].phoneNumbers = phoneNumbers || [];
           properties[propertyIndex].ownerPhoneIndex = ownerPhoneIndex;
@@ -2022,7 +2130,10 @@ app.put('/api/properties/:propertyId/action', async (req, res) => {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
         
         // Find and update the property
-        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        // Try matching by ID first (which is now accountNumber), then fallback to accountNumber field
+        const propertyIndex = properties.findIndex(p => 
+          p.id === propertyId || p.accountNumber === propertyId
+        );
         if (propertyIndex !== -1) {
           properties[propertyIndex].actionType = actionType;
           properties[propertyIndex].priority = priority;
@@ -2068,7 +2179,10 @@ app.put('/api/properties/:propertyId/priority', async (req, res) => {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
         
         // Find and update the property
-        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        // Try matching by ID first (which is now accountNumber), then fallback to accountNumber field
+        const propertyIndex = properties.findIndex(p => 
+          p.id === propertyId || p.accountNumber === propertyId
+        );
         if (propertyIndex !== -1) {
           properties[propertyIndex].priority = priority;
           
@@ -2112,7 +2226,10 @@ app.put('/api/properties/:propertyId/task-done', async (req, res) => {
         const properties = await loadJSON(bucket, `data/properties/${fileId}.json`) || [];
         
         // Find and update the property
-        const propertyIndex = properties.findIndex(p => p.id === propertyId);
+        // Try matching by ID first (which is now accountNumber), then fallback to accountNumber field
+        const propertyIndex = properties.findIndex(p => 
+          p.id === propertyId || p.accountNumber === propertyId
+        );
         if (propertyIndex !== -1) {
           const property = properties[propertyIndex];
           

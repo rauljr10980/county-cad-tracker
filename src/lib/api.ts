@@ -11,7 +11,8 @@ const getApiBaseUrl = () => {
   
   // In production (deployed), use Railway backend
   if (import.meta.env.PROD) {
-    // Railway backend URL
+    // Railway backend URL - Update this with your actual Railway deployment URL
+    // Get it from: Railway Dashboard → Your Service → Settings → Public Domain
     return 'https://county-cad-tracker-production.up.railway.app';
   }
   
@@ -81,16 +82,28 @@ export async function uploadFile(file: File): Promise<{ fileId: string }> {
 
         console.log(`[UPLOAD] Sending file: ${file.name}, size: ${Math.round(file.size / 1024 / 1024)}MB, base64 length: ${base64.length}`);
         
-        const response = await fetch(`${API_BASE_URL}/api/upload`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            filename: file.name,
-            fileData: base64,
-          }),
-        });
+        console.log(`[UPLOAD] Sending request to: ${API_BASE_URL}/api/upload`);
+        
+        let response;
+        try {
+          response = await fetch(`${API_BASE_URL}/api/upload`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              filename: file.name,
+              fileData: base64,
+            }),
+          });
+        } catch (fetchError) {
+          // Network error - server might not be running or CORS issue
+          console.error('[UPLOAD] Fetch error:', fetchError);
+          if (fetchError instanceof TypeError && fetchError.message.includes('fetch')) {
+            throw new Error(`Cannot connect to server at ${API_BASE_URL}. Make sure the server is running.`);
+          }
+          throw new Error(`Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
+        }
 
         if (!response.ok) {
           let errorMessage = 'Upload failed';
@@ -234,7 +247,18 @@ export async function reprocessFile(fileId: string) {
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
-    throw new Error('Failed to reprocess file');
+    // Try to extract error message from response
+    let errorMessage = 'Failed to reprocess file';
+    try {
+      const errorData = await response.json();
+      if (errorData.error) {
+        errorMessage = errorData.error;
+      }
+    } catch {
+      // If response is not JSON, use status text
+      errorMessage = response.statusText || errorMessage;
+    }
+    throw new Error(errorMessage);
   }
   return response.json();
 }
