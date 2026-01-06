@@ -1482,6 +1482,12 @@ function generateComparison(currentProps, previousProps, currentFilename, previo
 app.get('/api/files', async (req, res) => {
   try {
     console.log('[FILES] Starting file list request');
+    
+    if (!storage) {
+      console.error('[FILES] ERROR: Storage not initialized');
+      return res.status(500).json({ error: 'Storage not initialized. Check environment variables.' });
+    }
+    
     const bucket = storage.bucket(BUCKET_NAME);
 
     // Add timeout wrapper

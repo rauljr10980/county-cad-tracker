@@ -154,14 +154,38 @@ export async function getFiles() {
   try {
     const response = await fetch(url);
     console.log('[API] Files response status:', response.status);
+    console.log('[API] Files response headers:', {
+      'content-type': response.headers.get('content-type'),
+      'content-length': response.headers.get('content-length')
+    });
+    
     if (!response.ok) {
-      throw new Error('Failed to fetch files');
+      // Check if response is HTML (error page)
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        const text = await response.text();
+        console.error('[API] Server returned HTML instead of JSON:', text.substring(0, 200));
+        throw new Error(`Server error: Received HTML response (${response.status}). The API endpoint may not be available.`);
+      }
+      throw new Error(`Failed to fetch files: ${response.status} ${response.statusText}`);
     }
+    
+    // Verify response is JSON
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('[API] Server returned non-JSON response:', text.substring(0, 200));
+      throw new Error(`Invalid response format: Expected JSON but received ${contentType}`);
+    }
+    
     const data = await response.json();
     console.log('[API] Files data:', data);
     return data;
   } catch (error) {
     console.error('[API] Error fetching files:', error);
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error(`Cannot connect to server at ${API_BASE_URL}. Make sure the server is running.`);
+    }
     throw error;
   }
 }
