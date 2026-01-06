@@ -1642,8 +1642,20 @@ app.delete('/api/files/:fileId', async (req, res) => {
       console.error(`[DELETE] Error deleting metadata file:`, err.message);
     }
 
+    // Verify deletion by checking if metadata file still exists
+    const metadataFile = bucket.file(`metadata/files/${fileId}.json`);
+    const [metadataExists] = await metadataFile.exists();
+    
+    if (metadataExists) {
+      console.warn(`[DELETE] WARNING: Metadata file still exists after deletion attempt`);
+      return res.status(500).json({ 
+        error: 'Failed to delete file completely. Some files may still exist.',
+        fileId 
+      });
+    }
+    
     console.log(`[DELETE] Successfully deleted file ${fileId} and all associated data`);
-    res.json({ success: true, message: 'File deleted successfully' });
+    res.json({ success: true, message: 'File deleted successfully', fileId });
   } catch (error) {
     console.error('[DELETE] Error:', error);
     console.error('[DELETE] Error stack:', error.stack);
