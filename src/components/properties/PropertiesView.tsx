@@ -162,11 +162,13 @@ export function PropertiesView() {
     try {
       if (data) {
         if (Array.isArray(data)) {
-          return data.length;
-        } else if ('totalUnfiltered' in data) {
-          return data.totalUnfiltered || 0;
-        } else if ('total' in data) {
-          return data.total || 0;
+          return data.length || 0;
+        } else if (data && typeof data === 'object' && 'totalUnfiltered' in data) {
+          const value = data.totalUnfiltered;
+          return (typeof value === 'number' && !isNaN(value)) ? value : 0;
+        } else if (data && typeof data === 'object' && 'total' in data) {
+          const value = data.total;
+          return (typeof value === 'number' && !isNaN(value)) ? value : 0;
         }
       }
     } catch (e) {
@@ -487,7 +489,7 @@ export function PropertiesView() {
             <h2 className="text-xl font-semibold">Property List</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Browse and filter tax-delinquent properties. Click on a property to view details.
-              {totalUnfiltered > 0 && ` ${totalUnfiltered.toLocaleString()} total properties.`}
+              {totalUnfiltered && totalUnfiltered > 0 && ` ${(totalUnfiltered || 0).toLocaleString()} total properties.`}
             </p>
           </div>
         </div>
