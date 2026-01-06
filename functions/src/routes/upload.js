@@ -184,6 +184,7 @@ router.post('/', optionalAuth, async (req, res) => {
             'Unknown'
           ),
           propertyAddress: safeString(
+            row['NEW-Property Site Address'] ||  // Scraped data (best quality)
             row['PSTRNAME'] ||  // DTR Summary property street name
             row['pstrName'] ||
             row['Property Address'] ||
@@ -208,6 +209,7 @@ router.post('/', optionalAuth, async (req, res) => {
             null
           ),
           totalDue: safeParseFloat(
+            row['NEW-Total Amount Due'] ||  // Scraped data (most accurate)
             row['TOT_PERCAN'] ||  // DTR Summary total per account
             row['LEVY_BALANCE'] ||  // DTR Summary levy balance
             row['Total Due'] ||
@@ -242,6 +244,7 @@ router.post('/', optionalAuth, async (req, res) => {
             row['TAX STATUS']
           ),
           taxYear: parseInt(
+            row['NEW-Tax Year'] ||  // Scraped data
             row['YEAR'] ||  // DTR Summary year
             row['Tax Year'] ||
             row['TAX YEAR'] ||
@@ -249,6 +252,7 @@ router.post('/', optionalAuth, async (req, res) => {
             row['Year']
           ) || new Date().getFullYear(),
           legalDescription: safeString(
+            row['NEW-Legal Description'] ||  // Scraped data (more detailed)
             row['LGLSTRING'] ||  // DTR Summary legal string
             row['lglString'] ||
             row['Legal Description'] ||
@@ -260,6 +264,22 @@ router.post('/', optionalAuth, async (req, res) => {
             row['LEGAL'] ||
             null
           ),
+          // Scraped data fields (NEW- columns)
+          marketValue: safeParseFloat(row['NEW-Total Market Value']),
+          landValue: safeParseFloat(row['NEW-Land Value']),
+          improvementValue: safeParseFloat(row['NEW-Improvement Value']),
+          cappedValue: safeParseFloat(row['NEW-Capped Value']),
+          agriculturalValue: safeParseFloat(row['NEW-Agricultural Value']),
+          exemptions: row['NEW-Exemptions'] ? String(row['NEW-Exemptions']).split(',').map(s => s.trim()) : [],
+          jurisdictions: row['NEW-Jurisdictions'] ? String(row['NEW-Jurisdictions']).split(',').map(s => s.trim()) : [],
+          lastPaymentDate: safeString(row['NEW-Last Payment Date'] || null),
+          lastPaymentAmount: safeParseFloat(row['NEW-Last Payment Amount Received']),
+          lastPayer: safeString(row['NEW-Last Payer'] || null),
+          halfPaymentOptionAmount: safeParseFloat(row['NEW-Half Payment Option Amount']),
+          priorYearsAmountDue: safeParseFloat(row['NEW-Prior Years Amount Due']),
+          yearAmountDue: safeParseFloat(row['NEW-Year Amount Due']),
+          yearTaxLevy: safeParseFloat(row['NEW-Year Tax Levy']),
+          link: safeString(row['NEW-Link'] || null),
           phoneNumbers: [],
           isNew: false,
           isRemoved: false,
