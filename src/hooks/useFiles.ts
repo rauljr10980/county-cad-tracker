@@ -44,9 +44,16 @@ export function useReprocessFile() {
   return useMutation({
     mutationFn: reprocessFile,
     onSuccess: () => {
+      // Immediately invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['files'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['properties'] });
+      
+      // Refetch files to show updated status
+      queryClient.refetchQueries({ queryKey: ['files'] });
+    },
+    onError: (error) => {
+      console.error('[REPROCESS] Error:', error);
     },
   });
 }

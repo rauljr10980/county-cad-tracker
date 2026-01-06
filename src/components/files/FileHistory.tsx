@@ -16,18 +16,23 @@ export function FileHistory() {
   };
 
   const handleReprocess = (fileId: string, filename: string) => {
-    if (confirm(`Reprocess "${filename}" with the latest parsing logic? This will extract all NEW- columns.`)) {
+    const message = `Reprocess "${filename}" with the latest parsing logic? This will extract all NEW- columns and may take a few minutes.`;
+    if (confirm(message)) {
       reprocessMutation.mutate(fileId, {
-        onSuccess: () => {
+        onSuccess: (data) => {
           toast({
             title: "Reprocessing Started",
             description: `"${filename}" is being reprocessed. This may take a few minutes.`,
           });
+          // Refetch files to show updated status (processing)
+          setTimeout(() => {
+            refetch();
+          }, 1000);
         },
         onError: (error: Error) => {
           toast({
             title: "Reprocessing Failed",
-            description: error.message,
+            description: error.message || 'Failed to start reprocessing. Please check the server logs.',
             variant: "destructive",
           });
         },
@@ -136,16 +141,16 @@ export function FileHistory() {
                     <Button variant="ghost" size="icon" className="h-7 w-7">
                       <Download className="h-4 w-4" />
                     </Button>
-                    {file.status === 'completed' && (
+                    {(file.status === 'completed' || file.status === 'error') && (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-primary hover:text-primary"
                         onClick={() => handleReprocess(file.id, file.filename)}
-                        disabled={reprocessMutation.isPending}
-                        title="Reprocess file to extract all NEW- columns"
+                        disabled={reprocessMutation.isPending || file.status === 'processing'}
+                        title={file.status === 'error' ? 'Retry processing this file' : 'Reprocess file to extract all NEW- columns'}
                       >
-                        {reprocessMutation.isPending && reprocessMutation.variables === file.id ? (
+                        {(reprocessMutation.isPending && reprocessMutation.variables === file.id) || file.status === 'processing' ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <RefreshCw className="h-4 w-4" />
