@@ -52,7 +52,7 @@ model Property {
 
   // Owner Information
   ownerName         String
-  propertyAddress   String
+  propertyAddress   String  @default("")  // Allow empty string for properties without address
   mailingAddress    String?
 
   // Financial Information
