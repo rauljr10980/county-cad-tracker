@@ -527,28 +527,20 @@ export function PropertiesView() {
             Retry
           </button>
         </div>
+      ) : properties.length === 0 ? (
+        <div className="bg-secondary/30 rounded-lg p-12 text-center">
+          <FileSpreadsheet className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No Properties Found</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            {totalUnfiltered === 0 
+              ? 'No properties have been uploaded yet. Upload a file to get started.'
+              : 'No properties match your current filters. Try adjusting your search or filters.'}
+          </p>
+        </div>
       ) : (
         <>
-          {console.log('[PropertiesView] Rendering PropertyTable:', { 
-            propertiesCount: properties.length, 
-            total, 
-            totalPages,
-            isLoading,
-            hasError: !!error
-          })}
-          {properties.length === 0 && !isLoading && !error ? (
-            <div className="bg-secondary/30 rounded-lg p-12 text-center">
-              <FileSpreadsheet className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Properties Found</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                {totalUnfiltered === 0 
-                  ? 'No properties have been uploaded yet. Upload a file to get started.'
-                  : 'No properties match your current filters. Try adjusting your search or filters.'}
-              </p>
-            </div>
-          ) : (
-            <PropertyTable
-              properties={properties}
+          <PropertyTable
+            properties={properties}
             onViewProperty={setSelectedProperty}
             statusFilter={selectedStatuses.length === 1 ? selectedStatuses[0] : undefined}
             onStatusFilterChange={(status) => {
@@ -559,9 +551,8 @@ export function PropertiesView() {
             }}
             sortField={sortField}
             sortDirection={sortDirection}
-              onSort={handleSort}
-            />
-          )}
+            onSort={handleSort}
+          />
           
           {/* Pagination */}
           {totalPages > 1 && (
