@@ -474,14 +474,13 @@ export function PropertiesView() {
       const endIndex = startIndex + ITEMS_PER_PAGE;
       finalProperties = sortedProperties.slice(startIndex, endIndex);
     } else if (selectedStatuses.length === 1) {
-      // Single status selected - use sorted properties
+      // Single status selected - show ALL properties (no pagination)
+      // Backend already returns all matching properties
       finalTotal = sortedProperties.length;
-      finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
+      finalTotalPages = 1; // No pagination - show all on one "page"
       
-      // Apply pagination
-      const startIndex = (page - 1) * ITEMS_PER_PAGE;
-      const endIndex = startIndex + ITEMS_PER_PAGE;
-      finalProperties = sortedProperties.slice(startIndex, endIndex);
+      // Return all properties without slicing
+      finalProperties = sortedProperties;
     } else {
       // No filters
       if (isSortingActive) {
@@ -730,8 +729,14 @@ export function PropertiesView() {
             onSort={handleSort}
           />
           
-          {/* Pagination */}
-          {totalPages > 1 && (
+          {/* Show property count - pagination controls only when multiple pages */}
+          {selectedStatuses.length === 1 && totalPages === 1 ? (
+            <div className="mt-6">
+              <div className="text-sm text-muted-foreground">
+                Showing all {(total || 0).toLocaleString()} {(total === 1 ? 'property' : 'properties')}
+              </div>
+            </div>
+          ) : totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 Showing {(startItem || 0).toLocaleString()} to {(endItem || 0).toLocaleString()} of {(total || 0).toLocaleString()} properties
