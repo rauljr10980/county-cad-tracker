@@ -403,7 +403,7 @@ export function PropertiesView() {
     });
     
     // Debug logging when status filter is active
-    if (hasStatusFilter && advancedFilters.statuses.length > 0) {
+    if (needsFrontendStatusFilter && advancedFilters.statuses.length > 0) {
       console.log('[FILTER] Status filtering summary:', {
         totalProperties: rawProperties.length,
         filteredCount: filtered.length,

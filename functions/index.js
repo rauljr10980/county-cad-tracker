@@ -2024,6 +2024,13 @@ app.get('/api/comparisons/latest', async (req, res) => {
 app.get('/api/properties', async (req, res) => {
   try {
     console.log('[PROPERTIES] Starting properties request');
+    console.log('[PROPERTIES] Query parameters:', {
+      page: req.query.page,
+      limit: req.query.limit,
+      status: req.query.status,
+      statusType: typeof req.query.status,
+      search: req.query.search
+    });
     
     if (!storage) {
       console.error('[PROPERTIES] ERROR: Storage not initialized');
@@ -2105,10 +2112,20 @@ app.get('/api/properties', async (req, res) => {
         console.log(`[PROPERTIES] Status breakdown:`, statusCounts);
         
         // Apply status filter if provided (J, A, P, U only - single letters)
+        // Accepts both single letters (P, A, J, U) and full names (PENDING, ACTIVE, JUDGMENT, UNKNOWN)
         const statusFilter = req.query.status;
         let filteredProperties = properties;
         if (statusFilter) {
-          const upperFilter = statusFilter.toUpperCase().trim();
+          // Handle statusFilter - it might be a string, array, or other format
+          let statusValue = statusFilter;
+          if (Array.isArray(statusFilter)) {
+            statusValue = statusFilter[0]; // Take first if array
+          }
+          if (typeof statusValue !== 'string') {
+            statusValue = String(statusValue);
+          }
+          
+          const upperFilter = statusValue.toUpperCase().trim();
           // Normalize to single letter (J, A, P, U)
           let normalizedFilter = 'U'; // Default to U
           if (upperFilter === 'J' || upperFilter === 'JUDGMENT' || upperFilter.startsWith('JUDG')) {
@@ -2119,6 +2136,9 @@ app.get('/api/properties', async (req, res) => {
             normalizedFilter = 'P';
           } else if (upperFilter === 'U' || upperFilter === 'UNKNOWN' || upperFilter.startsWith('UNKN')) {
             normalizedFilter = 'U';
+          } else {
+            // If status doesn't match any known pattern, log warning but don't fail
+            console.warn(`[PROPERTIES] Unknown status filter value: ${statusFilter}, defaulting to U`);
           }
           
           filteredProperties = properties.filter(p => {
