@@ -321,8 +321,25 @@ export function PropertiesView() {
       // Multiple filters applied - use filtered results
       propertiesToSort = filteredProperties;
     } else if (selectedStatuses.length === 1) {
-      // Single status selected - filter by status
-      propertiesToSort = rawProperties.filter(p => p.status === selectedStatuses[0]);
+      // Single status selected - filter by status (normalize for comparison)
+      const filterStatus = (selectedStatuses[0] || '').toUpperCase();
+      const normalizedFilter = 
+        filterStatus === 'JUDGMENT' || filterStatus === 'J' ? 'J' :
+        filterStatus === 'ACTIVE' || filterStatus === 'A' ? 'A' :
+        filterStatus === 'PENDING' || filterStatus === 'P' ? 'P' :
+        filterStatus === 'UNKNOWN' || filterStatus === 'U' ? 'U' :
+        filterStatus;
+      
+      propertiesToSort = rawProperties.filter(p => {
+        const propStatus = (p.status || '').toUpperCase();
+        const normalizedProp = 
+          propStatus === 'JUDGMENT' || propStatus === 'J' ? 'J' :
+          propStatus === 'ACTIVE' || propStatus === 'A' ? 'A' :
+          propStatus === 'PENDING' || propStatus === 'P' ? 'P' :
+          propStatus === 'UNKNOWN' || propStatus === 'U' ? 'U' :
+          propStatus;
+        return normalizedProp === normalizedFilter;
+      });
     } else {
       // No filters - but if sorting is active, we have more properties
       // If sorting is not active, return raw (using API pagination)
