@@ -190,15 +190,15 @@ export function PropertiesView() {
   }, [data]);
   
   // Helper function to normalize status to single letter (J, A, P, U)
-  // Properties and filters now use ONLY single letters
-  const normalizeStatus = (status: string): string => {
+  // This matches exactly how StatusBadge handles statuses - simple and direct
+  const normalizeStatus = (status: string | undefined): string => {
     if (!status) return 'U'; // Default to U for empty status
     const upper = status.toUpperCase().trim();
-    // Handle single letters directly
+    // Direct single letter match (most common case)
     if (upper === 'J' || upper === 'A' || upper === 'P' || upper === 'U') {
       return upper;
     }
-    // Handle legacy full enum names (for backward compatibility during transition)
+    // Handle legacy full enum names (for backward compatibility)
     if (upper === 'JUDGMENT' || upper.startsWith('JUDG')) return 'J';
     if (upper === 'ACTIVE' || upper.startsWith('ACTI')) return 'A';
     if (upper === 'PENDING' || upper.startsWith('PEND')) return 'P';
@@ -239,32 +239,20 @@ export function PropertiesView() {
     }
 
     // Single pass filtering for better performance
+    // Match exactly how StatusBadge displays statuses - simple direct comparison
     const filtered = rawProperties.filter(p => {
-      // Status filter - normalize to handle both single letters (J, A, P) and full enum values (JUDGMENT, ACTIVE, PENDING)
-      // Check both advancedFilters.statuses and search query for status matches
+      // Status filter - use the same normalization logic as StatusBadge
       if (hasStatusFilter) {
-        const originalPropertyStatus = p.status || '';
-        const propertyStatus = normalizeStatus(originalPropertyStatus);
+        // Normalize property status to single letter (J, A, P, U)
+        const propertyStatus = normalizeStatus(p.status);
         
         // Check if property matches any selected statuses
         let matchesStatus = false;
         if (advancedFilters.statuses.length > 0) {
+          // advancedFilters.statuses already contains single letters (J, A, P, U)
+          // Normalize them to ensure consistency (handles any edge cases)
           const normalizedFilterStatuses = advancedFilters.statuses.map(s => normalizeStatus(s));
           matchesStatus = normalizedFilterStatuses.includes(propertyStatus);
-          
-          // Enhanced debug logging for first 10 properties to see what's happening
-          if (rawProperties.indexOf(p) < 10) {
-            console.log('[FILTER] Status comparison:', {
-              propertyIndex: rawProperties.indexOf(p),
-              accountNumber: p.accountNumber,
-              originalPropertyStatus,
-              normalizedPropertyStatus: propertyStatus,
-              selectedFilterStatuses: advancedFilters.statuses,
-              normalizedFilterStatuses,
-              matches: matchesStatus,
-              willInclude: matchesStatus
-            });
-          }
         }
         
         // Also check if search query matches status
