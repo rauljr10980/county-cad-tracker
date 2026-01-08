@@ -253,7 +253,15 @@ export function PropertiesView() {
       });
     }
     
+    // When backend filtering is active (single status), return rawProperties directly
+    // Backend has already filtered by status, so no need to filter again
     if (!hasActiveFilters && !needsFrontendStatusFilter) {
+      console.log('[FILTER] Backend filtering active, returning rawProperties:', {
+        rawPropertiesCount: rawProperties.length,
+        selectedStatuses: advancedFilters.statuses,
+        apiStatusFilter,
+        sampleProperties: rawProperties.slice(0, 3).map(p => ({ id: p.id, status: p.status, accountNumber: p.accountNumber }))
+      });
       return rawProperties;
     }
 
@@ -453,10 +461,12 @@ export function PropertiesView() {
     try {
       console.log('[PropertiesView] Calculating pagination:', {
         selectedStatuses: selectedStatuses.length,
+        selectedStatusesValues: selectedStatuses,
         hasActiveAdvancedFilters,
         isSortingActive,
         rawPropertiesCount: rawProperties.length,
         sortedPropertiesCount: sortedProperties.length,
+        filteredPropertiesCount: filteredProperties.length,
         page
       });
       
@@ -464,18 +474,9 @@ export function PropertiesView() {
       let finalTotal = 0;
       let finalTotalPages = 1;
     
-    if (selectedStatuses.length > 1 || hasActiveAdvancedFilters) {
-      // Multiple filters applied - use sorted filtered results
-      finalTotal = sortedProperties.length;
-      finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
-      
-      // Apply pagination
-      const startIndex = (page - 1) * ITEMS_PER_PAGE;
-      const endIndex = startIndex + ITEMS_PER_PAGE;
-      finalProperties = sortedProperties.slice(startIndex, endIndex);
-    } else if (selectedStatuses.length === 1) {
-      // Single status selected - show ALL properties (no pagination)
-      // Backend already returns all matching properties
+    if (selectedStatuses.length > 0 || hasActiveAdvancedFilters) {
+      // Any status filter or advanced filter - show ALL properties (no pagination)
+      // Backend returns all matching properties when status filter is active
       finalTotal = sortedProperties.length;
       finalTotalPages = 1; // No pagination - show all on one "page"
       
@@ -730,7 +731,7 @@ export function PropertiesView() {
           />
           
           {/* Show property count - pagination controls only when multiple pages */}
-          {selectedStatuses.length === 1 && totalPages === 1 ? (
+          {(selectedStatuses.length > 0 || hasActiveAdvancedFilters) && totalPages === 1 ? (
             <div className="mt-6">
               <div className="text-sm text-muted-foreground">
                 Showing all {(total || 0).toLocaleString()} {(total === 1 ? 'property' : 'properties')}
