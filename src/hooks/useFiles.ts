@@ -74,10 +74,18 @@ export interface PropertiesResponse {
   totalUnfiltered: number;
   totalPages: number;
   statusCounts: {
-    J: number;
-    A: number;
-    P: number;
-    other: number;
+    J?: number;
+    A?: number;
+    P?: number;
+    U?: number;
+    JUDGMENT?: number;
+    ACTIVE?: number;
+    PENDING?: number;
+    UNKNOWN?: number;
+    PAID?: number;
+    REMOVED?: number;
+    other?: number;
+    [key: string]: number | undefined; // Allow any status key
   };
 }
 
