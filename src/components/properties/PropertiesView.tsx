@@ -164,17 +164,19 @@ export function PropertiesView() {
 
         // API returns both formats: single letters (J, A, P, U) and full enum names (JUDGMENT, ACTIVE, etc.)
         // Map both formats to full enum names for consistency
+        const getCount = (fullKey: string, shortKey: string): number => {
+          const full = typeof apiCounts[fullKey] === 'number' ? apiCounts[fullKey] : 0;
+          const short = typeof apiCounts[shortKey] === 'number' ? apiCounts[shortKey] : 0;
+          return full + short;
+        };
+
         return {
-          JUDGMENT: (typeof apiCounts.JUDGMENT === 'number' ? apiCounts.JUDGMENT : 0) + 
-                    (typeof apiCounts.J === 'number' ? apiCounts.J : 0) || 0,
-          ACTIVE: (typeof apiCounts.ACTIVE === 'number' ? apiCounts.ACTIVE : 0) + 
-                  (typeof apiCounts.A === 'number' ? apiCounts.A : 0) || 0,
-          PENDING: (typeof apiCounts.PENDING === 'number' ? apiCounts.PENDING : 0) + 
-                   (typeof apiCounts.P === 'number' ? apiCounts.P : 0) || 0,
-          UNKNOWN: (typeof apiCounts.UNKNOWN === 'number' ? apiCounts.UNKNOWN : 0) + 
-                   (typeof apiCounts.U === 'number' ? apiCounts.U : 0) || 0,
-          PAID: (typeof apiCounts.PAID === 'number' ? apiCounts.PAID : 0) || 0,
-          REMOVED: (typeof apiCounts.REMOVED === 'number' ? apiCounts.REMOVED : 0) || 0,
+          JUDGMENT: getCount('JUDGMENT', 'J'),
+          ACTIVE: getCount('ACTIVE', 'A'),
+          PENDING: getCount('PENDING', 'P'),
+          UNKNOWN: getCount('UNKNOWN', 'U'),
+          PAID: typeof apiCounts.PAID === 'number' ? apiCounts.PAID : 0,
+          REMOVED: typeof apiCounts.REMOVED === 'number' ? apiCounts.REMOVED : 0,
         };
       }
     } catch (e) {
