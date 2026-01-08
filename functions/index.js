@@ -2161,14 +2161,35 @@ app.get('/api/properties', async (req, res) => {
         
         // Return paginated results (100 per page for performance)
         // Validate and cap limit to prevent excessive requests
-        const page = Math.max(1, parseInt(req.query.page) || 1);
-        let limit = parseInt(req.query.limit) || 100;
-        // Cap limit at 10000 to prevent memory issues, but allow larger requests for filtering
-        if (isNaN(limit) || limit < 1) {
-          limit = 100;
-        } else if (limit > 10000) {
-          limit = 10000;
+        const pageParam = req.query.page;
+        const limitParam = req.query.limit;
+        
+        // Validate page parameter
+        let page = 1;
+        if (pageParam) {
+          const parsedPage = parseInt(pageParam);
+          if (isNaN(parsedPage) || parsedPage < 1) {
+            console.warn(`[PROPERTIES] Invalid page value: ${pageParam}. Defaulting to 1.`);
+          } else {
+            page = parsedPage;
+          }
         }
+        
+        // Validate limit parameter
+        let limit = 100;
+        if (limitParam) {
+          const parsedLimit = parseInt(limitParam);
+          if (isNaN(parsedLimit) || parsedLimit < 1) {
+            console.warn(`[PROPERTIES] Invalid limit value: ${limitParam}. Defaulting to 100.`);
+          } else if (parsedLimit > 10000) {
+            console.warn(`[PROPERTIES] Limit value ${parsedLimit} exceeds maximum of 10000. Capping to 10000.`);
+            limit = 10000;
+          } else {
+            limit = parsedLimit;
+          }
+        }
+        
+        console.log(`[PROPERTIES] Pagination: page=${page}, limit=${limit}`);
         const start = (page - 1) * limit;
         
         // Ensure all properties include all fields (no filtering of fields)
