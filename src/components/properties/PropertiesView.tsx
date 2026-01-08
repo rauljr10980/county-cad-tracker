@@ -83,9 +83,10 @@ export function PropertiesView() {
   // Check if search query is active
   const hasSearchQuery = debouncedSearchQuery && typeof debouncedSearchQuery === 'string' && debouncedSearchQuery.trim().length > 0;
   
-  // When any filter is active (multiple statuses, advanced filters, search, or sorting), 
+  // When any filter is active (single or multiple statuses, advanced filters, search, or sorting), 
   // fetch all properties to enable proper filtering across all 33k+ properties
-  const hasAnyFilter = selectedStatuses.length > 1 || (hasActiveAdvancedFilters ?? false) || hasSearchQuery || isSortingActive;
+  // Include single status selection since we're now filtering on frontend
+  const hasAnyFilter = selectedStatuses.length > 0 || (hasActiveAdvancedFilters ?? false) || hasSearchQuery || isSortingActive;
   
   // Reduce fetch limit to improve performance - fetch in chunks if needed
   // Start with smaller limit and only increase if needed
