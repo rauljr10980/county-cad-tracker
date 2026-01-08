@@ -243,13 +243,9 @@ export function PropertiesView() {
     const hasActiveFilters = hasActiveAdvancedFilters ?? false;
     const searchStatus = debouncedSearchQuery ? getStatusFromSearch(debouncedSearchQuery) : null;
     
-    // Determine if we need to filter status on frontend:
-    // - If backend filtering is active (single status), backend already filtered by status
-    // - If multiple statuses selected, we need to filter on frontend
-    // - If search query matches a status, we need to filter on frontend
-    const needsFrontendStatusFilter = (advancedFilters.statuses.length > 1) || 
-                                      (apiStatusFilter === undefined && advancedFilters.statuses.length > 0) ||
-                                      (searchStatus !== null);
+    // Always use frontend filtering when statuses are selected (since apiStatusFilter is always undefined)
+    // This ensures we properly normalize database enum names (PENDING, ACTIVE, JUDGMENT) to single letters (P, A, J)
+    const needsFrontendStatusFilter = advancedFilters.statuses.length > 0 || searchStatus !== null;
     
     // Debug: Log filter state
     if (needsFrontendStatusFilter || hasActiveFilters) {
@@ -259,53 +255,35 @@ export function PropertiesView() {
         apiStatusFilter,
         needsFrontendStatusFilter,
         searchStatus,
-        hasActiveFilters
+        hasActiveFilters,
+        sampleStatuses: rawProperties.slice(0, 5).map(p => ({ accountNumber: p.accountNumber, status: p.status }))
       });
     }
     
-    // When backend filtering is active (single status), return rawProperties directly
-    // Backend has already filtered by status, so no need to filter again
+    // If no filters at all, return raw properties
     if (!hasActiveFilters && !needsFrontendStatusFilter) {
-      console.log('[FILTER] Backend filtering active, returning rawProperties:', {
-        rawPropertiesCount: rawProperties.length,
-        selectedStatuses: advancedFilters.statuses,
-        apiStatusFilter,
-        hasActiveFilters,
-        needsFrontendStatusFilter,
-        sampleProperties: rawProperties.length > 0 ? rawProperties.slice(0, 3).map(p => ({ id: p.id, status: p.status, accountNumber: p.accountNumber })) : 'NO PROPERTIES - rawProperties is empty!'
-      });
-      
-      // If rawProperties is empty but we have a status filter, log a warning
-      if (rawProperties.length === 0 && selectedStatuses.length > 0) {
-        console.error('[FILTER] WARNING: Backend filtering active but rawProperties is empty!', {
-          selectedStatuses,
-          apiStatusFilter,
-          dataKeys: data && typeof data === 'object' ? Object.keys(data) : []
-        });
-      }
-      
       return rawProperties;
     }
 
     // Single pass filtering for better performance
     // Match exactly how StatusBadge displays statuses - simple direct comparison
     const filtered = rawProperties.filter(p => {
-      // Status filter - only apply if frontend filtering is needed
+      // Status filter - ALWAYS apply when statuses are selected (database uses PENDING/ACTIVE/JUDGMENT, filter uses P/A/J)
       if (needsFrontendStatusFilter) {
-        // Normalize property status to single letter (J, A, P, U)
+        // Normalize property status from database format (PENDING, ACTIVE, JUDGMENT) to single letter (J, A, P, U)
         const originalStatus = p.status || '';
         const propertyStatus = normalizeStatus(originalStatus);
         
         // Check if property matches any selected statuses
         let matchesStatus = false;
         if (advancedFilters.statuses.length > 0) {
-          // advancedFilters.statuses already contains single letters (J, A, P, U)
+          // advancedFilters.statuses contains single letters (J, A, P, U)
           // Normalize them to ensure consistency (handles any edge cases)
           const normalizedFilterStatuses = advancedFilters.statuses.map(s => normalizeStatus(s));
           matchesStatus = normalizedFilterStatuses.includes(propertyStatus);
           
-          // Debug logging for first few properties when filtering
-          if (rawProperties.indexOf(p) < 10) {
+          // Debug logging for first 20 properties when filtering to see normalization in action
+          if (rawProperties.indexOf(p) < 20) {
             console.log('[FILTER DEBUG] Status comparison:', {
               accountNumber: p.accountNumber,
               originalStatus,
@@ -322,7 +300,8 @@ export function PropertiesView() {
           matchesStatus = propertyStatus === searchStatus;
         }
         
-        if (!matchesStatus) {
+        // If status filter is active and property doesn't match, exclude it
+        if (advancedFilters.statuses.length > 0 && !matchesStatus) {
           return false;
         }
       }
@@ -435,12 +414,25 @@ export function PropertiesView() {
     
     // Debug logging when status filter is active
     if (needsFrontendStatusFilter && advancedFilters.statuses.length > 0) {
+      // Count how many properties match each status after normalization
+      const statusBreakdown: Record<string, number> = {};
+      rawProperties.forEach(p => {
+        const normalized = normalizeStatus(p.status);
+        statusBreakdown[normalized] = (statusBreakdown[normalized] || 0) + 1;
+      });
+      
       console.log('[FILTER] Status filtering summary:', {
         totalProperties: rawProperties.length,
         filteredCount: filtered.length,
         selectedStatuses: advancedFilters.statuses,
+        normalizedSelectedStatuses: advancedFilters.statuses.map(s => normalizeStatus(s)),
         searchStatus,
-        sampleStatuses: rawProperties.slice(0, 10).map(p => p.status)
+        statusBreakdown,
+        sampleStatuses: rawProperties.slice(0, 10).map(p => ({ 
+          original: p.status, 
+          normalized: normalizeStatus(p.status),
+          accountNumber: p.accountNumber 
+        }))
       });
     }
     
