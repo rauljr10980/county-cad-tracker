@@ -190,20 +190,27 @@ export function PropertiesView() {
   }, [data]);
   
   // Helper function to normalize status to single letter (J, A, P, U)
-  // This matches exactly how StatusBadge handles statuses - simple and direct
+  // This matches exactly how StatusBadge handles statuses - it checks statusConfig keys
+  // StatusBadge does: status?.toString().toUpperCase() and looks up in statusConfig
+  // So we normalize the same way to ensure filtering matches display
   const normalizeStatus = (status: string | undefined): string => {
     if (!status) return 'U'; // Default to U for empty status
-    const upper = status.toUpperCase().trim();
-    // Direct single letter match (most common case)
-    if (upper === 'J' || upper === 'A' || upper === 'P' || upper === 'U') {
-      return upper;
-    }
-    // Handle legacy full enum names (for backward compatibility)
+    const upper = status.toString().toUpperCase().trim();
+    
+    // Direct match with statusConfig keys (same as StatusBadge lookup)
+    // Single letters (primary format)
+    if (upper === 'J') return 'J';
+    if (upper === 'A') return 'A';
+    if (upper === 'P') return 'P';
+    if (upper === 'U') return 'U';
+    
+    // Legacy full enum names (StatusBadge also handles these)
     if (upper === 'JUDGMENT' || upper.startsWith('JUDG')) return 'J';
     if (upper === 'ACTIVE' || upper.startsWith('ACTI')) return 'A';
     if (upper === 'PENDING' || upper.startsWith('PEND')) return 'P';
     if (upper === 'UNKNOWN' || upper.startsWith('UNKN')) return 'U';
-    // Default to U for unrecognized statuses
+    
+    // Default to U for unrecognized statuses (StatusBadge uses defaultConfig)
     return 'U';
   };
 
