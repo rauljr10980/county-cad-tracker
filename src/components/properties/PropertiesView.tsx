@@ -251,7 +251,8 @@ export function PropertiesView() {
       // Status filter - use the same normalization logic as StatusBadge
       if (hasStatusFilter) {
         // Normalize property status to single letter (J, A, P, U)
-        const propertyStatus = normalizeStatus(p.status);
+        const originalStatus = p.status || '';
+        const propertyStatus = normalizeStatus(originalStatus);
         
         // Check if property matches any selected statuses
         let matchesStatus = false;
@@ -260,6 +261,18 @@ export function PropertiesView() {
           // Normalize them to ensure consistency (handles any edge cases)
           const normalizedFilterStatuses = advancedFilters.statuses.map(s => normalizeStatus(s));
           matchesStatus = normalizedFilterStatuses.includes(propertyStatus);
+          
+          // Debug logging for first few properties when filtering
+          if (rawProperties.indexOf(p) < 5) {
+            console.log('[FILTER DEBUG] Status comparison:', {
+              accountNumber: p.accountNumber,
+              originalStatus,
+              normalizedPropertyStatus: propertyStatus,
+              selectedStatuses: advancedFilters.statuses,
+              normalizedFilterStatuses,
+              matches: matchesStatus
+            });
+          }
         }
         
         // Also check if search query matches status
