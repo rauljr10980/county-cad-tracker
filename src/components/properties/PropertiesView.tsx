@@ -162,19 +162,19 @@ export function PropertiesView() {
         const apiCounts = data.statusCounts || {};
         console.log('[PropertiesView] Raw statusCounts from API:', apiCounts);
 
-        // API returns both formats: single letters (J, A, P, U) and full enum names (JUDGMENT, ACTIVE, etc.)
-        // Map both formats to full enum names for consistency
-        const getCount = (fullKey: string, shortKey: string): number => {
-          const full = typeof apiCounts[fullKey] === 'number' ? apiCounts[fullKey] : 0;
+        // API returns single letters (J, A, P, U) - map to full enum names for frontend consistency
+        // Also handle case where API might return both formats
+        const getCount = (shortKey: string, fullKey?: string): number => {
           const short = typeof apiCounts[shortKey] === 'number' ? apiCounts[shortKey] : 0;
-          return full + short;
+          const full = fullKey && typeof apiCounts[fullKey] === 'number' ? apiCounts[fullKey] : 0;
+          return short + full;
         };
 
         return {
-          JUDGMENT: getCount('JUDGMENT', 'J'),
-          ACTIVE: getCount('ACTIVE', 'A'),
-          PENDING: getCount('PENDING', 'P'),
-          UNKNOWN: getCount('UNKNOWN', 'U'),
+          JUDGMENT: getCount('J', 'JUDGMENT'),
+          ACTIVE: getCount('A', 'ACTIVE'),
+          PENDING: getCount('P', 'PENDING'),
+          UNKNOWN: getCount('U', 'UNKNOWN'),
           PAID: typeof apiCounts.PAID === 'number' ? apiCounts.PAID : 0,
           REMOVED: typeof apiCounts.REMOVED === 'number' ? apiCounts.REMOVED : 0,
         };
