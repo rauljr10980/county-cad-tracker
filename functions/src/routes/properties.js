@@ -65,12 +65,13 @@ router.get('/',
         }
       }
 
-      // When a single status is selected, fetch ALL properties (no limit)
+      // When a status filter is provided, fetch ALL properties (no limit)
+      // When no status filter but limit is provided, use that limit (for frontend filtering)
       // Otherwise use pagination with default limit of 100
       const isSingleStatusFilter = normalizedStatus !== null && !dealStage && !search;
       const limit = isSingleStatusFilter 
         ? undefined // No limit - fetch all properties with this status
-        : (limitParam ? parseInt(limitParam) : 100); // Use provided limit or default to 100
+        : (limitParam ? parseInt(limitParam) : 100); // Use provided limit (can be 50000 for frontend filtering) or default to 100
 
       // Build where clause
       const where = {};
@@ -111,9 +112,17 @@ router.get('/',
       };
 
       // Only apply pagination if not fetching all properties for single status filter
+      // When limit is large (>= 10000), assume frontend filtering and return all (no pagination)
+      // Otherwise use pagination
       if (!isSingleStatusFilter && limit) {
-        queryOptions.skip = (page - 1) * limit;
-        queryOptions.take = limit;
+        if (limit >= 10000) {
+          // Large limit means frontend filtering - return all properties without pagination
+          // Don't set skip/take to get all matching properties
+        } else {
+          // Normal pagination for smaller limits
+          queryOptions.skip = (page - 1) * limit;
+          queryOptions.take = limit;
+        }
       }
 
       const properties = await prisma.property.findMany(queryOptions);
