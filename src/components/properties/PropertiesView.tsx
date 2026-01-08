@@ -55,9 +55,10 @@ export function PropertiesView() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Use backend filtering when a single status is selected (more efficient)
-  // Use frontend filtering when multiple statuses are selected (for flexibility)
-  const apiStatusFilter = selectedStatuses.length === 1 ? selectedStatuses[0] : undefined;
+  // Always use frontend filtering for status filters to ensure consistency
+  // This ensures properties are always displayed correctly whether 1 or multiple statuses are selected
+  // Backend filtering can be unreliable, so we fetch all properties and filter on frontend
+  const apiStatusFilter = undefined; // Always use frontend filtering for status
   
   // Helper function to check if any advanced filters are active (excluding status)
   const hasActiveAdvancedFilters = useMemo(() => {
