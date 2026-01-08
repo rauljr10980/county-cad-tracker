@@ -240,6 +240,16 @@ export function PropertiesView() {
     const searchStatus = debouncedSearchQuery ? getStatusFromSearch(debouncedSearchQuery) : null;
     const hasStatusFilter = advancedFilters.statuses.length > 0 || searchStatus !== null;
     
+    // Debug: Log filter state
+    if (hasStatusFilter) {
+      console.log('[FILTER] Filtering properties:', {
+        totalProperties: rawProperties.length,
+        selectedStatuses: advancedFilters.statuses,
+        searchStatus,
+        hasActiveFilters
+      });
+    }
+    
     if (!hasActiveFilters && !hasStatusFilter) {
       return rawProperties;
     }
