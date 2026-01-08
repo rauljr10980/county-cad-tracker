@@ -7,15 +7,18 @@ interface StatusBadgeProps {
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
+  // Single letters only (J, A, P, U)
   J: { label: 'J', className: 'status-judgment' },
   A: { label: 'A', className: 'status-active' },
   P: { label: 'P', className: 'status-pending' },
+  U: { label: 'Unknown', className: 'bg-gray-500/20 text-gray-400' },
+  // Legacy support (for backward compatibility during transition)
   JUDGMENT: { label: 'J', className: 'status-judgment' },
   ACTIVE: { label: 'A', className: 'status-active' },
   PENDING: { label: 'P', className: 'status-pending' },
+  UNKNOWN: { label: 'Unknown', className: 'bg-gray-500/20 text-gray-400' },
   PAID: { label: 'PAID', className: 'status-active' },
   REMOVED: { label: 'RMV', className: 'bg-gray-500/20 text-gray-400' },
-  UNKNOWN: { label: 'Unknown', className: 'bg-gray-500/20 text-gray-400' },
 };
 
 // Default config for unknown statuses

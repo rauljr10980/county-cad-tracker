@@ -1161,31 +1161,24 @@ function extractProperties(data, canHeaderName = null) {
       });
     }
     
-    // Determine final status: Map to PostgreSQL enum values (JUDGMENT, ACTIVE, PENDING, UNKNOWN)
+    // Determine final status: Use ONLY single letters (J, A, P, U)
     // finalStatus comes ONLY from LEGALSTATUS column
-    // PostgreSQL schema expects: JUDGMENT, ACTIVE, PENDING, PAID, REMOVED, UNKNOWN
-    let statusValue = 'UNKNOWN'; // Default to UNKNOWN (matches PostgreSQL enum)
+    // Map to single letters: J=Judgment, A=Active, P=Pending, U=Unknown
+    let statusValue = 'U'; // Default to U (Unknown)
     if (finalStatus) {
       const upperStatus = finalStatus.toUpperCase().trim();
       const firstChar = upperStatus.charAt(0);
       
-      // Map to PostgreSQL enum values
+      // Map to single letters only
       if (firstChar === 'J' || upperStatus.includes('JUDGMENT') || upperStatus.includes('JUDG')) {
-        statusValue = 'JUDGMENT';
+        statusValue = 'J';
       } else if (firstChar === 'A' || upperStatus.includes('ACTIVE')) {
-        statusValue = 'ACTIVE';
+        statusValue = 'A';
       } else if (firstChar === 'P' || upperStatus.includes('PENDING')) {
-        statusValue = 'PENDING';
-      } else if (upperStatus.includes('PAID')) {
-        statusValue = 'PAID';
-      } else if (upperStatus.includes('REMOVED')) {
-        statusValue = 'REMOVED';
+        statusValue = 'P';
       } else {
-        // Log if we get unexpected status values (for debugging)
-        if (index === 0 || Math.random() < 0.001) {
-          console.log(`[EXTRACT] LEGALSTATUS value "${finalStatus}" converted to UNKNOWN, original: "${upperStatus}"`);
-        }
-        statusValue = 'UNKNOWN';
+        // Default to U (Unknown) for anything else
+        statusValue = 'U';
       }
     }
     
@@ -2111,24 +2104,39 @@ app.get('/api/properties', async (req, res) => {
         });
         console.log(`[PROPERTIES] Status breakdown:`, statusCounts);
         
-        // Apply status filter if provided (J, A, P, U or full enum values)
+        // Apply status filter if provided (J, A, P, U only - single letters)
         const statusFilter = req.query.status;
         let filteredProperties = properties;
         if (statusFilter) {
-          const upperFilter = statusFilter.toUpperCase();
-          // Map single letters to full enum values for filtering
-          const statusMap = {
-            'J': 'JUDGMENT',
-            'A': 'ACTIVE',
-            'P': 'PENDING',
-            'U': 'UNKNOWN'
-          };
-          const filterValue = statusMap[upperFilter] || upperFilter;
+          const upperFilter = statusFilter.toUpperCase().trim();
+          // Normalize to single letter (J, A, P, U)
+          let normalizedFilter = 'U'; // Default to U
+          if (upperFilter === 'J' || upperFilter === 'JUDGMENT' || upperFilter.startsWith('JUDG')) {
+            normalizedFilter = 'J';
+          } else if (upperFilter === 'A' || upperFilter === 'ACTIVE' || upperFilter.startsWith('ACTI')) {
+            normalizedFilter = 'A';
+          } else if (upperFilter === 'P' || upperFilter === 'PENDING' || upperFilter.startsWith('PEND')) {
+            normalizedFilter = 'P';
+          } else if (upperFilter === 'U' || upperFilter === 'UNKNOWN' || upperFilter.startsWith('UNKN')) {
+            normalizedFilter = 'U';
+          }
+          
           filteredProperties = properties.filter(p => {
-            const pStatus = (p.status || '').toUpperCase();
-            return pStatus === filterValue || pStatus === upperFilter;
+            const pStatus = (p.status || '').toUpperCase().trim();
+            // Normalize property status to single letter
+            let normalizedStatus = 'U';
+            if (pStatus === 'J' || pStatus === 'JUDGMENT' || pStatus.startsWith('JUDG')) {
+              normalizedStatus = 'J';
+            } else if (pStatus === 'A' || pStatus === 'ACTIVE' || pStatus.startsWith('ACTI')) {
+              normalizedStatus = 'A';
+            } else if (pStatus === 'P' || pStatus === 'PENDING' || pStatus.startsWith('PEND')) {
+              normalizedStatus = 'P';
+            } else if (pStatus === 'U' || pStatus === 'UNKNOWN' || pStatus.startsWith('UNKN')) {
+              normalizedStatus = 'U';
+            }
+            return normalizedStatus === normalizedFilter;
           });
-          console.log(`[PROPERTIES] Filtered by status ${statusFilter} (${filterValue}): ${filteredProperties.length} properties`);
+          console.log(`[PROPERTIES] Filtered by status ${statusFilter} (normalized to ${normalizedFilter}): ${filteredProperties.length} properties`);
         }
         
         // Apply search filter if provided

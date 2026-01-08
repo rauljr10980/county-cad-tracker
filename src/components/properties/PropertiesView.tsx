@@ -153,28 +153,12 @@ export function PropertiesView() {
         const apiCounts = data.statusCounts || {};
         console.log('[PropertiesView] Raw statusCounts from API:', apiCounts);
 
-        // API returns single letters (J, A, P, U) - map to full enum names for frontend consistency
-        // Prefer single letter keys, fallback to full enum names if single letter doesn't exist
-        // Don't add them together - they represent the same data in different formats
-        const getCount = (shortKey: string, fullKey?: string): number => {
-          // Prefer single letter format (what API actually returns)
-          if (typeof apiCounts[shortKey] === 'number') {
-            return apiCounts[shortKey];
-          }
-          // Fallback to full enum name if single letter doesn't exist
-          if (fullKey && typeof apiCounts[fullKey] === 'number') {
-            return apiCounts[fullKey];
-          }
-          return 0;
-        };
-
+        // API returns single letters (J, A, P, U) - use them directly
         const counts = {
-          JUDGMENT: getCount('J', 'JUDGMENT'),
-          ACTIVE: getCount('A', 'ACTIVE'),
-          PENDING: getCount('P', 'PENDING'),
-          UNKNOWN: getCount('U', 'UNKNOWN') || (typeof apiCounts.other === 'number' ? apiCounts.other : 0),
-          PAID: typeof apiCounts.PAID === 'number' ? apiCounts.PAID : 0,
-          REMOVED: typeof apiCounts.REMOVED === 'number' ? apiCounts.REMOVED : 0,
+          J: typeof apiCounts.J === 'number' ? apiCounts.J : 0,
+          A: typeof apiCounts.A === 'number' ? apiCounts.A : 0,
+          P: typeof apiCounts.P === 'number' ? apiCounts.P : 0,
+          U: typeof apiCounts.U === 'number' ? apiCounts.U : (typeof apiCounts.other === 'number' ? apiCounts.other : 0),
         };
         
         console.log('[PropertiesView] Mapped statusCounts:', counts);
@@ -183,7 +167,7 @@ export function PropertiesView() {
     } catch (e) {
       console.error('[PropertiesView] Error parsing statusCounts:', e);
     }
-    return { JUDGMENT: 0, ACTIVE: 0, PENDING: 0, UNKNOWN: 0, PAID: 0, REMOVED: 0 };
+    return { J: 0, A: 0, P: 0, U: 0 };
   }, [data]);
   
   const totalUnfiltered = useMemo(() => {
@@ -205,21 +189,21 @@ export function PropertiesView() {
     return 0;
   }, [data]);
   
-  // Helper function to normalize status for comparison (handles both formats)
+  // Helper function to normalize status to single letter (J, A, P, U)
+  // Properties and filters now use ONLY single letters
   const normalizeStatus = (status: string): string => {
-    if (!status) return 'U'; // Default to Unknown for empty status
+    if (!status) return 'U'; // Default to U for empty status
     const upper = status.toUpperCase().trim();
-    // Handle full enum names
+    // Handle single letters directly
+    if (upper === 'J' || upper === 'A' || upper === 'P' || upper === 'U') {
+      return upper;
+    }
+    // Handle legacy full enum names (for backward compatibility during transition)
     if (upper === 'JUDGMENT' || upper.startsWith('JUDG')) return 'J';
     if (upper === 'ACTIVE' || upper.startsWith('ACTI')) return 'A';
     if (upper === 'PENDING' || upper.startsWith('PEND')) return 'P';
     if (upper === 'UNKNOWN' || upper.startsWith('UNKN')) return 'U';
-    // Handle single letters
-    if (upper === 'J') return 'J';
-    if (upper === 'A') return 'A';
-    if (upper === 'P') return 'P';
-    if (upper === 'U') return 'U';
-    // Default to Unknown for unrecognized statuses
+    // Default to U for unrecognized statuses
     return 'U';
   };
 
