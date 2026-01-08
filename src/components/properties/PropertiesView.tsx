@@ -229,30 +229,36 @@ export function PropertiesView() {
     // Early return if no filters
     const hasActiveFilters = hasActiveAdvancedFilters ?? false;
     const searchStatus = debouncedSearchQuery ? getStatusFromSearch(debouncedSearchQuery) : null;
-    // Only filter on frontend if multiple statuses selected OR backend filtering not used
-    // Single status with backend filtering: backend already filtered, just apply other filters
-    const hasStatusFilter = (advancedFilters.statuses.length > 1 || apiStatusFilter === undefined) && 
-                           (advancedFilters.statuses.length > 0 || searchStatus !== null);
+    
+    // Determine if we need to filter status on frontend:
+    // - If backend filtering is active (single status), backend already filtered by status
+    // - If multiple statuses selected, we need to filter on frontend
+    // - If search query matches a status, we need to filter on frontend
+    const needsFrontendStatusFilter = (advancedFilters.statuses.length > 1) || 
+                                      (apiStatusFilter === undefined && advancedFilters.statuses.length > 0) ||
+                                      (searchStatus !== null);
     
     // Debug: Log filter state
-    if (hasStatusFilter) {
+    if (needsFrontendStatusFilter || hasActiveFilters) {
       console.log('[FILTER] Filtering properties:', {
         totalProperties: rawProperties.length,
         selectedStatuses: advancedFilters.statuses,
+        apiStatusFilter,
+        needsFrontendStatusFilter,
         searchStatus,
         hasActiveFilters
       });
     }
     
-    if (!hasActiveFilters && !hasStatusFilter) {
+    if (!hasActiveFilters && !needsFrontendStatusFilter) {
       return rawProperties;
     }
 
     // Single pass filtering for better performance
     // Match exactly how StatusBadge displays statuses - simple direct comparison
     const filtered = rawProperties.filter(p => {
-      // Status filter - use the same normalization logic as StatusBadge
-      if (hasStatusFilter) {
+      // Status filter - only apply if frontend filtering is needed
+      if (needsFrontendStatusFilter) {
         // Normalize property status to single letter (J, A, P, U)
         const originalStatus = p.status || '';
         const propertyStatus = normalizeStatus(originalStatus);
