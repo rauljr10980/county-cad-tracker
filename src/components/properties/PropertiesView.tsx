@@ -198,9 +198,30 @@ export function PropertiesView() {
     
     // Single pass filtering for better performance
     return rawProperties.filter(p => {
-      // Status filter
-      if (advancedFilters.statuses.length > 0 && !advancedFilters.statuses.includes(p.status)) {
-        return false;
+      // Status filter - normalize to handle both single letters (J, A, P) and full enum values (JUDGMENT, ACTIVE, PENDING)
+      if (advancedFilters.statuses.length > 0) {
+        const propertyStatus = (p.status || '').toUpperCase();
+        // Map property status to normalized format for comparison
+        const normalizedPropertyStatus = 
+          propertyStatus === 'JUDGMENT' || propertyStatus === 'J' ? 'J' :
+          propertyStatus === 'ACTIVE' || propertyStatus === 'A' ? 'A' :
+          propertyStatus === 'PENDING' || propertyStatus === 'P' ? 'P' :
+          propertyStatus === 'UNKNOWN' || propertyStatus === 'U' ? 'U' :
+          propertyStatus;
+        
+        // Normalize filter statuses too
+        const normalizedFilterStatuses = advancedFilters.statuses.map(s => {
+          const upper = (s || '').toUpperCase();
+          return upper === 'JUDGMENT' || upper === 'J' ? 'J' :
+                 upper === 'ACTIVE' || upper === 'A' ? 'A' :
+                 upper === 'PENDING' || upper === 'P' ? 'P' :
+                 upper === 'UNKNOWN' || upper === 'U' ? 'U' :
+                 upper;
+        });
+        
+        if (!normalizedFilterStatuses.includes(normalizedPropertyStatus)) {
+          return false;
+        }
       }
       
       // Amount Due range
