@@ -462,14 +462,25 @@ export function PropertiesView() {
       propertiesToSort = rawProperties;
     }
     
-    // Apply sorting
+    // Apply sorting with proper handling of null/undefined values
     const sorted = [...propertiesToSort].sort((a, b) => {
       const aVal = a[sortField];
       const bVal = b[sortField];
-      if (aVal === undefined || bVal === undefined) return 0;
+      
+      // Handle null/undefined values - put them at the end
+      const aIsNull = aVal === undefined || aVal === null;
+      const bIsNull = bVal === undefined || bVal === null;
+      
+      if (aIsNull && bIsNull) return 0; // Both null, maintain order
+      if (aIsNull) return 1; // a is null, put it after b
+      if (bIsNull) return -1; // b is null, put it after a
+      
+      // Both values exist, compare them
       if (typeof aVal === 'number' && typeof bVal === 'number') {
         return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
       }
+      
+      // String comparison for non-numeric values
       return sortDirection === 'asc' 
         ? String(aVal).localeCompare(String(bVal))
         : String(bVal).localeCompare(String(aVal));
