@@ -504,13 +504,14 @@ export function PropertiesView() {
       let finalTotalPages = 1;
     
     if (selectedStatuses.length > 0 || hasActiveAdvancedFilters) {
-      // Any status filter or advanced filter - show ALL properties (no pagination)
-      // Backend returns all matching properties when status filter is active
+      // Any status filter or advanced filter - paginate filtered results
       finalTotal = sortedProperties.length;
-      finalTotalPages = 1; // No pagination - show all on one "page"
+      finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
       
-      // Return all properties without slicing
-      finalProperties = sortedProperties;
+      // Apply pagination
+      const startIndex = (page - 1) * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      finalProperties = sortedProperties.slice(startIndex, endIndex);
     } else {
       // No filters
       if (isSortingActive) {
@@ -585,6 +586,47 @@ export function PropertiesView() {
     }
   }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data, isSortingActive]);
   
+  // Helper function to generate page numbers for pagination
+  const getPageNumbers = (currentPage: number, totalPages: number): (number | string)[] => {
+    const pages: (number | string)[] = [];
+    const maxVisible = 5; // Show up to 5 page numbers
+    
+    if (totalPages <= maxVisible) {
+      // Show all pages if total is 5 or less
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show first page
+      pages.push(1);
+      
+      if (currentPage <= 3) {
+        // Near the beginning: show 1, 2, 3, 4, 5, ..., last
+        for (let i = 2; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        // Near the end: show 1, ..., n-3, n-2, n-1, n
+        pages.push('...');
+        for (let i = totalPages - 3; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        // In the middle: show 1, ..., current-1, current, current+1, ..., last
+        pages.push('...');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
+  };
+
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -776,19 +818,13 @@ export function PropertiesView() {
             onSort={handleSort}
           />
           
-          {/* Show property count - pagination controls only when multiple pages */}
-          {(selectedStatuses.length > 0 || hasActiveAdvancedFilters) && totalPages === 1 ? (
-            <div className="mt-6">
-              <div className="text-sm text-muted-foreground">
-                Showing all {(total || 0).toLocaleString()} {(total === 1 ? 'property' : 'properties')}
-              </div>
-            </div>
-          ) : totalPages > 1 && (
+          {/* Pagination controls */}
+          {totalPages > 0 && (
             <div className="mt-6 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 Showing {(startItem || 0).toLocaleString()} to {(endItem || 0).toLocaleString()} of {(total || 0).toLocaleString()} properties
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Button
                   variant="outline"
                   size="sm"
@@ -805,9 +841,30 @@ export function PropertiesView() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm font-medium">
-                  Page {page} of {totalPages}
-                </span>
+                
+                {/* Page number buttons */}
+                {getPageNumbers(page, totalPages).map((pageNum, index) => {
+                  if (pageNum === '...') {
+                    return (
+                      <span key={`ellipsis-${index}`} className="px-2 text-sm text-muted-foreground">
+                        ...
+                      </span>
+                    );
+                  }
+                  const pageNumber = pageNum as number;
+                  return (
+                    <Button
+                      key={pageNumber}
+                      variant={pageNumber === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPage(pageNumber)}
+                      className={pageNumber === page ? "" : "min-w-[2.5rem]"}
+                    >
+                      {pageNumber}
+                    </Button>
+                  );
+                })}
+                
                 <Button
                   variant="outline"
                   size="sm"
