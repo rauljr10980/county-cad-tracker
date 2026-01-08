@@ -95,6 +95,10 @@ router.get('/',
         })
       ]);
 
+      // Normalize sortBy field: map frontend field names to database field names
+      // Frontend uses totalAmountDue, but database uses totalDue
+      const normalizedSortBy = sortBy === 'totalAmountDue' ? 'totalDue' : sortBy;
+
       // Get properties
       // When single status filter is active, fetch ALL properties (no pagination)
       // Otherwise use pagination
@@ -108,7 +112,7 @@ router.get('/',
             }
           }
         },
-        orderBy: { [sortBy]: sortOrder }
+        orderBy: { [normalizedSortBy]: sortOrder }
       };
 
       // Only apply pagination if not fetching all properties for single status filter
@@ -126,6 +130,14 @@ router.get('/',
       }
 
       const properties = await prisma.property.findMany(queryOptions);
+
+      // Map database fields to frontend format
+      // Map totalDue (database) to totalAmountDue (frontend)
+      const mappedProperties = properties.map(prop => ({
+        ...prop,
+        totalAmountDue: prop.totalDue || 0, // Map totalDue to totalAmountDue for frontend
+        // Keep totalDue for backward compatibility but prioritize totalAmountDue
+      }));
 
       // Format status counts to match BOTH old and new frontend (backward compatible)
       const statusCounts = {
@@ -169,7 +181,7 @@ router.get('/',
       const totalPages = isSingleStatusFilter ? 1 : (limit ? Math.ceil(total / limit) : 1);
 
       res.json({
-        properties,
+        properties: mappedProperties, // Use mapped properties with totalAmountDue
         total,
         totalUnfiltered: total, // For now, same as total (can be optimized later)
         totalPages,
@@ -222,7 +234,15 @@ router.get('/:id', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Property not found' });
     }
 
-    res.json(property);
+    // Map database fields to frontend format
+    // Map totalDue (database) to totalAmountDue (frontend)
+    const mappedProperty = {
+      ...property,
+      totalAmountDue: property.totalDue || 0, // Map totalDue to totalAmountDue for frontend
+      // Keep totalDue for backward compatibility but prioritize totalAmountDue
+    };
+
+    res.json(mappedProperty);
   } catch (error) {
     console.error('[PROPERTIES] Fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch property' });
