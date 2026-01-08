@@ -336,10 +336,14 @@ export async function reprocessFile(fileId: string) {
  */
 export async function getProperties(page = 1, limit = 100, status?: string, search?: string) {
   try {
-    console.log(`[API] Fetching properties: page=${page}, limit=${limit}, status=${status}, search=${search}`);
-    let url = `${API_BASE_URL}/api/properties?page=${page}&limit=${limit}`;
+    // Ensure page and limit are valid numbers
+    const validPage = Math.max(1, Math.floor(Number(page)) || 1);
+    const validLimit = Math.max(1, Math.min(10000, Math.floor(Number(limit)) || 100));
+    
+    console.log(`[API] Fetching properties: page=${validPage}, limit=${validLimit}, status=${status}, search=${search}`);
+    let url = `${API_BASE_URL}/api/properties?page=${validPage}&limit=${validLimit}`;
     if (status) {
-      url += `&status=${status}`;
+      url += `&status=${encodeURIComponent(status)}`;
     }
     if (search && search.trim()) {
       url += `&search=${encodeURIComponent(search.trim())}`;
