@@ -253,7 +253,7 @@ export function PropertiesView() {
     if (!hasActiveFilters && !hasStatusFilter) {
       return rawProperties;
     }
-    
+
     // Single pass filtering for better performance
     const filtered = rawProperties.filter(p => {
       // Status filter - normalize to handle both single letters (J, A, P) and full enum values (JUDGMENT, ACTIVE, PENDING)
@@ -412,11 +412,9 @@ export function PropertiesView() {
   // Apply sorting to all properties before pagination (only for filtered cases)
   const sortedProperties = useMemo(() => {
     let propertiesToSort: Property[] = [];
-    
-    // Always use filteredProperties when status filters are active (single or multiple)
-    // The filteredProperties useMemo already handles all the normalization correctly
+
     if (selectedStatuses.length > 0 || hasActiveAdvancedFilters) {
-      // Status filter(s) or other advanced filters applied - use filtered results
+      // Any filters applied (status or advanced) - use filtered results
       propertiesToSort = filteredProperties;
     } else {
       // No filters - but if sorting is active, we have more properties
