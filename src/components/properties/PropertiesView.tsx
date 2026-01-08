@@ -168,14 +168,17 @@ export function PropertiesView() {
           return 0;
         };
 
-        return {
+        const counts = {
           JUDGMENT: getCount('J', 'JUDGMENT'),
           ACTIVE: getCount('A', 'ACTIVE'),
           PENDING: getCount('P', 'PENDING'),
-          UNKNOWN: getCount('U', 'UNKNOWN'),
+          UNKNOWN: getCount('U', 'UNKNOWN') || (typeof apiCounts.other === 'number' ? apiCounts.other : 0),
           PAID: typeof apiCounts.PAID === 'number' ? apiCounts.PAID : 0,
           REMOVED: typeof apiCounts.REMOVED === 'number' ? apiCounts.REMOVED : 0,
         };
+        
+        console.log('[PropertiesView] Mapped statusCounts:', counts);
+        return counts;
       }
     } catch (e) {
       console.error('[PropertiesView] Error parsing statusCounts:', e);
@@ -234,7 +237,7 @@ export function PropertiesView() {
     }
     
     // Single pass filtering for better performance
-    return rawProperties.filter(p => {
+    const filtered = rawProperties.filter(p => {
       // Status filter - normalize to handle both single letters (J, A, P) and full enum values (JUDGMENT, ACTIVE, PENDING)
       // Check both advancedFilters.statuses and search query for status matches
       if (hasStatusFilter) {
@@ -245,6 +248,17 @@ export function PropertiesView() {
         if (advancedFilters.statuses.length > 0) {
           const normalizedFilterStatuses = advancedFilters.statuses.map(s => normalizeStatus(s));
           matchesStatus = normalizedFilterStatuses.includes(propertyStatus);
+          
+          // Debug logging for first few properties
+          if (rawProperties.indexOf(p) < 3) {
+            console.log('[FILTER] Property status check:', {
+              originalStatus: p.status,
+              normalizedPropertyStatus: propertyStatus,
+              filterStatuses: advancedFilters.statuses,
+              normalizedFilterStatuses,
+              matches: matchesStatus
+            });
+          }
         }
         
         // Also check if search query matches status
