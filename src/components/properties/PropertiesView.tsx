@@ -207,12 +207,20 @@ export function PropertiesView() {
   
   // Helper function to normalize status for comparison (handles both formats)
   const normalizeStatus = (status: string): string => {
-    const upper = (status || '').toUpperCase();
-    if (upper === 'JUDGMENT' || upper === 'J') return 'J';
-    if (upper === 'ACTIVE' || upper === 'A') return 'A';
-    if (upper === 'PENDING' || upper === 'P') return 'P';
-    if (upper === 'UNKNOWN' || upper === 'U') return 'U';
-    return upper;
+    if (!status) return 'U'; // Default to Unknown for empty status
+    const upper = status.toUpperCase().trim();
+    // Handle full enum names
+    if (upper === 'JUDGMENT' || upper.startsWith('JUDG')) return 'J';
+    if (upper === 'ACTIVE' || upper.startsWith('ACTI')) return 'A';
+    if (upper === 'PENDING' || upper.startsWith('PEND')) return 'P';
+    if (upper === 'UNKNOWN' || upper.startsWith('UNKN')) return 'U';
+    // Handle single letters
+    if (upper === 'J') return 'J';
+    if (upper === 'A') return 'A';
+    if (upper === 'P') return 'P';
+    if (upper === 'U') return 'U';
+    // Default to Unknown for unrecognized statuses
+    return 'U';
   };
 
   // Helper function to check if search query matches a status
