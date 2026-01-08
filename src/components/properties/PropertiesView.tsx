@@ -202,38 +202,57 @@ export function PropertiesView() {
     return 0;
   }, [data]);
   
+  // Helper function to normalize status for comparison (handles both formats)
+  const normalizeStatus = (status: string): string => {
+    const upper = (status || '').toUpperCase();
+    if (upper === 'JUDGMENT' || upper === 'J') return 'J';
+    if (upper === 'ACTIVE' || upper === 'A') return 'A';
+    if (upper === 'PENDING' || upper === 'P') return 'P';
+    if (upper === 'UNKNOWN' || upper === 'U') return 'U';
+    return upper;
+  };
+
+  // Helper function to check if search query matches a status
+  const getStatusFromSearch = (search: string): string | null => {
+    const upper = search.trim().toUpperCase();
+    if (upper === 'J' || upper === 'JUDGMENT' || upper.startsWith('JUDG')) return 'J';
+    if (upper === 'A' || upper === 'ACTIVE' || upper.startsWith('ACTI')) return 'A';
+    if (upper === 'P' || upper === 'PENDING' || upper.startsWith('PEND')) return 'P';
+    if (upper === 'U' || upper === 'UNKNOWN' || upper.startsWith('UNKN')) return 'U';
+    return null;
+  };
+
   // Apply advanced filtering logic - optimized to combine filters in single pass
   const filteredProperties = useMemo(() => {
     // Early return if no filters
     const hasActiveFilters = hasActiveAdvancedFilters ?? false;
-    if (!hasActiveFilters && advancedFilters.statuses.length === 0) {
+    const searchStatus = debouncedSearchQuery ? getStatusFromSearch(debouncedSearchQuery) : null;
+    const hasStatusFilter = advancedFilters.statuses.length > 0 || searchStatus !== null;
+    
+    if (!hasActiveFilters && !hasStatusFilter) {
       return rawProperties;
     }
     
     // Single pass filtering for better performance
     return rawProperties.filter(p => {
       // Status filter - normalize to handle both single letters (J, A, P) and full enum values (JUDGMENT, ACTIVE, PENDING)
-      if (advancedFilters.statuses.length > 0) {
-        const propertyStatus = (p.status || '').toUpperCase();
-        // Map property status to normalized format for comparison
-        const normalizedPropertyStatus = 
-          propertyStatus === 'JUDGMENT' || propertyStatus === 'J' ? 'J' :
-          propertyStatus === 'ACTIVE' || propertyStatus === 'A' ? 'A' :
-          propertyStatus === 'PENDING' || propertyStatus === 'P' ? 'P' :
-          propertyStatus === 'UNKNOWN' || propertyStatus === 'U' ? 'U' :
-          propertyStatus;
+      // Check both advancedFilters.statuses and search query for status matches
+      if (hasStatusFilter) {
+        const propertyStatus = normalizeStatus(p.status || '');
         
-        // Normalize filter statuses too
-        const normalizedFilterStatuses = advancedFilters.statuses.map(s => {
-          const upper = (s || '').toUpperCase();
-          return upper === 'JUDGMENT' || upper === 'J' ? 'J' :
-                 upper === 'ACTIVE' || upper === 'A' ? 'A' :
-                 upper === 'PENDING' || upper === 'P' ? 'P' :
-                 upper === 'UNKNOWN' || upper === 'U' ? 'U' :
-                 upper;
-        });
+        // Check if property matches any selected statuses
+        let matchesStatus = false;
+        if (advancedFilters.statuses.length > 0) {
+          const normalizedFilterStatuses = advancedFilters.statuses.map(s => normalizeStatus(s));
+          matchesStatus = normalizedFilterStatuses.includes(propertyStatus);
+        }
         
-        if (!normalizedFilterStatuses.includes(normalizedPropertyStatus)) {
+        // Also check if search query matches status
+        if (!matchesStatus && searchStatus) {
+          matchesStatus = propertyStatus === searchStatus;
+        }
+        
+        if (!matchesStatus) {
           return false;
         }
       }
@@ -323,9 +342,27 @@ export function PropertiesView() {
         if (paymentDate > toDate) return false;
       }
       
+      // Search query filter (if not already handled by status matching above)
+      // Only apply if search doesn't match a status (status matching is handled above)
+      if (debouncedSearchQuery && !searchStatus) {
+        const searchLower = debouncedSearchQuery.toLowerCase().trim();
+        const matchesSearch = 
+          (p.accountNumber && p.accountNumber.toLowerCase().includes(searchLower)) ||
+          (p.ownerName && p.ownerName.toLowerCase().includes(searchLower)) ||
+          (p.propertyAddress && p.propertyAddress.toLowerCase().includes(searchLower)) ||
+          (p.notes && p.notes.toLowerCase().includes(searchLower)) ||
+          (p.phoneNumbers && Array.isArray(p.phoneNumbers) && p.phoneNumbers.some(phone => 
+            phone && phone.toLowerCase().includes(searchLower)
+          ));
+        
+        if (!matchesSearch) {
+          return false;
+        }
+      }
+      
       return true;
     });
-  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters]);
+  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery]);
   
   // Apply sorting to all properties before pagination (only for filtered cases)
   const sortedProperties = useMemo(() => {
