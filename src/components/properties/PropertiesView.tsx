@@ -376,6 +376,19 @@ export function PropertiesView() {
       
       return true;
     });
+    
+    // Debug logging when status filter is active
+    if (hasStatusFilter && advancedFilters.statuses.length > 0) {
+      console.log('[FILTER] Status filtering summary:', {
+        totalProperties: rawProperties.length,
+        filteredCount: filtered.length,
+        selectedStatuses: advancedFilters.statuses,
+        searchStatus,
+        sampleStatuses: rawProperties.slice(0, 10).map(p => p.status)
+      });
+    }
+    
+    return filtered;
   }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery]);
   
   // Apply sorting to all properties before pagination (only for filtered cases)
