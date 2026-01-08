@@ -91,7 +91,7 @@ export function PropertiesView() {
   // Reduce fetch limit to improve performance - fetch in chunks if needed
   // Start with smaller limit and only increase if needed
   const fetchLimit = hasAnyFilter
-    ? 5000  // Fetch 5k properties when filters are active (faster initial load)
+    ? 2000  // Fetch 2k properties when filters are active (enough for filtering, avoids backend limits)
     : ITEMS_PER_PAGE;
   
   // Fetch properties from API with status filter and search
