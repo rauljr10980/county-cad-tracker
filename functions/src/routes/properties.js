@@ -19,8 +19,13 @@ router.get('/',
   optionalAuth,
   [
     query('page').optional().isInt({ min: 1 }).toInt(),
-    query('limit').optional().isInt({ min: 1, max: 1000 }).toInt(),
-    query('status').optional().isIn(['JUDGMENT', 'ACTIVE', 'PENDING', 'PAID', 'REMOVED']),
+    query('limit').optional().isInt({ min: 1, max: 50000 }).toInt(), // Increased max to allow fetching all properties
+    query('status').optional().custom((value) => {
+      // Accept both single letters (P, A, J, U) and full enum names
+      const validValues = ['J', 'A', 'P', 'U', 'JUDGMENT', 'ACTIVE', 'PENDING', 'PAID', 'REMOVED', 'UNKNOWN'];
+      const upperValue = String(value).toUpperCase().trim();
+      return validValues.includes(upperValue) || upperValue.startsWith('JUDG') || upperValue.startsWith('ACTI') || upperValue.startsWith('PEND') || upperValue.startsWith('UNKN');
+    }),
     query('dealStage').optional().isIn(['NEW_LEAD', 'CONTACTED', 'INTERESTED', 'OFFER_SENT', 'NEGOTIATING', 'UNDER_CONTRACT', 'CLOSED', 'DEAD']),
     query('search').optional().isString()
   ],
@@ -33,17 +38,43 @@ router.get('/',
 
       const {
         page = 1,
-        limit = 100,
-        status,
+        limit: limitParam,
+        status: statusParam,
         dealStage,
         search,
         sortBy = 'createdAt',
         sortOrder = 'desc'
       } = req.query;
 
+      // Normalize status parameter: convert single letters (P, A, J, U) to full enum names
+      let normalizedStatus = null;
+      if (statusParam) {
+        const upperStatus = String(statusParam).toUpperCase().trim();
+        if (upperStatus === 'J' || upperStatus === 'JUDGMENT' || upperStatus.startsWith('JUDG')) {
+          normalizedStatus = 'JUDGMENT';
+        } else if (upperStatus === 'A' || upperStatus === 'ACTIVE' || upperStatus.startsWith('ACTI')) {
+          normalizedStatus = 'ACTIVE';
+        } else if (upperStatus === 'P' || upperStatus === 'PENDING' || upperStatus.startsWith('PEND')) {
+          normalizedStatus = 'PENDING';
+        } else if (upperStatus === 'U' || upperStatus === 'UNKNOWN' || upperStatus.startsWith('UNKN')) {
+          normalizedStatus = 'UNKNOWN';
+        } else if (upperStatus === 'PAID') {
+          normalizedStatus = 'PAID';
+        } else if (upperStatus === 'REMOVED') {
+          normalizedStatus = 'REMOVED';
+        }
+      }
+
+      // When a single status is selected, fetch ALL properties (no limit)
+      // Otherwise use pagination with default limit of 100
+      const isSingleStatusFilter = normalizedStatus !== null && !dealStage && !search;
+      const limit = isSingleStatusFilter 
+        ? undefined // No limit - fetch all properties with this status
+        : (limitParam ? parseInt(limitParam) : 100); // Use provided limit or default to 100
+
       // Build where clause
       const where = {};
-      if (status) where.status = status;
+      if (normalizedStatus) where.status = normalizedStatus;
       if (dealStage) where.dealStage = dealStage;
 
       if (search) {
@@ -64,7 +95,9 @@ router.get('/',
       ]);
 
       // Get properties
-      const properties = await prisma.property.findMany({
+      // When single status filter is active, fetch ALL properties (no pagination)
+      // Otherwise use pagination
+      const queryOptions = {
         where,
         include: {
           _count: {
@@ -74,10 +107,16 @@ router.get('/',
             }
           }
         },
-        skip: (page - 1) * limit,
-        take: limit,
         orderBy: { [sortBy]: sortOrder }
-      });
+      };
+
+      // Only apply pagination if not fetching all properties for single status filter
+      if (!isSingleStatusFilter && limit) {
+        queryOptions.skip = (page - 1) * limit;
+        queryOptions.take = limit;
+      }
+
+      const properties = await prisma.property.findMany(queryOptions);
 
       // Format status counts to match BOTH old and new frontend (backward compatible)
       const statusCounts = {
@@ -117,11 +156,15 @@ router.get('/',
         }
       });
 
+      // Calculate total pages - if fetching all properties, totalPages is 1
+      const totalPages = isSingleStatusFilter ? 1 : (limit ? Math.ceil(total / limit) : 1);
+
       res.json({
         properties,
         total,
         totalUnfiltered: total, // For now, same as total (can be optimized later)
-        totalPages: Math.ceil(total / limit),
+        totalPages,
+        page: isSingleStatusFilter ? 1 : page, // Always page 1 when fetching all
         statusCounts
       });
     } catch (error) {

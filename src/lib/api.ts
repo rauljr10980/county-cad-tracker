@@ -338,7 +338,10 @@ export async function getProperties(page = 1, limit = 100, status?: string, sear
   try {
     // Ensure page and limit are valid numbers
     const validPage = Math.max(1, Math.floor(Number(page)) || 1);
-    const validLimit = Math.max(1, Math.min(10000, Math.floor(Number(limit)) || 100));
+    // When a single status is provided (no search), allow larger limits to fetch ALL properties
+    // Otherwise cap at 10000 for performance
+    const maxLimit = (status && !search) ? 50000 : 10000;
+    const validLimit = Math.max(1, Math.min(maxLimit, Math.floor(Number(limit)) || 100));
     
     console.log(`[API] Fetching properties: page=${validPage}, limit=${validLimit}, status=${status}, search=${search}`);
     let url = `${API_BASE_URL}/api/properties?page=${validPage}&limit=${validLimit}`;

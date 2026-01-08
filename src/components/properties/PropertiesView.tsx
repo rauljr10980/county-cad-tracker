@@ -87,11 +87,12 @@ export function PropertiesView() {
   const hasAnyFilter = selectedStatuses.length > 0 || (hasActiveAdvancedFilters ?? false) || hasSearchQuery || isSortingActive;
   
   // Fetch strategy:
-  // - Single status with backend filtering: Fetch up to 10000 to get all matches
+  // - Single status with backend filtering: Fetch ALL properties (no limit - backend handles this)
   // - Multiple statuses or other filters: Fetch 2000 for frontend filtering
   // - No filters: Use API pagination (100 per page)
+  // When single status is selected, backend will return ALL matching properties
   const fetchLimit = selectedStatuses.length === 1 && !hasActiveAdvancedFilters && !hasSearchQuery
-    ? 10000  // Single status with backend filtering - fetch more to get all matches
+    ? 50000  // Single status - request large limit, backend will return ALL matching properties
     : hasAnyFilter
     ? 2000   // Multiple filters - fetch 2k for frontend filtering
     : ITEMS_PER_PAGE;

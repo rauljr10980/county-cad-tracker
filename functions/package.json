@@ -17,7 +17,6 @@
     "build": "npm run prisma:generate"
   },
   "dependencies": {
-    "@google-cloud/storage": "^7.7.0",
     "@paralleldrive/cuid2": "^3.0.6",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
