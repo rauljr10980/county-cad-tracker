@@ -259,7 +259,8 @@ export function PropertiesView() {
       // Status filter - normalize to handle both single letters (J, A, P) and full enum values (JUDGMENT, ACTIVE, PENDING)
       // Check both advancedFilters.statuses and search query for status matches
       if (hasStatusFilter) {
-        const propertyStatus = normalizeStatus(p.status || '');
+        const originalPropertyStatus = p.status || '';
+        const propertyStatus = normalizeStatus(originalPropertyStatus);
         
         // Check if property matches any selected statuses
         let matchesStatus = false;
@@ -267,14 +268,17 @@ export function PropertiesView() {
           const normalizedFilterStatuses = advancedFilters.statuses.map(s => normalizeStatus(s));
           matchesStatus = normalizedFilterStatuses.includes(propertyStatus);
           
-          // Debug logging for first few properties
-          if (rawProperties.indexOf(p) < 3) {
-            console.log('[FILTER] Property status check:', {
-              originalStatus: p.status,
+          // Enhanced debug logging for first 10 properties to see what's happening
+          if (rawProperties.indexOf(p) < 10) {
+            console.log('[FILTER] Status comparison:', {
+              propertyIndex: rawProperties.indexOf(p),
+              accountNumber: p.accountNumber,
+              originalPropertyStatus,
               normalizedPropertyStatus: propertyStatus,
-              filterStatuses: advancedFilters.statuses,
+              selectedFilterStatuses: advancedFilters.statuses,
               normalizedFilterStatuses,
-              matches: matchesStatus
+              matches: matchesStatus,
+              willInclude: matchesStatus
             });
           }
         }
