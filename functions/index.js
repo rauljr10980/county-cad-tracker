@@ -2152,8 +2152,15 @@ app.get('/api/properties', async (req, res) => {
         }
         
         // Return paginated results (100 per page for performance)
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 100;
+        // Validate and cap limit to prevent excessive requests
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        let limit = parseInt(req.query.limit) || 100;
+        // Cap limit at 10000 to prevent memory issues, but allow larger requests for filtering
+        if (isNaN(limit) || limit < 1) {
+          limit = 100;
+        } else if (limit > 10000) {
+          limit = 10000;
+        }
         const start = (page - 1) * limit;
         
         // Ensure all properties include all fields (no filtering of fields)
