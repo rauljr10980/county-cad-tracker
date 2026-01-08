@@ -58,7 +58,16 @@ export function PropertiesView() {
   // Convert selectedStatuses array to single status for API
   // If multiple statuses selected, fetch all (no filter) and filter on frontend
   // If single status, use API filtering for efficiency
-  const apiStatusFilter = selectedStatuses.length === 1 ? selectedStatuses[0] : undefined;
+  // Normalize status to single letter format for API (J, A, P, U)
+  const apiStatusFilter = selectedStatuses.length === 1 ? (() => {
+    const status = (selectedStatuses[0] || '').toUpperCase();
+    // Map to single letter for API compatibility
+    if (status === 'JUDGMENT' || status === 'J') return 'J';
+    if (status === 'ACTIVE' || status === 'A') return 'A';
+    if (status === 'PENDING' || status === 'P') return 'P';
+    if (status === 'UNKNOWN' || status === 'U') return 'U';
+    return status; // Fallback to original
+  })() : undefined;
   
   // Helper function to check if any advanced filters are active (excluding status)
   const hasActiveAdvancedFilters = useMemo(() => {
