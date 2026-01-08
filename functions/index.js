@@ -422,13 +422,14 @@ app.get('/api/debug/sample', async (req, res) => {
     };
     
     properties.forEach(p => {
-      if (p.status === 'J') samples.statusCounts.J++;
-      else if (p.status === 'A') samples.statusCounts.A++;
-      else if (p.status === 'P') samples.statusCounts.P++;
+      const status = p.status || '';
+      if (status === 'JUDGMENT' || status === 'J') samples.statusCounts.J++;
+      else if (status === 'ACTIVE' || status === 'A') samples.statusCounts.A++;
+      else if (status === 'PENDING' || status === 'P') samples.statusCounts.P++;
       else {
         samples.statusCounts.other++;
-        if (samples.statusCounts.otherValues.length < 10 && !samples.statusCounts.otherValues.includes(p.status)) {
-          samples.statusCounts.otherValues.push(p.status);
+        if (samples.statusCounts.otherValues.length < 10 && !samples.statusCounts.otherValues.includes(status)) {
+          samples.statusCounts.otherValues.push(status);
         }
       }
     });
@@ -1160,19 +1161,31 @@ function extractProperties(data, canHeaderName = null) {
       });
     }
     
-    // Determine final status: P, A, J, or U (unknown)
+    // Determine final status: Map to PostgreSQL enum values (JUDGMENT, ACTIVE, PENDING, UNKNOWN)
     // finalStatus comes ONLY from LEGALSTATUS column
-    let statusValue = 'U'; // Default to Unknown
+    // PostgreSQL schema expects: JUDGMENT, ACTIVE, PENDING, PAID, REMOVED, UNKNOWN
+    let statusValue = 'UNKNOWN'; // Default to UNKNOWN (matches PostgreSQL enum)
     if (finalStatus) {
-      const firstChar = finalStatus.charAt(0).toUpperCase();
-      // Only accept P, A, or J - anything else is unknown (U)
-      if (firstChar === 'P' || firstChar === 'A' || firstChar === 'J') {
-        statusValue = firstChar;
+      const upperStatus = finalStatus.toUpperCase().trim();
+      const firstChar = upperStatus.charAt(0);
+      
+      // Map to PostgreSQL enum values
+      if (firstChar === 'J' || upperStatus.includes('JUDGMENT') || upperStatus.includes('JUDG')) {
+        statusValue = 'JUDGMENT';
+      } else if (firstChar === 'A' || upperStatus.includes('ACTIVE')) {
+        statusValue = 'ACTIVE';
+      } else if (firstChar === 'P' || upperStatus.includes('PENDING')) {
+        statusValue = 'PENDING';
+      } else if (upperStatus.includes('PAID')) {
+        statusValue = 'PAID';
+      } else if (upperStatus.includes('REMOVED')) {
+        statusValue = 'REMOVED';
       } else {
         // Log if we get unexpected status values (for debugging)
         if (index === 0 || Math.random() < 0.001) {
-          console.log(`[EXTRACT] LEGALSTATUS value "${finalStatus}" converted to Unknown (U), first char: "${firstChar}"`);
+          console.log(`[EXTRACT] LEGALSTATUS value "${finalStatus}" converted to UNKNOWN, original: "${upperStatus}"`);
         }
+        statusValue = 'UNKNOWN';
       }
     }
     
@@ -1372,12 +1385,15 @@ function extractProperties(data, canHeaderName = null) {
   }
   
   // Log status breakdown - track P, A, J, and U (Unknown)
+  // Count statuses - PostgreSQL uses full enum values (JUDGMENT, ACTIVE, PENDING, UNKNOWN)
+  // But API returns J, A, P, U for backward compatibility with frontend
   const statusCounts = { J: 0, A: 0, P: 0, U: 0, other: 0 };
   properties.forEach(p => {
-    if (p.status === 'J') statusCounts.J++;
-    else if (p.status === 'A') statusCounts.A++;
-    else if (p.status === 'P') statusCounts.P++;
-    else if (p.status === 'U' || !p.status) statusCounts.U++;
+    const status = p.status || '';
+    if (status === 'JUDGMENT' || status === 'J') statusCounts.J++;
+    else if (status === 'ACTIVE' || status === 'A') statusCounts.A++;
+    else if (status === 'PENDING' || status === 'P') statusCounts.P++;
+    else if (status === 'UNKNOWN' || status === 'U' || !status) statusCounts.U++;
     else statusCounts.other++;
   });
   console.log(`[EXTRACT] Status breakdown: P=${statusCounts.P}, A=${statusCounts.A}, J=${statusCounts.J}, U=${statusCounts.U}, other=${statusCounts.other}`);
@@ -1415,12 +1431,14 @@ function generateComparison(currentProps, previousProps, currentFilename, previo
     const previous = previousMap.get(accountNumber);
     if (!previous) {
       // Mark new properties with P status as "new leads"
-      const isNewLead = current.status === 'P';
+      const isNewLead = (current.status || '').toUpperCase() === 'PENDING' || current.status === 'P';
       newProperties.push({ ...current, isNew: true, isNewLead });
     } else if (current.status !== previous.status || current.totalPercentage !== previous.totalPercentage) {
-      // Flag critical status transitions
-      const isEscalation = previous.status === 'P' && current.status === 'A'; // P → A
-      const isCritical = previous.status === 'A' && current.status === 'J';    // A → J
+      // Flag critical status transitions - support both full enum and single letter
+      const prevStatus = (previous.status || '').toUpperCase();
+      const currStatus = (current.status || '').toUpperCase();
+      const isEscalation = (prevStatus === 'PENDING' || prevStatus === 'P') && (currStatus === 'ACTIVE' || currStatus === 'A'); // P → A
+      const isCritical = (prevStatus === 'ACTIVE' || prevStatus === 'A') && (currStatus === 'JUDGMENT' || currStatus === 'J');    // A → J
 
       changedProperties.push({
         ...current,
@@ -2081,21 +2099,36 @@ app.get('/api/properties', async (req, res) => {
         }
         
         // Log status breakdown (U = Unknown/blank LEGALSTATUS)
+        // Count statuses - PostgreSQL uses full enum values (JUDGMENT, ACTIVE, PENDING, UNKNOWN)
+        // But API returns J, A, P, U for backward compatibility with frontend
         const statusCounts = { J: 0, A: 0, P: 0, U: 0 };
         properties.forEach(p => {
-          if (p.status === 'J') statusCounts.J++;
-          else if (p.status === 'A') statusCounts.A++;
-          else if (p.status === 'P') statusCounts.P++;
-          else statusCounts.U++; // Unknown status (blank LEGALSTATUS)
+          const status = p.status || '';
+          if (status === 'JUDGMENT' || status === 'J') statusCounts.J++;
+          else if (status === 'ACTIVE' || status === 'A') statusCounts.A++;
+          else if (status === 'PENDING' || status === 'P') statusCounts.P++;
+          else statusCounts.U++; // Unknown status (blank LEGALSTATUS or UNKNOWN)
         });
         console.log(`[PROPERTIES] Status breakdown:`, statusCounts);
         
-        // Apply status filter if provided (J, A, P, or U for unknown)
+        // Apply status filter if provided (J, A, P, U or full enum values)
         const statusFilter = req.query.status;
         let filteredProperties = properties;
-        if (statusFilter && ['J', 'A', 'P', 'U'].includes(statusFilter.toUpperCase())) {
-          filteredProperties = properties.filter(p => p.status === statusFilter.toUpperCase());
-          console.log(`[PROPERTIES] Filtered by status ${statusFilter}: ${filteredProperties.length} properties`);
+        if (statusFilter) {
+          const upperFilter = statusFilter.toUpperCase();
+          // Map single letters to full enum values for filtering
+          const statusMap = {
+            'J': 'JUDGMENT',
+            'A': 'ACTIVE',
+            'P': 'PENDING',
+            'U': 'UNKNOWN'
+          };
+          const filterValue = statusMap[upperFilter] || upperFilter;
+          filteredProperties = properties.filter(p => {
+            const pStatus = (p.status || '').toUpperCase();
+            return pStatus === filterValue || pStatus === upperFilter;
+          });
+          console.log(`[PROPERTIES] Filtered by status ${statusFilter} (${filterValue}): ${filteredProperties.length} properties`);
         }
         
         // Apply search filter if provided
@@ -2634,9 +2667,9 @@ app.get('/api/dashboard', async (req, res) => {
       console.log(`[DASHBOARD] Loaded ${properties.length} properties`);
 
       const byStatus = {
-        judgment: properties.filter(p => p.status === 'J').length,
-        active: properties.filter(p => p.status === 'A').length,
-        pending: properties.filter(p => p.status === 'P').length,
+        judgment: properties.filter(p => (p.status || '').toUpperCase() === 'JUDGMENT' || p.status === 'J').length,
+        active: properties.filter(p => (p.status || '').toUpperCase() === 'ACTIVE' || p.status === 'A').length,
+        pending: properties.filter(p => (p.status || '').toUpperCase() === 'PENDING' || p.status === 'P').length,
       };
 
       const totalAmountDue = properties.reduce((sum, p) => sum + (p.totalAmountDue || 0), 0);
