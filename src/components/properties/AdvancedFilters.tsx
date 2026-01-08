@@ -204,7 +204,7 @@ export function AdvancedFiltersPanel({
                       <span>Unknown</span>
                     </div>
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({((statusCounts?.UNKNOWN) || 0).toLocaleString()})
+                      ({((statusCounts?.U) || 0).toLocaleString()})
                     </span>
                   </div>
                 </DropdownMenuCheckboxItem>
