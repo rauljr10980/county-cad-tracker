@@ -65,12 +65,10 @@ export function PropertyTable({
   };
 
 
-  const filteredProperties = statusFilter 
-    ? properties.filter(p => p.status === statusFilter)
-    : properties;
-
-  // Properties are already sorted and paginated by PropertiesView, so just display them
-  const displayProperties = filteredProperties;
+  // Properties are already filtered, sorted, and paginated by PropertiesView
+  // No need to filter again here - PropertiesView handles all filtering including status normalization
+  // (Database uses PENDING/ACTIVE/JUDGMENT, but filters use P/A/J, so PropertiesView normalizes them)
+  const displayProperties = properties;
   
   const handleSort = (field: keyof Property) => {
     if (onSort) {

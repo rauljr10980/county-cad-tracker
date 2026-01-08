@@ -446,6 +446,12 @@ export function PropertiesView() {
     if (selectedStatuses.length > 0 || hasActiveAdvancedFilters) {
       // Any filters applied (status or advanced) - use filtered results
       propertiesToSort = filteredProperties;
+      console.log('[SORT] Using filteredProperties for sorting:', {
+        filteredPropertiesCount: filteredProperties.length,
+        selectedStatuses: selectedStatuses.length,
+        hasActiveAdvancedFilters,
+        sampleProperties: filteredProperties.slice(0, 3).map(p => ({ id: p.id, status: p.status, accountNumber: p.accountNumber }))
+      });
     } else {
       // No filters - but if sorting is active, we have more properties
       // If sorting is not active, return raw (using API pagination)
@@ -457,7 +463,7 @@ export function PropertiesView() {
     }
     
     // Apply sorting
-    return [...propertiesToSort].sort((a, b) => {
+    const sorted = [...propertiesToSort].sort((a, b) => {
       const aVal = a[sortField];
       const bVal = b[sortField];
       if (aVal === undefined || bVal === undefined) return 0;
@@ -468,6 +474,15 @@ export function PropertiesView() {
         ? String(aVal).localeCompare(String(bVal))
         : String(bVal).localeCompare(String(aVal));
     });
+    
+    console.log('[SORT] Sorting complete:', {
+      inputCount: propertiesToSort.length,
+      outputCount: sorted.length,
+      sortField,
+      sortDirection
+    });
+    
+    return sorted;
   }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, rawProperties, sortField, sortDirection, isSortingActive]);
   
   // Calculate totals and pagination
@@ -529,7 +544,13 @@ export function PropertiesView() {
         propertiesCount: finalProperties.length,
         total: finalTotal,
         totalPages: finalTotalPages,
-        page
+        page,
+        selectedStatuses: selectedStatuses.length,
+        hasActiveAdvancedFilters,
+        sortedPropertiesCount: sortedProperties.length,
+        filteredPropertiesCount: filteredProperties.length,
+        rawPropertiesCount: rawProperties.length,
+        sampleFinalProperties: finalProperties.slice(0, 3).map(p => ({ id: p.id, status: p.status, accountNumber: p.accountNumber }))
       });
       
     const result = {
@@ -541,6 +562,17 @@ export function PropertiesView() {
     // Ensure all values are numbers, not undefined
     if (typeof result.total !== 'number') result.total = 0;
     if (typeof result.totalPages !== 'number') result.totalPages = 1;
+    
+    // Final safety check - if we have a total but no properties, log a warning
+    if (result.total > 0 && result.properties.length === 0) {
+      console.error('[PropertiesView] WARNING: Total is', result.total, 'but properties array is empty!', {
+        sortedPropertiesLength: sortedProperties.length,
+        filteredPropertiesLength: filteredProperties.length,
+        rawPropertiesLength: rawProperties.length,
+        selectedStatuses,
+        hasActiveAdvancedFilters
+      });
+    }
     
     return result;
     } catch (err) {
