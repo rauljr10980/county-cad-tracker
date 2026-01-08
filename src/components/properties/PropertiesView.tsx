@@ -333,29 +333,11 @@ export function PropertiesView() {
   const sortedProperties = useMemo(() => {
     let propertiesToSort: Property[] = [];
     
-    if (selectedStatuses.length > 1 || hasActiveAdvancedFilters) {
-      // Multiple filters applied - use filtered results
+    // Always use filteredProperties when status filters are active (single or multiple)
+    // The filteredProperties useMemo already handles all the normalization correctly
+    if (selectedStatuses.length > 0 || hasActiveAdvancedFilters) {
+      // Status filter(s) or other advanced filters applied - use filtered results
       propertiesToSort = filteredProperties;
-    } else if (selectedStatuses.length === 1) {
-      // Single status selected - filter by status (normalize for comparison)
-      const filterStatus = (selectedStatuses[0] || '').toUpperCase();
-      const normalizedFilter = 
-        filterStatus === 'JUDGMENT' || filterStatus === 'J' ? 'J' :
-        filterStatus === 'ACTIVE' || filterStatus === 'A' ? 'A' :
-        filterStatus === 'PENDING' || filterStatus === 'P' ? 'P' :
-        filterStatus === 'UNKNOWN' || filterStatus === 'U' ? 'U' :
-        filterStatus;
-      
-      propertiesToSort = rawProperties.filter(p => {
-        const propStatus = (p.status || '').toUpperCase();
-        const normalizedProp = 
-          propStatus === 'JUDGMENT' || propStatus === 'J' ? 'J' :
-          propStatus === 'ACTIVE' || propStatus === 'A' ? 'A' :
-          propStatus === 'PENDING' || propStatus === 'P' ? 'P' :
-          propStatus === 'UNKNOWN' || propStatus === 'U' ? 'U' :
-          propStatus;
-        return normalizedProp === normalizedFilter;
-      });
     } else {
       // No filters - but if sorting is active, we have more properties
       // If sorting is not active, return raw (using API pagination)
