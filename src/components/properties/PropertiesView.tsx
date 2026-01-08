@@ -154,11 +154,18 @@ export function PropertiesView() {
         console.log('[PropertiesView] Raw statusCounts from API:', apiCounts);
 
         // API returns single letters (J, A, P, U) - map to full enum names for frontend consistency
-        // Also handle case where API might return both formats
+        // Prefer single letter keys, fallback to full enum names if single letter doesn't exist
+        // Don't add them together - they represent the same data in different formats
         const getCount = (shortKey: string, fullKey?: string): number => {
-          const short = typeof apiCounts[shortKey] === 'number' ? apiCounts[shortKey] : 0;
-          const full = fullKey && typeof apiCounts[fullKey] === 'number' ? apiCounts[fullKey] : 0;
-          return short + full;
+          // Prefer single letter format (what API actually returns)
+          if (typeof apiCounts[shortKey] === 'number') {
+            return apiCounts[shortKey];
+          }
+          // Fallback to full enum name if single letter doesn't exist
+          if (fullKey && typeof apiCounts[fullKey] === 'number') {
+            return apiCounts[fullKey];
+          }
+          return 0;
         };
 
         return {
