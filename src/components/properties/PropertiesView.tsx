@@ -126,7 +126,10 @@ export function PropertiesView() {
         hasData: !!data, 
         isArray: Array.isArray(data),
         dataType: typeof data,
-        hasProperties: data && typeof data === 'object' && 'properties' in data
+        hasProperties: data && typeof data === 'object' && 'properties' in data,
+        dataKeys: data && typeof data === 'object' ? Object.keys(data) : [],
+        selectedStatuses: selectedStatuses,
+        apiStatusFilter
       });
       
       if (data) {
@@ -136,9 +139,15 @@ export function PropertiesView() {
           return data;
         } else if (data && typeof data === 'object' && 'properties' in data && Array.isArray(data.properties)) {
           console.log('[PropertiesView] Data has properties array, returning', data.properties.length, 'properties');
+          console.log('[PropertiesView] Sample properties:', data.properties.slice(0, 3).map(p => ({ id: p.id, status: p.status, accountNumber: p.accountNumber })));
           return data.properties;
         } else {
-          console.warn('[PropertiesView] Data format not recognized:', Object.keys(data || {}));
+          console.warn('[PropertiesView] Data format not recognized:', {
+            keys: Object.keys(data || {}),
+            hasTotal: 'total' in (data || {}),
+            hasStatusCounts: 'statusCounts' in (data || {}),
+            dataSample: data
+          });
         }
       } else {
         console.log('[PropertiesView] No data available');
@@ -148,7 +157,7 @@ export function PropertiesView() {
     }
     console.log('[PropertiesView] Returning empty array');
     return [];
-  }, [data]);
+  }, [data, selectedStatuses, apiStatusFilter]);
   
   const statusCounts = useMemo(() => {
     try {
@@ -260,8 +269,20 @@ export function PropertiesView() {
         rawPropertiesCount: rawProperties.length,
         selectedStatuses: advancedFilters.statuses,
         apiStatusFilter,
-        sampleProperties: rawProperties.slice(0, 3).map(p => ({ id: p.id, status: p.status, accountNumber: p.accountNumber }))
+        hasActiveFilters,
+        needsFrontendStatusFilter,
+        sampleProperties: rawProperties.length > 0 ? rawProperties.slice(0, 3).map(p => ({ id: p.id, status: p.status, accountNumber: p.accountNumber })) : 'NO PROPERTIES - rawProperties is empty!'
       });
+      
+      // If rawProperties is empty but we have a status filter, log a warning
+      if (rawProperties.length === 0 && selectedStatuses.length > 0) {
+        console.error('[FILTER] WARNING: Backend filtering active but rawProperties is empty!', {
+          selectedStatuses,
+          apiStatusFilter,
+          dataKeys: data && typeof data === 'object' ? Object.keys(data) : []
+        });
+      }
+      
       return rawProperties;
     }
 
