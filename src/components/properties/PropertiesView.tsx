@@ -305,7 +305,7 @@ export function PropertiesView() {
           matchesStatus = normalizedFilterStatuses.includes(propertyStatus);
           
           // Debug logging for first few properties when filtering
-          if (rawProperties.indexOf(p) < 5) {
+          if (rawProperties.indexOf(p) < 10) {
             console.log('[FILTER DEBUG] Status comparison:', {
               accountNumber: p.accountNumber,
               originalStatus,
