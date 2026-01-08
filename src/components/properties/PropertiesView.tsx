@@ -55,9 +55,9 @@ export function PropertiesView() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Always filter on frontend for consistency - don't use API status filtering
-  // This ensures the filtering logic matches exactly between single and multiple status selections
-  const apiStatusFilter = undefined; // Always fetch all properties, filter on frontend
+  // Use backend filtering when a single status is selected (more efficient)
+  // Use frontend filtering when multiple statuses are selected (for flexibility)
+  const apiStatusFilter = selectedStatuses.length === 1 ? selectedStatuses[0] : undefined;
   
   // Helper function to check if any advanced filters are active (excluding status)
   const hasActiveAdvancedFilters = useMemo(() => {
@@ -229,7 +229,10 @@ export function PropertiesView() {
     // Early return if no filters
     const hasActiveFilters = hasActiveAdvancedFilters ?? false;
     const searchStatus = debouncedSearchQuery ? getStatusFromSearch(debouncedSearchQuery) : null;
-    const hasStatusFilter = advancedFilters.statuses.length > 0 || searchStatus !== null;
+    // Only filter on frontend if multiple statuses selected OR backend filtering not used
+    // Single status with backend filtering: backend already filtered, just apply other filters
+    const hasStatusFilter = (advancedFilters.statuses.length > 1 || apiStatusFilter === undefined) && 
+                           (advancedFilters.statuses.length > 0 || searchStatus !== null);
     
     // Debug: Log filter state
     if (hasStatusFilter) {
