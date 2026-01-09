@@ -16,8 +16,8 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP } from '@/lib/api';
-import { RouteMap } from '@/components/routing/RouteMap';
-import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
+import { RouteMap } from '@/components/routing/RouteMapLeaflet';
+import { AreaSelectorMap } from '@/components/routing/AreaSelectorMapLeaflet';
 
 export function PreForeclosureView() {
   const [searchQuery, setSearchQuery] = useState('');
