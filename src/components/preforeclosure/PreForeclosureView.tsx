@@ -574,6 +574,7 @@ export function PreForeclosureView() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Last Action</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Next Follow-Up</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -637,6 +638,52 @@ export function PreForeclosureView() {
                           record.notes ? "text-primary" : "text-muted-foreground"
                         )} />
                       </Button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            // View action - could open property details or show related info
+                            toast({
+                              title: 'View',
+                              description: `Viewing details for ${record.document_number}`,
+                            });
+                          }}
+                          title="View"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            // Send action - placeholder
+                            toast({
+                              title: 'Send',
+                              description: 'Send functionality coming soon',
+                            });
+                          }}
+                          title="Send"
+                          disabled
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+                          }}
+                          title="External Link"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
