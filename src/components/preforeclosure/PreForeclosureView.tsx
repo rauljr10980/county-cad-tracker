@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP } from '@/lib/api';
+import { RouteMap } from '@/components/routing/RouteMap';
 
 export function PreForeclosureView() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,6 +43,8 @@ export function PreForeclosureView() {
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [numVehicles, setNumVehicles] = useState<1 | 2>(1);
   const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
+  const [routeMapOpen, setRouteMapOpen] = useState(false);
+  const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -210,70 +213,13 @@ export function PreForeclosureView() {
         throw new Error('No routes generated');
       }
 
-      // Build Google Maps URLs for each route
-      // Google Maps has a limit of 25 waypoints per URL, so we need to batch them
-      const GOOGLE_MAPS_WAYPOINT_LIMIT = 25;
-      let totalUrlsOpened = 0;
-      let totalWaypoints = 0;
-
-      solution.routes.forEach((route: any, routeIndex: number) => {
-        if (route.waypoints.length < 2) return;
-
-        // Build waypoints string for Google Maps
-        const waypoints = route.waypoints
-          .filter((wp: any) => wp.id !== 'depot') // Exclude depot from waypoints
-          .map((wp: any) => `${wp.lat},${wp.lon}`);
-
-        if (waypoints.length === 0) return;
-        
-        totalWaypoints += waypoints.length;
-
-        // If we have more than 25 waypoints, split into multiple URLs
-        if (waypoints.length <= GOOGLE_MAPS_WAYPOINT_LIMIT) {
-          // Single URL for small routes
-          const origin = waypoints[0];
-          const destination = waypoints[waypoints.length - 1];
-          const middleWaypoints = waypoints.slice(1, -1);
-
-          let mapsUrl = `https://www.google.com/maps/dir/${origin}/`;
-          if (middleWaypoints.length > 0) {
-            mapsUrl += middleWaypoints.join('/') + '/';
-          }
-          mapsUrl += destination;
-
-          setTimeout(() => {
-            window.open(mapsUrl, '_blank');
-          }, totalUrlsOpened * 500);
-          totalUrlsOpened++;
-        } else {
-          // Split into chunks of 25 waypoints
-          for (let i = 0; i < waypoints.length; i += GOOGLE_MAPS_WAYPOINT_LIMIT - 1) {
-            const chunk = waypoints.slice(i, i + GOOGLE_MAPS_WAYPOINT_LIMIT);
-            if (chunk.length < 2) continue;
-
-            const origin = chunk[0];
-            const destination = chunk[chunk.length - 1];
-            const middleWaypoints = chunk.slice(1, -1);
-
-            let mapsUrl = `https://www.google.com/maps/dir/${origin}/`;
-            if (middleWaypoints.length > 0) {
-              mapsUrl += middleWaypoints.join('/') + '/';
-            }
-            mapsUrl += destination;
-
-            setTimeout(() => {
-              window.open(mapsUrl, '_blank');
-            }, totalUrlsOpened * 500);
-            totalUrlsOpened++;
-          }
-        }
-      });
-
-      const estimatedUrls = Math.ceil(totalWaypoints / GOOGLE_MAPS_WAYPOINT_LIMIT);
+      // Store routes and show map visualization
+      setOptimizedRoutes(solution);
+      setRouteMapOpen(true);
       
       toast({
         title: "Route Optimized",
-        description: `Optimized route for ${selectedRecords.length} records using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. Opening ${estimatedUrls} Google Maps window(s) (25 waypoints per window).`,
+        description: `Optimized route for ${selectedRecords.length} records using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km.`,
       });
     } catch (error) {
       console.error('[Route Optimization] Error:', error);
