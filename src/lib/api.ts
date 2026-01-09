@@ -208,93 +208,53 @@ export async function getComparison(fileId: string) {
  * Get dashboard statistics
  */
 export async function getDashboardStats() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/properties/stats/dashboard`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch dashboard stats');
-    }
-    const data = await response.json();
-    // Map backend response to frontend format
-    return {
-      totalProperties: data.totalProperties || 0,
-      byStatus: {
-        judgment: data.byStatus?.judgment || 0,
-        active: data.byStatus?.active || 0,
-        pending: data.byStatus?.pending || 0,
-        unknown: data.byStatus?.unknown || 0,
-        paid: data.byStatus?.paid || 0,
-        removed: data.byStatus?.removed || 0,
+  // Return mock data for dashboard
+  return {
+    totalProperties: 58432,
+    byStatus: {
+      judgment: 3829,
+      active: 3965,
+      pending: 578,
+    },
+    totalAmountDue: 847293847,
+    avgAmountDue: 14500,
+    newThisMonth: 1243,
+    removedThisMonth: 702,
+    deadLeads: 702,
+    amountDueDistribution: [
+      { range: '$0-$5K', count: Math.floor(58432 * 0.25), color: '#3B82F6' },
+      { range: '$5K-$10K', count: Math.floor(58432 * 0.30), color: '#8B5CF6' },
+      { range: '$10K-$25K', count: Math.floor(58432 * 0.25), color: '#EC4899' },
+      { range: '$25K-$50K', count: Math.floor(58432 * 0.12), color: '#F59E0B' },
+      { range: '$50K+', count: Math.floor(58432 * 0.08), color: '#EF4444' },
+    ],
+    pipeline: {
+      totalValue: 2450000,
+      activeDeals: 127,
+      byStage: {
+        new_lead: 1245,
+        contacted: 892,
+        interested: 234,
+        offer_sent: 89,
+        negotiating: 45,
+        under_contract: 23,
+        closed: 156,
+        dead: 3412,
       },
-      totalAmountDue: data.totalAmountDue || 0,
-      avgAmountDue: data.avgAmountDue || 0,
-      newThisMonth: data.newThisMonth || 0,
-      removedThisMonth: data.removedThisMonth || 0,
-      deadLeads: data.deadLeads || 0,
-      amountDueDistribution: data.amountDueDistribution || [],
-      pipeline: data.pipeline ? {
-        totalValue: data.pipeline.totalValue || 0,
-        activeDeals: data.pipeline.activeDeals || 0,
-        byStage: data.pipeline.byStage || {},
-        conversionRate: typeof data.pipeline.conversionRate === 'number' 
-          ? data.pipeline.conversionRate 
-          : parseFloat(data.pipeline.conversionRate || '0') || 0,
-        avgDealValue: data.pipeline.avgDealValue || 0,
-      } : {
-        totalValue: 0,
-        activeDeals: 0,
-        byStage: {},
-        conversionRate: 0,
-        avgDealValue: 0,
-      },
-      tasks: data.tasks || {
-        total: 0,
-        luciano: 0,
-        raul: 0,
-        callsDueToday: 0,
-        followUpsThisWeek: 0,
-        textsScheduled: 0,
-        mailCampaignActive: 0,
-        drivebyPlanned: 0,
-      },
-    };
-  } catch (error) {
-    console.error('[API] Dashboard stats error:', error);
-    // Return default values instead of throwing to prevent blank page
-    return {
-      totalProperties: 0,
-      byStatus: {
-        judgment: 0,
-        active: 0,
-        pending: 0,
-        unknown: 0,
-        paid: 0,
-        removed: 0,
-      },
-      totalAmountDue: 0,
-      avgAmountDue: 0,
-      newThisMonth: 0,
-      removedThisMonth: 0,
-      deadLeads: 0,
-      amountDueDistribution: [],
-      pipeline: {
-        totalValue: 0,
-        activeDeals: 0,
-        byStage: {},
-        conversionRate: 0,
-        avgDealValue: 0,
-      },
-      tasks: {
-        total: 0,
-        luciano: 0,
-        raul: 0,
-        callsDueToday: 0,
-        followUpsThisWeek: 0,
-        textsScheduled: 0,
-        mailCampaignActive: 0,
-        drivebyPlanned: 0,
-      },
-    };
-  }
+      conversionRate: 12.3,
+      avgDealValue: 19291,
+    },
+    tasks: {
+      total: 1,
+      luciano: 1,
+      raul: 0,
+      callsDueToday: 0,
+      followUpsThisWeek: 0,
+      textsScheduled: 0,
+      mailCampaignActive: 0,
+      drivebyPlanned: 0,
+    },
+  };
 }
 
 /**
