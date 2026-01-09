@@ -182,9 +182,11 @@ export function PreForeclosureView() {
       viewRecord.dueTime = isoDateTime;
       viewRecord.assignedTo = assignedTo || undefined;
     } catch (error) {
+      console.error('[PreForeclosure] Schedule action error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to schedule action';
       toast({
         title: "Error",
-        description: "Failed to schedule action",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

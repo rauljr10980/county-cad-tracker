@@ -402,9 +402,11 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
           'call': 'CALL',
           'text': 'TEXT',
           'mail': 'MAIL',
-          'driveby': 'DRIVEBY'
+          'driveby': 'DRIVEBY',
+          'drive-by': 'DRIVEBY' // Handle hyphenated version
         };
-        dbUpdates.actionType = actionMap[updates.actionType.toLowerCase()] || updates.actionType.toUpperCase();
+        const normalizedAction = updates.actionType.toLowerCase().replace(/-/g, '');
+        dbUpdates.actionType = actionMap[normalizedAction] || updates.actionType.toUpperCase();
       } else {
         dbUpdates.actionType = null;
       }
@@ -414,6 +416,7 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
         // Map frontend values to enum: 'med' -> 'MEDIUM', 'high' -> 'HIGH', 'low' -> 'LOW'
         const priorityMap = {
           'med': 'MEDIUM',
+          'medium': 'MEDIUM',
           'high': 'HIGH',
           'low': 'LOW'
         };
@@ -423,11 +426,29 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
       }
     }
     if (updates.dueTime !== undefined) {
-      dbUpdates.dueTime = updates.dueTime ? new Date(updates.dueTime) : null;
+      if (updates.dueTime) {
+        try {
+          dbUpdates.dueTime = new Date(updates.dueTime);
+          if (isNaN(dbUpdates.dueTime.getTime())) {
+            throw new Error('Invalid date format');
+          }
+        } catch (dateError) {
+          console.error('[PRE-FORECLOSURE] Invalid dueTime format:', updates.dueTime);
+          return res.status(400).json({ error: 'Invalid dueTime format. Expected ISO date string.' });
+        }
+      } else {
+        dbUpdates.dueTime = null;
+      }
     }
     if (updates.assignedTo !== undefined) {
       dbUpdates.assignedTo = updates.assignedTo || null;
     }
+    
+    console.log('[PRE-FORECLOSURE] Update request:', {
+      documentNumber,
+      dbUpdates,
+      originalUpdates: updates
+    });
 
     const record = await prisma.preForeclosure.update({
       where: { documentNumber },
@@ -465,7 +486,14 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Pre-foreclosure record not found' });
     }
     console.error('[PRE-FORECLOSURE] Update error:', error);
-    res.status(500).json({ error: 'Failed to update pre-foreclosure record' });
+    console.error('[PRE-FORECLOSURE] Update error details:', {
+      code: error.code,
+      message: error.message,
+      meta: error.meta,
+      stack: error.stack
+    });
+    const errorMessage = error.message || 'Failed to update pre-foreclosure record';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
