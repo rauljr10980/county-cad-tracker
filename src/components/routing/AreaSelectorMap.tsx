@@ -66,34 +66,45 @@ export function AreaSelectorMap({
   useEffect(() => {
     if (!isOpen || !mapRef.current) return;
 
-    // Check if Google Maps is loaded
-    if (!window.google || !window.google.maps) {
-      setError('Google Maps SDK not loaded. Please check your API key.');
-      setIsLoading(false);
-      return;
-    }
+    // Wait for Google Maps to load
+    const initMap = () => {
+      if (!mapRef.current) return;
 
-    // Check if drawing library is loaded
-    if (!window.google.maps.drawing) {
-      setError('Google Maps Drawing library not loaded. Please ensure the "drawing" library is included in the API script.');
-      setIsLoading(false);
-      return;
-    }
+      // Check if Google Maps is loaded
+      if (!window.google || !window.google.maps) {
+        // Retry after a short delay
+        setTimeout(initMap, 100);
+        return;
+      }
 
-    try {
-      // Create map
-      const newMap = new google.maps.Map(mapRef.current, {
-        zoom: initialZoom,
-        center: initialCenter,
-        mapTypeId: google.maps.MapTypeId.ROADMAP,
-        styles: [
-          {
-            featureType: 'poi',
-            elementType: 'labels',
-            stylers: [{ visibility: 'off' }]
-          }
-        ]
-      });
+      // Check if drawing library is loaded
+      if (!window.google.maps.drawing) {
+        setError('Google Maps Drawing library not loaded. Please ensure the "drawing" library is included in the API script.');
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Ensure the map container has dimensions
+        if (mapRef.current.offsetWidth === 0 || mapRef.current.offsetHeight === 0) {
+          // Wait a bit for the modal to fully render
+          setTimeout(initMap, 100);
+          return;
+        }
+
+        // Create map
+        const newMap = new google.maps.Map(mapRef.current, {
+          zoom: initialZoom,
+          center: initialCenter,
+          mapTypeId: google.maps.MapTypeId.ROADMAP,
+          styles: [
+            {
+              featureType: 'poi',
+              elementType: 'labels',
+              stylers: [{ visibility: 'off' }]
+            }
+          ]
+        });
 
       // Initialize Drawing Manager
       const manager = new google.maps.drawing.DrawingManager({
