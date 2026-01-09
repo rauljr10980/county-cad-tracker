@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Save, FileText, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { X, Save, FileText, MapPin, Calendar, AlertCircle, Eye, Send, ExternalLink } from 'lucide-react';
 import { PreForeclosure, PreForeclosureInternalStatus } from '@/types/property';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface PreForeclosureDetailsModalProps {
   preforeclosure: PreForeclosure | null;
@@ -38,6 +39,7 @@ export function PreForeclosureDetailsModal({
   );
   const [nextFollowUp, setNextFollowUp] = useState(preforeclosure?.next_follow_up_date || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
 
   // Reset form when modal opens with new data
   useState(() => {
@@ -177,15 +179,67 @@ export function PreForeclosureDetailsModal({
               />
             </div>
 
-            <div>
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add notes about this property..."
-                rows={4}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="notes" className="flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4" />
+                  Notes
+                </Label>
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add notes about this property..."
+                  rows={4}
+                />
+              </div>
+              
+              <div>
+                <Label className="flex items-center gap-2 mb-2">
+                  Actions
+                </Label>
+                <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                  <div className="flex gap-2">
+                    <Button
+                      variant={activeAction === 'view' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setActiveAction('view')}
+                      className={cn(
+                        "flex-1",
+                        activeAction === 'view' && "bg-primary text-primary-foreground"
+                      )}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={activeAction === 'send' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setActiveAction('send')}
+                      className={cn(
+                        "flex-1",
+                        activeAction === 'send' && "bg-primary text-primary-foreground"
+                      )}
+                      disabled
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={activeAction === 'external' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setActiveAction('external');
+                        window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+                      }}
+                      className={cn(
+                        "flex-1",
+                        activeAction === 'external' && "bg-primary text-primary-foreground"
+                      )}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {preforeclosure.last_action_date && (
