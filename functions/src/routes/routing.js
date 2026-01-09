@@ -1,6 +1,6 @@
 /**
  * Vehicle Routing Problem (VRP) Solver
- * Optimizes routes for 1-2 vehicles visiting up to 200 addresses
+ * Optimizes routes for 1-2 vehicles visiting up to 500 addresses
  * Based on graph theory and discrete optimization with heuristics
  */
 
@@ -269,8 +269,8 @@ router.post('/solve', async (req, res) => {
       return res.status(400).json({ error: 'Properties array is required' });
     }
 
-    if (properties.length > 200) {
-      return res.status(400).json({ error: 'Maximum 200 properties allowed' });
+    if (properties.length > 500) {
+      return res.status(400).json({ error: 'Maximum 500 properties allowed' });
     }
 
     if (numVehicles !== 1 && numVehicles !== 2) {
