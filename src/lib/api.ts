@@ -465,13 +465,12 @@ export async function updatePropertyAction(
 ) {
   const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/action`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ actionType, priority, dueTime, assignedTo }),
   });
   if (!response.ok) {
-    throw new Error('Failed to update action');
+    const errorData = await response.json().catch(() => ({ error: 'Failed to schedule action' }));
+    throw new Error(errorData.error || 'Failed to schedule action');
   }
   return response.json();
 }

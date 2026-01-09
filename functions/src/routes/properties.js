@@ -414,6 +414,181 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // ============================================================================
+// UPDATE/CREATE PROPERTY ACTION (Task)
+// ============================================================================
+
+router.put('/:id/action', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { actionType, priority, dueTime, assignedTo } = req.body;
+
+    // Validate required fields
+    if (!actionType || !priority || !dueTime) {
+      return res.status(400).json({ error: 'actionType, priority, and dueTime are required' });
+    }
+
+    // Validate property exists
+    const property = await prisma.property.findUnique({
+      where: { id }
+    });
+
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    // Get or create user (default user if not authenticated)
+    let userId = req.user?.id;
+    if (!userId) {
+      // Find or create a default system user
+      let defaultUser = await prisma.user.findFirst({
+        where: { username: 'system' }
+      });
+      if (!defaultUser) {
+        defaultUser = await prisma.user.create({
+          data: {
+            username: 'system',
+            email: 'system@countycadtracker.com',
+            password: 'default', // Should be hashed, but for now this works
+            role: 'OPERATOR'
+          }
+        });
+      }
+      userId = defaultUser.id;
+    }
+
+    // Map frontend actionType to database enum
+    const actionTypeMap = {
+      'call': 'CALL',
+      'text': 'TEXT',
+      'mail': 'MAIL',
+      'driveby': 'DRIVEBY'
+    };
+    const dbActionType = actionTypeMap[actionType.toLowerCase()];
+    if (!dbActionType) {
+      return res.status(400).json({ error: 'Invalid actionType. Must be: call, text, mail, or driveby' });
+    }
+
+    // Map frontend priority to database enum
+    const priorityMap = {
+      'high': 'HIGH',
+      'med': 'MEDIUM',
+      'low': 'LOW'
+    };
+    const dbPriority = priorityMap[priority.toLowerCase()];
+    if (!dbPriority) {
+      return res.status(400).json({ error: 'Invalid priority. Must be: high, med, or low' });
+    }
+
+    // Handle assignedTo - find user by name or create if doesn't exist
+    let assignedToId = null;
+    if (assignedTo) {
+      const assignedToLower = assignedTo.toLowerCase();
+      let assignedUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: { equals: assignedToLower, mode: 'insensitive' } },
+            { username: { equals: assignedTo, mode: 'insensitive' } }
+          ]
+        }
+      });
+      if (!assignedUser) {
+        // Create user if doesn't exist
+        assignedUser = await prisma.user.create({
+          data: {
+            username: assignedToLower,
+            email: `${assignedToLower}@countycadtracker.com`,
+            password: 'default', // Should be hashed
+            role: 'OPERATOR'
+          }
+        });
+      }
+      assignedToId = assignedUser.id;
+    }
+
+    // Find existing pending task for this property, or create new one
+    const existingTask = await prisma.task.findFirst({
+      where: {
+        propertyId: id,
+        status: 'PENDING'
+      }
+    });
+
+    const dueDateTime = new Date(dueTime);
+
+    let task;
+    if (existingTask) {
+      // Update existing task
+      task = await prisma.task.update({
+        where: { id: existingTask.id },
+        data: {
+          actionType: dbActionType,
+          priority: dbPriority,
+          dueTime: dueDateTime,
+          assignedToId: assignedToId,
+          updatedAt: new Date()
+        },
+        include: {
+          assignedTo: true,
+          createdBy: true
+        }
+      });
+
+      // Log activity
+      await prisma.taskActivity.create({
+        data: {
+          taskId: task.id,
+          userId: userId,
+          action: 'STATUS_CHANGED',
+          oldValue: JSON.stringify({
+            actionType: existingTask.actionType,
+            priority: existingTask.priority,
+            dueTime: existingTask.dueTime
+          }),
+          newValue: JSON.stringify({
+            actionType: dbActionType,
+            priority: dbPriority,
+            dueTime: dueDateTime
+          }),
+          description: 'Task updated'
+        }
+      });
+    } else {
+      // Create new task
+      task = await prisma.task.create({
+        data: {
+          propertyId: id,
+          actionType: dbActionType,
+          priority: dbPriority,
+          status: 'PENDING',
+          dueTime: dueDateTime,
+          assignedToId: assignedToId,
+          createdById: userId
+        },
+        include: {
+          assignedTo: true,
+          createdBy: true
+        }
+      });
+
+      // Log activity
+      await prisma.taskActivity.create({
+        data: {
+          taskId: task.id,
+          userId: userId,
+          action: 'CREATED',
+          description: `Task created: ${dbActionType} with ${dbPriority} priority`
+        }
+      });
+    }
+
+    res.json(task);
+  } catch (error) {
+    console.error('[PROPERTIES] Action error:', error);
+    res.status(500).json({ error: 'Failed to schedule action' });
+  }
+});
+
+// ============================================================================
 // GET DASHBOARD STATS
 // ============================================================================
 
