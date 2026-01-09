@@ -84,6 +84,52 @@ export function PreForeclosureDetailsModal({
           </DialogTitle>
         </DialogHeader>
 
+        {/* Actions Panel - Prominent at top */}
+        <div className="bg-secondary/30 rounded-lg p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm font-medium">Actions</span>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant={activeAction === 'view' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveAction('view')}
+              className={cn(
+                "flex-1",
+                activeAction === 'view' && "bg-primary text-primary-foreground"
+              )}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeAction === 'send' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveAction('send')}
+              className={cn(
+                "flex-1",
+                activeAction === 'send' && "bg-primary text-primary-foreground"
+              )}
+              disabled
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeAction === 'external' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                setActiveAction('external');
+                window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+              }}
+              className={cn(
+                "flex-1",
+                activeAction === 'external' && "bg-primary text-primary-foreground"
+              )}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
         <div className="space-y-6">
           {/* Immutable Data Section */}
           <div className="bg-muted/30 rounded-lg p-4 space-y-3">
@@ -179,67 +225,18 @@ export function PreForeclosureDetailsModal({
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="notes" className="flex items-center gap-2 mb-2">
-                  <FileText className="h-4 w-4" />
-                  Notes
-                </Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add notes about this property..."
-                  rows={4}
-                />
-              </div>
-              
-              <div>
-                <Label className="flex items-center gap-2 mb-2">
-                  Actions
-                </Label>
-                <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
-                  <div className="flex gap-2">
-                    <Button
-                      variant={activeAction === 'view' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setActiveAction('view')}
-                      className={cn(
-                        "flex-1",
-                        activeAction === 'view' && "bg-primary text-primary-foreground"
-                      )}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant={activeAction === 'send' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setActiveAction('send')}
-                      className={cn(
-                        "flex-1",
-                        activeAction === 'send' && "bg-primary text-primary-foreground"
-                      )}
-                      disabled
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant={activeAction === 'external' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => {
-                        setActiveAction('external');
-                        window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
-                      }}
-                      className={cn(
-                        "flex-1",
-                        activeAction === 'external' && "bg-primary text-primary-foreground"
-                      )}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
+            <div>
+              <Label htmlFor="notes" className="flex items-center gap-2 mb-2">
+                <FileText className="h-4 w-4" />
+                Notes
+              </Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add notes about this property..."
+                rows={4}
+              />
             </div>
 
             {preforeclosure.last_action_date && (
