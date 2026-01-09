@@ -365,8 +365,8 @@ model PreForeclosure {
   schoolDistrict    String?
   internalStatus    String     @default("New") // "New", "Contact Attempted", "Monitoring", "Dead"
   notes             String?    @db.Text
-  lastActionDate    String?
-  nextFollowUpDate  String?
+  lastActionDate    DateTime?
+  nextFollowUpDate  DateTime?
   actionType        ActionType?
   priority          Priority?
   dueTime           DateTime?
