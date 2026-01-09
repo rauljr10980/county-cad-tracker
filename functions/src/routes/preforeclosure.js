@@ -17,7 +17,22 @@ const router = express.Router();
 
 router.get('/', optionalAuth, async (req, res) => {
   try {
+    const { address, city, zip } = req.query;
+    
+    // Build where clause for filtering
+    const where = {};
+    if (address) {
+      where.address = { contains: address, mode: 'insensitive' };
+    }
+    if (city) {
+      where.city = { contains: city, mode: 'insensitive' };
+    }
+    if (zip) {
+      where.zip = zip;
+    }
+
     const records = await prisma.preForeclosure.findMany({
+      where: Object.keys(where).length > 0 ? where : undefined,
       orderBy: { createdAt: 'desc' }
     });
 

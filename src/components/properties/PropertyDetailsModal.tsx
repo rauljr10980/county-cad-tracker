@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, Target } from 'lucide-react';
+import { X, ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, Target, Eye, Send } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -12,10 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyDealStage } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyDealStage, getPreForeclosures } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
+import { PreForeclosureRecord } from '@/types/property';
 
 interface PropertyDetailsModalProps {
   property: Property | null;
@@ -46,6 +47,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [expectedCloseDate, setExpectedCloseDate] = useState<Date | undefined>(undefined);
   const [savingDealStage, setSavingDealStage] = useState(false);
 
+  // Pre-foreclosure state
+  const [preForeclosureRecords, setPreForeclosureRecords] = useState<PreForeclosureRecord[]>([]);
+  const [loadingPreForeclosure, setLoadingPreForeclosure] = useState(false);
+  const [showPreForeclosure, setShowPreForeclosure] = useState(false);
+  const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
+
   // Initialize notes and phone numbers from property when modal opens or property changes
   useEffect(() => {
     if (property && isOpen) {
@@ -73,8 +80,65 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setEstimatedDealValue(property.estimatedDealValue?.toString() || '');
       setOfferAmount(property.offerAmount?.toString() || '');
       setExpectedCloseDate(property.expectedCloseDate ? new Date(property.expectedCloseDate) : undefined);
+      
+      // Load pre-foreclosure records for this property
+      loadPreForeclosureRecords();
     }
   }, [property?.id, isOpen]);
+
+  const loadPreForeclosureRecords = async () => {
+    if (!property) return;
+    
+    setLoadingPreForeclosure(true);
+    try {
+      // Extract address from property address (format: "OWNER NAME 123 STREET CITY, STATE ZIP")
+      const propertyAddress = property.propertyAddress || '';
+      
+      // Try to extract street number and street name
+      const addressMatch = propertyAddress.match(/\b(\d+)\s+([A-Za-z\s]+?)(?:\s+[A-Z]{2}\s+\d{5}|$)/);
+      const streetNumber = addressMatch ? addressMatch[1] : null;
+      const streetName = addressMatch ? addressMatch[2].trim().split(/\s+/).slice(0, 3).join(' ') : null;
+      
+      // Fetch all pre-foreclosure records
+      const records = await getPreForeclosures();
+      
+      // Filter records that match this property's address
+      const matchingRecords = records.filter((record: PreForeclosureRecord) => {
+        if (!record.address) return false;
+        
+        const recordAddress = record.address.toLowerCase().trim();
+        const propAddress = propertyAddress.toLowerCase().trim();
+        
+        // Try to match by street number and street name if available
+        if (streetNumber && streetName) {
+          const recordLower = recordAddress.toLowerCase();
+          const streetNumLower = streetNumber.toLowerCase();
+          const streetNameLower = streetName.toLowerCase();
+          
+          // Check if record contains both street number and street name
+          return recordLower.includes(streetNumLower) && 
+                 recordLower.includes(streetNameLower.substring(0, Math.min(15, streetNameLower.length)));
+        }
+        
+        // Fallback: try to match first 30 characters (usually contains street number and name)
+        const propPrefix = propAddress.substring(0, 30).trim();
+        const recordPrefix = recordAddress.substring(0, 30).trim();
+        
+        // Check if either contains the other (fuzzy match)
+        return propPrefix.length > 10 && recordPrefix.length > 10 && (
+          recordAddress.includes(propPrefix) || 
+          propAddress.includes(recordPrefix)
+        );
+      });
+      
+      setPreForeclosureRecords(matchingRecords);
+    } catch (error) {
+      console.error('Failed to load pre-foreclosure records:', error);
+      setPreForeclosureRecords([]);
+    } finally {
+      setLoadingPreForeclosure(false);
+    }
+  };
 
   if (!property) return null;
 
@@ -863,6 +927,130 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 </Button>
               </div>
             </div>
+          </div>
+
+          {/* Actions Panel */}
+          <div className="bg-secondary/30 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm font-medium">Actions</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={activeAction === 'view' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setActiveAction('view');
+                  setShowPreForeclosure(true);
+                }}
+                className={cn(
+                  "flex-1",
+                  activeAction === 'view' && "bg-primary text-primary-foreground"
+                )}
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={activeAction === 'send' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveAction('send')}
+                className={cn(
+                  "flex-1",
+                  activeAction === 'send' && "bg-primary text-primary-foreground"
+                )}
+                disabled
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={activeAction === 'external' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setActiveAction('external');
+                  if (property.link) {
+                    window.open(property.link, '_blank');
+                  } else {
+                    window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+                  }
+                }}
+                className={cn(
+                  "flex-1",
+                  activeAction === 'external' && "bg-primary text-primary-foreground"
+                )}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Pre-Foreclosure Information */}
+            {showPreForeclosure && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium">Pre-Foreclosure Records</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowPreForeclosure(false)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+                {loadingPreForeclosure ? (
+                  <div className="text-sm text-muted-foreground">Loading...</div>
+                ) : preForeclosureRecords.length > 0 ? (
+                  <div className="space-y-3">
+                    {preForeclosureRecords.map((record, index) => (
+                      <div key={index} className="bg-card rounded-lg p-3 border border-border">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-muted-foreground">Document Number:</span>
+                            <div className="font-mono font-medium">{record.document_number}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Type:</span>
+                            <div className="font-medium">{record.type}</div>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Address:</span>
+                            <div>{record.address}, {record.city}, {record.zip}</div>
+                          </div>
+                          {record.filing_month && (
+                            <div>
+                              <span className="text-muted-foreground">Filing Month:</span>
+                              <div>{record.filing_month}</div>
+                            </div>
+                          )}
+                          {record.county && (
+                            <div>
+                              <span className="text-muted-foreground">County:</span>
+                              <div>{record.county}</div>
+                            </div>
+                          )}
+                          {record.internal_status && (
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Status:</span>
+                              <div>
+                                <Badge variant="outline">{record.internal_status}</Badge>
+                              </div>
+                            </div>
+                          )}
+                          {record.notes && (
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Notes:</span>
+                              <div className="text-xs mt-1">{record.notes}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    No pre-foreclosure records found for this property.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Actions */}

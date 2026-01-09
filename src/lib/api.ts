@@ -657,9 +657,16 @@ export async function verifyEmail(token: string) {
 
 /**
  * Get all pre-foreclosure records
+ * @param filters Optional filters for address, city, zip
  */
-export async function getPreForeclosures() {
-  const response = await fetch(`${API_BASE_URL}/api/preforeclosure`);
+export async function getPreForeclosures(filters?: { address?: string; city?: string; zip?: string }) {
+  const params = new URLSearchParams();
+  if (filters?.address) params.append('address', filters.address);
+  if (filters?.city) params.append('city', filters.city);
+  if (filters?.zip) params.append('zip', filters.zip);
+  
+  const url = `${API_BASE_URL}/api/preforeclosure${params.toString() ? `?${params.toString()}` : ''}`;
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Failed to fetch pre-foreclosure records');
   }
