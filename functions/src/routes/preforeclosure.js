@@ -52,7 +52,7 @@ router.get('/', optionalAuth, async (req, res) => {
 // UPLOAD PRE-FORECLOSURE FILE
 // ============================================================================
 
-router.post('/upload', authenticateToken, async (req, res) => {
+router.post('/upload', optionalAuth, async (req, res) => {
   try {
     const { filename, fileData } = req.body;
 
@@ -66,14 +66,28 @@ router.post('/upload', authenticateToken, async (req, res) => {
     // Parse Excel/CSV file
     let workbook;
     try {
-      workbook = XLSX.read(buffer, { type: 'buffer' });
+      // Try to detect if it's CSV or Excel
+      const isCSV = filename.toLowerCase().endsWith('.csv');
+      if (isCSV) {
+        // For CSV, read as string first
+        const csvString = buffer.toString('utf-8');
+        workbook = XLSX.read(csvString, { type: 'string' });
+      } else {
+        // For Excel files, read as buffer
+        workbook = XLSX.read(buffer, { type: 'buffer' });
+      }
     } catch (parseError) {
+      console.error('[PRE-FORECLOSURE] Parse error:', parseError);
       return res.status(400).json({ error: 'Invalid file format. Please upload a valid Excel or CSV file.' });
+    }
+
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      return res.status(400).json({ error: 'File has no sheets' });
     }
 
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: null, raw: false });
 
     if (rows.length === 0) {
       return res.status(400).json({ error: 'File is empty or has no data rows' });
@@ -91,34 +105,84 @@ router.post('/upload', authenticateToken, async (req, res) => {
       const row = rows[i];
       
       try {
-        // Find document number field (case-insensitive)
-        const docNumberKey = Object.keys(row).find(
-          key => key.toLowerCase().includes('doc') && key.toLowerCase().includes('number')
-        ) || Object.keys(row).find(key => key.toLowerCase() === 'document_number');
+        // Get column names from the row (handle case-insensitive matching)
+        const rowKeys = Object.keys(row);
         
-        const documentNumber = row[docNumberKey] || row['Document Number'] || row['Doc Number'];
+        // Find document number field - exact match first, then case-insensitive
+        let documentNumber = row['Doc Number'] || row['Document Number'] || row['doc number'] || row['document_number'];
+        if (!documentNumber) {
+          const docKey = rowKeys.find(key => 
+            key.toLowerCase().replace(/\s+/g, ' ') === 'doc number' ||
+            key.toLowerCase().replace(/\s+/g, ' ') === 'document number'
+          );
+          documentNumber = docKey ? row[docKey] : null;
+        }
         
         if (!documentNumber) {
           errors.push(`Row ${i + 2}: Missing document number`);
           continue;
         }
 
-        // Find type field
-        const typeKey = Object.keys(row).find(key => key.toLowerCase() === 'type');
-        let type = row[typeKey] || row['Type'] || '';
-        type = String(type).trim();
-        if (!type || (type.toLowerCase() !== 'mortgage' && type.toLowerCase() !== 'tax')) {
-          errors.push(`Row ${i + 2}: Invalid type (must be Mortgage or Tax)`);
+        // Find type field - exact match first, then case-insensitive
+        let type = row['Type'] || row['type'] || row['TYPE'];
+        if (!type) {
+          const typeKey = rowKeys.find(key => key.toLowerCase() === 'type');
+          type = typeKey ? row[typeKey] : null;
+        }
+        
+        if (!type) {
+          errors.push(`Row ${i + 2}: Missing type`);
           continue;
         }
-        type = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+        
+        type = String(type).trim().toUpperCase();
+        if (type !== 'MORTGAGE' && type !== 'TAX') {
+          errors.push(`Row ${i + 2}: Invalid type "${type}" (must be MORTGAGE or TAX)`);
+          continue;
+        }
+        // Convert to proper case: MORTGAGE -> Mortgage, TAX -> Tax
+        type = type.charAt(0) + type.slice(1).toLowerCase();
 
-        // Find address fields
-        const address = row['Address'] || row['address'] || '';
-        const city = row['City'] || row['city'] || '';
-        const zip = row['ZIP'] || row['zip'] || row['Zip'] || '';
-        const filingMonth = row['Filing Month'] || row['Filing Month'] || row['filing_month'] || currentMonth;
-        const county = row['County'] || row['county'] || 'Bexar';
+        // Find address fields - exact match first, then case-insensitive
+        let address = row['Address'] || row['address'] || row['ADDRESS'];
+        if (!address) {
+          const addrKey = rowKeys.find(key => key.toLowerCase() === 'address');
+          address = addrKey ? row[addrKey] : '';
+        }
+        
+        let city = row['City'] || row['city'] || row['CITY'];
+        if (!city) {
+          const cityKey = rowKeys.find(key => key.toLowerCase() === 'city');
+          city = cityKey ? row[cityKey] : '';
+        }
+        
+        let zip = row['ZIP'] || row['zip'] || row['Zip'] || row['ZIP Code'] || row['zip code'];
+        if (!zip) {
+          const zipKey = rowKeys.find(key => 
+            key.toLowerCase() === 'zip' || 
+            key.toLowerCase() === 'zip code' ||
+            key.toLowerCase() === 'zipcode'
+          );
+          zip = zipKey ? row[zipKey] : '';
+        }
+        
+        // Filing Month is optional - default to current month
+        let filingMonth = row['Filing Month'] || row['Filing Month'] || row['filing_month'] || row['FilingMonth'];
+        if (!filingMonth) {
+          const filingKey = rowKeys.find(key => 
+            key.toLowerCase().includes('filing') && key.toLowerCase().includes('month')
+          );
+          filingMonth = filingKey ? row[filingKey] : currentMonth;
+        }
+        if (!filingMonth) filingMonth = currentMonth;
+        
+        // County is optional - default to Bexar
+        let county = row['County'] || row['county'] || row['COUNTY'] || 'Bexar';
+        if (!county) {
+          const countyKey = rowKeys.find(key => key.toLowerCase() === 'county');
+          county = countyKey ? row[countyKey] : 'Bexar';
+        }
+        if (!county) county = 'Bexar';
 
         if (!address) {
           errors.push(`Row ${i + 2}: Missing address`);
