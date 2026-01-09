@@ -83,6 +83,8 @@ model Property {
   yearTaxLevy              Float?
   link                     String?   // URL to property detail page
   ownerAddress             String?   // Owner mailing address
+  latitude                 Float?
+  longitude                Float?
 
   // Contact Information
   phoneNumbers      String[]  // Array of phone numbers
