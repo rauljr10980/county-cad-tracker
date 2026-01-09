@@ -764,10 +764,10 @@ export function PropertiesView() {
       return;
     }
 
-    if (selectedProperties.length > 50) {
+    if (selectedProperties.length > 200) {
       toast({
         title: "Too many properties",
-        description: "Maximum 50 properties allowed for route optimization",
+        description: "Maximum 200 properties allowed for route optimization. For larger batches, please select fewer properties.",
         variant: "destructive",
       });
       return;

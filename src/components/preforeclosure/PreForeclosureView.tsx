@@ -182,10 +182,10 @@ export function PreForeclosureView() {
       return;
     }
 
-    if (selectedRecords.length > 50) {
+    if (selectedRecords.length > 200) {
       toast({
         title: "Too many records",
-        description: "Maximum 50 records allowed for route optimization",
+        description: "Maximum 200 records allowed for route optimization. For larger batches, please select fewer records.",
         variant: "destructive",
       });
       return;
