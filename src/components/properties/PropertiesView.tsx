@@ -7,8 +7,10 @@ import { Property, PropertyStatus } from '@/types/property';
 import { useProperties } from '@/hooks/useFiles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { solveVRP } from '@/lib/api';
 import { FileDropZone } from '@/components/upload/FileDropZone';
 import {
   DropdownMenu,
@@ -24,6 +26,8 @@ const ITEMS_PER_PAGE = 100;
 export function PropertiesView() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<Set<string>>(new Set());
+  const [numVehicles, setNumVehicles] = useState<1 | 2>(1);
+  const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({
     statuses: [],
     amountDueMin: undefined,
@@ -743,7 +747,7 @@ export function PropertiesView() {
     });
   };
 
-  const handleCreateRoute = () => {
+  const handleCreateRoute = async () => {
     // Get selected properties with valid coordinates
     const selectedProperties = rawProperties.filter(p => 
       selectedPropertyIds.has(p.id) && 
@@ -760,43 +764,68 @@ export function PropertiesView() {
       return;
     }
 
-    if (selectedProperties.length === 1) {
-      // Single property - just open Google Maps
-      const prop = selectedProperties[0];
-      const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(prop.propertyAddress)}/@${prop.latitude},${prop.longitude},16z`;
-      window.open(mapsUrl, '_blank');
+    if (selectedProperties.length > 50) {
+      toast({
+        title: "Too many properties",
+        description: "Maximum 50 properties allowed for route optimization",
+        variant: "destructive",
+      });
       return;
     }
 
-    // Multiple properties - create optimized route
-    // Google Maps supports up to 25 waypoints
-    const propertiesToRoute = selectedProperties.slice(0, 25);
-    
-    // Use the first property as origin
-    const origin = `${propertiesToRoute[0].latitude},${propertiesToRoute[0].longitude}`;
-    
-    // Build waypoints (all properties except first and last)
-    const waypoints = propertiesToRoute.slice(1, -1).map(p => 
-      `${p.latitude},${p.longitude}`
-    );
-    
-    // Use the last property as destination
-    const destination = `${propertiesToRoute[propertiesToRoute.length - 1].latitude},${propertiesToRoute[propertiesToRoute.length - 1].longitude}`;
-    
-    // Google Maps directions URL with waypoints
-    // Format: /dir/origin/waypoint1/waypoint2/.../destination
-    let mapsUrl = `https://www.google.com/maps/dir/${origin}/`;
-    if (waypoints.length > 0) {
-      mapsUrl += waypoints.join('/') + '/';
+    setIsOptimizingRoute(true);
+
+    try {
+      // Solve VRP using the backend solver
+      const solution = await solveVRP(selectedProperties, numVehicles);
+
+      if (!solution.success || !solution.routes || solution.routes.length === 0) {
+        throw new Error('No routes generated');
+      }
+
+      // Build Google Maps URLs for each route
+      solution.routes.forEach((route: any, routeIndex: number) => {
+        if (route.waypoints.length < 2) return;
+
+        // Build waypoints string for Google Maps
+        const waypoints = route.waypoints
+          .filter((wp: any) => wp.id !== 'depot') // Exclude depot from waypoints
+          .map((wp: any) => `${wp.lat},${wp.lon}`);
+
+        if (waypoints.length === 0) return;
+
+        // Use first waypoint as origin, last as destination
+        const origin = waypoints[0];
+        const destination = waypoints[waypoints.length - 1];
+        const middleWaypoints = waypoints.slice(1, -1);
+
+        // Google Maps directions URL
+        let mapsUrl = `https://www.google.com/maps/dir/${origin}/`;
+        if (middleWaypoints.length > 0) {
+          mapsUrl += middleWaypoints.join('/') + '/';
+        }
+        mapsUrl += destination;
+
+        // Open in new tab (with delay for multiple routes)
+        setTimeout(() => {
+          window.open(mapsUrl, '_blank');
+        }, routeIndex * 500);
+      });
+
+      toast({
+        title: "Route Optimized",
+        description: `Optimized route for ${selectedProperties.length} properties using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. Opening ${solution.routes.length} route(s) in Google Maps.`,
+      });
+    } catch (error) {
+      console.error('[Route Optimization] Error:', error);
+      toast({
+        title: "Route Optimization Failed",
+        description: error instanceof Error ? error.message : 'Failed to optimize route. Please try again.',
+        variant: "destructive",
+      });
+    } finally {
+      setIsOptimizingRoute(false);
     }
-    mapsUrl += destination;
-    
-    window.open(mapsUrl, '_blank');
-    
-    toast({
-      title: "Route Created",
-      description: `Opening Google Maps with ${propertiesToRoute.length} properties in your route${selectedProperties.length > 25 ? ' (showing first 25)' : ''}`,
-    });
   };
 
   return (
@@ -810,6 +839,51 @@ export function PropertiesView() {
               {totalUnfiltered && typeof totalUnfiltered === 'number' && totalUnfiltered > 0 && ` ${totalUnfiltered.toLocaleString()} total properties.`}
             </p>
           </div>
+          {selectedPropertyIds.size > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                {selectedPropertyIds.size} selected
+              </span>
+              <Select
+                value={numVehicles.toString()}
+                onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 Vehicle</SelectItem>
+                  <SelectItem value="2">2 Vehicles</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleCreateRoute}
+                className="bg-primary text-primary-foreground"
+                size="sm"
+                disabled={isOptimizingRoute}
+              >
+                {isOptimizingRoute ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Optimizing...
+                  </>
+                ) : (
+                  <>
+                    <Route className="h-4 w-4 mr-2" />
+                    Optimize Route
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => setSelectedPropertyIds(new Set())}
+                variant="outline"
+                size="sm"
+                disabled={isOptimizingRoute}
+              >
+                Clear Selection
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Search Bar */}

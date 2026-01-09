@@ -674,6 +674,39 @@ export async function getPreForeclosures(filters?: { address?: string; city?: st
 }
 
 /**
+ * Solve Vehicle Routing Problem (VRP) for selected properties
+ */
+export async function solveVRP(properties: Array<{
+  id: string;
+  latitude: number;
+  longitude: number;
+  propertyAddress?: string;
+  address?: string;
+  [key: string]: any;
+}>, numVehicles: 1 | 2 = 1, depotLat?: number, depotLon?: number) {
+  const response = await fetch(`${API_BASE_URL}/api/routing/solve`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({
+      properties,
+      numVehicles,
+      depotLat,
+      depotLon,
+    }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to solve routing problem');
+  }
+  
+  return response.json();
+}
+
+/**
  * Update a pre-foreclosure record (operator-entered fields only)
  */
 export async function updatePreForeclosure(updates: {
