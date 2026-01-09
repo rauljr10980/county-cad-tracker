@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP } from '@/lib/api';
 import { RouteMap } from '@/components/routing/RouteMap';
+import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 
 export function PreForeclosureView() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,6 +46,7 @@ export function PreForeclosureView() {
   const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
+  const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -379,6 +381,14 @@ export function PreForeclosureView() {
                 <SelectItem value="2">2 Vehicles</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              onClick={() => setAreaSelectorOpen(true)}
+              variant="outline"
+              size="sm"
+              title="Select area on map to filter records"
+            >
+              Select Area
+            </Button>
             <Button
               onClick={handleCreateRoute}
               className="bg-primary text-primary-foreground"

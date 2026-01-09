@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP } from '@/lib/api';
 import { RouteMap } from '@/components/routing/RouteMap';
+import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { FileDropZone } from '@/components/upload/FileDropZone';
 import {
   DropdownMenu,
@@ -31,6 +32,7 @@ export function PropertiesView() {
   const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
+  const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({
     statuses: [],
     amountDueMin: undefined,
@@ -835,6 +837,14 @@ export function PropertiesView() {
                 </SelectContent>
               </Select>
               <Button
+                onClick={() => setAreaSelectorOpen(true)}
+                variant="outline"
+                size="sm"
+                title="Select area on map to filter properties"
+              >
+                Select Area
+              </Button>
+              <Button
                 onClick={handleCreateRoute}
                 className="bg-primary text-primary-foreground"
                 size="sm"
@@ -1057,6 +1067,13 @@ export function PropertiesView() {
           }}
         />
       )}
+
+      {/* Area Selector Map */}
+      <AreaSelectorMap
+        isOpen={areaSelectorOpen}
+        onClose={() => setAreaSelectorOpen(false)}
+        onAreaSelected={handleAreaSelected}
+      />
     </div>
   );
 }
