@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -139,7 +139,7 @@ export function PreForeclosureView() {
   const [savingAction, setSavingAction] = useState(false);
 
   // Initialize action state when view record changes
-  useMemo(() => {
+  useEffect(() => {
     if (viewRecord) {
       setActionType(viewRecord.actionType || '');
       setPriority(viewRecord.priority || 'med');
