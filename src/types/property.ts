@@ -29,6 +29,8 @@ export interface Property {
   yearTaxLevy?: number; // NEW-Year Tax Levy
   link?: string; // NEW-Link (URL to property detail page)
   ownerAddress?: string; // NEW-Owner Address (separate from mailingAddress)
+  latitude?: number;
+  longitude?: number;
   lastFollowUp?: string;
   notes?: string;
   phoneNumbers?: string[];

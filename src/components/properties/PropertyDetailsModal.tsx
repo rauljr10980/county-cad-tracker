@@ -495,6 +495,13 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 <div>
                   <p className="text-xs text-muted-foreground">Property Address</p>
                   <p className="font-medium">{parsedAddress || property.propertyAddress}</p>
+                  {property.latitude && property.longitude && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      <span className="font-mono">Lat: {property.latitude.toFixed(6)}</span>
+                      {' • '}
+                      <span className="font-mono">Long: {property.longitude.toFixed(6)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
               
