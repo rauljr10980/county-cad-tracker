@@ -66,20 +66,39 @@ export function AreaSelectorMap({
   useEffect(() => {
     if (!isOpen || !mapRef.current) return;
 
+    let retryCount = 0;
+    const maxRetries = 50; // 5 seconds max wait (50 * 100ms)
+
     // Wait for Google Maps to load
     const initMap = () => {
       if (!mapRef.current) return;
 
+      retryCount++;
+
       // Check if Google Maps is loaded
       if (!window.google || !window.google.maps) {
+        if (retryCount >= maxRetries) {
+          setError('Google Maps API failed to load. Please check your API key and ensure it has the required permissions (Maps JavaScript API, Drawing Library).');
+          setIsLoading(false);
+          return;
+        }
         // Retry after a short delay
         setTimeout(initMap, 100);
         return;
       }
 
+      // Check for API key errors in the script tag
+      const mapScript = document.querySelector('script[src*="maps.googleapis.com"]');
+      if (mapScript) {
+        mapScript.addEventListener('error', () => {
+          setError('Failed to load Google Maps API. Please check your API key in index.html.');
+          setIsLoading(false);
+        });
+      }
+
       // Check if drawing library is loaded
       if (!window.google.maps.drawing) {
-        setError('Google Maps Drawing library not loaded. Please ensure the "drawing" library is included in the API script.');
+        setError('Google Maps Drawing library not loaded. Please ensure the "drawing" library is included in the API script tag.');
         setIsLoading(false);
         return;
       }
