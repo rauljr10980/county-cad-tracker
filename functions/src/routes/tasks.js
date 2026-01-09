@@ -49,8 +49,14 @@ router.get('/',
       } = req.query;
 
       // Build where clause
+      // Default: only return PENDING tasks if no status filter specified
       const where = {};
-      if (status) where.status = status;
+      if (status) {
+        where.status = status;
+      } else {
+        // Default to PENDING tasks only
+        where.status = 'PENDING';
+      }
       if (priority) where.priority = priority;
       if (actionType) where.actionType = actionType;
       if (assignedToId) where.assignedToId = assignedToId;
@@ -62,10 +68,8 @@ router.get('/',
         if (dueTo) where.dueTime.lte = new Date(dueTo);
       }
 
-      // Get total count
-      const total = await prisma.task.count({ where });
-
-      // Get tasks with relations
+      // Frontend expects all tasks, not paginated
+      // Fetch all tasks matching the filter (no pagination for frontend)
       const tasks = await prisma.task.findMany({
         where,
         include: {
@@ -75,8 +79,20 @@ router.get('/',
               accountNumber: true,
               ownerName: true,
               propertyAddress: true,
+              mailingAddress: true,
               status: true,
-              totalDue: true
+              totalDue: true,
+              marketValue: true,
+              notes: true,
+              phoneNumbers: true,
+              ownerPhoneIndex: true,
+              link: true,
+              exemptions: true,
+              jurisdictions: true,
+              lastPaymentDate: true,
+              lastPaymentAmount: true,
+              taxYear: true,
+              legalDescription: true
             }
           },
           assignedTo: {
@@ -105,20 +121,33 @@ router.get('/',
             }
           }
         },
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { [sortBy]: sortOrder }
+        orderBy: { dueTime: 'asc' }
       });
 
-      res.json({
-        tasks,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit)
-        }
+      // Transform tasks to Property format expected by frontend
+      // Frontend expects an array of Properties with task information embedded
+      const propertiesWithTasks = tasks.map(task => {
+        const property = task.property;
+        // Get last outcome from activities
+        const lastOutcomeActivity = task.activities?.find(a => a.action === 'OUTCOME_RECORDED');
+        
+        return {
+          ...property,
+          // Map task fields to property fields (frontend expects these on Property)
+          actionType: task.actionType.toLowerCase(), // CALL -> call
+          priority: task.priority === 'MEDIUM' ? 'med' : task.priority.toLowerCase(), // HIGH -> high, MEDIUM -> med, LOW -> low
+          dueTime: task.dueTime.toISOString(),
+          assignedTo: task.assignedTo?.username || null,
+          attempts: task.attempts || 0,
+          lastOutcome: task.lastOutcome ? task.lastOutcome.toLowerCase().replace(/_/g, '_') : null,
+          lastOutcomeDate: lastOutcomeActivity?.createdAt?.toISOString() || null,
+          // Map totalDue to totalAmountDue for frontend
+          totalAmountDue: property.totalDue || 0,
+        };
       });
+
+      // Frontend expects array directly (not wrapped in object)
+      res.json(propertiesWithTasks);
     } catch (error) {
       console.error('[TASKS] Fetch error:', error);
       res.status(500).json({ error: 'Failed to fetch tasks' });

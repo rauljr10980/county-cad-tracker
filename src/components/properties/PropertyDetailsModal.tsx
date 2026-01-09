@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyDealStage } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface PropertyDetailsModalProps {
   property: Property | null;
@@ -23,6 +24,7 @@ interface PropertyDetailsModalProps {
 }
 
 export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDetailsModalProps) {
+  const queryClient = useQueryClient();
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
@@ -216,6 +218,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       property.priority = priority;
       property.dueTime = isoDateTime;
       property.assignedTo = assignedTo || undefined;
+      // Invalidate tasks query to refresh tasks list
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     } catch (error) {
       toast({
         title: "Error",
