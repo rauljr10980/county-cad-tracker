@@ -88,20 +88,11 @@ export function PropertiesView() {
   const hasAnyFilter = selectedStatuses.length > 0 || (hasActiveAdvancedFilters ?? false) || hasSearchQuery || isSortingActive;
   
   // Fetch strategy:
-  // - Any status filter (1, 2, 3+): ALWAYS fetch all properties (50000) to filter from all 33k properties
-  // - Advanced filters (Amount Due, Market Value, etc.): Fetch all properties (50000) to filter from all 33k
-  // - Sorting: Fetch all properties (50000) to sort all 33k properties
-  // - Search: Fetch 2000 for frontend filtering (can be optimized later with backend search)
+  // - ANY filter or sorting active: ALWAYS fetch all properties (50000) to search/filter/sort from all 33k properties
   // - No filters: Fetch all properties (50000) to show all at once
-  // Always fetch all properties when filtering/sorting to ensure accuracy across all 33k properties
-  const fetchLimit = selectedStatuses.length > 0
-    ? 50000  // Any status filter (1, 2, 3+) - ALWAYS fetch all properties to filter from all 33k
-    : hasActiveAdvancedFilters
-    ? 50000  // Advanced filters (Amount Due, Market Value, etc.) - fetch all properties to filter from all 33k
-    : isSortingActive
-    ? 50000  // Sorting active - fetch all properties to sort all 33k properties
-    : hasSearchQuery
-    ? 2000   // Search only - fetch 2k for frontend filtering (can optimize with backend search later)
+  // Always fetch all properties when filtering/sorting/searching to ensure accuracy across all 33k properties
+  const fetchLimit = hasAnyFilter
+    ? 50000  // ANY filter or sorting active - fetch all properties to search/filter/sort from all 33k
     : 50000; // No filters - fetch all properties (up to 50k) to show all at once
   
   // Fetch properties from API with status filter and search
