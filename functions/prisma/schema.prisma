@@ -346,7 +346,7 @@ enum FileStatus {
 }
 
 // ============================================================================
-// PRE-FORECLOSURE RECORDS
+// FORECLOSED PROPERTIES
 // ============================================================================
 
 model PreForeclosure {
@@ -372,5 +372,5 @@ model PreForeclosure {
   @@index([type])
   @@index([inactive])
   @@index([internalStatus])
-  @@map("pre_foreclosures")
+  @@map("foreclosed")
 }
