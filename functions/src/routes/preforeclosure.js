@@ -396,10 +396,31 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
     
     // Action/Task fields
     if (updates.actionType !== undefined) {
-      dbUpdates.actionType = updates.actionType ? updates.actionType.toUpperCase() : null;
+      if (updates.actionType) {
+        // Map frontend values to enum: 'call' -> 'CALL', 'text' -> 'TEXT', etc.
+        const actionMap = {
+          'call': 'CALL',
+          'text': 'TEXT',
+          'mail': 'MAIL',
+          'driveby': 'DRIVEBY'
+        };
+        dbUpdates.actionType = actionMap[updates.actionType.toLowerCase()] || updates.actionType.toUpperCase();
+      } else {
+        dbUpdates.actionType = null;
+      }
     }
     if (updates.priority !== undefined) {
-      dbUpdates.priority = updates.priority ? updates.priority.toUpperCase() === 'MED' ? 'MEDIUM' : updates.priority.toUpperCase() : null;
+      if (updates.priority) {
+        // Map frontend values to enum: 'med' -> 'MEDIUM', 'high' -> 'HIGH', 'low' -> 'LOW'
+        const priorityMap = {
+          'med': 'MEDIUM',
+          'high': 'HIGH',
+          'low': 'LOW'
+        };
+        dbUpdates.priority = priorityMap[updates.priority.toLowerCase()] || updates.priority.toUpperCase();
+      } else {
+        dbUpdates.priority = null;
+      }
     }
     if (updates.dueTime !== undefined) {
       dbUpdates.dueTime = updates.dueTime ? new Date(updates.dueTime) : null;
