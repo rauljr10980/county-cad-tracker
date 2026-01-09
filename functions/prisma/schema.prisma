@@ -344,3 +344,33 @@ enum FileStatus {
   COMPLETED
   FAILED
 }
+
+// ============================================================================
+// PRE-FORECLOSURE RECORDS
+// ============================================================================
+
+model PreForeclosure {
+  id                String   @id @default(cuid())
+  documentNumber    String   @unique
+  type              String   // "Mortgage" or "Tax"
+  address           String
+  city              String
+  zip               String
+  filingMonth       String
+  county            String   @default("Bexar")
+  internalStatus    String   @default("New") // "New", "Contact Attempted", "Monitoring", "Dead"
+  notes             String?  @db.Text
+  lastActionDate    String?
+  nextFollowUpDate  String?
+  inactive          Boolean  @default(false)
+  firstSeenMonth    String
+  lastSeenMonth     String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([documentNumber])
+  @@index([type])
+  @@index([inactive])
+  @@index([internalStatus])
+  @@map("pre_foreclosures")
+}
