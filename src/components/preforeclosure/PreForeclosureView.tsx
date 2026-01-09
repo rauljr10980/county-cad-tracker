@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,6 +15,7 @@ import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { solveVRP } from '@/lib/api';
 
 export function PreForeclosureView() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,6 +39,9 @@ export function PreForeclosureView() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
+  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
+  const [numVehicles, setNumVehicles] = useState<1 | 2>(1);
+  const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -147,6 +152,108 @@ export function PreForeclosureView() {
       setAssignedTo(viewRecord.assignedTo || '');
     }
   }, [viewRecord]);
+
+  const handleRecordSelect = (documentNumber: string, selected: boolean) => {
+    setSelectedRecordIds(prev => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(documentNumber);
+      } else {
+        newSet.delete(documentNumber);
+      }
+      return newSet;
+    });
+  };
+
+  const handleCreateRoute = async () => {
+    // Get selected records with valid coordinates
+    const selectedRecords = filteredRecords.filter(r => 
+      selectedRecordIds.has(r.document_number) && 
+      r.latitude != null && 
+      r.longitude != null
+    );
+
+    if (selectedRecords.length === 0) {
+      toast({
+        title: "No valid locations",
+        description: "Please select records with latitude and longitude coordinates",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedRecords.length > 50) {
+      toast({
+        title: "Too many records",
+        description: "Maximum 50 records allowed for route optimization",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsOptimizingRoute(true);
+
+    try {
+      // Convert pre-foreclosure records to property format for VRP solver
+      const properties = selectedRecords.map(r => ({
+        id: r.document_number,
+        latitude: r.latitude!,
+        longitude: r.longitude!,
+        propertyAddress: r.address,
+        address: r.address,
+      }));
+
+      // Solve VRP using the backend solver
+      const solution = await solveVRP(properties, numVehicles);
+
+      if (!solution.success || !solution.routes || solution.routes.length === 0) {
+        throw new Error('No routes generated');
+      }
+
+      // Build Google Maps URLs for each route
+      solution.routes.forEach((route: any, routeIndex: number) => {
+        if (route.waypoints.length < 2) return;
+
+        // Build waypoints string for Google Maps
+        const waypoints = route.waypoints
+          .filter((wp: any) => wp.id !== 'depot') // Exclude depot from waypoints
+          .map((wp: any) => `${wp.lat},${wp.lon}`);
+
+        if (waypoints.length === 0) return;
+
+        // Use first waypoint as origin, last as destination
+        const origin = waypoints[0];
+        const destination = waypoints[waypoints.length - 1];
+        const middleWaypoints = waypoints.slice(1, -1);
+
+        // Google Maps directions URL
+        let mapsUrl = `https://www.google.com/maps/dir/${origin}/`;
+        if (middleWaypoints.length > 0) {
+          mapsUrl += middleWaypoints.join('/') + '/';
+        }
+        mapsUrl += destination;
+
+        // Open in new tab (with delay for multiple routes)
+        setTimeout(() => {
+          window.open(mapsUrl, '_blank');
+        }, routeIndex * 500);
+      });
+
+      toast({
+        title: "Route Optimized",
+        description: `Optimized route for ${selectedRecords.length} records using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. Opening ${solution.routes.length} route(s) in Google Maps.`,
+      });
+    } catch (error) {
+      console.error('[Route Optimization] Error:', error);
+      toast({
+        title: "Route Optimization Failed",
+        description: error instanceof Error ? error.message : 'Failed to optimize route. Please try again.',
+        variant: "destructive",
+      });
+    } finally {
+      setIsOptimizingRoute(false);
+    }
+  };
 
   const handleSaveAction = async () => {
     if (!viewRecord || !actionType || !dueDateTime) {
@@ -276,7 +383,52 @@ export function PreForeclosureView() {
           </p>
         )}
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
+        {selectedRecordIds.size > 0 && (
+          <>
+            <span className="text-sm text-muted-foreground mr-2">
+              {selectedRecordIds.size} selected
+            </span>
+            <Select
+              value={numVehicles.toString()}
+              onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
+            >
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 Vehicle</SelectItem>
+                <SelectItem value="2">2 Vehicles</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={handleCreateRoute}
+              className="bg-primary text-primary-foreground"
+              size="sm"
+              disabled={isOptimizingRoute}
+            >
+              {isOptimizingRoute ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Optimizing...
+                </>
+              ) : (
+                <>
+                  <Route className="h-4 w-4 mr-2" />
+                  Optimize Route
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => setSelectedRecordIds(new Set())}
+              variant="outline"
+              size="sm"
+              disabled={isOptimizingRoute}
+            >
+              Clear Selection
+            </Button>
+          </>
+        )}
         <Button 
           onClick={() => setDeleteConfirmOpen(true)} 
           variant="destructive" 
@@ -647,6 +799,17 @@ export function PreForeclosureView() {
             <table className="w-full">
               <thead className="bg-secondary/50 border-b border-border">
                 <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-12">
+                    <Checkbox
+                      checked={selectedRecordIds.size > 0 && selectedRecordIds.size === filteredRecords.length && filteredRecords.length > 0}
+                      onCheckedChange={(checked) => {
+                        filteredRecords.forEach(record => {
+                          handleRecordSelect(record.document_number, checked as boolean);
+                        });
+                      }}
+                      title="Select all"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Document #</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Address</th>
@@ -662,7 +825,22 @@ export function PreForeclosureView() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredRecords.map((record) => (
-                  <tr key={record.document_number} className="hover:bg-secondary/30 transition-colors">
+                  <tr 
+                    key={record.document_number} 
+                    className={cn(
+                      "hover:bg-secondary/30 transition-colors",
+                      selectedRecordIds.has(record.document_number) && "bg-primary/10"
+                    )}
+                  >
+                    <td className="px-4 py-3">
+                      <Checkbox
+                        checked={selectedRecordIds.has(record.document_number)}
+                        onCheckedChange={(checked) => {
+                          handleRecordSelect(record.document_number, checked as boolean);
+                        }}
+                        title="Select record"
+                      />
+                    </td>
                     <td className="px-4 py-3 font-mono text-sm">{record.document_number}</td>
                     <td className="px-4 py-3">
                       <Badge variant="outline" className={getTypeColor(record.type)}>
