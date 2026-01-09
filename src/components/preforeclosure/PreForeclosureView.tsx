@@ -165,7 +165,10 @@ export function PreForeclosureView() {
       await updateMutation.mutateAsync({
         document_number: viewRecord.document_number,
         last_action_date: new Date().toISOString(),
-        // Note: We'll need to add an endpoint to update action/task fields
+        actionType: actionType,
+        priority: priority,
+        dueTime: isoDateTime,
+        assignedTo: assignedTo || undefined,
       });
       
       toast({

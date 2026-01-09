@@ -378,7 +378,7 @@ router.post('/upload', optionalAuth, async (req, res) => {
 // UPDATE PRE-FORECLOSURE RECORD
 // ============================================================================
 
-router.put('/:documentNumber', authenticateToken, async (req, res) => {
+router.put('/:documentNumber', optionalAuth, async (req, res) => {
   try {
     const { documentNumber } = req.params;
     const updates = req.body;
@@ -387,8 +387,26 @@ router.put('/:documentNumber', authenticateToken, async (req, res) => {
     const dbUpdates = {};
     if (updates.internal_status !== undefined) dbUpdates.internalStatus = updates.internal_status;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
-    if (updates.last_action_date !== undefined) dbUpdates.lastActionDate = updates.last_action_date;
-    if (updates.next_follow_up_date !== undefined) dbUpdates.nextFollowUpDate = updates.next_follow_up_date;
+    if (updates.last_action_date !== undefined) {
+      dbUpdates.lastActionDate = updates.last_action_date ? new Date(updates.last_action_date) : null;
+    }
+    if (updates.next_follow_up_date !== undefined) {
+      dbUpdates.nextFollowUpDate = updates.next_follow_up_date ? new Date(updates.next_follow_up_date) : null;
+    }
+    
+    // Action/Task fields
+    if (updates.actionType !== undefined) {
+      dbUpdates.actionType = updates.actionType ? updates.actionType.toUpperCase() : null;
+    }
+    if (updates.priority !== undefined) {
+      dbUpdates.priority = updates.priority ? updates.priority.toUpperCase() === 'MED' ? 'MEDIUM' : updates.priority.toUpperCase() : null;
+    }
+    if (updates.dueTime !== undefined) {
+      dbUpdates.dueTime = updates.dueTime ? new Date(updates.dueTime) : null;
+    }
+    if (updates.assignedTo !== undefined) {
+      dbUpdates.assignedTo = updates.assignedTo || null;
+    }
 
     const record = await prisma.preForeclosure.update({
       where: { documentNumber },
@@ -404,10 +422,17 @@ router.put('/:documentNumber', authenticateToken, async (req, res) => {
       zip: record.zip,
       filing_month: record.filingMonth,
       county: record.county,
+      latitude: record.latitude,
+      longitude: record.longitude,
+      school_district: record.schoolDistrict,
       internal_status: record.internalStatus,
       notes: record.notes,
       last_action_date: record.lastActionDate,
       next_follow_up_date: record.nextFollowUpDate,
+      actionType: record.actionType ? record.actionType.toLowerCase() : undefined,
+      priority: record.priority ? record.priority.toLowerCase() === 'medium' ? 'med' : record.priority.toLowerCase() : undefined,
+      dueTime: record.dueTime ? record.dueTime.toISOString() : undefined,
+      assignedTo: record.assignedTo,
       inactive: record.inactive,
       first_seen_month: record.firstSeenMonth,
       last_seen_month: record.lastSeenMonth,

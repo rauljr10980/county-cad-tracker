@@ -682,10 +682,17 @@ export async function updatePreForeclosure(updates: {
   notes?: string;
   last_action_date?: string;
   next_follow_up_date?: string;
+  actionType?: 'call' | 'text' | 'mail' | 'driveby';
+  priority?: 'high' | 'med' | 'low';
+  dueTime?: string;
+  assignedTo?: 'Luciano' | 'Raul';
 }) {
   const response = await fetch(`${API_BASE_URL}/api/preforeclosure/${updates.document_number}`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
     body: JSON.stringify(updates),
   });
   if (!response.ok) {
