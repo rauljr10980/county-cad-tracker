@@ -962,18 +962,18 @@ export function PreForeclosureView() {
                       {viewRecord.city}, TX {viewRecord.zip}
                     </p>
                   </div>
-                  {viewRecord.latitude && viewRecord.longitude && (
-                    <>
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Latitude</Label>
-                        <p className="font-mono text-sm">{viewRecord.latitude.toFixed(6)}</p>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Longitude</Label>
-                        <p className="font-mono text-sm">{viewRecord.longitude.toFixed(6)}</p>
-                      </div>
-                    </>
-                  )}
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Latitude</Label>
+                    <p className="font-mono text-sm">
+                      {viewRecord.latitude != null ? viewRecord.latitude.toFixed(6) : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Longitude</Label>
+                    <p className="font-mono text-sm">
+                      {viewRecord.longitude != null ? viewRecord.longitude.toFixed(6) : 'N/A'}
+                    </p>
+                  </div>
                   {viewRecord.school_district && (
                     <div className="col-span-2">
                       <Label className="text-muted-foreground text-xs">School District</Label>
