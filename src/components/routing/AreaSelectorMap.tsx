@@ -53,6 +53,13 @@ export function AreaSelectorMap({
       return;
     }
 
+    // Check if drawing library is loaded
+    if (!window.google.maps.drawing) {
+      setError('Google Maps Drawing library not loaded. Please ensure the "drawing" library is included in the API script.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       // Create map
       const newMap = new google.maps.Map(mapRef.current, {
@@ -95,7 +102,7 @@ export function AreaSelectorMap({
       manager.setMap(newMap);
 
       // Listen for shape completion
-      google.maps.event.addListener(manager, 'overlaycomplete', (event: any) => {
+      google.maps.event.addListener(manager, 'overlaycomplete', (event: google.maps.drawing.OverlayCompleteEvent) => {
         // Clear previous selection
         if (rectangleRef.current) {
           rectangleRef.current.setMap(null);
