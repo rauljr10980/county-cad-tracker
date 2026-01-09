@@ -784,6 +784,10 @@ export function PropertiesView() {
       }
 
       // Build Google Maps URLs for each route
+      // Google Maps has a limit of 25 waypoints per URL, so we need to batch them
+      const GOOGLE_MAPS_WAYPOINT_LIMIT = 25;
+      let totalUrlsOpened = 0;
+
       solution.routes.forEach((route: any, routeIndex: number) => {
         if (route.waypoints.length < 2) return;
 
@@ -794,27 +798,55 @@ export function PropertiesView() {
 
         if (waypoints.length === 0) return;
 
-        // Use first waypoint as origin, last as destination
-        const origin = waypoints[0];
-        const destination = waypoints[waypoints.length - 1];
-        const middleWaypoints = waypoints.slice(1, -1);
+        // If we have more than 25 waypoints, split into multiple URLs
+        if (waypoints.length <= GOOGLE_MAPS_WAYPOINT_LIMIT) {
+          // Single URL for small routes
+          const origin = waypoints[0];
+          const destination = waypoints[waypoints.length - 1];
+          const middleWaypoints = waypoints.slice(1, -1);
 
-        // Google Maps directions URL
-        let mapsUrl = `https://www.google.com/maps/dir/${origin}/`;
-        if (middleWaypoints.length > 0) {
-          mapsUrl += middleWaypoints.join('/') + '/';
+          let mapsUrl = `https://www.google.com/maps/dir/${origin}/`;
+          if (middleWaypoints.length > 0) {
+            mapsUrl += middleWaypoints.join('/') + '/';
+          }
+          mapsUrl += destination;
+
+          setTimeout(() => {
+            window.open(mapsUrl, '_blank');
+          }, totalUrlsOpened * 500);
+          totalUrlsOpened++;
+        } else {
+          // Split into chunks of 25 waypoints
+          for (let i = 0; i < waypoints.length; i += GOOGLE_MAPS_WAYPOINT_LIMIT - 1) {
+            const chunk = waypoints.slice(i, i + GOOGLE_MAPS_WAYPOINT_LIMIT);
+            if (chunk.length < 2) continue;
+
+            const origin = chunk[0];
+            const destination = chunk[chunk.length - 1];
+            const middleWaypoints = chunk.slice(1, -1);
+
+            let mapsUrl = `https://www.google.com/maps/dir/${origin}/`;
+            if (middleWaypoints.length > 0) {
+              mapsUrl += middleWaypoints.join('/') + '/';
+            }
+            mapsUrl += destination;
+
+            setTimeout(() => {
+              window.open(mapsUrl, '_blank');
+            }, totalUrlsOpened * 500);
+            totalUrlsOpened++;
+          }
         }
-        mapsUrl += destination;
-
-        // Open in new tab (with delay for multiple routes)
-        setTimeout(() => {
-          window.open(mapsUrl, '_blank');
-        }, routeIndex * 500);
       });
 
+      const totalWaypoints = solution.routes.reduce((sum: number, route: any) => 
+        sum + route.waypoints.filter((wp: any) => wp.id !== 'depot').length, 0
+      );
+      const estimatedUrls = Math.ceil(totalWaypoints / GOOGLE_MAPS_WAYPOINT_LIMIT);
+      
       toast({
         title: "Route Optimized",
-        description: `Optimized route for ${selectedProperties.length} properties using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. Opening ${solution.routes.length} route(s) in Google Maps.`,
+        description: `Optimized route for ${selectedProperties.length} properties using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. Opening ${estimatedUrls} Google Maps window(s) (25 waypoints per window).`,
       });
     } catch (error) {
       console.error('[Route Optimization] Error:', error);
