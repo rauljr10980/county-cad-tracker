@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP } from '@/lib/api';
-import { RouteMap } from '@/components/routing/RouteMapLeaflet';
-import { AreaSelectorMap } from '@/components/routing/AreaSelectorMapLeaflet';
+import { RouteMap } from '@/components/routing/RouteMap';
+import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { FileDropZone } from '@/components/upload/FileDropZone';
 import {
   DropdownMenu,
