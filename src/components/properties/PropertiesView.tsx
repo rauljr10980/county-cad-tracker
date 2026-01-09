@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown, Route } from 'lucide-react';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { AdvancedFiltersPanel, AdvancedFilters } from './AdvancedFilters';
@@ -22,6 +22,7 @@ const ITEMS_PER_PAGE = 100;
 
 export function PropertiesView() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [selectedPropertyIds, setSelectedPropertyIds] = useState<Set<string>>(new Set());
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({
     statuses: [],
     amountDueMin: undefined,
@@ -729,6 +730,74 @@ export function PropertiesView() {
     window.location.reload();
   };
 
+  const handlePropertySelect = (propertyId: string, selected: boolean) => {
+    setSelectedPropertyIds(prev => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(propertyId);
+      } else {
+        newSet.delete(propertyId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleCreateRoute = () => {
+    // Get selected properties with valid coordinates
+    const selectedProperties = rawProperties.filter(p => 
+      selectedPropertyIds.has(p.id) && 
+      p.latitude != null && 
+      p.longitude != null
+    );
+
+    if (selectedProperties.length === 0) {
+      toast({
+        title: "No valid locations",
+        description: "Please select properties with latitude and longitude coordinates",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedProperties.length === 1) {
+      // Single property - just open Google Maps
+      const prop = selectedProperties[0];
+      const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(prop.propertyAddress)}/@${prop.latitude},${prop.longitude},16z`;
+      window.open(mapsUrl, '_blank');
+      return;
+    }
+
+    // Multiple properties - create optimized route
+    // Google Maps supports up to 25 waypoints
+    const propertiesToRoute = selectedProperties.slice(0, 25);
+    
+    // Use the first property as origin
+    const origin = `${propertiesToRoute[0].latitude},${propertiesToRoute[0].longitude}`;
+    
+    // Build waypoints (all properties except first and last)
+    const waypoints = propertiesToRoute.slice(1, -1).map(p => 
+      `${p.latitude},${p.longitude}`
+    );
+    
+    // Use the last property as destination
+    const destination = `${propertiesToRoute[propertiesToRoute.length - 1].latitude},${propertiesToRoute[propertiesToRoute.length - 1].longitude}`;
+    
+    // Google Maps directions URL with waypoints
+    // Format: /dir/origin/waypoint1/waypoint2/.../destination
+    let mapsUrl = `https://www.google.com/maps/dir/${origin}/`;
+    if (waypoints.length > 0) {
+      mapsUrl += waypoints.join('/') + '/';
+    }
+    mapsUrl += destination;
+    
+    window.open(mapsUrl, '_blank');
+    
+    toast({
+      title: "Route Created",
+      description: `Opening Google Maps with ${propertiesToRoute.length} properties in your route${selectedProperties.length > 25 ? ' (showing first 25)' : ''}`,
+    });
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -843,6 +912,8 @@ export function PropertiesView() {
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
+            selectedPropertyIds={selectedPropertyIds}
+            onPropertySelect={handlePropertySelect}
           />
           
           {/* Pagination controls */}

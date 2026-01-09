@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar, CalendarPlus, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Property, PropertyStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
@@ -19,6 +20,8 @@ interface PropertyTableProps {
   sortField?: keyof Property | 'ratio';
   sortDirection?: 'asc' | 'desc';
   onSort?: (field: keyof Property | 'ratio') => void;
+  selectedPropertyIds?: Set<string>;
+  onPropertySelect?: (propertyId: string, selected: boolean) => void;
 }
 
 
@@ -30,7 +33,9 @@ export function PropertyTable({
   onStatusFilterChange,
   sortField: externalSortField = 'totalAmountDue',
   sortDirection: externalSortDirection = 'asc',
-  onSort
+  onSort,
+  selectedPropertyIds = new Set(),
+  onPropertySelect
 }: PropertyTableProps) {
   // Use external sort state if provided, otherwise use internal state (fallback)
   const [internalSortField, setInternalSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
@@ -191,6 +196,19 @@ export function PropertyTable({
         <table className="data-table">
           <thead>
             <tr>
+              <th className="w-12">
+                {onPropertySelect && (
+                  <Checkbox
+                    checked={selectedPropertyIds.size > 0 && selectedPropertyIds.size === displayProperties.length}
+                    onCheckedChange={(checked) => {
+                      displayProperties.forEach(prop => {
+                        onPropertySelect(prop.id, checked as boolean);
+                      });
+                    }}
+                    title="Select all"
+                  />
+                )}
+              </th>
               <th className="w-24">Status</th>
               <th>Owner</th>
               <th>Property Address</th>
@@ -259,9 +277,21 @@ export function PropertyTable({
                   className={cn(
                     'transition-colors',
                     property.isNew && 'bg-success/5',
-                    property.statusChanged && 'bg-warning/5'
+                    property.statusChanged && 'bg-warning/5',
+                    selectedPropertyIds.has(property.id) && 'bg-primary/10'
                   )}
                 >
+                  <td>
+                    {onPropertySelect && (
+                      <Checkbox
+                        checked={selectedPropertyIds.has(property.id)}
+                        onCheckedChange={(checked) => {
+                          onPropertySelect(property.id, checked as boolean);
+                        }}
+                        title="Select property"
+                      />
+                    )}
+                  </td>
                   <td>
                     <div className="flex items-center gap-1">
                       <StatusBadge status={property.status} />
