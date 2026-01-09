@@ -463,12 +463,28 @@ export function PreForeclosureView() {
           <Button
             variant={activeAction === 'send' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setActiveAction('send')}
+            onClick={() => {
+              setActiveAction('send');
+              // If there's a selected record, open Google Maps
+              if (selectedRecord && selectedRecord.latitude != null && selectedRecord.longitude != null) {
+                const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(selectedRecord.address)},+${encodeURIComponent(selectedRecord.city)},+TX+${selectedRecord.zip}/@${selectedRecord.latitude},${selectedRecord.longitude},16z`;
+                window.open(mapsUrl, '_blank');
+              } else if (viewRecord && viewRecord.latitude != null && viewRecord.longitude != null) {
+                const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(viewRecord.address)},+${encodeURIComponent(viewRecord.city)},+TX+${viewRecord.zip}/@${viewRecord.latitude},${viewRecord.longitude},16z`;
+                window.open(mapsUrl, '_blank');
+              } else {
+                toast({
+                  title: 'No location available',
+                  description: 'Please select a record with latitude and longitude to open in Google Maps',
+                  variant: 'destructive',
+                });
+              }
+            }}
             className={cn(
               "flex-1",
               activeAction === 'send' && "bg-primary text-primary-foreground"
             )}
-            disabled
+            title="Open selected record in Google Maps"
           >
             <Send className="h-4 w-4" />
           </Button>
@@ -725,14 +741,19 @@ export function PreForeclosureView() {
                           size="icon"
                           className="h-7 w-7"
                           onClick={() => {
-                            // Send action - placeholder
-                            toast({
-                              title: 'Send',
-                              description: 'Send functionality coming soon',
-                            });
+                            if (record.latitude != null && record.longitude != null) {
+                              const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(record.address)},+${encodeURIComponent(record.city)},+TX+${record.zip}/@${record.latitude},${record.longitude},16z`;
+                              window.open(mapsUrl, '_blank');
+                            } else {
+                              toast({
+                                title: 'Location not available',
+                                description: 'Latitude and longitude are not available for this property',
+                                variant: 'destructive',
+                              });
+                            }
                           }}
-                          title="Send"
-                          disabled
+                          title="Open in Google Maps"
+                          disabled={record.latitude == null || record.longitude == null}
                         >
                           <Send className="h-3.5 w-3.5" />
                         </Button>
@@ -922,7 +943,20 @@ export function PreForeclosureView() {
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    disabled
+                    onClick={() => {
+                      if (viewRecord.latitude != null && viewRecord.longitude != null) {
+                        const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(viewRecord.address)},+${encodeURIComponent(viewRecord.city)},+TX+${viewRecord.zip}/@${viewRecord.latitude},${viewRecord.longitude},16z`;
+                        window.open(mapsUrl, '_blank');
+                      } else {
+                        toast({
+                          title: 'Location not available',
+                          description: 'Latitude and longitude are not available for this property',
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
+                    disabled={viewRecord.latitude == null || viewRecord.longitude == null}
+                    title="Open in Google Maps"
                   >
                     <Send className="h-4 w-4" />
                   </Button>
