@@ -39,15 +39,29 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
     );
   }
 
+  // Ensure stats has required fields
+  const safeStats = {
+    totalProperties: stats?.totalProperties || 0,
+    byStatus: stats?.byStatus || { judgment: 0, active: 0, pending: 0 },
+    totalAmountDue: stats?.totalAmountDue || 0,
+    avgAmountDue: stats?.avgAmountDue || 0,
+    newThisMonth: stats?.newThisMonth || 0,
+    removedThisMonth: stats?.removedThisMonth || 0,
+    deadLeads: stats?.deadLeads || 0,
+    amountDueDistribution: stats?.amountDueDistribution || [],
+    pipeline: stats?.pipeline,
+    tasks: stats?.tasks,
+  };
+
   // Status distribution data (from PostgreSQL)
   const statusData = [
-    { name: 'Judgment (J)', value: stats.byStatus?.judgment || 0, color: '#EF4444', percentage: stats.totalProperties > 0 ? ((stats.byStatus?.judgment || 0) / stats.totalProperties * 100).toFixed(1) : '0.0' },
-    { name: 'Active (A)', value: stats.byStatus?.active || 0, color: '#10B981', percentage: stats.totalProperties > 0 ? ((stats.byStatus?.active || 0) / stats.totalProperties * 100).toFixed(1) : '0.0' },
-    { name: 'Pending (P)', value: stats.byStatus?.pending || 0, color: '#F59E0B', percentage: stats.totalProperties > 0 ? ((stats.byStatus?.pending || 0) / stats.totalProperties * 100).toFixed(1) : '0.0' },
+    { name: 'Judgment (J)', value: safeStats.byStatus.judgment || 0, color: '#EF4444', percentage: safeStats.totalProperties > 0 ? ((safeStats.byStatus.judgment || 0) / safeStats.totalProperties * 100).toFixed(1) : '0.0' },
+    { name: 'Active (A)', value: safeStats.byStatus.active || 0, color: '#10B981', percentage: safeStats.totalProperties > 0 ? ((safeStats.byStatus.active || 0) / safeStats.totalProperties * 100).toFixed(1) : '0.0' },
+    { name: 'Pending (P)', value: safeStats.byStatus.pending || 0, color: '#F59E0B', percentage: safeStats.totalProperties > 0 ? ((safeStats.byStatus.pending || 0) / safeStats.totalProperties * 100).toFixed(1) : '0.0' },
   ];
 
   // Amount due ranges from PostgreSQL data
-  const amountRanges = stats.amountDueDistribution || [
+  const amountRanges = safeStats.amountDueDistribution.length > 0 ? safeStats.amountDueDistribution : [
     { range: '$0-$5K', count: 0, color: '#3B82F6' },
     { range: '$5K-$10K', count: 0, color: '#8B5CF6' },
     { range: '$10K-$25K', count: 0, color: '#EC4899' },
@@ -56,18 +70,18 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   ];
 
   // Use pipeline data from API (PostgreSQL)
-  const pipelineData = stats.pipeline || {
+  const pipelineData = safeStats.pipeline || {
     totalValue: 0,
     activeDeals: 0,
     byStage: {},
-    conversionRate: '0.0',
+    conversionRate: 0,
     avgDealValue: 0,
   };
   
-  // Parse conversionRate if it's a string
-  const conversionRate = typeof pipelineData.conversionRate === 'string' 
-    ? parseFloat(pipelineData.conversionRate) 
-    : pipelineData.conversionRate || 0;
+  // Ensure conversionRate is a number
+  const conversionRate = typeof pipelineData.conversionRate === 'number' 
+    ? pipelineData.conversionRate 
+    : parseFloat(String(pipelineData.conversionRate || 0)) || 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -81,7 +95,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProperties.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{safeStats.totalProperties.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Tax delinquent properties
             </p>
@@ -96,9 +110,9 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${(stats.totalAmountDue / 1000000).toFixed(1)}M</div>
+            <div className="text-2xl font-bold">${(safeStats.totalAmountDue / 1000000).toFixed(1)}M</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Avg: ${stats.avgAmountDue.toLocaleString()} per property
+              Avg: ${safeStats.avgAmountDue.toLocaleString()} per property
             </p>
           </CardContent>
         </Card>
@@ -111,7 +125,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.newThisMonth.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{safeStats.newThisMonth.toLocaleString()}</div>
             <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
               <Plus className="h-3 w-3" />
               New delinquencies added
@@ -127,7 +141,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.deadLeads.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{safeStats.deadLeads.toLocaleString()}</div>
             <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
               <Minus className="h-3 w-3" />
               Properties resolved
@@ -159,7 +173,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           <CardContent>
             <div className="text-center py-12 text-muted-foreground">
               <p>Monthly trends chart will be available when historical data is tracked.</p>
-              <p className="text-sm mt-2">New this month: {stats.newThisMonth || 0} | Removed this month: {stats.removedThisMonth || 0}</p>
+              <p className="text-sm mt-2">New this month: {safeStats.newThisMonth || 0} | Removed this month: {safeStats.removedThisMonth || 0}</p>
             </div>
           </CardContent>
       </Card>
@@ -230,7 +244,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                       className="h-2 rounded-full transition-all"
                       style={{
                         backgroundColor: range.color,
-                        width: `${(range.count / stats.totalProperties) * 100}%`
+                        width: `${safeStats.totalProperties > 0 ? (range.count / safeStats.totalProperties) * 100 : 0}%`
                       }}
                     />
                   </div>
@@ -249,9 +263,9 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           <CardContent>
             <div className="space-y-4">
               {[
-                { action: 'Total Tasks', count: stats.tasks?.total || 0, color: '#3B82F6', icon: '📋' },
-                { action: 'Luciano', count: stats.tasks?.luciano || 0, color: '#10B981', icon: '👤' },
-                { action: 'Raul', count: stats.tasks?.raul || 0, color: '#F59E0B', icon: '👤' },
+                { action: 'Total Tasks', count: safeStats.tasks?.total || 0, color: '#3B82F6', icon: '📋' },
+                { action: 'Luciano', count: safeStats.tasks?.luciano || 0, color: '#10B981', icon: '👤' },
+                { action: 'Raul', count: safeStats.tasks?.raul || 0, color: '#F59E0B', icon: '👤' },
               ].map((task, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
@@ -268,7 +282,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                       className="h-1.5 rounded-full transition-all"
                       style={{
                         backgroundColor: task.color,
-                        width: `${Math.min((task.count / Math.max(stats.tasks?.total || 1, 1)) * 100, 100)}%`
+                        width: `${Math.min((task.count / Math.max(safeStats.tasks?.total || 1, 1)) * 100, 100)}%`
                       }}
                     />
                   </div>

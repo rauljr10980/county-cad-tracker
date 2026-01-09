@@ -231,11 +231,19 @@ export async function getDashboardStats() {
       removedThisMonth: data.removedThisMonth || 0,
       deadLeads: data.deadLeads || 0,
       amountDueDistribution: data.amountDueDistribution || [],
-      pipeline: data.pipeline || {
+      pipeline: data.pipeline ? {
+        totalValue: data.pipeline.totalValue || 0,
+        activeDeals: data.pipeline.activeDeals || 0,
+        byStage: data.pipeline.byStage || {},
+        conversionRate: typeof data.pipeline.conversionRate === 'number' 
+          ? data.pipeline.conversionRate 
+          : parseFloat(data.pipeline.conversionRate || '0') || 0,
+        avgDealValue: data.pipeline.avgDealValue || 0,
+      } : {
         totalValue: 0,
         activeDeals: 0,
         byStage: {},
-        conversionRate: '0.0',
+        conversionRate: 0,
         avgDealValue: 0,
       },
       tasks: data.tasks || {
@@ -251,7 +259,41 @@ export async function getDashboardStats() {
     };
   } catch (error) {
     console.error('[API] Dashboard stats error:', error);
-    throw error;
+    // Return default values instead of throwing to prevent blank page
+    return {
+      totalProperties: 0,
+      byStatus: {
+        judgment: 0,
+        active: 0,
+        pending: 0,
+        unknown: 0,
+        paid: 0,
+        removed: 0,
+      },
+      totalAmountDue: 0,
+      avgAmountDue: 0,
+      newThisMonth: 0,
+      removedThisMonth: 0,
+      deadLeads: 0,
+      amountDueDistribution: [],
+      pipeline: {
+        totalValue: 0,
+        activeDeals: 0,
+        byStage: {},
+        conversionRate: 0,
+        avgDealValue: 0,
+      },
+      tasks: {
+        total: 0,
+        luciano: 0,
+        raul: 0,
+        callsDueToday: 0,
+        followUpsThisWeek: 0,
+        textsScheduled: 0,
+        mailCampaignActive: 0,
+        drivebyPlanned: 0,
+      },
+    };
   }
 }
 
