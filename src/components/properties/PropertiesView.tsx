@@ -90,23 +90,23 @@ export function PropertiesView() {
   // Fetch strategy:
   // - Any status filter: Fetch large batch (50000) for frontend filtering (more reliable)
   // - Other filters: Fetch 2000 for frontend filtering
-  // - No filters: Use API pagination (100 per page)
+  // - No filters: Fetch all properties (50000) to show all at once
   // Always use frontend filtering for status to ensure properties are displayed correctly
   const fetchLimit = selectedStatuses.length > 0 && !hasActiveAdvancedFilters && !hasSearchQuery
     ? 50000  // Any status filter - fetch large batch for frontend filtering
     : hasAnyFilter
     ? 2000   // Other filters - fetch 2k for frontend filtering
-    : ITEMS_PER_PAGE;
+    : 50000; // No filters - fetch all properties (up to 50k) to show all at once
   
   // Fetch properties from API with status filter and search
-  // When no filters: use API pagination
+  // When no filters: fetch all and paginate on frontend
   // When any filter is active: fetch all and paginate on frontend
-  const shouldUseApiPagination = !hasAnyFilter;
+  const shouldUseApiPagination = false; // Always use frontend pagination to show all properties
   const { data, isLoading, error } = useProperties({
     status: apiStatusFilter,
     search: debouncedSearchQuery,
-    page: shouldUseApiPagination ? page : 1, // Use API pagination when no frontend filtering needed
-    limit: shouldUseApiPagination ? ITEMS_PER_PAGE : fetchLimit,
+    page: 1, // Always use page 1, pagination is handled on frontend
+    limit: fetchLimit,
   });
   
   // Debug: Log query state
@@ -453,12 +453,12 @@ export function PropertiesView() {
         sampleProperties: filteredProperties.slice(0, 3).map(p => ({ id: p.id, status: p.status, accountNumber: p.accountNumber }))
       });
     } else {
-      // No filters - but if sorting is active, we have more properties
-      // If sorting is not active, return raw (using API pagination)
+      // No filters - all properties are loaded, use raw properties for sorting
+      // If sorting is not active, return raw properties as-is
       if (!isSortingActive) {
         return rawProperties;
       }
-      // Sorting is active, so we have more properties to sort
+      // Sorting is active, so sort all raw properties
       propertiesToSort = rawProperties;
     }
     
@@ -529,43 +529,16 @@ export function PropertiesView() {
       let finalTotal = 0;
       let finalTotalPages = 1;
     
-    if (selectedStatuses.length > 0 || hasActiveAdvancedFilters) {
-      // Any status filter or advanced filter - paginate filtered results
-      finalTotal = sortedProperties.length;
-      finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
-      
-      // Apply pagination
-      const startIndex = (page - 1) * ITEMS_PER_PAGE;
-      const endIndex = startIndex + ITEMS_PER_PAGE;
-      finalProperties = sortedProperties.slice(startIndex, endIndex);
-    } else {
-      // No filters
-      if (isSortingActive) {
-        // Sorting is active - use sorted properties
-        finalTotal = sortedProperties.length;
-        finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
-        
-        // Apply pagination
-        const startIndex = (page - 1) * ITEMS_PER_PAGE;
-        const endIndex = startIndex + ITEMS_PER_PAGE;
-        finalProperties = sortedProperties.slice(startIndex, endIndex);
-      } else {
-        // No sorting - use API pagination directly (API already returns the correct page)
-        finalProperties = rawProperties;
-        finalTotal = totalUnfiltered;
-        
-        // Extract totalPages from API response if available
-        try {
-          if (data && !Array.isArray(data) && 'totalPages' in data) {
-            finalTotalPages = data.totalPages || Math.ceil(finalTotal / ITEMS_PER_PAGE);
-          } else {
-            finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
-          }
-        } catch (e) {
-          finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
-        }
-      }
-    }
+    // All properties are now fetched and paginated on frontend
+    // Use sorted properties if sorting is active, otherwise use raw properties
+    const propertiesToPaginate = isSortingActive ? sortedProperties : rawProperties;
+    finalTotal = propertiesToPaginate.length || totalUnfiltered;
+    finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
+    
+    // Apply pagination
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    finalProperties = propertiesToPaginate.slice(startIndex, endIndex);
     
       console.log('[PropertiesView] Pagination result:', {
         propertiesCount: finalProperties.length,
