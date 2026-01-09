@@ -354,7 +354,11 @@ export function AreaSelectorMap({
                     </div>
                   </div>
                 )}
-                <div ref={mapRef} className="w-full h-full rounded-lg" />
+                <div 
+                  ref={mapRef} 
+                  className="w-full h-full rounded-lg"
+                  style={{ minHeight: '400px' }}
+                />
               </>
             )}
           </div>
