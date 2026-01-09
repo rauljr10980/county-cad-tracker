@@ -170,6 +170,52 @@ export function PreForeclosureView() {
     });
   };
 
+  const handleAreaSelected = async (bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+    center?: { lat: number; lng: number };
+    radius?: number;
+  }) => {
+    // Filter records within the selected area
+    const recordsInArea = filteredRecords.filter(r => {
+      if (!r.latitude || !r.longitude) return false;
+      
+      // Check if record is within bounds
+      return r.latitude >= bounds.south &&
+             r.latitude <= bounds.north &&
+             r.longitude >= bounds.west &&
+             r.longitude <= bounds.east;
+    });
+
+    if (recordsInArea.length === 0) {
+      toast({
+        title: "No records in area",
+        description: "No records found within the selected area. Try selecting a different area.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (recordsInArea.length > 500) {
+      toast({
+        title: "Too many records",
+        description: `Found ${recordsInArea.length} records in the selected area. Maximum 500 allowed. Please select a smaller area.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Auto-select records in area
+    setSelectedRecordIds(new Set(recordsInArea.map(r => r.document_number)));
+    
+    toast({
+      title: "Area Selected",
+      description: `Found ${recordsInArea.length} records in the selected area. Click "Optimize Route" to continue.`,
+    });
+  };
+
   const handleCreateRoute = async () => {
     // Get selected records with valid coordinates
     const selectedRecords = filteredRecords.filter(r => 

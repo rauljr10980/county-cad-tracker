@@ -752,6 +752,52 @@ export function PropertiesView() {
     });
   };
 
+  const handleAreaSelected = async (bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+    center?: { lat: number; lng: number };
+    radius?: number;
+  }) => {
+    // Filter properties within the selected area
+    const propertiesInArea = rawProperties.filter(p => {
+      if (!p.latitude || !p.longitude) return false;
+      
+      // Check if property is within bounds
+      return p.latitude >= bounds.south &&
+             p.latitude <= bounds.north &&
+             p.longitude >= bounds.west &&
+             p.longitude <= bounds.east;
+    });
+
+    if (propertiesInArea.length === 0) {
+      toast({
+        title: "No properties in area",
+        description: "No properties found within the selected area. Try selecting a different area.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (propertiesInArea.length > 500) {
+      toast({
+        title: "Too many properties",
+        description: `Found ${propertiesInArea.length} properties in the selected area. Maximum 500 allowed. Please select a smaller area.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Auto-select properties in area
+    setSelectedPropertyIds(new Set(propertiesInArea.map(p => p.id)));
+    
+    toast({
+      title: "Area Selected",
+      description: `Found ${propertiesInArea.length} properties in the selected area. Click "Optimize Route" to continue.`,
+    });
+  };
+
   const handleCreateRoute = async () => {
     // Get selected properties with valid coordinates
     const selectedProperties = rawProperties.filter(p => 
