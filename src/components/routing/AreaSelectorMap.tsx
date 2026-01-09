@@ -42,6 +42,26 @@ export function AreaSelectorMap({
   const rectangleRef = useRef<google.maps.Rectangle | null>(null);
   const circleRef = useRef<google.maps.Circle | null>(null);
 
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setMap(null);
+      setDrawingManager(null);
+      setSelectedShape(null);
+      setDrawingMode(null);
+      setError(null);
+      setIsLoading(true);
+      if (rectangleRef.current) {
+        rectangleRef.current.setMap(null);
+        rectangleRef.current = null;
+      }
+      if (circleRef.current) {
+        circleRef.current.setMap(null);
+        circleRef.current = null;
+      }
+    }
+  }, [isOpen]);
+
   // Initialize Google Maps
   useEffect(() => {
     if (!isOpen || !mapRef.current) return;
@@ -138,7 +158,7 @@ export function AreaSelectorMap({
 
   // Handle drawing mode changes
   useEffect(() => {
-    if (!drawingManager || !map) return;
+    if (!drawingManager || !map || !window.google?.maps?.drawing) return;
 
     if (drawingMode === 'rectangle') {
       drawingManager.setDrawingMode(google.maps.drawing.OverlayType.RECTANGLE);
