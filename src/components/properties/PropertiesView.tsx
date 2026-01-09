@@ -787,6 +787,7 @@ export function PropertiesView() {
       // Google Maps has a limit of 25 waypoints per URL, so we need to batch them
       const GOOGLE_MAPS_WAYPOINT_LIMIT = 25;
       let totalUrlsOpened = 0;
+      let totalWaypoints = 0;
 
       solution.routes.forEach((route: any, routeIndex: number) => {
         if (route.waypoints.length < 2) return;
@@ -797,6 +798,8 @@ export function PropertiesView() {
           .map((wp: any) => `${wp.lat},${wp.lon}`);
 
         if (waypoints.length === 0) return;
+        
+        totalWaypoints += waypoints.length;
 
         // If we have more than 25 waypoints, split into multiple URLs
         if (waypoints.length <= GOOGLE_MAPS_WAYPOINT_LIMIT) {
@@ -839,9 +842,6 @@ export function PropertiesView() {
         }
       });
 
-      const totalWaypoints = solution.routes.reduce((sum: number, route: any) => 
-        sum + route.waypoints.filter((wp: any) => wp.id !== 'depot').length, 0
-      );
       const estimatedUrls = Math.ceil(totalWaypoints / GOOGLE_MAPS_WAYPOINT_LIMIT);
       
       toast({
