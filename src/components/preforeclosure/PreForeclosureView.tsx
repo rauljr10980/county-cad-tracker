@@ -1344,6 +1344,20 @@ export function PreForeclosureView() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Route Map Modal */}
+      {optimizedRoutes && (
+        <RouteMap
+          routes={optimizedRoutes.routes}
+          numVehicles={numVehicles}
+          totalDistance={optimizedRoutes.totalDistance}
+          isOpen={routeMapOpen}
+          onClose={() => {
+            setRouteMapOpen(false);
+            setOptimizedRoutes(null);
+          }}
+        />
+      )}
     </div>
   );
 }
