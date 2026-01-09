@@ -39,61 +39,35 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
     );
   }
 
-  // Monthly tracking data (simulated - you can connect to real API data)
-  const monthlyTrendsData = [
-    { month: 'Jun', totalProperties: 56234, newDelinquencies: 892, resolved: 445 },
-    { month: 'Jul', totalProperties: 56681, newDelinquencies: 1043, resolved: 596 },
-    { month: 'Aug', totalProperties: 57128, newDelinquencies: 978, resolved: 531 },
-    { month: 'Sep', totalProperties: 57575, newDelinquencies: 1124, resolved: 677 },
-    { month: 'Oct', totalProperties: 57234, newDelinquencies: 756, resolved: 1097 },
-    { month: 'Nov', totalProperties: 57891, newDelinquencies: 1289, resolved: 632 },
-    { month: 'Dec', totalProperties: 58432, newDelinquencies: 1243, resolved: 702 },
-  ];
-
-  // Status distribution data
+  // Status distribution data (from PostgreSQL)
   const statusData = [
-    { name: 'Judgment (J)', value: stats.byStatus.judgment, color: '#EF4444', percentage: ((stats.byStatus.judgment / stats.totalProperties) * 100).toFixed(1) },
-    { name: 'Active (A)', value: stats.byStatus.active, color: '#10B981', percentage: ((stats.byStatus.active / stats.totalProperties) * 100).toFixed(1) },
-    { name: 'Pending (P)', value: stats.byStatus.pending, color: '#F59E0B', percentage: ((stats.byStatus.pending / stats.totalProperties) * 100).toFixed(1) },
+    { name: 'Judgment (J)', value: stats.byStatus?.judgment || 0, color: '#EF4444', percentage: stats.totalProperties > 0 ? ((stats.byStatus?.judgment || 0) / stats.totalProperties * 100).toFixed(1) : '0.0' },
+    { name: 'Active (A)', value: stats.byStatus?.active || 0, color: '#10B981', percentage: stats.totalProperties > 0 ? ((stats.byStatus?.active || 0) / stats.totalProperties * 100).toFixed(1) : '0.0' },
+    { name: 'Pending (P)', value: stats.byStatus?.pending || 0, color: '#F59E0B', percentage: stats.totalProperties > 0 ? ((stats.byStatus?.pending || 0) / stats.totalProperties * 100).toFixed(1) : '0.0' },
   ];
 
-  // Amount due ranges for distribution
-  const amountRanges = [
-    { range: '$0-$5K', count: Math.floor(stats.totalProperties * 0.25), color: '#3B82F6' },
-    { range: '$5K-$10K', count: Math.floor(stats.totalProperties * 0.30), color: '#8B5CF6' },
-    { range: '$10K-$25K', count: Math.floor(stats.totalProperties * 0.25), color: '#EC4899' },
-    { range: '$25K-$50K', count: Math.floor(stats.totalProperties * 0.12), color: '#F59E0B' },
-    { range: '$50K+', count: Math.floor(stats.totalProperties * 0.08), color: '#EF4444' },
+  // Amount due ranges from PostgreSQL data
+  const amountRanges = stats.amountDueDistribution || [
+    { range: '$0-$5K', count: 0, color: '#3B82F6' },
+    { range: '$5K-$10K', count: 0, color: '#8B5CF6' },
+    { range: '$10K-$25K', count: 0, color: '#EC4899' },
+    { range: '$25K-$50K', count: 0, color: '#F59E0B' },
+    { range: '$50K+', count: 0, color: '#EF4444' },
   ];
 
-  // Pipeline progression over time (simulated - you can connect to real API data)
-  const pipelineProgressionData = [
-    { month: 'Jun', interested: 198, offer_sent: 67, negotiating: 34, under_contract: 18, closed: 112 },
-    { month: 'Jul', interested: 212, offer_sent: 73, negotiating: 38, under_contract: 21, closed: 128 },
-    { month: 'Aug', interested: 224, offer_sent: 78, negotiating: 41, under_contract: 19, closed: 134 },
-    { month: 'Sep', interested: 219, offer_sent: 81, negotiating: 42, under_contract: 22, closed: 141 },
-    { month: 'Oct', interested: 228, offer_sent: 85, negotiating: 44, under_contract: 20, closed: 149 },
-    { month: 'Nov', interested: 231, offer_sent: 87, negotiating: 43, under_contract: 24, closed: 153 },
-    { month: 'Dec', interested: 234, offer_sent: 89, negotiating: 45, under_contract: 23, closed: 156 },
-  ];
-
-  // Use pipeline data from API if available, otherwise use mock data
+  // Use pipeline data from API (PostgreSQL)
   const pipelineData = stats.pipeline || {
-    totalValue: 2450000,
-    activeDeals: 127,
-    byStage: {
-      new_lead: 1245,
-      contacted: 892,
-      interested: 234,
-      offer_sent: 89,
-      negotiating: 45,
-      under_contract: 23,
-      closed: 156,
-      dead: 3412,
-    },
-    conversionRate: 12.3,
-    avgDealValue: 19291,
+    totalValue: 0,
+    activeDeals: 0,
+    byStage: {},
+    conversionRate: '0.0',
+    avgDealValue: 0,
   };
+  
+  // Parse conversionRate if it's a string
+  const conversionRate = typeof pipelineData.conversionRate === 'string' 
+    ? parseFloat(pipelineData.conversionRate) 
+    : pipelineData.conversionRate || 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -182,24 +156,12 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyTrendsData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
-              <YAxis stroke="#9ca3af" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                }}
-              />
-              <Bar dataKey="newDelinquencies" fill="#EF4444" radius={[4, 4, 0, 0]} name="New Delinquencies" />
-              <Bar dataKey="resolved" fill="#10B981" radius={[4, 4, 0, 0]} name="Resolved" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
+          <CardContent>
+            <div className="text-center py-12 text-muted-foreground">
+              <p>Monthly trends chart will be available when historical data is tracked.</p>
+              <p className="text-sm mt-2">New this month: {stats.newThisMonth || 0} | Removed this month: {stats.removedThisMonth || 0}</p>
+            </div>
+          </CardContent>
       </Card>
 
       {/* Bottom Row - Status Distribution, Amount Ranges, and Tasks */}
@@ -287,11 +249,9 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           <CardContent>
             <div className="space-y-4">
               {[
-                { action: 'Calls Due Today', count: stats.tasks?.callsDueToday || 0, color: '#EF4444', icon: '📞' },
-                { action: 'Follow-ups This Week', count: stats.tasks?.followUpsThisWeek || 0, color: '#F59E0B', icon: '📅' },
-                { action: 'Texts Scheduled', count: stats.tasks?.textsScheduled || 0, color: '#8B5CF6', icon: '💬' },
-                { action: 'Mail Campaign Active', count: stats.tasks?.mailCampaignActive || 0, color: '#3B82F6', icon: '✉️' },
-                { action: 'Drive-bys Planned', count: stats.tasks?.drivebyPlanned || 0, color: '#10B981', icon: '🚗' },
+                { action: 'Total Tasks', count: stats.tasks?.total || 0, color: '#3B82F6', icon: '📋' },
+                { action: 'Luciano', count: stats.tasks?.luciano || 0, color: '#10B981', icon: '👤' },
+                { action: 'Raul', count: stats.tasks?.raul || 0, color: '#F59E0B', icon: '👤' },
               ].map((task, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
@@ -308,7 +268,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                       className="h-1.5 rounded-full transition-all"
                       style={{
                         backgroundColor: task.color,
-                        width: `${Math.min((task.count / 250) * 100, 100)}%`
+                        width: `${Math.min((task.count / Math.max(stats.tasks?.total || 1, 1)) * 100, 100)}%`
                       }}
                     />
                   </div>
@@ -384,7 +344,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {pipelineData.conversionRate}%
+              {conversionRate.toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Lead to close
@@ -452,81 +412,9 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             <p className="text-sm text-muted-foreground mt-1">Track deal stages over time</p>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={pipelineProgressionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} />
-                <YAxis stroke="#9ca3af" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="interested"
-                  stroke="#EC4899"
-                  strokeWidth={2}
-                  name="Interested"
-                  dot={{ fill: '#EC4899', r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="offer_sent"
-                  stroke="#F59E0B"
-                  strokeWidth={2}
-                  name="Offer Sent"
-                  dot={{ fill: '#F59E0B', r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="negotiating"
-                  stroke="#EF4444"
-                  strokeWidth={2}
-                  name="Negotiating"
-                  dot={{ fill: '#EF4444', r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="under_contract"
-                  stroke="#10B981"
-                  strokeWidth={2}
-                  name="Under Contract"
-                  dot={{ fill: '#10B981', r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="closed"
-                  stroke="#059669"
-                  strokeWidth={3}
-                  name="Closed"
-                  dot={{ fill: '#059669', r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-0.5 bg-[#EC4899]" />
-                <span className="text-muted-foreground">Interested</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-0.5 bg-[#F59E0B]" />
-                <span className="text-muted-foreground">Offer Sent</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-0.5 bg-[#EF4444]" />
-                <span className="text-muted-foreground">Negotiating</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-0.5 bg-[#10B981]" />
-                <span className="text-muted-foreground">Under Contract</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-0.5 bg-[#059669]" />
-                <span className="text-muted-foreground font-semibold">Closed</span>
-              </div>
+            <div className="text-center py-12 text-muted-foreground">
+              <p>Pipeline progression chart will be available when historical data is tracked.</p>
+              <p className="text-sm mt-2">Current active deals: {pipelineData.activeDeals || 0}</p>
             </div>
           </CardContent>
         </Card>

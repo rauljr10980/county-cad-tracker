@@ -593,8 +593,22 @@ router.put('/:id/action', optionalAuth, async (req, res) => {
 
 router.get('/stats/dashboard', optionalAuth, async (req, res) => {
   try {
-    // Run all queries in parallel for better performance (4x faster)
-    const [statusCounts, dealStageCounts, taskCounts, financialStats] = await Promise.all([
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Run all queries in parallel for better performance
+    const [
+      statusCounts,
+      dealStageCounts,
+      taskCounts,
+      financialStats,
+      newThisMonthCount,
+      removedThisMonthCount,
+      deadLeadsCount,
+      amountDueRanges,
+      tasksByUser
+    ] = await Promise.all([
       // Get property counts by status
       prisma.property.groupBy({
         by: ['status'],
@@ -623,6 +637,53 @@ router.get('/stats/dashboard', optionalAuth, async (req, res) => {
         _avg: {
           totalDue: true
         }
+      }),
+      // Get new properties this month
+      prisma.property.count({
+        where: {
+          createdAt: {
+            gte: startOfMonth,
+            lte: endOfMonth
+          }
+        }
+      }),
+      // Get removed properties this month
+      prisma.property.count({
+        where: {
+          isRemoved: true,
+          updatedAt: {
+            gte: startOfMonth,
+            lte: endOfMonth
+          }
+        }
+      }),
+      // Get dead leads (removed or dealStage=DEAD)
+      prisma.property.count({
+        where: {
+          OR: [
+            { isRemoved: true },
+            { dealStage: 'DEAD' }
+          ]
+        }
+      }),
+      // Get amount due ranges
+      Promise.all([
+        prisma.property.count({ where: { totalDue: { gte: 0, lt: 5000 } } }),
+        prisma.property.count({ where: { totalDue: { gte: 5000, lt: 10000 } } }),
+        prisma.property.count({ where: { totalDue: { gte: 10000, lt: 25000 } } }),
+        prisma.property.count({ where: { totalDue: { gte: 25000, lt: 50000 } } }),
+        prisma.property.count({ where: { totalDue: { gte: 50000 } } })
+      ]),
+      // Get tasks by assigned user
+      prisma.task.findMany({
+        where: { status: 'PENDING' },
+        include: {
+          assignedTo: {
+            select: {
+              username: true
+            }
+          }
+        }
       })
     ]);
 
@@ -635,24 +696,59 @@ router.get('/stats/dashboard', optionalAuth, async (req, res) => {
     const byDealStage = {};
     dealStageCounts.forEach(item => {
       if (item.dealStage) {
+        // Convert NEW_LEAD to new_lead format
         byDealStage[item.dealStage.toLowerCase()] = item._count.dealStage;
       }
     });
 
-    const taskStats = {};
-    taskCounts.forEach(item => {
-      taskStats[item.status.toLowerCase()] = item._count.status;
-    });
+    // Calculate task stats by user (Luciano, Raul)
+    const lucianoTasks = tasksByUser.filter(t => 
+      t.assignedTo && t.assignedTo.username.toLowerCase() === 'luciano'
+    ).length;
+    const raulTasks = tasksByUser.filter(t => 
+      t.assignedTo && t.assignedTo.username.toLowerCase() === 'raul'
+    ).length;
+
+    const taskStats = {
+      total: tasksByUser.length,
+      luciano: lucianoTasks,
+      raul: raulTasks,
+      // Keep legacy fields for compatibility
+      callsDueToday: 0,
+      followUpsThisWeek: 0,
+      textsScheduled: 0,
+      mailCampaignActive: 0,
+      drivebyPlanned: 0
+    };
+
+    // Format amount due ranges
+    const amountDueDistribution = [
+      { range: '$0-$5K', count: amountDueRanges[0], color: '#3B82F6' },
+      { range: '$5K-$10K', count: amountDueRanges[1], color: '#8B5CF6' },
+      { range: '$10K-$25K', count: amountDueRanges[2], color: '#EC4899' },
+      { range: '$25K-$50K', count: amountDueRanges[3], color: '#F59E0B' },
+      { range: '$50K+', count: amountDueRanges[4], color: '#EF4444' }
+    ];
 
     res.json({
       totalProperties: financialStats._count,
       byStatus,
       totalAmountDue: financialStats._sum.totalDue || 0,
       avgAmountDue: financialStats._avg.totalDue || 0,
+      newThisMonth: newThisMonthCount,
+      removedThisMonth: removedThisMonthCount,
+      deadLeads: deadLeadsCount,
+      amountDueDistribution,
       pipeline: {
         totalValue: financialStats._sum.estimatedDealValue || 0,
         activeDeals: (byDealStage.contacted || 0) + (byDealStage.interested || 0) + (byDealStage.offer_sent || 0) + (byDealStage.negotiating || 0),
-        byStage: byDealStage
+        byStage: byDealStage,
+        conversionRate: financialStats._count > 0 
+          ? parseFloat((((byDealStage.closed || 0) / financialStats._count) * 100).toFixed(1))
+          : 0,
+        avgDealValue: (byDealStage.closed || 0) > 0
+          ? Math.round((financialStats._sum.estimatedDealValue || 0) / (byDealStage.closed || 1))
+          : 0
       },
       tasks: taskStats
     });

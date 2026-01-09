@@ -209,43 +209,49 @@ export async function getComparison(fileId: string) {
  */
 export async function getDashboardStats() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/dashboard`);
+    const response = await fetch(`${API_BASE_URL}/api/properties/stats/dashboard`);
     if (!response.ok) {
       throw new Error('Failed to fetch dashboard stats');
     }
-    return response.json();
-  } catch (error) {
-    // Fallback to mock data if API is unavailable (e.g., on GitHub Pages)
-    console.warn('[API] Using fallback mock data for dashboard');
+    const data = await response.json();
+    // Map backend response to frontend format
     return {
-      totalProperties: 58432,
+      totalProperties: data.totalProperties || 0,
       byStatus: {
-        judgment: 3829,
-        active: 5164,
-        pending: 858,
+        judgment: data.byStatus?.judgment || 0,
+        active: data.byStatus?.active || 0,
+        pending: data.byStatus?.pending || 0,
+        unknown: data.byStatus?.unknown || 0,
+        paid: data.byStatus?.paid || 0,
+        removed: data.byStatus?.removed || 0,
       },
-      totalAmountDue: 847293847,
-      avgAmountDue: 14500,
-      newThisMonth: 1243,
-      removedThisMonth: 702,
-      deadLeads: 702,
-      pipeline: {
-        totalValue: 2450000,
-        activeDeals: 127,
-        byStage: {
-          new_lead: 1245,
-          contacted: 892,
-          interested: 234,
-          offer_sent: 89,
-          negotiating: 45,
-          under_contract: 23,
-          closed: 156,
-          dead: 3412,
-        },
-        conversionRate: 12.3,
-        avgDealValue: 19291,
+      totalAmountDue: data.totalAmountDue || 0,
+      avgAmountDue: data.avgAmountDue || 0,
+      newThisMonth: data.newThisMonth || 0,
+      removedThisMonth: data.removedThisMonth || 0,
+      deadLeads: data.deadLeads || 0,
+      amountDueDistribution: data.amountDueDistribution || [],
+      pipeline: data.pipeline || {
+        totalValue: 0,
+        activeDeals: 0,
+        byStage: {},
+        conversionRate: '0.0',
+        avgDealValue: 0,
+      },
+      tasks: data.tasks || {
+        total: 0,
+        luciano: 0,
+        raul: 0,
+        callsDueToday: 0,
+        followUpsThisWeek: 0,
+        textsScheduled: 0,
+        mailCampaignActive: 0,
+        drivebyPlanned: 0,
       },
     };
+  } catch (error) {
+    console.error('[API] Dashboard stats error:', error);
+    throw error;
   }
 }
 
