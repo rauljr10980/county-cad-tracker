@@ -28,6 +28,8 @@ export interface AdvancedFilters {
   amountDueMax?: number;
   marketValueMin?: number;
   marketValueMax?: number;
+  ratioMin?: number;
+  ratioMax?: number;
   taxYear?: string;
   hasNotes?: 'yes' | 'no' | 'any';
   hasLink?: 'yes' | 'no' | 'any';
@@ -280,6 +282,45 @@ export function AdvancedFiltersPanel({
                   onChange={(e) => {
                     const value = e.target.value ? parseFloat(e.target.value) : undefined;
                     updateFilter('marketValueMax', value);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Ratio Range */}
+          <div className="space-y-3">
+            <Label>Ratio (%)</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ratioMin" className="text-xs text-muted-foreground">
+                  Min (%)
+                </Label>
+                <Input
+                  id="ratioMin"
+                  type="number"
+                  placeholder="0"
+                  step="0.1"
+                  value={filters.ratioMin || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                    updateFilter('ratioMin', value);
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ratioMax" className="text-xs text-muted-foreground">
+                  Max (%)
+                </Label>
+                <Input
+                  id="ratioMax"
+                  type="number"
+                  placeholder="No limit"
+                  step="0.1"
+                  value={filters.ratioMax || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                    updateFilter('ratioMax', value);
                   }}
                 />
               </div>

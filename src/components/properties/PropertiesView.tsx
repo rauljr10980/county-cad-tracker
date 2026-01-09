@@ -28,6 +28,8 @@ export function PropertiesView() {
     amountDueMax: undefined,
     marketValueMin: undefined,
     marketValueMax: undefined,
+    ratioMin: undefined,
+    ratioMax: undefined,
     taxYear: undefined,
     hasNotes: 'any',
     hasLink: 'any',
@@ -67,6 +69,8 @@ export function PropertiesView() {
       (advancedFilters.amountDueMax !== undefined) ||
       (advancedFilters.marketValueMin !== undefined) ||
       (advancedFilters.marketValueMax !== undefined) ||
+      (advancedFilters.ratioMin !== undefined) ||
+      (advancedFilters.ratioMax !== undefined) ||
       (advancedFilters.taxYear !== undefined) ||
       (advancedFilters.hasNotes !== 'any') ||
       (advancedFilters.hasLink !== 'any') ||
@@ -317,6 +321,29 @@ export function PropertiesView() {
       }
       if (advancedFilters.marketValueMax !== undefined && (p.marketValue === undefined || p.marketValue > advancedFilters.marketValueMax)) {
         return false;
+      }
+      
+      // Ratio range (calculated as: amountDue / marketValue * 100)
+      if (advancedFilters.ratioMin !== undefined || advancedFilters.ratioMax !== undefined) {
+        // Calculate ratio
+        const ratio = (p.marketValue && p.marketValue !== 0) 
+          ? (p.totalAmountDue / p.marketValue) * 100 
+          : null;
+        
+        // If ratio is null (no market value) and min is set, exclude it
+        if (ratio === null && advancedFilters.ratioMin !== undefined) {
+          return false;
+        }
+        
+        // Check min ratio
+        if (ratio !== null && advancedFilters.ratioMin !== undefined && ratio < advancedFilters.ratioMin) {
+          return false;
+        }
+        
+        // Check max ratio
+        if (ratio !== null && advancedFilters.ratioMax !== undefined && ratio > advancedFilters.ratioMax) {
+          return false;
+        }
       }
       
       // Tax Year
@@ -631,6 +658,8 @@ export function PropertiesView() {
     if (advancedFilters.amountDueMax !== undefined) count++;
     if (advancedFilters.marketValueMin !== undefined) count++;
     if (advancedFilters.marketValueMax !== undefined) count++;
+    if (advancedFilters.ratioMin !== undefined) count++;
+    if (advancedFilters.ratioMax !== undefined) count++;
     if (advancedFilters.taxYear) count++;
     if (advancedFilters.hasNotes !== 'any') count++;
     if (advancedFilters.hasLink !== 'any') count++;
@@ -666,6 +695,8 @@ export function PropertiesView() {
       amountDueMax: undefined,
       marketValueMin: undefined,
       marketValueMax: undefined,
+      ratioMin: undefined,
+      ratioMax: undefined,
       taxYear: undefined,
       hasNotes: 'any',
       hasLink: 'any',
