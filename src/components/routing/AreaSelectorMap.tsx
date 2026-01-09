@@ -157,14 +157,23 @@ export function AreaSelectorMap({
         }
       });
 
-      setDrawingManager(manager);
-      setMap(newMap);
-      setIsLoading(false);
-    } catch (err) {
-      console.error('[AreaSelectorMap] Error initializing map:', err);
-      setError(err instanceof Error ? err.message : 'Failed to initialize map');
-      setIsLoading(false);
-    }
+        setDrawingManager(manager);
+        setMap(newMap);
+        setIsLoading(false);
+      } catch (err) {
+        console.error('[AreaSelectorMap] Error initializing map:', err);
+        setError(err instanceof Error ? err.message : 'Failed to initialize map');
+        setIsLoading(false);
+      }
+    };
+
+    // Start initialization
+    initMap();
+
+    // Cleanup function
+    return () => {
+      // Cleanup will be handled by the reset effect when isOpen changes
+    };
   }, [isOpen, initialCenter, initialZoom]);
 
   // Handle drawing mode changes
