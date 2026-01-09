@@ -235,54 +235,69 @@ router.post('/upload', optionalAuth, async (req, res) => {
     // Upsert records (create or update)
     let created = 0;
     let updated = 0;
+    const dbErrors = [];
 
     for (const record of processedRecords) {
-      const existing = await prisma.preForeclosure.findUnique({
-        where: { documentNumber: record.documentNumber }
-      });
+      try {
+        const existing = await prisma.preForeclosure.findUnique({
+          where: { documentNumber: record.documentNumber }
+        });
 
-      if (existing) {
-        // Update existing record
-        await prisma.preForeclosure.update({
-          where: { documentNumber: record.documentNumber },
-          data: {
-            type: record.type,
-            address: record.address,
-            city: record.city,
-            zip: record.zip,
-            filingMonth: record.filingMonth,
-            county: record.county,
-            inactive: false,
-            lastSeenMonth: currentMonth,
-            updatedAt: new Date()
-          }
-        });
-        updated++;
-      } else {
-        // Create new record
-        await prisma.preForeclosure.create({
-          data: {
-            documentNumber: record.documentNumber,
-            type: record.type,
-            address: record.address,
-            city: record.city,
-            zip: record.zip,
-            filingMonth: record.filingMonth,
-            county: record.county,
-            internalStatus: 'New',
-            inactive: false,
-            firstSeenMonth: currentMonth,
-            lastSeenMonth: currentMonth
-          }
-        });
-        created++;
+        if (existing) {
+          // Update existing record
+          await prisma.preForeclosure.update({
+            where: { documentNumber: record.documentNumber },
+            data: {
+              type: record.type,
+              address: record.address,
+              city: record.city,
+              zip: record.zip,
+              filingMonth: record.filingMonth,
+              county: record.county,
+              inactive: false,
+              lastSeenMonth: currentMonth,
+              updatedAt: new Date()
+            }
+          });
+          updated++;
+        } else {
+          // Create new record
+          await prisma.preForeclosure.create({
+            data: {
+              documentNumber: record.documentNumber,
+              type: record.type,
+              address: record.address,
+              city: record.city,
+              zip: record.zip,
+              filingMonth: record.filingMonth,
+              county: record.county,
+              internalStatus: 'New',
+              inactive: false,
+              firstSeenMonth: currentMonth,
+              lastSeenMonth: currentMonth
+            }
+          });
+          created++;
+        }
+      } catch (dbError) {
+        console.error(`[PRE-FORECLOSURE] Database error for record ${record.documentNumber}:`, dbError);
+        dbErrors.push(`Failed to save record ${record.documentNumber}: ${dbError.message}`);
       }
+    }
+
+    if (created === 0 && updated === 0 && dbErrors.length > 0) {
+      return res.status(500).json({ 
+        error: 'Failed to save records to database',
+        errors: dbErrors.slice(0, 10)
+      });
     }
 
     // Get counts
     const totalRecords = await prisma.preForeclosure.count();
     const activeRecords = await prisma.preForeclosure.count({ where: { inactive: false } });
     const inactiveRecords = await prisma.preForeclosure.count({ where: { inactive: true } });
+
+    console.log(`[PRE-FORECLOSURE] Upload complete: ${created} created, ${updated} updated, ${processedRecords.length} processed`);
 
     res.json({
       success: true,
@@ -293,11 +308,17 @@ router.post('/upload', optionalAuth, async (req, res) => {
       inactiveRecords,
       created,
       updated,
-      errors: errors.length > 0 ? errors.slice(0, 10) : undefined
+      errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+      dbErrors: dbErrors.length > 0 ? dbErrors.slice(0, 10) : undefined
     });
   } catch (error) {
     console.error('[PRE-FORECLOSURE] Upload error:', error);
-    res.status(500).json({ error: 'Failed to process pre-foreclosure file' });
+    console.error('[PRE-FORECLOSURE] Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to process pre-foreclosure file',
+      details: error.message,
+      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+    });
   }
 });
 
