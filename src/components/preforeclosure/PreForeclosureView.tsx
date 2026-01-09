@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,6 +32,7 @@ export function PreForeclosureView() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -374,6 +375,52 @@ export function PreForeclosureView() {
     <div className="p-6 space-y-6">
       {/* Header */}
       {headerSection}
+
+      {/* Actions Panel */}
+      <div className="bg-secondary/30 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-sm font-medium">Actions</span>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={activeAction === 'view' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveAction('view')}
+            className={cn(
+              "flex-1",
+              activeAction === 'view' && "bg-primary text-primary-foreground"
+            )}
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={activeAction === 'send' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveAction('send')}
+            className={cn(
+              "flex-1",
+              activeAction === 'send' && "bg-primary text-primary-foreground"
+            )}
+            disabled
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={activeAction === 'external' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setActiveAction('external');
+              window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+            }}
+            className={cn(
+              "flex-1",
+              activeAction === 'external' && "bg-primary text-primary-foreground"
+            )}
+          >
+            <ExternalLink className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       {/* Search and Filters */}
       <div className="space-y-4">
