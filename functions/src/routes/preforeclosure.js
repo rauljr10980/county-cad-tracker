@@ -427,7 +427,7 @@ router.put('/:documentNumber', authenticateToken, async (req, res) => {
 // DELETE ALL PRE-FORECLOSURE RECORDS
 // ============================================================================
 
-router.delete('/', authenticateToken, async (req, res) => {
+router.delete('/', optionalAuth, async (req, res) => {
   try {
     await prisma.preForeclosure.deleteMany({});
     res.json({ success: true, message: 'All pre-foreclosure records deleted' });
