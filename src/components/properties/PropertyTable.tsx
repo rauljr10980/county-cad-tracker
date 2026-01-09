@@ -16,9 +16,9 @@ interface PropertyTableProps {
   onFollowUp?: (property: Property) => void;
   statusFilter?: PropertyStatus;
   onStatusFilterChange?: (status: PropertyStatus | undefined) => void;
-  sortField?: keyof Property;
+  sortField?: keyof Property | 'ratio';
   sortDirection?: 'asc' | 'desc';
-  onSort?: (field: keyof Property) => void;
+  onSort?: (field: keyof Property | 'ratio') => void;
 }
 
 
@@ -33,7 +33,7 @@ export function PropertyTable({
   onSort
 }: PropertyTableProps) {
   // Use external sort state if provided, otherwise use internal state (fallback)
-  const [internalSortField, setInternalSortField] = useState<keyof Property>('totalAmountDue');
+  const [internalSortField, setInternalSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
   const [internalSortDirection, setInternalSortDirection] = useState<'asc' | 'desc'>('asc');
   
   const sortField = onSort ? externalSortField : internalSortField;
@@ -70,7 +70,7 @@ export function PropertyTable({
   // (Database uses PENDING/ACTIVE/JUDGMENT, but filters use P/A/J, so PropertiesView normalizes them)
   const displayProperties = properties;
   
-  const handleSort = (field: keyof Property) => {
+  const handleSort = (field: keyof Property | 'ratio') => {
     if (onSort) {
       // Use external sort handler (from PropertiesView)
       onSort(field);
@@ -224,8 +224,20 @@ export function PropertyTable({
                   )}
                 </div>
               </th>
-              <th className="text-right text-muted-foreground">
-                Ratio
+              <th 
+                className="cursor-pointer hover:bg-secondary text-right"
+                onClick={() => handleSort('ratio')}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Ratio
+                  {sortField === 'ratio' && (
+                    sortDirection === 'asc' ? (
+                      <ArrowUp className="h-3 w-3" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3" />
+                    )
+                  )}
+                </div>
               </th>
               <th 
                 className="cursor-pointer hover:bg-secondary"

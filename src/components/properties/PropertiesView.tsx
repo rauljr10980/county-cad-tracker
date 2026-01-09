@@ -40,7 +40,7 @@ export function PropertiesView() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [sortField, setSortField] = useState<keyof Property>('totalAmountDue');
+  const [sortField, setSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
   // Convert advancedFilters.statuses to legacy format for API
@@ -464,12 +464,27 @@ export function PropertiesView() {
     
     // Apply sorting with proper handling of null/undefined values
     const sorted = [...propertiesToSort].sort((a, b) => {
-      const aVal = a[sortField];
-      const bVal = b[sortField];
+      let aVal: any;
+      let bVal: any;
+      
+      // Handle special case: ratio is calculated (totalAmountDue / marketValue * 100)
+      if (sortField === 'ratio') {
+        // Calculate ratio: (amountDue / marketValue) * 100
+        aVal = (a.marketValue && a.marketValue !== 0) 
+          ? (a.totalAmountDue / a.marketValue) * 100 
+          : null;
+        bVal = (b.marketValue && b.marketValue !== 0) 
+          ? (b.totalAmountDue / b.marketValue) * 100 
+          : null;
+      } else {
+        // Normal field access
+        aVal = a[sortField];
+        bVal = b[sortField];
+      }
       
       // Handle null/undefined values - put them at the end
-      const aIsNull = aVal === undefined || aVal === null;
-      const bIsNull = bVal === undefined || bVal === null;
+      const aIsNull = aVal === undefined || aVal === null || (typeof aVal === 'number' && isNaN(aVal));
+      const bIsNull = bVal === undefined || bVal === null || (typeof bVal === 'number' && isNaN(bVal));
       
       if (aIsNull && bIsNull) return 0; // Both null, maintain order
       if (aIsNull) return 1; // a is null, put it after b
@@ -698,7 +713,7 @@ export function PropertiesView() {
     setDebouncedSearchQuery('');
   };
 
-  const handleSort = (field: keyof Property) => {
+  const handleSort = (field: keyof Property | 'ratio') => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
