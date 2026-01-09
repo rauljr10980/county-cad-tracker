@@ -1366,9 +1366,16 @@ export function PreForeclosureView() {
             setRouteMapOpen(false);
             setOptimizedRoutes(null);
           }}
-        />
-      )}
-    </div>
-  );
-}
+          />
+        )}
+
+      {/* Area Selector Map */}
+      <AreaSelectorMap
+        isOpen={areaSelectorOpen}
+        onClose={() => setAreaSelectorOpen(false)}
+        onAreaSelected={handleAreaSelected}
+      />
+      </div>
+    );
+  }
 
