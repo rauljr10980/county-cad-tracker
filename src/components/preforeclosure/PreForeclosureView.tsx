@@ -883,6 +883,272 @@ export function PreForeclosureView() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* View Details Modal */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Pre-Foreclosure Details
+            </DialogTitle>
+            <DialogDescription>
+              Document #{viewRecord?.document_number}
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewRecord && (
+            <div className="space-y-6">
+              {/* Actions Panel */}
+              <div className="bg-secondary/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm font-medium">Actions</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="flex-1 bg-primary text-primary-foreground"
+                    disabled
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    disabled
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Property Information */}
+              <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                  Property Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Document Number</Label>
+                    <p className="font-mono text-sm">{viewRecord.document_number}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Type</Label>
+                    <Badge 
+                      variant="outline" 
+                      className={getTypeColor(viewRecord.type)}
+                    >
+                      {viewRecord.type}
+                    </Badge>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> Address
+                    </Label>
+                    <p className="text-sm">{viewRecord.address}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {viewRecord.city}, TX {viewRecord.zip}
+                    </p>
+                  </div>
+                  {viewRecord.latitude && viewRecord.longitude && (
+                    <>
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Latitude</Label>
+                        <p className="font-mono text-sm">{viewRecord.latitude.toFixed(6)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Longitude</Label>
+                        <p className="font-mono text-sm">{viewRecord.longitude.toFixed(6)}</p>
+                      </div>
+                    </>
+                  )}
+                  {viewRecord.school_district && (
+                    <div className="col-span-2">
+                      <Label className="text-muted-foreground text-xs">School District</Label>
+                      <p className="text-sm">{viewRecord.school_district}</p>
+                    </div>
+                  )}
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Filing Month</Label>
+                    <p className="text-sm">{viewRecord.filing_month}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">County</Label>
+                    <p className="text-sm">{viewRecord.county}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions & Tasks Section */}
+              <div className="bg-secondary/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Actions & Tasks</span>
+                </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Action Type</label>
+                      <Select value={actionType} onValueChange={(value) => setActionType(value as any)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select action type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="call">📞 Call</SelectItem>
+                          <SelectItem value="text">💬 Text</SelectItem>
+                          <SelectItem value="mail">✉️ Mail</SelectItem>
+                          <SelectItem value="driveby">🚗 Drive-by</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Priority</label>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={priority === 'high' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPriority('high')}
+                          className="flex-1"
+                        >
+                          High
+                        </Button>
+                        <Button
+                          variant={priority === 'med' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPriority('med')}
+                          className="flex-1"
+                        >
+                          Med
+                        </Button>
+                        <Button
+                          variant={priority === 'low' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPriority('low')}
+                          className="flex-1"
+                        >
+                          Low
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Due Date & Time</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !dueDateTime && "text-muted-foreground"
+                            )}
+                          >
+                            <Calendar className="mr-2 h-4 w-4" />
+                            {dueDateTime ? format(dueDateTime, 'PPP p') : <span>Pick a date & time</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={dueDateTime}
+                            onSelect={setDueDateTime}
+                            initialFocus
+                          />
+                          <div className="p-3 border-t">
+                            <Input
+                              type="time"
+                              value={dueDateTime ? format(dueDateTime, 'HH:mm') : ''}
+                              onChange={(e) => {
+                                if (dueDateTime && e.target.value) {
+                                  const [hours, minutes] = e.target.value.split(':');
+                                  const newDate = new Date(dueDateTime);
+                                  newDate.setHours(parseInt(hours), parseInt(minutes));
+                                  setDueDateTime(newDate);
+                                }
+                              }}
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Assigned To</label>
+                      <Select value={assignedTo} onValueChange={(value) => setAssignedTo(value as any)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select assignee" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Luciano">Luciano</SelectItem>
+                          <SelectItem value="Raul">Raul</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      onClick={handleSaveAction}
+                      disabled={savingAction || !actionType || !dueDateTime}
+                    >
+                      {savingAction ? 'Scheduling...' : 'Schedule Action'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Status */}
+              {viewRecord.actionType && (
+                <div className="bg-secondary/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Current Task</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Action:</span>
+                      <div className="font-medium capitalize">{viewRecord.actionType}</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Priority:</span>
+                      <div className="font-medium capitalize">{viewRecord.priority}</div>
+                    </div>
+                    {viewRecord.dueTime && (
+                      <div>
+                        <span className="text-muted-foreground">Due:</span>
+                        <div className="font-medium">{format(new Date(viewRecord.dueTime), 'MMM d, yyyy h:mm a')}</div>
+                      </div>
+                    )}
+                    {viewRecord.assignedTo && (
+                      <div>
+                        <span className="text-muted-foreground">Assigned To:</span>
+                        <div className="font-medium">{viewRecord.assignedTo}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button variant="outline" onClick={() => setViewOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
