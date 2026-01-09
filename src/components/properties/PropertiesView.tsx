@@ -8,6 +8,7 @@ import { useProperties } from '@/hooks/useFiles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 import { FileDropZone } from '@/components/upload/FileDropZone';
 import {
   DropdownMenu,
