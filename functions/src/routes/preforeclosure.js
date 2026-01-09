@@ -45,10 +45,17 @@ router.get('/', optionalAuth, async (req, res) => {
       zip: record.zip,
       filing_month: record.filingMonth,
       county: record.county,
+      latitude: record.latitude,
+      longitude: record.longitude,
+      school_district: record.schoolDistrict,
       internal_status: record.internalStatus,
       notes: record.notes,
       last_action_date: record.lastActionDate,
       next_follow_up_date: record.nextFollowUpDate,
+      actionType: record.actionType ? record.actionType.toLowerCase() : undefined,
+      priority: record.priority ? record.priority.toLowerCase() : undefined,
+      dueTime: record.dueTime ? record.dueTime.toISOString() : undefined,
+      assignedTo: record.assignedTo,
       inactive: record.inactive,
       first_seen_month: record.firstSeenMonth,
       last_seen_month: record.lastSeenMonth,
@@ -204,6 +211,27 @@ router.post('/upload', optionalAuth, async (req, res) => {
           continue;
         }
 
+        // Parse latitude and longitude (optional)
+        let latitude = row['Lat'] || row['lat'] || row['Latitude'] || row['latitude'] || row['LAT'];
+        let longitude = row['Long'] || row['long'] || row['Longitude'] || row['longitude'] || row['LONG'];
+        if (!latitude) {
+          const latKey = rowKeys.find(key => key.toLowerCase() === 'lat' || key.toLowerCase() === 'latitude');
+          latitude = latKey ? row[latKey] : null;
+        }
+        if (!longitude) {
+          const longKey = rowKeys.find(key => key.toLowerCase() === 'long' || key.toLowerCase() === 'longitude');
+          longitude = longKey ? row[longKey] : null;
+        }
+
+        // Parse school district (optional)
+        let schoolDistrict = row['School District'] || row['school district'] || row['SchoolDistrict'] || row['school_district'];
+        if (!schoolDistrict) {
+          const schoolKey = rowKeys.find(key => 
+            key.toLowerCase().includes('school') && key.toLowerCase().includes('district')
+          );
+          schoolDistrict = schoolKey ? row[schoolKey] : null;
+        }
+
         processedRecords.push({
           documentNumber: String(documentNumber).trim(),
           type: type,
@@ -212,6 +240,9 @@ router.post('/upload', optionalAuth, async (req, res) => {
           zip: String(zip).trim(),
           filingMonth: String(filingMonth).trim(),
           county: String(county).trim(),
+          latitude: latitude ? parseFloat(String(latitude).trim()) : null,
+          longitude: longitude ? parseFloat(String(longitude).trim()) : null,
+          schoolDistrict: schoolDistrict ? String(schoolDistrict).trim() : null,
         });
       } catch (rowError) {
         errors.push(`Row ${i + 2}: ${rowError.message}`);
@@ -259,39 +290,45 @@ router.post('/upload', optionalAuth, async (req, res) => {
         });
 
         if (existing) {
-          // Update existing record
-          await prisma.preForeclosure.update({
-            where: { documentNumber: record.documentNumber },
-            data: {
-              type: record.type,
-              address: record.address,
-              city: record.city,
-              zip: record.zip,
-              filingMonth: record.filingMonth,
-              county: record.county,
-              inactive: false,
-              lastSeenMonth: currentMonth,
-              updatedAt: new Date()
-            }
-          });
+        // Update existing record
+        await prisma.preForeclosure.update({
+          where: { documentNumber: record.documentNumber },
+          data: {
+            type: record.type,
+            address: record.address,
+            city: record.city,
+            zip: record.zip,
+            filingMonth: record.filingMonth,
+            county: record.county,
+            latitude: record.latitude,
+            longitude: record.longitude,
+            schoolDistrict: record.schoolDistrict,
+            inactive: false,
+            lastSeenMonth: currentMonth,
+            updatedAt: new Date()
+          }
+        });
           updated++;
         } else {
-          // Create new record
-          await prisma.preForeclosure.create({
-            data: {
-              documentNumber: record.documentNumber,
-              type: record.type,
-              address: record.address,
-              city: record.city,
-              zip: record.zip,
-              filingMonth: record.filingMonth,
-              county: record.county,
-              internalStatus: 'New',
-              inactive: false,
-              firstSeenMonth: currentMonth,
-              lastSeenMonth: currentMonth
-            }
-          });
+        // Create new record
+        await prisma.preForeclosure.create({
+          data: {
+            documentNumber: record.documentNumber,
+            type: record.type,
+            address: record.address,
+            city: record.city,
+            zip: record.zip,
+            filingMonth: record.filingMonth,
+            county: record.county,
+            latitude: record.latitude,
+            longitude: record.longitude,
+            schoolDistrict: record.schoolDistrict,
+            internalStatus: 'New',
+            inactive: false,
+            firstSeenMonth: currentMonth,
+            lastSeenMonth: currentMonth
+          }
+        });
           created++;
         }
       } catch (dbError) {

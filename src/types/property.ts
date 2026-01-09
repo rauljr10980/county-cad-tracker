@@ -173,12 +173,21 @@ export interface PreForeclosureRecord {
   zip: string;
   filing_month: string; // e.g., "January 2026"
   county: string; // e.g., "Bexar"
+  latitude?: number;
+  longitude?: number;
+  school_district?: string;
   
   // Operator-Entered (manual only)
   internal_status: PreForeclosureStatus;
   notes?: string;
   last_action_date?: string; // ISO date string
   next_follow_up_date?: string; // ISO date string
+  
+  // Task/Action fields
+  actionType?: 'call' | 'text' | 'mail' | 'driveby';
+  priority?: 'high' | 'med' | 'low';
+  dueTime?: string; // ISO datetime string
+  assignedTo?: 'Luciano' | 'Raul';
   
   // System-tracked (not user-editable)
   inactive: boolean; // true if record missing from latest upload

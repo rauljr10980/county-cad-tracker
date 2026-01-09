@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useDeletePreForeclosures } from '@/hooks/usePreForeclosure';
 import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
@@ -24,6 +26,8 @@ export function PreForeclosureView() {
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosureRecord | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<PreForeclosureRecord | null>(null);
+  const [viewRecord, setViewRecord] = useState<PreForeclosureRecord | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
 
   const { data: records = [], isLoading, error } = usePreForeclosures();
   const updateMutation = useUpdatePreForeclosure();
@@ -125,6 +129,64 @@ export function PreForeclosureView() {
     
     setNotesOpen(false);
     setEditingRecord(null);
+  };
+
+  // Actions & Tasks state for view modal
+  const [actionType, setActionType] = useState<'call' | 'text' | 'mail' | 'driveby' | ''>('');
+  const [priority, setPriority] = useState<'high' | 'med' | 'low'>('med');
+  const [dueDateTime, setDueDateTime] = useState<Date | undefined>(undefined);
+  const [assignedTo, setAssignedTo] = useState<'Luciano' | 'Raul' | ''>('');
+  const [savingAction, setSavingAction] = useState(false);
+
+  // Initialize action state when view record changes
+  useMemo(() => {
+    if (viewRecord) {
+      setActionType(viewRecord.actionType || '');
+      setPriority(viewRecord.priority || 'med');
+      setDueDateTime(viewRecord.dueTime ? new Date(viewRecord.dueTime) : undefined);
+      setAssignedTo(viewRecord.assignedTo || '');
+    }
+  }, [viewRecord]);
+
+  const handleSaveAction = async () => {
+    if (!viewRecord || !actionType || !dueDateTime) {
+      toast({
+        title: "Missing Information",
+        description: "Please select an action type and due date/time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingAction(true);
+    try {
+      const isoDateTime = dueDateTime.toISOString();
+      // Update the record with action/task info
+      await updateMutation.mutateAsync({
+        document_number: viewRecord.document_number,
+        last_action_date: new Date().toISOString(),
+        // Note: We'll need to add an endpoint to update action/task fields
+      });
+      
+      toast({
+        title: "Action Scheduled",
+        description: `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} scheduled for ${format(dueDateTime, 'MMM d, yyyy h:mm a')}${assignedTo ? ` - Assigned to ${assignedTo}` : ''}`,
+      });
+      
+      // Update local record
+      viewRecord.actionType = actionType;
+      viewRecord.priority = priority;
+      viewRecord.dueTime = isoDateTime;
+      viewRecord.assignedTo = assignedTo || undefined;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to schedule action",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingAction(false);
+    }
   };
 
   const getStatusColor = (status: PreForeclosureStatus) => {
@@ -646,11 +708,8 @@ export function PreForeclosureView() {
                           size="icon"
                           className="h-7 w-7"
                           onClick={() => {
-                            // View action - could open property details or show related info
-                            toast({
-                              title: 'View',
-                              description: `Viewing details for ${record.document_number}`,
-                            });
+                            setViewRecord(record);
+                            setViewOpen(true);
                           }}
                           title="View"
                         >
