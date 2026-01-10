@@ -752,6 +752,24 @@ export function PropertiesView() {
     });
   };
 
+  // Point-in-polygon algorithm (ray casting)
+  const isPointInPolygon = (point: { lat: number; lng: number }, polygon: { lat: number; lng: number }[]) => {
+    if (polygon.length < 3) return false;
+    
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].lng;
+      const yi = polygon[i].lat;
+      const xj = polygon[j].lng;
+      const yj = polygon[j].lat;
+      
+      const intersect = ((yi > point.lat) !== (yj > point.lat)) &&
+        (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  };
+
   const handleAreaSelected = async (bounds: {
     north: number;
     south: number;
@@ -759,12 +777,27 @@ export function PropertiesView() {
     west: number;
     center?: { lat: number; lng: number };
     radius?: number;
+    polygon?: { lat: number; lng: number }[];
   }) => {
     // Filter properties within the selected area
     const propertiesInArea = rawProperties.filter(p => {
       if (!p.latitude || !p.longitude) return false;
       
-      // Check if property is within bounds
+      // If polygon is provided, use point-in-polygon check
+      if (bounds.polygon && bounds.polygon.length >= 3) {
+        return isPointInPolygon({ lat: p.latitude, lng: p.longitude }, bounds.polygon);
+      }
+      
+      // For circle with radius, check distance from center
+      if (bounds.center && bounds.radius) {
+        const distance = Math.sqrt(
+          Math.pow(p.latitude - bounds.center.lat, 2) + 
+          Math.pow(p.longitude - bounds.center.lng, 2)
+        ) * 111; // Convert degrees to km
+        return distance <= bounds.radius;
+      }
+      
+      // Check if property is within rectangular bounds
       return p.latitude >= bounds.south &&
              p.latitude <= bounds.north &&
              p.longitude >= bounds.west &&
