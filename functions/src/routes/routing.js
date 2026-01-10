@@ -474,32 +474,29 @@ router.post('/solve', async (req, res) => {
       accountNumber: depotProperty.accountNumber // Keep account number for reference
     };
 
-    // Build locations array: [depot, ...other properties]
-    // Exclude the depot property from the list of properties to visit
-    // Match by both id and accountNumber to ensure we exclude the correct property
-    const otherProperties = validProperties.filter(p => 
-      p.id !== depotProperty.id && 
-      p.accountNumber !== depotProperty.accountNumber
-    );
+    // Build locations array: [depot, ...all properties including depot if selected]
+    // The depot property can be BOTH the starting point AND a visitable stop
+    // This allows routes even when the starting point is the only property selected
+    const otherProperties = validProperties; // Include ALL properties, including depot if it's in the selection
     
     console.log('[ROUTING] Depot setup:', {
       depotAddress: depot.address,
       depotId: depotProperty.id,
       depotAccountNumber: depotProperty.accountNumber,
       totalProperties: validProperties.length,
-      otherPropertiesCount: otherProperties.length,
-      depotExcluded: !otherProperties.find(p => p.id === depotProperty.id)
+      propertiesToVisit: otherProperties.length,
+      depotIncludedAsStop: otherProperties.some(p => p.id === depotProperty.id)
     });
     
     // Validate that we have properties to visit
     if (otherProperties.length === 0) {
-      console.error('[ROUTING] No properties to visit after excluding depot:', {
+      console.error('[ROUTING] No properties to visit:', {
         totalProperties: validProperties.length,
         depotId: depotProperty.id,
         depotAccountNumber: depotProperty.accountNumber
       });
       return res.status(400).json({ 
-        error: 'No properties to visit. The starting point property is the only selected property, or all other properties are already in routes.',
+        error: 'No properties to visit. Please select at least one property.',
         depotProperty: {
           id: depotProperty.id,
           address: depot.address,
