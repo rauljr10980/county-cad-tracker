@@ -442,8 +442,8 @@ router.post('/solve', async (req, res) => {
 
     // Find depot: if custom depot coordinates provided, find closest property
     // OR if a specific depot property ID is provided, use that
+    // Note: depotPropertyId was already destructured from req.body on line 399
     let depotProperty;
-    const { depotPropertyId } = req.body; // Optional: specific property ID to use as depot
     
     if (depotPropertyId) {
       // Use the specified property as depot
