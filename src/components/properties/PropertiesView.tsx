@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown, Route } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown, Route, MapPin } from 'lucide-react';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { AdvancedFiltersPanel, AdvancedFilters } from './AdvancedFilters';
@@ -13,6 +13,7 @@ import { toast } from '@/hooks/use-toast';
 import { solveVRP } from '@/lib/api';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
+import { StartingPointSelector } from '@/components/routing/StartingPointSelector';
 import { FileDropZone } from '@/components/upload/FileDropZone';
 import {
   DropdownMenu,
@@ -33,6 +34,8 @@ export function PropertiesView() {
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
   const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
+  const [startingPointSelectorOpen, setStartingPointSelectorOpen] = useState(false);
+  const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({
     statuses: [],
     amountDueMin: undefined,
@@ -831,7 +834,17 @@ export function PropertiesView() {
     });
   };
 
-  const handleCreateRoute = async () => {
+  const handleStartingPointSelected = (property: Property, pinLocation: { lat: number; lng: number }) => {
+    setCustomDepot(pinLocation);
+    toast({
+      title: "Starting Point Selected",
+      description: `Starting point set. Route will begin from the closest property: ${property.propertyAddress}`,
+    });
+    // Automatically optimize route after selecting starting point
+    handleCreateRouteWithDepot(property, pinLocation);
+  };
+
+  const handleCreateRouteWithDepot = async (depotProperty?: Property, depotLocation?: { lat: number; lng: number }) => {
     // Get selected properties with valid coordinates
     const selectedProperties = rawProperties.filter(p => 
       selectedPropertyIds.has(p.id) && 
@@ -842,7 +855,7 @@ export function PropertiesView() {
     if (selectedProperties.length === 0) {
       toast({
         title: "No valid locations",
-        description: "Please select properties with latitude and longitude coordinates",
+        description: "Please select properties with latitude and longitude coordinates, or use the area selector.",
         variant: "destructive",
       });
       return;
@@ -860,8 +873,12 @@ export function PropertiesView() {
     setIsOptimizingRoute(true);
 
     try {
+      // Use custom depot if provided, otherwise use default (first property)
+      const depotLat = depotLocation?.lat || customDepot?.lat;
+      const depotLon = depotLocation?.lng || customDepot?.lng;
+
       // Solve VRP using the backend solver
-      const solution = await solveVRP(selectedProperties, numVehicles);
+      const solution = await solveVRP(selectedProperties, numVehicles, depotLat, depotLon);
 
       if (!solution.success || !solution.routes || solution.routes.length === 0) {
         throw new Error('No routes generated');
@@ -885,6 +902,11 @@ export function PropertiesView() {
     } finally {
       setIsOptimizingRoute(false);
     }
+  };
+
+  const handleCreateRoute = async () => {
+    // If no custom depot is set, just proceed with optimization
+    await handleCreateRouteWithDepot();
   };
 
   return (
@@ -923,6 +945,31 @@ export function PropertiesView() {
               >
                 Select Area
               </Button>
+              <Button
+                onClick={() => setStartingPointSelectorOpen(true)}
+                variant="outline"
+                size="sm"
+                title="Drop a pin to set starting point"
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                Set Starting Point
+              </Button>
+              {customDepot && (
+                <Button
+                  onClick={() => {
+                    setCustomDepot(null);
+                    toast({
+                      title: "Starting Point Cleared",
+                      description: "Starting point has been cleared. Route will use default starting point.",
+                    });
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  title="Clear custom starting point"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 onClick={handleCreateRoute}
                 className="bg-primary text-primary-foreground"
@@ -1152,6 +1199,14 @@ export function PropertiesView() {
         isOpen={areaSelectorOpen}
         onClose={() => setAreaSelectorOpen(false)}
         onAreaSelected={handleAreaSelected}
+      />
+
+      {/* Starting Point Selector */}
+      <StartingPointSelector
+        isOpen={startingPointSelectorOpen}
+        onClose={() => setStartingPointSelectorOpen(false)}
+        onStartingPointSelected={handleStartingPointSelected}
+        properties={rawProperties.filter(p => p.latitude != null && p.longitude != null)}
       />
     </div>
   );

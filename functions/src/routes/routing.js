@@ -422,18 +422,41 @@ router.post('/solve', async (req, res) => {
       return res.status(400).json({ error: 'No properties with valid coordinates' });
     }
 
-    // Use first property as depot if not specified
+    // Find depot: if custom depot coordinates provided, find closest property
+    let depotProperty;
+    if (depotLat != null && depotLon != null) {
+      // Find the closest property to the custom depot location
+      let minDistance = Infinity;
+      for (const prop of validProperties) {
+        const dist = haversineDistance(depotLat, depotLon, prop.latitude, prop.longitude);
+        if (dist < minDistance) {
+          minDistance = dist;
+          depotProperty = prop;
+        }
+      }
+    } else {
+      // Use first property as default depot
+      depotProperty = validProperties[0];
+    }
+
+    if (!depotProperty) {
+      return res.status(400).json({ error: 'Could not determine depot location' });
+    }
+
     const depot = {
-      lat: depotLat || validProperties[0].latitude,
-      lon: depotLon || validProperties[0].longitude,
+      lat: depotProperty.latitude,
+      lon: depotProperty.longitude,
       id: 'depot',
-      address: 'Depot'
+      address: depotProperty.propertyAddress || depotProperty.address || 'Depot'
     };
 
-    // Build locations array: [depot, ...properties]
+    // Build locations array: [depot, ...other properties]
+    // Exclude the depot property from the list of properties to visit
+    const otherProperties = validProperties.filter(p => p.id !== depotProperty.id);
+    
     const locations = [
       depot,
-      ...validProperties.map(p => ({
+      ...otherProperties.map(p => ({
         lat: p.latitude,
         lon: p.longitude,
         id: p.id,

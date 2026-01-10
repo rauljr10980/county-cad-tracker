@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,6 +18,7 @@ import { toast } from '@/hooks/use-toast';
 import { solveVRP } from '@/lib/api';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
+import { StartingPointSelector } from '@/components/routing/StartingPointSelector';
 
 export function PreForeclosureView() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +48,8 @@ export function PreForeclosureView() {
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
   const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
+  const [startingPointSelectorOpen, setStartingPointSelectorOpen] = useState(false);
+  const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -249,7 +252,21 @@ export function PreForeclosureView() {
     });
   };
 
-  const handleCreateRoute = async () => {
+  const handleStartingPointSelected = (record: PreForeclosureRecord, pinLocation: { lat: number; lng: number }) => {
+    setCustomDepot(pinLocation);
+    // Ensure the closest record is selected
+    if (!selectedRecordIds.has(record.document_number)) {
+      setSelectedRecordIds(new Set([...selectedRecordIds, record.document_number]));
+    }
+    toast({
+      title: "Starting Point Selected",
+      description: `Starting point set. Route will begin from the closest record: ${record.address}`,
+    });
+    // Automatically optimize route after selecting starting point
+    handleCreateRouteWithDepot(record, pinLocation);
+  };
+
+  const handleCreateRouteWithDepot = async (depotRecord?: PreForeclosureRecord, depotLocation?: { lat: number; lng: number }) => {
     // Get selected records with valid coordinates
     const selectedRecords = filteredRecords.filter(r => 
       selectedRecordIds.has(r.document_number) && 
@@ -260,7 +277,7 @@ export function PreForeclosureView() {
     if (selectedRecords.length === 0) {
       toast({
         title: "No valid locations",
-        description: "Please select records with latitude and longitude coordinates",
+        description: "Please select records with latitude and longitude coordinates, or use the area selector.",
         variant: "destructive",
       });
       return;
@@ -278,6 +295,10 @@ export function PreForeclosureView() {
     setIsOptimizingRoute(true);
 
     try {
+      // Use custom depot if provided, otherwise use default (first record)
+      const depotLat = depotLocation?.lat || customDepot?.lat;
+      const depotLon = depotLocation?.lng || customDepot?.lng;
+
       // Convert pre-foreclosure records to property format for VRP solver
       const properties = selectedRecords.map(r => ({
         id: r.document_number,
@@ -288,7 +309,7 @@ export function PreForeclosureView() {
       }));
 
       // Solve VRP using the backend solver
-      const solution = await solveVRP(properties, numVehicles);
+      const solution = await solveVRP(properties, numVehicles, depotLat, depotLon);
 
       if (!solution.success || !solution.routes || solution.routes.length === 0) {
         throw new Error('No routes generated');
@@ -312,6 +333,11 @@ export function PreForeclosureView() {
     } finally {
       setIsOptimizingRoute(false);
     }
+  };
+
+  const handleCreateRoute = async () => {
+    // If no custom depot is set, just proceed with optimization
+    await handleCreateRouteWithDepot();
   };
 
   const handleSaveAction = async () => {
@@ -468,6 +494,31 @@ export function PreForeclosureView() {
             >
               Select Area
             </Button>
+            <Button
+              onClick={() => setStartingPointSelectorOpen(true)}
+              variant="outline"
+              size="sm"
+              title="Drop a pin to set starting point"
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              Set Starting Point
+            </Button>
+            {customDepot && (
+              <Button
+                onClick={() => {
+                  setCustomDepot(null);
+                  toast({
+                    title: "Starting Point Cleared",
+                    description: "Starting point has been cleared. Route will use default starting point.",
+                  });
+                }}
+                variant="ghost"
+                size="sm"
+                title="Clear custom starting point"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               onClick={handleCreateRoute}
               className="bg-primary text-primary-foreground"
@@ -1453,6 +1504,28 @@ export function PreForeclosureView() {
         isOpen={areaSelectorOpen}
         onClose={() => setAreaSelectorOpen(false)}
         onAreaSelected={handleAreaSelected}
+      />
+
+      {/* Starting Point Selector */}
+      <StartingPointSelector
+        isOpen={startingPointSelectorOpen}
+        onClose={() => setStartingPointSelectorOpen(false)}
+        onStartingPointSelected={(property, pinLocation) => {
+          // Find the record that matches the property (it should have document_number as id)
+          const record = filteredRecords.find(r => r.document_number === property.id);
+          if (record) {
+            handleStartingPointSelected(record, pinLocation);
+          }
+        }}
+        properties={filteredRecords.filter(r => r.latitude != null && r.longitude != null).map(r => ({
+          id: r.document_number,
+          latitude: r.latitude!,
+          longitude: r.longitude!,
+          propertyAddress: r.address || '',
+          address: r.address || '',
+          ownerName: r.property_owner || '',
+          accountNumber: r.document_number
+        }))}
       />
       </div>
     );
