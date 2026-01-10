@@ -843,10 +843,9 @@ export function PropertiesView() {
     }
     toast({
       title: "Starting Point Selected",
-      description: `Starting point set. Route will begin from the closest property: ${property.propertyAddress}`,
+      description: `Starting point set. Route will begin from the closest property: ${property.propertyAddress}. You can now draw an area or select properties, then click "Optimize Route".`,
     });
-    // Automatically optimize route after selecting starting point
-    handleCreateRouteWithDepot(property, pinLocation);
+    // Don't automatically optimize route - let user draw area first, then optimize manually
   };
 
   const handleCreateRouteWithDepot = async (depotProperty?: Property, depotLocation?: { lat: number; lng: number }) => {

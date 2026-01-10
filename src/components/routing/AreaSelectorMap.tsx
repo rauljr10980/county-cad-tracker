@@ -348,12 +348,12 @@ export function AreaSelectorMap({
 
   const handleConfirmStartingPoint = () => {
     if (!closestProperty || !pinLocation || !onStartingPointSelected) return;
+    
     onStartingPointSelected(closestProperty, { lat: pinLocation.lat, lng: pinLocation.lng });
     // Reset drawing mode to allow user to continue drawing shapes
     // Keep pin location and closest property visible for reference
     setDrawingMode(null);
-    // Ensure map interactions are restored
-    // The map interactions will be restored when drawingMode becomes null
+    // Map interactions will be restored automatically when drawingMode becomes null
   };
 
   if (!isOpen) return null;

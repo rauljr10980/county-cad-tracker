@@ -261,10 +261,9 @@ export function PreForeclosureView() {
     }
     toast({
       title: "Starting Point Selected",
-      description: `Starting point set. Route will begin from the closest record: ${record.address}`,
+      description: `Starting point set. Route will begin from the closest record: ${record.address}. You can now draw an area or select records, then click "Optimize Route".`,
     });
-    // Automatically optimize route after selecting starting point
-    handleCreateRouteWithDepot(record, pinLocation);
+    // Don't automatically optimize route - let user draw area first, then optimize manually
   };
 
   const handleCreateRouteWithDepot = async (depotRecord?: PreForeclosureRecord, depotLocation?: { lat: number; lng: number }) => {
