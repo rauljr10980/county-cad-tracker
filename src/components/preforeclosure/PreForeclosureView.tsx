@@ -271,18 +271,43 @@ export function PreForeclosureView() {
   const handleCreateRouteWithDepot = async (depotRecord?: PreForeclosureRecord, depotLocation?: { lat: number; lng: number }) => {
     // Get selected records with valid coordinates
     // Filter out records that are already in existing routes
-    const availableRecords = filteredRecords.filter(r => 
+    let availableRecords = filteredRecords.filter(r => 
       selectedRecordIds.has(r.document_number) && 
       r.latitude != null && 
       r.longitude != null &&
       !recordsInRoutes.has(r.document_number) // Exclude records already in routes
     );
 
+    // Use custom depot if provided, otherwise use default (first record)
+    const depotLat = depotLocation?.lat || customDepot?.lat;
+    const depotLon = depotLocation?.lng || customDepot?.lng;
+    const depotPropertyId = depotRecord?.document_number || customDepotRecordId; // Use the specific record ID
+
+    // IMPORTANT: If a custom depot record is specified, ensure it's included in the route
+    // even if it's not in the selected area (it will be the starting point)
+    if (depotPropertyId) {
+      const depotRec = filteredRecords.find(r => r.document_number === depotPropertyId) ||
+                       records.find(r => r.document_number === depotPropertyId); // Also check all records
+      if (depotRec && depotRec.latitude != null && depotRec.longitude != null) {
+        // Check if depot record is already in available records
+        const depotInList = availableRecords.find(r => r.document_number === depotPropertyId);
+        if (!depotInList) {
+          // Add depot record to the list (it will be the starting point)
+          availableRecords = [depotRec, ...availableRecords];
+          // Also add it to selectedRecordIds if not already there
+          if (!selectedRecordIds.has(depotPropertyId)) {
+            setSelectedRecordIds(new Set([...selectedRecordIds, depotPropertyId]));
+          }
+        }
+      }
+    }
+
     // Check if any selected records are already in routes
     const duplicateCount = Array.from(selectedRecordIds).filter(id => 
       recordsInRoutes.has(id) && 
       filteredRecords.find(r => r.document_number === id)?.latitude != null &&
-      filteredRecords.find(r => r.document_number === id)?.longitude != null
+      filteredRecords.find(r => r.document_number === id)?.longitude != null &&
+      id !== depotPropertyId // Don't count depot record as duplicate if it's already in routes
     ).length;
 
     if (duplicateCount > 0) {
@@ -318,11 +343,6 @@ export function PreForeclosureView() {
     setIsOptimizingRoute(true);
 
     try {
-      // Use custom depot if provided, otherwise use default (first record)
-      const depotLat = depotLocation?.lat || customDepot?.lat;
-      const depotLon = depotLocation?.lng || customDepot?.lng;
-      const depotPropertyId = depotRecord?.document_number || customDepotRecordId; // Use the specific record ID
-
       // Convert pre-foreclosure records to property format for VRP solver
       const properties = selectedRecords.map(r => ({
         id: r.document_number,

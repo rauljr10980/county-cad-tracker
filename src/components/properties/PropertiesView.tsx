@@ -853,18 +853,42 @@ export function PropertiesView() {
   const handleCreateRouteWithDepot = async (depotProperty?: Property, depotLocation?: { lat: number; lng: number }) => {
     // Get selected properties with valid coordinates
     // Filter out properties that are already in existing routes
-    const availableProperties = rawProperties.filter(p => 
+    let availableProperties = rawProperties.filter(p => 
       selectedPropertyIds.has(p.id) && 
       p.latitude != null && 
       p.longitude != null &&
       !propertiesInRoutes.has(p.id) // Exclude properties already in routes
     );
 
+    // Use custom depot if provided, otherwise use default (first property)
+    const depotLat = depotLocation?.lat || customDepot?.lat;
+    const depotLon = depotLocation?.lng || customDepot?.lng;
+    const depotPropertyId = depotProperty?.id || customDepotPropertyId; // Use the specific property ID
+
+    // IMPORTANT: If a custom depot property is specified, ensure it's included in the route
+    // even if it's not in the selected area (it will be the starting point)
+    if (depotPropertyId) {
+      const depotProp = rawProperties.find(p => p.id === depotPropertyId);
+      if (depotProp && depotProp.latitude != null && depotProp.longitude != null) {
+        // Check if depot property is already in available properties
+        const depotInList = availableProperties.find(p => p.id === depotPropertyId);
+        if (!depotInList) {
+          // Add depot property to the list (it will be the starting point)
+          availableProperties = [depotProp, ...availableProperties];
+          // Also add it to selectedPropertyIds if not already there
+          if (!selectedPropertyIds.has(depotPropertyId)) {
+            setSelectedPropertyIds(new Set([...selectedPropertyIds, depotPropertyId]));
+          }
+        }
+      }
+    }
+
     // Check if any selected properties are already in routes
     const duplicateCount = Array.from(selectedPropertyIds).filter(id => 
       propertiesInRoutes.has(id) && 
       rawProperties.find(p => p.id === id)?.latitude != null &&
-      rawProperties.find(p => p.id === id)?.longitude != null
+      rawProperties.find(p => p.id === id)?.longitude != null &&
+      id !== depotPropertyId // Don't count depot property as duplicate if it's already in routes
     ).length;
 
     if (duplicateCount > 0) {
@@ -900,11 +924,6 @@ export function PropertiesView() {
     setIsOptimizingRoute(true);
 
     try {
-      // Use custom depot if provided, otherwise use default (first property)
-      const depotLat = depotLocation?.lat || customDepot?.lat;
-      const depotLon = depotLocation?.lng || customDepot?.lng;
-      const depotPropertyId = depotProperty?.id || customDepotPropertyId; // Use the specific property ID
-
       // Solve VRP using the backend solver
       const solution = await solveVRP(selectedProperties, numVehicles, depotLat, depotLon, depotPropertyId);
 
