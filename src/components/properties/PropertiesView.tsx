@@ -13,7 +13,6 @@ import { toast } from '@/hooks/use-toast';
 import { solveVRP } from '@/lib/api';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
-import { StartingPointSelector } from '@/components/routing/StartingPointSelector';
 import { FileDropZone } from '@/components/upload/FileDropZone';
 import {
   DropdownMenu,
@@ -34,7 +33,6 @@ export function PropertiesView() {
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
   const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
-  const [startingPointSelectorOpen, setStartingPointSelectorOpen] = useState(false);
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotPropertyId, setCustomDepotPropertyId] = useState<string | null>(null);
   const [propertiesInRoutes, setPropertiesInRoutes] = useState<Set<string>>(new Set());
@@ -1058,15 +1056,6 @@ export function PropertiesView() {
               >
                 Select Area
               </Button>
-              <Button
-                onClick={() => setStartingPointSelectorOpen(true)}
-                variant="outline"
-                size="sm"
-                title="Drop a pin to set starting point"
-              >
-                <MapPin className="h-4 w-4 mr-2" />
-                Set Starting Point
-              </Button>
               {customDepot && (
                 <Button
                   onClick={() => {
@@ -1312,17 +1301,36 @@ export function PropertiesView() {
       <AreaSelectorMap
         isOpen={areaSelectorOpen}
         onClose={() => setAreaSelectorOpen(false)}
-        onAreaSelected={handleAreaSelected}
-        onStartingPointSelected={handleStartingPointSelected}
-        properties={rawProperties.filter(p => p.latitude != null && p.longitude != null)}
-      />
+        onOptimize={async ({ startingPoint, area, selectedProperties }) => {
+          // Find the property that matches the starting point
+          const depotProperty = rawProperties.find(p => p.id === startingPoint.property.id);
+          
+          if (!depotProperty) {
+            toast({
+              title: "Error",
+              description: "Starting point property not found.",
+              variant: "destructive",
+            });
+            return;
+          }
 
-      {/* Starting Point Selector */}
-      <StartingPointSelector
-        isOpen={startingPointSelectorOpen}
-        onClose={() => setStartingPointSelectorOpen(false)}
-        onStartingPointSelected={handleStartingPointSelected}
-        properties={rawProperties.filter(p => p.latitude != null && p.longitude != null)}
+          // Auto-select all selected properties
+          const propertyIds = new Set(selectedProperties.map(p => p.id));
+          setSelectedPropertyIds(propertyIds);
+          
+          // Create route with depot
+          await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation);
+        }}
+        properties={rawProperties.filter(p => p.latitude != null && p.longitude != null).map(p => ({
+          id: p.id,
+          latitude: p.latitude!,
+          longitude: p.longitude!,
+          propertyAddress: p.propertyAddress || '',
+          address: p.propertyAddress || '',
+          ownerName: p.ownerName || '',
+          accountNumber: p.accountNumber || ''
+        }))}
+        numVehicles={numVehicles}
       />
     </div>
   );

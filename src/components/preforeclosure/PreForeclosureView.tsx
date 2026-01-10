@@ -1591,17 +1591,30 @@ export function PreForeclosureView() {
           />
         )}
 
-      {/* Area Selector Map */}
+      {/* Area Selector Map - Wizard Version */}
       <AreaSelectorMap
         isOpen={areaSelectorOpen}
         onClose={() => setAreaSelectorOpen(false)}
-        onAreaSelected={handleAreaSelected}
-        onStartingPointSelected={(property, pinLocation) => {
-          // Find the record that matches the property (it should have document_number as id)
-          const record = filteredRecords.find(r => r.document_number === property.id);
-          if (record) {
-            handleStartingPointSelected(record, pinLocation);
+        onOptimize={async ({ startingPoint, area, selectedProperties }) => {
+          // Find the record that matches the starting point property
+          const depotRecord = filteredRecords.find(r => r.document_number === startingPoint.property.id) ||
+                              records.find(r => r.document_number === startingPoint.property.id);
+          
+          if (!depotRecord) {
+            toast({
+              title: "Error",
+              description: "Starting point record not found.",
+              variant: "destructive",
+            });
+            return;
           }
+
+          // Auto-select all selected properties
+          const propertyIds = new Set(selectedProperties.map(p => p.id));
+          setSelectedRecordIds(propertyIds);
+          
+          // Create route with depot
+          await handleCreateRouteWithDepot(depotRecord, startingPoint.pinLocation);
         }}
         properties={filteredRecords.filter(r => r.latitude != null && r.longitude != null).map(r => ({
           id: r.document_number,
@@ -1612,6 +1625,7 @@ export function PreForeclosureView() {
           ownerName: r.property_owner || '',
           accountNumber: r.document_number
         }))}
+        numVehicles={numVehicles}
       />
 
       {/* Starting Point Selector */}
