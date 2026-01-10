@@ -176,7 +176,7 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }
                     ? waypoints.slice(0, -1) // Remove last depot
                     : waypoints;
 
-                  const path = uniqueWaypoints.map(wp => [wp.lat, wp.lon] as LatLng);
+                  const path = uniqueWaypoints.map(wp => new LatLng(wp.lat, wp.lon));
                   const color = ROUTE_COLORS[routeIndex % ROUTE_COLORS.length];
 
                   return (
@@ -191,38 +191,45 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }
                         }}
                       />
                       {/* Markers for waypoints */}
-                      {waypoints.map((wp, wpIndex) => (
-                        <Marker
-                          key={`${routeIndex}-${wpIndex}`}
-                          position={[wp.lat, wp.lon]}
-                          icon={L.divIcon({
-                            className: 'custom-marker',
-                            html: `<div style="
-                              background-color: ${color};
-                              width: 24px;
-                              height: 24px;
-                              border-radius: 50%;
-                              border: 2px solid white;
-                              display: flex;
-                              align-items: center;
-                              justify-content: center;
-                              color: white;
-                              font-weight: bold;
-                              font-size: 12px;
-                            ">${wpIndex + 1}</div>`,
-                            iconSize: [24, 24],
-                            iconAnchor: [12, 12],
-                          })}
-                        >
-                          <Popup>
-                            <div style={{ padding: '4px' }}>
-                              <strong>Stop {wpIndex + 1}</strong><br/>
-                              {wp.address || 'No address'}<br/>
-                              <small>Route {routeIndex + 1}</small>
-                            </div>
-                          </Popup>
-                        </Marker>
-                      ))}
+                      {uniqueWaypoints.map((wp, wpIndex) => {
+                        const isDepot = wp.id === 'depot';
+                        const stopNumber = isDepot ? 0 : wpIndex; // Depot is stop 0, others are numbered
+                        const displayNumber = isDepot ? 'START' : stopNumber;
+                        
+                        return (
+                          <Marker
+                            key={`${routeIndex}-${wpIndex}`}
+                            position={[wp.lat, wp.lon]}
+                            icon={L.divIcon({
+                              className: 'custom-marker',
+                              html: `<div style="
+                                background-color: ${isDepot ? '#10B981' : color};
+                                width: ${isDepot ? '28px' : '24px'};
+                                height: ${isDepot ? '28px' : '24px'};
+                                border-radius: 50%;
+                                border: 2px solid white;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                color: white;
+                                font-weight: bold;
+                                font-size: ${isDepot ? '10px' : '12px'};
+                              ">${displayNumber}</div>`,
+                              iconSize: [isDepot ? 28 : 24, isDepot ? 28 : 24],
+                              iconAnchor: [isDepot ? 14 : 12, isDepot ? 14 : 12],
+                            })}
+                          >
+                            <Popup>
+                              <div style={{ padding: '4px' }}>
+                                <strong>{isDepot ? 'Starting Point' : `Stop ${stopNumber}`}</strong><br/>
+                                {wp.address || wp.originalId || 'No address'}<br/>
+                                {wp.accountNumber && <><small>Account: {wp.accountNumber}</small><br/></>}
+                                {!isDepot && <small>Route {routeIndex + 1}</small>}
+                              </div>
+                            </Popup>
+                          </Marker>
+                        );
+                      })}
                     </div>
                   );
                 })}
