@@ -60,25 +60,52 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, curl, Postman, etc.)
     if (!origin) {
+      console.log('[CORS] Request with no origin - allowing');
       return callback(null, true);
     }
 
-    // Check if origin matches any allowed origin
+    console.log(`[CORS] Checking origin: ${origin}`);
+
+    // Check for exact match first
+    if (allowedOrigins.includes(origin)) {
+      console.log(`[CORS] ✅ Exact match - ALLOWING: ${origin}`);
+      return callback(null, true);
+    }
+
+    // Check for GitHub Pages (any subpath of rauljr10980.github.io)
+    if (origin.startsWith('https://rauljr10980.github.io')) {
+      console.log(`[CORS] ✅ GitHub Pages origin - ALLOWING: ${origin}`);
+      return callback(null, true);
+    }
+
+    // Check for localhost (any port)
+    if (origin.startsWith('http://localhost:') || origin === 'http://localhost') {
+      console.log(`[CORS] ✅ Localhost origin - ALLOWING: ${origin}`);
+      return callback(null, true);
+    }
+
+    // Check if origin matches any allowed origin pattern
     const isAllowed = allowedOrigins.some(allowed => {
       if (origin === allowed) return true;
-      if (origin.startsWith(allowed)) return true;
+      // Check if origin starts with allowed origin (for subpaths)
+      if (allowed && origin.startsWith(allowed)) return true;
       return false;
     });
 
     if (isAllowed) {
+      console.log(`[CORS] ✅ Pattern match - ALLOWING: ${origin}`);
       callback(null, true);
     } else {
+      console.error(`[CORS] ❌ BLOCKED origin: ${origin}`);
+      console.error(`[CORS] Allowed origins:`, allowedOrigins);
       callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Type'],
+  optionsSuccessStatus: 200
 }));
 
 // Body parsing - increased limit for large Excel files
