@@ -57,7 +57,7 @@ function MapBoundsFitter({ waypoints }: { waypoints: Waypoint[] }) {
     if (waypoints.length === 0) return;
 
     const bounds = new LatLngBounds(
-      waypoints.map(wp => [wp.lat, wp.lon] as LatLng)
+      waypoints.map(wp => new LatLng(wp.lat, wp.lon))
     );
     map.fitBounds(bounds, { padding: [20, 20] });
   }, [waypoints, map]);
