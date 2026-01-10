@@ -98,6 +98,80 @@ function nearestNeighbor(dist, depot, nodes) {
 }
 
 /**
+ * Find and remove the longest edge, then reconnect route optimally
+ * This helps close loops when endpoints are close together
+ */
+function removeLongestEdge(route, dist) {
+  if (route.length <= 3) return false; // Need at least depot -> node -> depot
+  
+  // Find the longest edge (excluding depot connections at start/end)
+  let maxDist = -1;
+  let maxIdx = -1;
+  
+  for (let i = 0; i < route.length - 1; i++) {
+    const edgeDist = dist[route[i]][route[i + 1]];
+    if (edgeDist > maxDist) {
+      maxDist = edgeDist;
+      maxIdx = i;
+    }
+  }
+  
+  if (maxIdx === -1 || maxIdx === 0 || maxIdx === route.length - 2) {
+    // Don't remove depot connections
+    return false;
+  }
+  
+  // Split route at the longest edge
+  // Route: [depot, ...nodes before maxIdx, node at maxIdx, node at maxIdx+1, ...nodes after, depot]
+  // After removal: [depot, ...nodes before maxIdx, node at maxIdx] and [node at maxIdx+1, ...nodes after, depot]
+  
+  const firstPart = route.slice(0, maxIdx + 1); // From depot to node before the break
+  const secondPart = route.slice(maxIdx + 1); // From node after break to depot
+  
+  // Remove depot from secondPart end (it will be added back)
+  secondPart.pop();
+  
+  // Try connecting in both directions to find the best reconnection
+  const option1 = [
+    ...firstPart,
+    ...secondPart.reverse(), // Reverse second part
+    route[0] // Back to depot
+  ];
+  
+  const option2 = [
+    ...firstPart.slice(0, -1).reverse(), // Reverse first part (excluding last)
+    ...secondPart,
+    firstPart[firstPart.length - 1], // Add back the node we kept
+    route[0] // Back to depot
+  ];
+  
+  const originalCost = routeCost(route, dist);
+  const cost1 = routeCost(option1, dist);
+  const cost2 = routeCost(option2, dist);
+  
+  let bestRoute = route;
+  let bestCost = originalCost;
+  
+  if (cost1 < bestCost) {
+    bestRoute = option1;
+    bestCost = cost1;
+  }
+  
+  if (cost2 < bestCost) {
+    bestRoute = option2;
+    bestCost = cost2;
+  }
+  
+  if (bestCost < originalCost) {
+    route.length = 0;
+    route.push(...bestRoute);
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * 2-opt local search improvement
  * Removes crossings and shortens routes
  */
@@ -224,6 +298,13 @@ function solveVRP(dist, depots, numVehicles) {
     improved = false;
     iterations++;
 
+    // Apply longest edge removal first (helps close loops)
+    for (const route of routes) {
+      if (removeLongestEdge(route, dist)) {
+        improved = true;
+      }
+    }
+
     // Apply 2-opt to each route
     for (const route of routes) {
       if (twoOpt(route, dist)) {
@@ -235,6 +316,11 @@ function solveVRP(dist, depots, numVehicles) {
     if (numVehicles > 1 && relocate(routes, dist)) {
       improved = true;
     }
+  }
+  
+  // Final pass: Apply longest edge removal one more time after all optimizations
+  for (const route of routes) {
+    removeLongestEdge(route, dist);
   }
 
   const totalCost = routes.reduce((sum, route) => sum + routeCost(route, dist), 0);
