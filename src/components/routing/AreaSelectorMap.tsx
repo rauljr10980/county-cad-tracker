@@ -38,94 +38,62 @@ interface AreaSelectorMapProps {
   initialZoom?: number;
 }
 
-// Component to handle drawing rectangle
-function RectangleDrawer({ 
+// Component to handle drawing (both rectangle and circle)
+function ShapeDrawer({ 
   drawingMode, 
-  onShapeComplete 
+  onRectangleComplete,
+  onCircleComplete
 }: { 
-  drawingMode: 'rectangle' | null;
-  onShapeComplete: (bounds: LatLngBounds) => void;
+  drawingMode: 'rectangle' | 'circle' | null;
+  onRectangleComplete: (bounds: LatLngBounds) => void;
+  onCircleComplete: (center: LatLng, radius: number) => void;
 }) {
   const map = useMap();
-  const [rectangle, setRectangle] = useState<{ bounds: LatLngBounds } | null>(null);
   const [startPos, setStartPos] = useState<LatLng | null>(null);
   const [currentPos, setCurrentPos] = useState<LatLng | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
 
   useMapEvents({
     mousedown(e) {
-      if (drawingMode === 'rectangle') {
+      if (drawingMode && !isDrawing) {
+        setIsDrawing(true);
         setStartPos(e.latlng);
         setCurrentPos(e.latlng);
+        // Prevent map panning while drawing
+        map.dragging.disable();
+        map.doubleClickZoom.disable();
       }
     },
     mousemove(e) {
-      if (drawingMode === 'rectangle' && startPos) {
+      if (drawingMode && isDrawing && startPos) {
         setCurrentPos(e.latlng);
       }
     },
     mouseup(e) {
-      if (drawingMode === 'rectangle' && startPos) {
-        const bounds = new LatLngBounds([startPos, e.latlng]);
-        setRectangle({ bounds });
-        onShapeComplete(bounds);
+      if (drawingMode && isDrawing && startPos) {
+        if (drawingMode === 'rectangle') {
+          const bounds = new LatLngBounds([startPos, e.latlng]);
+          onRectangleComplete(bounds);
+        } else if (drawingMode === 'circle') {
+          const radius = startPos.distanceTo(e.latlng);
+          onCircleComplete(startPos, radius);
+        }
+        setIsDrawing(false);
         setStartPos(null);
         setCurrentPos(null);
+        // Re-enable map interactions
+        map.dragging.enable();
+        map.doubleClickZoom.enable();
       }
     },
   });
 
-  if (rectangle) {
-    return <Rectangle bounds={rectangle.bounds} pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.2, weight: 2 }} />;
-  }
-
-  if (drawingMode === 'rectangle' && startPos && currentPos) {
+  // Render preview shape while drawing
+  if (drawingMode === 'rectangle' && startPos && currentPos && isDrawing) {
     return <Rectangle bounds={new LatLngBounds([startPos, currentPos])} pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.2, weight: 2, dashArray: '5, 5' }} />;
   }
 
-  return null;
-}
-
-// Component to handle drawing circle
-function CircleDrawer({ 
-  drawingMode, 
-  onShapeComplete 
-}: { 
-  drawingMode: 'circle' | null;
-  onShapeComplete: (center: LatLng, radius: number) => void;
-}) {
-  const map = useMap();
-  const [circle, setCircle] = useState<{ center: LatLng; radius: number } | null>(null);
-  const [startPos, setStartPos] = useState<LatLng | null>(null);
-  const [currentPos, setCurrentPos] = useState<LatLng | null>(null);
-
-  useMapEvents({
-    mousedown(e) {
-      if (drawingMode === 'circle') {
-        setStartPos(e.latlng);
-        setCurrentPos(e.latlng);
-      }
-    },
-    mousemove(e) {
-      if (drawingMode === 'circle' && startPos) {
-        setCurrentPos(e.latlng);
-      }
-    },
-    mouseup(e) {
-      if (drawingMode === 'circle' && startPos) {
-        const radius = startPos.distanceTo(e.latlng);
-        setCircle({ center: startPos, radius });
-        onShapeComplete(startPos, radius);
-        setStartPos(null);
-        setCurrentPos(null);
-      }
-    },
-  });
-
-  if (circle) {
-    return <Circle center={circle.center} radius={circle.radius} pathOptions={{ color: '#EA4335', fillColor: '#EA4335', fillOpacity: 0.2, weight: 2 }} />;
-  }
-
-  if (drawingMode === 'circle' && startPos && currentPos) {
+  if (drawingMode === 'circle' && startPos && currentPos && isDrawing) {
     const radius = startPos.distanceTo(currentPos);
     return <Circle center={startPos} radius={radius} pathOptions={{ color: '#EA4335', fillColor: '#EA4335', fillOpacity: 0.2, weight: 2, dashArray: '5, 5' }} />;
   }
@@ -155,26 +123,34 @@ export function AreaSelectorMap({
 }: AreaSelectorMapProps) {
   const [drawingMode, setDrawingMode] = useState<'rectangle' | 'circle' | null>(null);
   const [selectedShape, setSelectedShape] = useState<{ type: 'rectangle' | 'circle'; bounds: LatLngBounds; center?: LatLng; radius?: number } | null>(null);
+  const [drawnRectangle, setDrawnRectangle] = useState<LatLngBounds | null>(null);
+  const [drawnCircle, setDrawnCircle] = useState<{ center: LatLng; radius: number } | null>(null);
 
-  const handleShapeComplete = (bounds?: LatLngBounds, center?: LatLng, radius?: number) => {
-    if (bounds) {
-      setSelectedShape({ type: 'rectangle', bounds });
-      setDrawingMode(null);
-    } else if (center && radius !== undefined) {
-      // For circle, create bounds from center and radius
-      const radiusDegrees = radius / 111000; // Approximate conversion: 1 degree ≈ 111 km
-      const bounds = new LatLngBounds(
-        [center.lat - radiusDegrees, center.lng - radiusDegrees / Math.cos(center.lat * Math.PI / 180)],
-        [center.lat + radiusDegrees, center.lng + radiusDegrees / Math.cos(center.lat * Math.PI / 180)]
-      );
-      setSelectedShape({ type: 'circle', bounds, center, radius });
-      setDrawingMode(null);
-    }
+  const handleRectangleComplete = (bounds: LatLngBounds) => {
+    setDrawnRectangle(bounds);
+    setDrawnCircle(null);
+    setSelectedShape({ type: 'rectangle', bounds });
+    setDrawingMode(null);
+  };
+
+  const handleCircleComplete = (center: LatLng, radius: number) => {
+    setDrawnCircle({ center, radius });
+    setDrawnRectangle(null);
+    // For circle, create bounds from center and radius
+    const radiusDegrees = radius / 111000; // Approximate conversion: 1 degree ≈ 111 km
+    const bounds = new LatLngBounds(
+      [center.lat - radiusDegrees, center.lng - radiusDegrees / Math.cos(center.lat * Math.PI / 180)],
+      [center.lat + radiusDegrees, center.lng + radiusDegrees / Math.cos(center.lat * Math.PI / 180)]
+    );
+    setSelectedShape({ type: 'circle', bounds, center, radius });
+    setDrawingMode(null);
   };
 
   const handleClearSelection = () => {
     setSelectedShape(null);
     setDrawingMode(null);
+    setDrawnRectangle(null);
+    setDrawnCircle(null);
   };
 
   const handleDone = () => {
@@ -291,14 +267,17 @@ export function AreaSelectorMap({
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <RectangleDrawer 
-                drawingMode={drawingMode === 'rectangle' ? 'rectangle' : null}
-                onShapeComplete={(bounds) => handleShapeComplete(bounds)}
+              <ShapeDrawer
+                drawingMode={drawingMode}
+                onRectangleComplete={handleRectangleComplete}
+                onCircleComplete={handleCircleComplete}
               />
-              <CircleDrawer 
-                drawingMode={drawingMode === 'circle' ? 'circle' : null}
-                onShapeComplete={(center, radius) => handleShapeComplete(undefined, center, radius)}
-              />
+              {drawnRectangle && (
+                <Rectangle bounds={drawnRectangle} pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.2, weight: 2 }} />
+              )}
+              {drawnCircle && (
+                <Circle center={drawnCircle.center} radius={drawnCircle.radius} pathOptions={{ color: '#EA4335', fillColor: '#EA4335', fillOpacity: 0.2, weight: 2 }} />
+              )}
               {selectedShape && <MapBoundsFitter bounds={selectedShape.bounds} />}
             </MapContainer>
           </div>
