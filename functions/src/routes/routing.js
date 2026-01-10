@@ -99,126 +99,120 @@ function nearestNeighbor(dist, depot, nodes) {
 
 /**
  * Find and remove the longest edge, then reconnect route optimally
- * This helps close loops when endpoints are close together and eliminates inefficient long jumps
+ * This eliminates inefficient long jumps and connects close stops together
  */
 function removeLongestEdge(route, dist) {
   if (route.length <= 3) return false; // Need at least depot -> node -> depot
   
-  // Find the longest edge (excluding depot connections at start/end)
+  // Find the longest edge (prioritize non-depot edges)
   let maxDist = -1;
   let maxIdx = -1;
+  let maxDistDepot = -1;
+  let maxIdxDepot = -1;
   
   for (let i = 0; i < route.length - 1; i++) {
-    // Skip depot connections if they're not extremely long
-    if ((i === 0 || i === route.length - 2) && route[i] === route[0] && route[i + 1] === route[route.length - 1]) {
-      // This is a depot connection, check if it's really long
-      const edgeDist = dist[route[i]][route[i + 1]];
-      // Only consider depot edge if it's the absolute longest
-      if (edgeDist > maxDist * 1.5) { // Depot edge must be significantly longer
+    const edgeDist = dist[route[i]][route[i + 1]];
+    const isDepotEdge = (i === 0 || i === route.length - 2) && 
+                        (route[i] === route[0] || route[i + 1] === route[0]);
+    
+    if (isDepotEdge) {
+      // Track depot edges separately
+      if (edgeDist > maxDistDepot) {
+        maxDistDepot = edgeDist;
+        maxIdxDepot = i;
+      }
+    } else {
+      // Track non-depot edges (preferred to break)
+      if (edgeDist > maxDist) {
         maxDist = edgeDist;
         maxIdx = i;
       }
-      continue;
-    }
-    
-    const edgeDist = dist[route[i]][route[i + 1]];
-    if (edgeDist > maxDist) {
-      maxDist = edgeDist;
-      maxIdx = i;
     }
   }
   
-  if (maxIdx === -1) return false;
+  // Use longest non-depot edge if available, otherwise use depot edge
+  let targetIdx = maxIdx >= 0 ? maxIdx : maxIdxDepot;
+  if (targetIdx === -1) return false;
   
-  // If longest edge is at start (depot -> first node), try reordering to start elsewhere
-  if (maxIdx === 0 && route[0] !== route[route.length - 1]) {
-    // Find the node closest to the last visited node (before returning to depot)
-    const lastNode = route[route.length - 2];
-    let closestStart = -1;
-    let minDistToLast = Infinity;
+  const longestEdgeDist = maxIdx >= 0 ? maxDist : maxDistDepot;
+  
+  // Special case: If first and last stops (excluding depot) are close, 
+  // break at longest edge and reconnect to form a loop
+  if (route.length > 3) {
+    const firstStop = route[1]; // First stop after depot
+    const lastStop = route[route.length - 2]; // Last stop before depot
+    const distBetweenEnds = dist[firstStop][lastStop];
     
-    for (let i = 1; i < route.length - 1; i++) {
-      if (dist[route[0]][route[i]] < minDistToLast) {
-        minDistToLast = dist[route[0]][route[i]];
-        closestStart = i;
+    // If first and last stops are close (within 20% of longest edge), 
+    // and longest edge is much longer, reconnect
+    if (distBetweenEnds < longestEdgeDist * 0.8 && longestEdgeDist > distBetweenEnds * 2) {
+      // Break at longest edge and reconnect
+      if (targetIdx > 0 && targetIdx < route.length - 2) {
+        // Split: [depot, ...before break, nodeA, nodeB (break), ...after break, depot]
+        const beforeBreak = route.slice(1, targetIdx + 1); // From first stop to node before break
+        const afterBreak = route.slice(targetIdx + 1, route.length - 1); // From node after break to last stop
+        
+        // Try reconnecting: start from after break, go to before break, connect ends
+        const newRoute1 = [
+          route[0], // Depot
+          ...afterBreak,
+          ...beforeBreak,
+          route[0] // Back to depot
+        ];
+        
+        // Or: start from before break, reverse order, connect ends
+        const newRoute2 = [
+          route[0], // Depot
+          ...beforeBreak.reverse(),
+          ...afterBreak.reverse(),
+          route[0] // Back to depot
+        ];
+        
+        const originalCost = routeCost(route, dist);
+        const cost1 = routeCost(newRoute1, dist);
+        const cost2 = routeCost(newRoute2, dist);
+        
+        if (cost1 < originalCost || cost2 < originalCost) {
+          route.length = 0;
+          route.push(...(cost1 < cost2 ? newRoute1 : newRoute2));
+          return true;
+        }
+      }
+    }
+  }
+  
+  // General case: Break at longest edge and try reconnecting
+  if (targetIdx > 0 && targetIdx < route.length - 2) {
+    const firstPart = route.slice(0, targetIdx + 1);
+    const secondPart = route.slice(targetIdx + 1);
+    secondPart.pop(); // Remove depot from end
+    
+    // Try reconnecting in different ways
+    const options = [
+      [...firstPart, ...secondPart.reverse(), route[0]], // Reverse second part
+      [route[0], ...firstPart.slice(1).reverse(), ...secondPart, route[0]], // Reverse first part
+      [route[0], ...secondPart, ...firstPart.slice(1).reverse(), route[0]] // Swap and reverse
+    ];
+    
+    const originalCost = routeCost(route, dist);
+    let bestRoute = route;
+    let bestCost = originalCost;
+    
+    for (const option of options) {
+      if (option.length === route.length) {
+        const cost = routeCost(option, dist);
+        if (cost < bestCost) {
+          bestRoute = option;
+          bestCost = cost;
+        }
       }
     }
     
-    if (closestStart > 0 && dist[route[closestStart]][lastNode] < maxDist) {
-      // Reorder route to start from closer node
-      const newRoute = [
-        route[0], // Depot
-        ...route.slice(closestStart, route.length - 1), // From new start to end
-        ...route.slice(1, closestStart), // Remaining nodes
-        route[0] // Back to depot
-      ];
+    if (bestCost < originalCost * 0.98) { // Only accept if at least 2% improvement
       route.length = 0;
-      route.push(...newRoute);
+      route.push(...bestRoute);
       return true;
     }
-  }
-  
-  // Split route at the longest edge
-  const firstPart = route.slice(0, maxIdx + 1);
-  const secondPart = route.slice(maxIdx + 1);
-  
-  // Remove depot from end if present
-  const hasDepotAtEnd = secondPart.length > 0 && secondPart[secondPart.length - 1] === route[0];
-  if (hasDepotAtEnd) {
-    secondPart.pop();
-  }
-  
-  // Try different reconnection strategies
-  const options = [];
-  
-  // Option 1: Connect first part to reversed second part
-  if (secondPart.length > 0) {
-    options.push([
-      ...firstPart.slice(0, -1), // Remove last node of first part
-      ...secondPart.reverse(),
-      firstPart[firstPart.length - 1], // Add back the last node
-      route[0] // Back to depot
-    ]);
-  }
-  
-  // Option 2: Reverse first part and connect to second part
-  if (firstPart.length > 2) {
-    options.push([
-      route[0], // Depot
-      ...firstPart.slice(1, -1).reverse(), // Reverse middle nodes
-      ...secondPart,
-      firstPart[firstPart.length - 1], // Add last node
-      route[0] // Back to depot
-    ]);
-  }
-  
-  // Option 3: Simple reversal of second part
-  if (secondPart.length > 0) {
-    options.push([
-      ...firstPart,
-      ...secondPart.reverse(),
-      route[0] // Back to depot
-    ]);
-  }
-  
-  const originalCost = routeCost(route, dist);
-  let bestRoute = route;
-  let bestCost = originalCost;
-  
-  for (const option of options) {
-    if (option.length === route.length) {
-      const cost = routeCost(option, dist);
-      if (cost < bestCost) {
-        bestRoute = option;
-        bestCost = cost;
-      }
-    }
-  }
-  
-  if (bestCost < originalCost * 0.99) { // Only accept if at least 1% improvement
-    route.length = 0;
-    route.push(...bestRoute);
-    return true;
   }
   
   return false;
