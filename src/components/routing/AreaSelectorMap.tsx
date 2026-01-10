@@ -158,14 +158,22 @@ function ShapeDrawer({
     },
   });
 
-  // Reset polygon when mode changes
+  // Reset polygon when mode changes and restore map interactions
   useEffect(() => {
     if (drawingMode !== 'polygon') {
       setPolygonPoints([]);
       setCurrentPos(null);
       onPolygonPointAdd([]);
-      map.dragging.enable();
-      map.doubleClickZoom.enable();
+    }
+    // Re-enable map interactions when not in a drawing mode or when in pin mode
+    // This ensures that after confirming starting point (drawingMode becomes null),
+    // the map interactions are restored so user can draw shapes
+    if (!drawingMode || drawingMode === 'pin') {
+      // Use setTimeout to ensure map interactions are restored after state update
+      setTimeout(() => {
+        map.dragging.enable();
+        map.doubleClickZoom.enable();
+      }, 0);
     }
   }, [drawingMode, map, onPolygonPointAdd]);
 
