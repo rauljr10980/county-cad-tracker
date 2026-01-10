@@ -164,10 +164,19 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }
                 
                 {/* Render routes */}
                 {routes.map((route, routeIndex) => {
-                  const waypoints = route.waypoints.filter(wp => wp.id !== 'depot');
+                  // Include depot in the route path (it's the starting point)
+                  // Filter out only duplicate depots (depot appears at start and end)
+                  const waypoints = route.waypoints;
                   if (waypoints.length < 2) return null;
 
-                  const path = waypoints.map(wp => [wp.lat, wp.lon] as LatLng);
+                  // Remove duplicate depot at the end if present
+                  const uniqueWaypoints = waypoints.length > 1 && 
+                    waypoints[0].id === 'depot' && 
+                    waypoints[waypoints.length - 1].id === 'depot'
+                    ? waypoints.slice(0, -1) // Remove last depot
+                    : waypoints;
+
+                  const path = uniqueWaypoints.map(wp => [wp.lat, wp.lon] as LatLng);
                   const color = ROUTE_COLORS[routeIndex % ROUTE_COLORS.length];
 
                   return (

@@ -510,14 +510,34 @@ router.post('/solve', async (req, res) => {
     const solution = solveVRP(dist, depots, numVehicles);
 
     // Map routes back to property data
-    const optimizedRoutes = solution.routes.map(route => ({
-      waypoints: route.map(idx => ({
-        ...locations[idx],
-        index: idx
-      })),
-      cost: routeCost(route, dist),
-      distance: routeCost(route, dist) // In kilometers
-    }));
+    const optimizedRoutes = solution.routes.map((route, routeIdx) => {
+      const waypoints = route.map(idx => {
+        const location = locations[idx];
+        return {
+          ...location,
+          index: idx,
+          isDepot: idx === 0 // Mark depot waypoint
+        };
+      });
+      
+      // Log the first waypoint to verify it's the depot
+      if (route.length > 0) {
+        const firstWaypoint = waypoints[0];
+        console.log(`[ROUTING] Route ${routeIdx + 1} first waypoint:`, {
+          isDepot: firstWaypoint.isDepot,
+          address: firstWaypoint.address,
+          originalId: firstWaypoint.originalId,
+          accountNumber: firstWaypoint.accountNumber,
+          index: firstWaypoint.index
+        });
+      }
+      
+      return {
+        waypoints,
+        cost: routeCost(route, dist),
+        distance: routeCost(route, dist) // In kilometers
+      };
+    });
 
     res.json({
       success: true,
