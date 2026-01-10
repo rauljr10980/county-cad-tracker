@@ -245,12 +245,28 @@ export function PreForeclosureView() {
       return;
     }
 
-    // Auto-select records in area
-    setSelectedRecordIds(new Set(recordsInArea.map(r => r.document_number)));
+    // Auto-select records in area, but preserve custom starting point if set
+    const areaRecordIds = new Set(recordsInArea.map(r => r.document_number));
+    
+    // If a custom starting point was set, ensure it's included in the selection
+    if (customDepotRecordId) {
+      areaRecordIds.add(customDepotRecordId);
+    }
+    
+    setSelectedRecordIds(areaRecordIds);
+    
+    // Automatically create route with custom starting point if it was set
+    if (customDepotRecordId) {
+      const depotRecord = records.find(r => r.document_number === customDepotRecordId);
+      if (depotRecord && customDepot) {
+        await handleCreateRouteWithDepot(depotRecord, customDepot);
+        return;
+      }
+    }
     
     toast({
       title: "Area Selected",
-      description: `Found ${recordsInArea.length} records in the selected area. Click "Optimize Route" to continue.`,
+      description: `Found ${recordsInArea.length} records in the selected area. ${customDepotRecordId ? 'Route optimized with custom starting point.' : 'Click "Optimize Route" to continue.'}`,
     });
   };
 

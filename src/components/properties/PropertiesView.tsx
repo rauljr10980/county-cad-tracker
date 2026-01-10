@@ -827,12 +827,28 @@ export function PropertiesView() {
       return;
     }
 
-    // Auto-select properties in area
-    setSelectedPropertyIds(new Set(propertiesInArea.map(p => p.id)));
+    // Auto-select properties in area, but preserve custom starting point if set
+    const areaPropertyIds = new Set(propertiesInArea.map(p => p.id));
+    
+    // If a custom starting point was set, ensure it's included in the selection
+    if (customDepotPropertyId) {
+      areaPropertyIds.add(customDepotPropertyId);
+    }
+    
+    setSelectedPropertyIds(areaPropertyIds);
+    
+    // Automatically create route with custom starting point if it was set
+    if (customDepotPropertyId) {
+      const depotProperty = rawProperties.find(p => p.id === customDepotPropertyId);
+      if (depotProperty && customDepot) {
+        await handleCreateRouteWithDepot(depotProperty, customDepot);
+        return;
+      }
+    }
     
     toast({
       title: "Area Selected",
-      description: `Found ${propertiesInArea.length} properties in the selected area. Click "Optimize Route" to continue.`,
+      description: `Found ${propertiesInArea.length} properties in the selected area. ${customDepotPropertyId ? 'Route optimized with custom starting point.' : 'Click "Optimize Route" to continue.'}`,
     });
   };
 
