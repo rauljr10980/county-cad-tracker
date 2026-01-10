@@ -873,6 +873,21 @@ export function PropertiesView() {
       depotPropertyId: depotProperty?.id || customDepotPropertyId
     });
 
+    // CRITICAL VALIDATION: If providedProperties is passed (area selector), it MUST have 25 or fewer properties
+    let validatedProvidedProperties = providedProperties;
+    if (providedProperties && providedProperties.length > 25) {
+      console.error('[handleCreateRouteWithDepot] FATAL ERROR: providedProperties has MORE than 25 properties!');
+      console.error('[handleCreateRouteWithDepot] providedProperties.length:', providedProperties.length);
+      console.error('[handleCreateRouteWithDepot] This should NEVER happen! Limiting to 25 immediately.');
+      
+      // Force limit to 25 - this should never happen if AreaSelectorMap is working correctly
+      const depotId = depotProperty?.id || customDepotPropertyId;
+      const depot = depotProperty || (providedProperties.find(p => p.id === depotId));
+      const others = providedProperties.filter(p => p.id !== depotId).slice(0, 24);
+      validatedProvidedProperties = depot ? [depot, ...others] : providedProperties.slice(0, 25);
+      console.error('[handleCreateRouteWithDepot] Force-limited providedProperties to:', validatedProvidedProperties.length);
+    }
+
     // Use custom depot if provided, otherwise use default (first property)
     const depotLat = depotLocation?.lat || customDepot?.lat;
     const depotLon = depotLocation?.lng || customDepot?.lng;
@@ -884,9 +899,9 @@ export function PropertiesView() {
     // This ensures the area selector's 25-property limit is respected
     let availableProperties: Property[];
     
-    if (providedProperties && providedProperties.length > 0) {
-      console.log('[handleCreateRouteWithDepot] Using providedProperties (from area selector):', providedProperties.length);
-      availableProperties = providedProperties.filter(p => {
+    if (validatedProvidedProperties && validatedProvidedProperties.length > 0) {
+      console.log('[handleCreateRouteWithDepot] Using validatedProvidedProperties (from area selector):', validatedProvidedProperties.length);
+      availableProperties = validatedProvidedProperties.filter(p => {
         if (p.latitude == null || p.longitude == null) {
           console.warn('[handleCreateRouteWithDepot] Property missing coordinates:', p.id);
           return false;
@@ -920,12 +935,12 @@ export function PropertiesView() {
     // This ensures we respect the area boundaries and property limits
     if (depotPropertyId) {
       if (providedProperties) {
-        // When using providedProperties (from area selector), only use properties from that list
-        // The depot should already be in providedProperties, but ensure it's first
+        // When using validatedProvidedProperties (from area selector), only use properties from that list
+        // The depot should already be in validatedProvidedProperties, but ensure it's first
         const depotInList = availableProperties.find(p => p.id === depotPropertyId);
         if (!depotInList) {
-          // Try to find depot in the original providedProperties (before filtering)
-          const depotFromProvided = providedProperties.find(p => p.id === depotPropertyId);
+          // Try to find depot in the original validatedProvidedProperties (before filtering)
+          const depotFromProvided = validatedProvidedProperties.find(p => p.id === depotPropertyId);
           if (depotFromProvided && depotFromProvided.latitude != null && depotFromProvided.longitude != null) {
             // Only add if it's not already in routes (or handle it specially)
             const wasInRoutes = propertiesInRoutes.has(depotPropertyId);
@@ -939,7 +954,7 @@ export function PropertiesView() {
             }
             availableProperties = [depotFromProvided, ...availableProperties];
           } else {
-            console.warn('[Properties] Depot property not found in providedProperties:', depotPropertyId);
+            console.warn('[Properties] Depot property not found in validatedProvidedProperties:', depotPropertyId);
           }
         } else {
           // Depot is already in list, ensure it's first
@@ -1003,16 +1018,23 @@ export function PropertiesView() {
       return;
     }
 
-    // IMPORTANT: If providedProperties was passed (from area selector), enforce 25 property limit
-    if (providedProperties && providedProperties.length > 0) {
+    // IMPORTANT: If validatedProvidedProperties was passed (from area selector), enforce 25 property limit STRICTLY
+    if (validatedProvidedProperties && validatedProvidedProperties.length > 0) {
       if (availableProperties.length > 25) {
-        console.warn('[handleCreateRouteWithDepot] More than 25 properties after filtering. Limiting to 25.');
+        console.error('[handleCreateRouteWithDepot] CRITICAL ERROR: More than 25 properties after filtering!');
+        console.error('[handleCreateRouteWithDepot] providedProperties:', providedProperties.length, 'availableProperties:', availableProperties.length);
         // Keep depot first, then limit to 24 more
         const depot = availableProperties.find(p => p.id === depotPropertyId);
         const others = availableProperties.filter(p => p.id !== depotPropertyId).slice(0, 24);
         availableProperties = depot ? [depot, ...others] : others.slice(0, 25);
-        console.log('[handleCreateRouteWithDepot] Limited to:', availableProperties.length);
+        console.warn('[handleCreateRouteWithDepot] Force-limited to 25:', availableProperties.length);
       }
+      // ABSOLUTE HARD CAP: Never allow more than 25 properties for area selector
+      if (availableProperties.length > 25) {
+        console.error('[handleCreateRouteWithDepot] CRITICAL: Still more than 25 after filtering! Force limiting.');
+        availableProperties = availableProperties.slice(0, 25);
+      }
+      console.log('[handleCreateRouteWithDepot] Final count after hard cap (area selector):', availableProperties.length);
     } else if (availableProperties.length > 500) {
       toast({
         title: "Too many properties",
@@ -1044,13 +1066,38 @@ export function PropertiesView() {
         });
       }
 
+      // CRITICAL: Final safeguard - NEVER send more than 25 properties when using area selector
+      // If validatedProvidedProperties was passed, enforce 25-property limit strictly
+      let finalPropertiesForOptimization = selectedProperties;
+      if (validatedProvidedProperties && validatedProvidedProperties.length > 0) {
+        if (finalPropertiesForOptimization.length > 25) {
+          console.error('[Route Optimization] CRITICAL: More than 25 properties detected! Limiting now.');
+          // Keep depot first, then limit to 24 more
+          const depot = finalPropertiesForOptimization.find(p => p.id === depotPropertyId);
+          const others = finalPropertiesForOptimization.filter(p => p.id !== depotPropertyId).slice(0, 24);
+          finalPropertiesForOptimization = depot ? [depot, ...others] : others.slice(0, 25);
+        }
+        // Hard limit: absolutely never more than 25
+        finalPropertiesForOptimization = finalPropertiesForOptimization.slice(0, 25);
+        console.log('[Route Optimization] Final properties count for solveVRP:', finalPropertiesForOptimization.length, '(max 25)');
+      }
+
       // Solve VRP using the backend solver
       // Map properties to match solveVRP type signature (latitude/longitude required)
-      const propertiesForVRP = selectedProperties.map(p => ({
+      const propertiesForVRP = finalPropertiesForOptimization.map(p => ({
         ...p,
         latitude: p.latitude!,
         longitude: p.longitude!,
       }));
+      
+      console.log('[Route Optimization] Calling solveVRP with:', {
+        propertyCount: propertiesForVRP.length,
+        numVehicles,
+        depotLat,
+        depotLon,
+        depotPropertyId
+      });
+      
       const solution = await solveVRP(propertiesForVRP, numVehicles, depotLat, depotLon, depotPropertyId);
 
       if (!solution.success || !solution.routes || solution.routes.length === 0) {
@@ -1078,9 +1125,10 @@ export function PropertiesView() {
       setOptimizedRoutes(solution);
       setRouteMapOpen(true);
       
+      const actualOptimizedCount = propertiesForVRP.length;
       toast({
         title: "Route Optimized",
-        description: `Optimized route for ${selectedProperties.length} properties using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. ${routePropertyIds.size} properties added to routes.`,
+        description: `Optimized route for ${actualOptimizedCount} properties using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. ${routePropertyIds.size} properties added to routes.`,
       });
     } catch (error) {
       console.error('[Route Optimization] Error:', error);
