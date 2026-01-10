@@ -864,26 +864,40 @@ export function PropertiesView() {
     // Don't automatically optimize route - let user draw area first, then optimize manually
   };
 
-  const handleCreateRouteWithDepot = async (depotProperty?: Property, depotLocation?: { lat: number; lng: number }) => {
-    // Get selected properties with valid coordinates
-    // Filter out properties that are already in existing routes
-    let availableProperties = rawProperties.filter(p => 
-      selectedPropertyIds.has(p.id) && 
-      p.latitude != null && 
-      p.longitude != null &&
-      !propertiesInRoutes.has(p.id) // Exclude properties already in routes
-    );
-
+  const handleCreateRouteWithDepot = async (depotProperty?: Property, depotLocation?: { lat: number; lng: number }, providedProperties?: Property[]) => {
     // Use custom depot if provided, otherwise use default (first property)
     const depotLat = depotLocation?.lat || customDepot?.lat;
     const depotLon = depotLocation?.lng || customDepot?.lng;
     const depotPropertyId = depotProperty?.id || customDepotPropertyId; // Use the specific property ID
 
+    // Get selected properties with valid coordinates
+    // Filter out properties that are already in existing routes
+    // If providedProperties is passed, use those directly (e.g., from area selector with 25 property limit)
+    // Note: We filter out properties in routes, but the depot (if specified) will be added back below
+    let availableProperties = providedProperties 
+      ? providedProperties.filter(p => {
+          if (p.latitude == null || p.longitude == null) return false;
+          // Allow depot property even if it's in routes (it's the starting point)
+          if (depotPropertyId && p.id === depotPropertyId) return true;
+          // Filter out properties already in routes
+          return !propertiesInRoutes.has(p.id);
+        })
+      : rawProperties.filter(p => {
+          if (!selectedPropertyIds.has(p.id)) return false;
+          if (p.latitude == null || p.longitude == null) return false;
+          // Allow depot property even if it's in routes (it's the starting point)
+          if (depotPropertyId && p.id === depotPropertyId) return true;
+          // Filter out properties already in routes
+          return !propertiesInRoutes.has(p.id);
+        });
+
     // IMPORTANT: If a custom depot property is specified, ensure it's included in the route
     // even if it's not in the selected area (it will be the starting point)
     // Also, ensure it's NOT filtered out even if it's already in routes (it's the starting point)
     if (depotPropertyId) {
-      const depotProp = rawProperties.find(p => p.id === depotPropertyId);
+      // Try to find depot property from providedProperties first, then fall back to rawProperties
+      const depotProp = (providedProperties?.find(p => p.id === depotPropertyId)) || 
+                        rawProperties.find(p => p.id === depotPropertyId);
       if (depotProp && depotProp.latitude != null && depotProp.longitude != null) {
         // Check if depot property is already in available properties
         const depotInList = availableProperties.find(p => p.id === depotPropertyId);
@@ -911,11 +925,12 @@ export function PropertiesView() {
     }
 
     // Check if any selected properties are already in routes
-    const duplicateCount = Array.from(selectedPropertyIds).filter(id => 
-      propertiesInRoutes.has(id) && 
-      rawProperties.find(p => p.id === id)?.latitude != null &&
-      rawProperties.find(p => p.id === id)?.longitude != null &&
-      id !== depotPropertyId // Don't count depot property as duplicate if it's already in routes
+    const propertiesToCheck = providedProperties || availableProperties;
+    const duplicateCount = propertiesToCheck.filter(p => 
+      propertiesInRoutes.has(p.id) && 
+      p.latitude != null &&
+      p.longitude != null &&
+      p.id !== depotPropertyId // Don't count depot property as duplicate if it's already in routes
     ).length;
 
     if (duplicateCount > 0) {
@@ -1314,12 +1329,20 @@ export function PropertiesView() {
             return;
           }
 
-          // Auto-select all selected properties
-          const propertyIds = new Set(selectedProperties.map(p => p.id));
+          // Convert selectedProperties (PropertyLike) to full Property objects from rawProperties
+          // selectedProperties is already limited to 25 and includes the depot as the first property
+          // Preserve the order (depot first, then closest properties)
+          const propertyMap = new Map(rawProperties.map(p => [p.id, p]));
+          const propertiesToOptimize = selectedProperties
+            .map(sp => propertyMap.get(sp.id))
+            .filter((p): p is Property => p !== undefined && p.latitude != null && p.longitude != null);
+
+          // Auto-select all selected properties (for UI consistency)
+          const propertyIds = new Set(propertiesToOptimize.map(p => p.id));
           setSelectedPropertyIds(propertyIds);
           
-          // Create route with depot
-          await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation);
+          // Create route with depot, passing the limited properties directly
+          await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation, propertiesToOptimize);
         }}
         properties={rawProperties.filter(p => p.latitude != null && p.longitude != null).map(p => ({
           id: p.id,
