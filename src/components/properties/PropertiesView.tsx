@@ -892,35 +892,57 @@ export function PropertiesView() {
         });
 
     // IMPORTANT: If a custom depot property is specified, ensure it's included in the route
-    // even if it's not in the selected area (it will be the starting point)
-    // Also, ensure it's NOT filtered out even if it's already in routes (it's the starting point)
+    // If providedProperties is passed (from area selector), only use properties from that list
+    // This ensures we respect the area boundaries and property limits
     if (depotPropertyId) {
-      // Try to find depot property from providedProperties first, then fall back to rawProperties
-      const depotProp = (providedProperties?.find(p => p.id === depotPropertyId)) || 
-                        rawProperties.find(p => p.id === depotPropertyId);
-      if (depotProp && depotProp.latitude != null && depotProp.longitude != null) {
-        // Check if depot property is already in available properties
+      if (providedProperties) {
+        // When using providedProperties (from area selector), only use properties from that list
+        // The depot should already be in providedProperties, but ensure it's first
         const depotInList = availableProperties.find(p => p.id === depotPropertyId);
         if (!depotInList) {
-          // Add depot property to the list (it will be the starting point)
-          // Remove it from propertiesInRoutes temporarily so it's not filtered out
-          const wasInRoutes = propertiesInRoutes.has(depotPropertyId);
-          if (wasInRoutes) {
-            // Temporarily remove from tracking so it can be used as starting point
-            setPropertiesInRoutes(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(depotPropertyId);
-              return newSet;
-            });
+          // Try to find depot in the original providedProperties (before filtering)
+          const depotFromProvided = providedProperties.find(p => p.id === depotPropertyId);
+          if (depotFromProvided && depotFromProvided.latitude != null && depotFromProvided.longitude != null) {
+            // Only add if it's not already in routes (or handle it specially)
+            const wasInRoutes = propertiesInRoutes.has(depotPropertyId);
+            if (wasInRoutes) {
+              // Temporarily remove from tracking so it can be used as starting point
+              setPropertiesInRoutes(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(depotPropertyId);
+                return newSet;
+              });
+            }
+            availableProperties = [depotFromProvided, ...availableProperties];
+          } else {
+            console.warn('[Properties] Depot property not found in providedProperties:', depotPropertyId);
           }
-          availableProperties = [depotProp, ...availableProperties];
-          // Also add it to selectedPropertyIds if not already there
-          if (!selectedPropertyIds.has(depotPropertyId)) {
-            setSelectedPropertyIds(new Set([...selectedPropertyIds, depotPropertyId]));
+        } else {
+          // Depot is already in list, ensure it's first
+          const depotIndex = availableProperties.findIndex(p => p.id === depotPropertyId);
+          if (depotIndex > 0) {
+            const depot = availableProperties[depotIndex];
+            availableProperties.splice(depotIndex, 1);
+            availableProperties.unshift(depot);
           }
         }
       } else {
-        console.error('[Properties] Depot property not found:', depotPropertyId);
+        // Legacy behavior: when not using providedProperties, allow finding depot from rawProperties
+        const depotProp = rawProperties.find(p => p.id === depotPropertyId);
+        if (depotProp && depotProp.latitude != null && depotProp.longitude != null) {
+          const depotInList = availableProperties.find(p => p.id === depotPropertyId);
+          if (!depotInList) {
+            const wasInRoutes = propertiesInRoutes.has(depotPropertyId);
+            if (wasInRoutes) {
+              setPropertiesInRoutes(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(depotPropertyId);
+                return newSet;
+              });
+            }
+            availableProperties = [depotProp, ...availableProperties];
+          }
+        }
       }
     }
 
@@ -980,14 +1002,20 @@ export function PropertiesView() {
           property: depotProp ? {
             id: depotProp.id,
             accountNumber: depotProp.accountNumber,
-            address: depotProp.propertyAddress || depotProp.address
+            address: depotProp.propertyAddress
           } : null,
           selectedCount: selectedProperties.length
         });
       }
 
       // Solve VRP using the backend solver
-      const solution = await solveVRP(selectedProperties, numVehicles, depotLat, depotLon, depotPropertyId);
+      // Map properties to match solveVRP type signature (latitude/longitude required)
+      const propertiesForVRP = selectedProperties.map(p => ({
+        ...p,
+        latitude: p.latitude!,
+        longitude: p.longitude!,
+      }));
+      const solution = await solveVRP(propertiesForVRP, numVehicles, depotLat, depotLon, depotPropertyId);
 
       if (!solution.success || !solution.routes || solution.routes.length === 0) {
         throw new Error('No routes generated');
@@ -1329,19 +1357,146 @@ export function PropertiesView() {
             return;
           }
 
+          // Helper functions to check if point is within area (matching AreaSelectorMap logic)
+          const isPointInBounds = (point: { lat: number; lng: number }, bounds: { north: number; south: number; east: number; west: number }): boolean => {
+            return point.lat >= bounds.south &&
+                   point.lat <= bounds.north &&
+                   point.lng >= bounds.west &&
+                   point.lng <= bounds.east;
+          };
+
+          const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+          };
+
+          const isPointInCircle = (point: { lat: number; lng: number }, center: { lat: number; lng: number }, radiusKm: number): boolean => {
+            const distance = calculateDistance(point.lat, point.lng, center.lat, center.lng);
+            return distance <= radiusKm;
+          };
+
+          const isPointInPolygon = (point: { lat: number; lng: number }, polygon: { lat: number; lng: number }[]): boolean => {
+            if (polygon.length < 3) return false;
+            let inside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+              const xi = polygon[i].lng;
+              const yi = polygon[i].lat;
+              const xj = polygon[j].lng;
+              const yj = polygon[j].lat;
+              const intersect = ((yi > point.lat) !== (yj > point.lat)) &&
+                (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi);
+              if (intersect) inside = !inside;
+            }
+            return inside;
+          };
+
           // Convert selectedProperties (PropertyLike) to full Property objects from rawProperties
           // selectedProperties is already limited to 25 and includes the depot as the first property
-          // Preserve the order (depot first, then closest properties)
+          // Also re-validate that each property is actually within the drawn area
           const propertyMap = new Map(rawProperties.map(p => [p.id, p]));
-          const propertiesToOptimize = selectedProperties
-            .map(sp => propertyMap.get(sp.id))
-            .filter((p): p is Property => p !== undefined && p.latitude != null && p.longitude != null);
+          const propertiesToOptimize: Property[] = [];
+          
+          for (const sp of selectedProperties) {
+            const fullProperty = propertyMap.get(sp.id);
+            if (!fullProperty || fullProperty.latitude == null || fullProperty.longitude == null) {
+              console.warn(`[Route Optimization] Property ${sp.id} not found or missing coordinates, skipping`);
+              continue;
+            }
+
+            const point = { lat: fullProperty.latitude, lng: fullProperty.longitude };
+            let isWithinArea = false;
+
+            // Check if property is within the drawn area based on area type
+            if (area.polygon && area.polygon.length >= 3) {
+              isWithinArea = isPointInPolygon(point, area.polygon);
+            } else if (area.center && area.radius !== undefined) {
+              isWithinArea = isPointInCircle(point, area.center, area.radius);
+            } else {
+              // Rectangle bounds
+              isWithinArea = isPointInBounds(point, {
+                north: area.north,
+                south: area.south,
+                east: area.east,
+                west: area.west
+              });
+            }
+
+            if (isWithinArea) {
+              propertiesToOptimize.push(fullProperty);
+            } else {
+              console.warn(`[Route Optimization] Property ${sp.id} (${fullProperty.propertyAddress}) is outside the drawn area, skipping`);
+            }
+          }
+
+          console.log('[Route Optimization] Area validation:', {
+            selectedPropertiesCount: selectedProperties.length,
+            validatedCount: propertiesToOptimize.length,
+            areaType: area.polygon ? 'polygon' : area.radius !== undefined ? 'circle' : 'rectangle',
+            areaBounds: { north: area.north, south: area.south, east: area.east, west: area.west }
+          });
+
+          if (propertiesToOptimize.length === 0) {
+            toast({
+              title: "Error",
+              description: "No properties found within the drawn area. Please redraw the area.",
+              variant: "destructive",
+            });
+            return;
+          }
+
+          // Ensure depot property is included and is first
+          // The depot should already be in propertiesToOptimize, but ensure it's first
+          const depotIndex = propertiesToOptimize.findIndex(p => p.id === depotProperty.id);
+          if (depotIndex > 0) {
+            // Move depot to first position
+            propertiesToOptimize.splice(depotIndex, 1);
+            propertiesToOptimize.unshift(depotProperty);
+          } else if (depotIndex === -1) {
+            // Depot not in validated list, but it should be - verify it's within area
+            const depotPoint = { lat: depotProperty.latitude!, lng: depotProperty.longitude! };
+            let depotInArea = false;
+            if (area.polygon && area.polygon.length >= 3) {
+              depotInArea = isPointInPolygon(depotPoint, area.polygon);
+            } else if (area.center && area.radius !== undefined) {
+              depotInArea = isPointInCircle(depotPoint, area.center, area.radius);
+            } else {
+              depotInArea = isPointInBounds(depotPoint, {
+                north: area.north,
+                south: area.south,
+                east: area.east,
+                west: area.west
+              });
+            }
+            
+            if (depotInArea) {
+              // Add depot to beginning if it's within area
+              propertiesToOptimize.unshift(depotProperty);
+            } else {
+              console.warn('[Route Optimization] Depot property is outside the drawn area, but adding as starting point');
+              // Still add it as it's the starting point, but log warning
+              propertiesToOptimize.unshift(depotProperty);
+            }
+          }
+
+          console.log('[Route Optimization] Final properties to optimize:', {
+            count: propertiesToOptimize.length,
+            depotId: depotProperty.id,
+            depotAddress: depotProperty.propertyAddress,
+            propertyIds: propertiesToOptimize.map(p => p.id).slice(0, 5) + (propertiesToOptimize.length > 5 ? '...' : '')
+          });
 
           // Auto-select all selected properties (for UI consistency)
           const propertyIds = new Set(propertiesToOptimize.map(p => p.id));
           setSelectedPropertyIds(propertyIds);
           
-          // Create route with depot, passing the limited properties directly
+          // Create route with depot, passing the limited and validated properties directly
           await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation, propertiesToOptimize);
         }}
         properties={rawProperties.filter(p => p.latitude != null && p.longitude != null).map(p => ({
