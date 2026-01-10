@@ -105,11 +105,14 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }
     
     if (waypoints.length === 0) return;
 
-    // Open in Google Maps (or OpenStreetMap) with waypoints
-    // For simplicity, we'll open Google Maps with the first and last waypoint
-    const first = waypoints[0];
-    const last = waypoints[waypoints.length - 1];
-    const mapsUrl = `https://www.google.com/maps/dir/${first.lat},${first.lon}/${last.lat},${last.lon}`;
+    // Google Maps URL format: /dir/{origin}/{waypoint1}/{waypoint2}/.../{destination}
+    // Limit to 25 waypoints (Google Maps limit)
+    const limitedWaypoints = waypoints.slice(0, 25);
+    
+    // Build URL with all waypoints
+    const waypointStrings = limitedWaypoints.map(wp => `${wp.lat},${wp.lon}`);
+    const mapsUrl = `https://www.google.com/maps/dir/${waypointStrings.join('/')}`;
+    
     window.open(mapsUrl, '_blank');
   };
 
@@ -240,9 +243,9 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }
                 variant="outline"
                 size="sm"
                 onClick={() => handleOpenInMaps(index)}
-                title="Open route in Google Maps for navigation"
+                title={`Open route in Google Maps with ${Math.min(routes[index].waypoints.filter(wp => wp.id !== 'depot').length, 25)} stops`}
               >
-                Open Route {index + 1} in Maps
+                Open Route {index + 1} in Maps ({Math.min(routes[index].waypoints.filter(wp => wp.id !== 'depot').length, 25)} stops)
               </Button>
             ))}
             <Button onClick={onClose}>Close</Button>
