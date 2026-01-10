@@ -429,10 +429,23 @@ router.post('/solve', async (req, res) => {
     
     if (depotPropertyId) {
       // Use the specified property as depot
-      depotProperty = validProperties.find(p => p.id === depotPropertyId);
+      // Try matching by id first, then by accountNumber if id doesn't match
+      depotProperty = validProperties.find(p => p.id === depotPropertyId || p.accountNumber === depotPropertyId);
       if (!depotProperty) {
-        return res.status(400).json({ error: `Specified depot property (ID: ${depotPropertyId}) not found in selected properties` });
+        console.error('[ROUTING] Depot property not found:', {
+          requestedId: depotPropertyId,
+          availableIds: validProperties.slice(0, 5).map(p => ({ id: p.id, accountNumber: p.accountNumber }))
+        });
+        return res.status(400).json({ 
+          error: `Specified depot property (ID: ${depotPropertyId}) not found in selected properties`,
+          availableCount: validProperties.length
+        });
       }
+      console.log('[ROUTING] Using specified depot property:', {
+        id: depotProperty.id,
+        accountNumber: depotProperty.accountNumber,
+        address: depotProperty.propertyAddress || depotProperty.address
+      });
     } else if (depotLat != null && depotLon != null) {
       // Find the closest property to the custom depot location
       let minDistance = Infinity;
@@ -456,12 +469,27 @@ router.post('/solve', async (req, res) => {
       lat: depotProperty.latitude,
       lon: depotProperty.longitude,
       id: 'depot',
-      address: depotProperty.propertyAddress || depotProperty.address || 'Depot'
+      address: depotProperty.propertyAddress || depotProperty.address || 'Depot',
+      originalId: depotProperty.id, // Keep track of original property ID
+      accountNumber: depotProperty.accountNumber // Keep account number for reference
     };
 
     // Build locations array: [depot, ...other properties]
     // Exclude the depot property from the list of properties to visit
-    const otherProperties = validProperties.filter(p => p.id !== depotProperty.id);
+    // Match by both id and accountNumber to ensure we exclude the correct property
+    const otherProperties = validProperties.filter(p => 
+      p.id !== depotProperty.id && 
+      p.accountNumber !== depotProperty.accountNumber
+    );
+    
+    console.log('[ROUTING] Depot setup:', {
+      depotAddress: depot.address,
+      depotId: depotProperty.id,
+      depotAccountNumber: depotProperty.accountNumber,
+      totalProperties: validProperties.length,
+      otherPropertiesCount: otherProperties.length,
+      depotExcluded: !otherProperties.find(p => p.id === depotProperty.id)
+    });
     
     const locations = [
       depot,

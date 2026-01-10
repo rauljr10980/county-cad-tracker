@@ -924,6 +924,21 @@ export function PropertiesView() {
     setIsOptimizingRoute(true);
 
     try {
+      // Debug: Log the depot property ID being sent
+      if (depotPropertyId) {
+        const depotProp = selectedProperties.find(p => p.id === depotPropertyId);
+        console.log('[Route Optimization] Using depot property:', {
+          depotPropertyId,
+          foundInSelected: !!depotProp,
+          property: depotProp ? {
+            id: depotProp.id,
+            accountNumber: depotProp.accountNumber,
+            address: depotProp.propertyAddress || depotProp.address
+          } : null,
+          selectedCount: selectedProperties.length
+        });
+      }
+
       // Solve VRP using the backend solver
       const solution = await solveVRP(selectedProperties, numVehicles, depotLat, depotLon, depotPropertyId);
 
