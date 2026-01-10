@@ -1504,6 +1504,22 @@ export function PreForeclosureView() {
         isOpen={areaSelectorOpen}
         onClose={() => setAreaSelectorOpen(false)}
         onAreaSelected={handleAreaSelected}
+        onStartingPointSelected={(property, pinLocation) => {
+          // Find the record that matches the property (it should have document_number as id)
+          const record = filteredRecords.find(r => r.document_number === property.id);
+          if (record) {
+            handleStartingPointSelected(record, pinLocation);
+          }
+        }}
+        properties={filteredRecords.filter(r => r.latitude != null && r.longitude != null).map(r => ({
+          id: r.document_number,
+          latitude: r.latitude!,
+          longitude: r.longitude!,
+          propertyAddress: r.address || '',
+          address: r.address || '',
+          ownerName: r.property_owner || '',
+          accountNumber: r.document_number
+        }))}
       />
 
       {/* Starting Point Selector */}

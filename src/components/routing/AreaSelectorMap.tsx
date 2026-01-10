@@ -10,10 +10,11 @@ import { LatLngBounds, LatLng } from 'leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
-import { Loader2, Square, Circle as CircleIcon, Check, X, PenTool } from 'lucide-react';
+import { Loader2, Square, Circle as CircleIcon, Check, X, PenTool, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Marker, Popup } from 'react-leaflet';
 
 // Fix for default marker icons in Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -22,6 +23,17 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
+
+interface PropertyLike {
+  id: string;
+  latitude: number;
+  longitude: number;
+  propertyAddress?: string;
+  address?: string;
+  ownerName?: string;
+  accountNumber?: string;
+  [key: string]: any;
+}
 
 interface AreaSelectorMapProps {
   isOpen: boolean;
@@ -35,8 +47,23 @@ interface AreaSelectorMapProps {
     radius?: number; // For circle
     polygon?: LatLng[]; // For custom polygon
   }) => void;
+  onStartingPointSelected?: (property: PropertyLike, pinLocation: { lat: number; lng: number }) => void;
+  properties?: PropertyLike[];
   initialCenter?: { lat: number; lng: number };
   initialZoom?: number;
+}
+
+// Calculate distance between two points (Haversine formula)
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 // Component to handle drawing (rectangle, circle, and polygon)
@@ -45,13 +72,15 @@ function ShapeDrawer({
   onRectangleComplete,
   onCircleComplete,
   onPolygonComplete,
-  onPolygonPointAdd
+  onPolygonPointAdd,
+  onPinDrop
 }: { 
-  drawingMode: 'rectangle' | 'circle' | 'polygon' | null;
+  drawingMode: 'rectangle' | 'circle' | 'polygon' | 'pin' | null;
   onRectangleComplete: (bounds: LatLngBounds) => void;
   onCircleComplete: (center: LatLng, radius: number) => void;
   onPolygonComplete: (points: LatLng[]) => void;
   onPolygonPointAdd: (points: LatLng[]) => void;
+  onPinDrop?: (latlng: LatLng) => void;
 }) {
   const map = useMap();
   const [startPos, setStartPos] = useState<LatLng | null>(null);
@@ -61,6 +90,11 @@ function ShapeDrawer({
 
   useMapEvents({
     mousedown(e) {
+      if (drawingMode === 'pin' && onPinDrop) {
+        onPinDrop(e.latlng);
+        e.originalEvent.stopPropagation();
+        return;
+      }
       if (drawingMode === 'polygon') {
         // Add point to polygon
         const newPoints = [...polygonPoints, e.latlng];
@@ -167,14 +201,19 @@ export function AreaSelectorMap({
   isOpen, 
   onClose, 
   onAreaSelected,
+  onStartingPointSelected,
+  properties = [],
   initialCenter = { lat: 29.4241, lng: -98.4936 }, // San Antonio default
   initialZoom = 11
 }: AreaSelectorMapProps) {
-  const [drawingMode, setDrawingMode] = useState<'rectangle' | 'circle' | 'polygon' | null>(null);
+  const [drawingMode, setDrawingMode] = useState<'rectangle' | 'circle' | 'polygon' | 'pin' | null>(null);
   const [selectedShape, setSelectedShape] = useState<{ type: 'rectangle' | 'circle' | 'polygon'; bounds: LatLngBounds; center?: LatLng; radius?: number; polygon?: LatLng[] } | null>(null);
   const [drawnRectangle, setDrawnRectangle] = useState<LatLngBounds | null>(null);
   const [drawnCircle, setDrawnCircle] = useState<{ center: LatLng; radius: number } | null>(null);
   const [drawnPolygon, setDrawnPolygon] = useState<LatLng[] | null>(null);
+  const [pinLocation, setPinLocation] = useState<LatLng | null>(null);
+  const [closestProperty, setClosestProperty] = useState<PropertyLike | null>(null);
+  const [isFindingClosest, setIsFindingClosest] = useState(false);
 
   const handleRectangleComplete = (bounds: LatLngBounds) => {
     setDrawnRectangle(bounds);
@@ -264,6 +303,53 @@ export function AreaSelectorMap({
     }
   };
 
+  const handlePinDrop = (latlng: LatLng) => {
+    setPinLocation(latlng);
+    setIsFindingClosest(true);
+
+    // Find the closest property to the pin location
+    const validProperties = properties.filter(p => 
+      p.latitude != null && 
+      p.longitude != null
+    );
+
+    if (validProperties.length === 0) {
+      setClosestProperty(null);
+      setIsFindingClosest(false);
+      return;
+    }
+
+    let closest: PropertyLike | null = null;
+    let minDistance = Infinity;
+
+    for (const property of validProperties) {
+      if (!property.latitude || !property.longitude) continue;
+
+      const distance = calculateDistance(
+        latlng.lat,
+        latlng.lng,
+        property.latitude,
+        property.longitude
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = property;
+      }
+    }
+
+    setClosestProperty(closest);
+    setIsFindingClosest(false);
+  };
+
+  const handleConfirmStartingPoint = () => {
+    if (!closestProperty || !pinLocation || !onStartingPointSelected) return;
+    onStartingPointSelected(closestProperty, { lat: pinLocation.lat, lng: pinLocation.lng });
+    setPinLocation(null);
+    setClosestProperty(null);
+    setDrawingMode(null);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -280,8 +366,9 @@ export function AreaSelectorMap({
           {/* Controls Sidebar */}
           <div className="w-64 flex flex-col gap-4">
             <Tabs defaultValue="draw" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="draw">Draw</TabsTrigger>
+                <TabsTrigger value="starting">Starting Point</TabsTrigger>
                 <TabsTrigger value="clear">Clear</TabsTrigger>
               </TabsList>
               
@@ -332,6 +419,91 @@ export function AreaSelectorMap({
                   >
                     Finish Polygon ({polygonPointsBeingDrawn.length} points)
                   </Button>
+                )}
+              </TabsContent>
+
+              <TabsContent value="starting" className="mt-4 space-y-4">
+                {onStartingPointSelected && properties.length > 0 ? (
+                  <>
+                    <div className="text-sm text-muted-foreground">
+                      Click on the map to drop a pin. The route will start from the closest property to your pin location.
+                    </div>
+                    <Button
+                      variant={drawingMode === 'pin' ? 'default' : 'outline'}
+                      className="w-full justify-start"
+                      onClick={() => {
+                        handleClearSelection();
+                        setDrawingMode('pin');
+                        setPinLocation(null);
+                        setClosestProperty(null);
+                      }}
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Drop Pin
+                    </Button>
+                    {pinLocation && (
+                      <>
+                        <div className="text-xs space-y-1">
+                          <div><strong>Pin Location:</strong></div>
+                          <div className="text-muted-foreground">
+                            Lat: {pinLocation.lat.toFixed(6)}<br/>
+                            Lng: {pinLocation.lng.toFixed(6)}
+                          </div>
+                        </div>
+                        {isFindingClosest ? (
+                          <div className="flex items-center justify-center py-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            <span className="ml-2 text-xs">Finding closest...</span>
+                          </div>
+                        ) : closestProperty ? (
+                          <div className="text-xs space-y-1">
+                            <div><strong>Closest Property:</strong></div>
+                            <div className="text-muted-foreground">
+                              {closestProperty.propertyAddress || closestProperty.address || 'N/A'}<br/>
+                              {closestProperty.accountNumber && <span>Account: {closestProperty.accountNumber}</span>}
+                              <div className="mt-1">
+                                Distance: {calculateDistance(
+                                  pinLocation.lat,
+                                  pinLocation.lng,
+                                  closestProperty.latitude,
+                                  closestProperty.longitude
+                                ).toFixed(2)} km
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground">
+                            No properties with valid coordinates found.
+                          </div>
+                        )}
+                        {closestProperty && (
+                          <Button
+                            className="w-full"
+                            onClick={handleConfirmStartingPoint}
+                          >
+                            <Check className="h-4 w-4 mr-2" />
+                            Use as Starting Point
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => {
+                            setPinLocation(null);
+                            setClosestProperty(null);
+                            setDrawingMode(null);
+                          }}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Clear Pin
+                        </Button>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Starting point selection requires properties with coordinates.
+                  </div>
                 )}
               </TabsContent>
               
@@ -386,6 +558,7 @@ export function AreaSelectorMap({
                 onCircleComplete={handleCircleComplete}
                 onPolygonComplete={handlePolygonComplete}
                 onPolygonPointAdd={handlePolygonPointAdd}
+                onPinDrop={drawingMode === 'pin' ? handlePinDrop : undefined}
               />
               {drawnRectangle && (
                 <Rectangle bounds={drawnRectangle} pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.2, weight: 2 }} />
@@ -395,6 +568,45 @@ export function AreaSelectorMap({
               )}
               {drawnPolygon && drawnPolygon.length >= 3 && (
                 <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
+              )}
+              {/* Show starting point pin */}
+              {pinLocation && (
+                <Marker
+                  position={[pinLocation.lat, pinLocation.lng]}
+                  icon={L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                  })}
+                >
+                  <Popup>
+                    <div style={{ padding: '4px' }}>
+                      <strong>Starting Point</strong><br/>
+                      {closestProperty ? `Closest: ${closestProperty.propertyAddress || closestProperty.address || 'N/A'}` : 'Finding closest property...'}
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+              {/* Show closest property marker */}
+              {closestProperty && pinLocation && (
+                <Marker
+                  position={[closestProperty.latitude, closestProperty.longitude]}
+                  icon={L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                  })}
+                >
+                  <Popup>
+                    <div style={{ padding: '4px' }}>
+                      <strong>Closest Property</strong><br/>
+                      {closestProperty.propertyAddress || closestProperty.address || 'N/A'}<br/>
+                      {closestProperty.accountNumber && <small>{closestProperty.accountNumber}</small>}
+                    </div>
+                  </Popup>
+                </Marker>
               )}
               {selectedShape && <MapBoundsFitter bounds={selectedShape.bounds} />}
             </MapContainer>

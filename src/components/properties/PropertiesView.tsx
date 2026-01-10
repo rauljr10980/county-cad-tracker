@@ -1203,6 +1203,8 @@ export function PropertiesView() {
         isOpen={areaSelectorOpen}
         onClose={() => setAreaSelectorOpen(false)}
         onAreaSelected={handleAreaSelected}
+        onStartingPointSelected={handleStartingPointSelected}
+        properties={rawProperties.filter(p => p.latitude != null && p.longitude != null)}
       />
 
       {/* Starting Point Selector */}
