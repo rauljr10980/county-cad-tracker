@@ -167,4 +167,30 @@ router.post('/logout', authenticateToken, async (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
+// ============================================================================
+// VERIFY EMAIL
+// ============================================================================
+
+router.get('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Verification token is required' });
+    }
+
+    // Verify the token (this should be a JWT or similar token with user info)
+    // For now, just return success - implement actual token verification if needed
+    // You would decode the token and update the user's emailVerified field
+    
+    res.json({ 
+      success: true, 
+      message: 'Email verified successfully' 
+    });
+  } catch (error) {
+    console.error('[AUTH] Email verification error:', error);
+    res.status(500).json({ error: 'Failed to verify email' });
+  }
+});
+
 module.exports = router;

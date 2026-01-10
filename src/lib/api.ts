@@ -405,6 +405,7 @@ export async function updatePropertyFollowUp(propertyId: string, followUpDate: s
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ followUpDate }),
   });
@@ -422,6 +423,7 @@ export async function updatePropertyNotes(propertyId: string, notes: string) {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ notes }),
   });
@@ -439,6 +441,7 @@ export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumber
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ phoneNumbers, ownerPhoneIndex }),
   });
@@ -494,6 +497,7 @@ export async function updatePropertyPriority(
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ priority }),
   });
@@ -515,6 +519,7 @@ export async function markTaskDone(
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ outcome, nextAction }),
   });
@@ -538,6 +543,7 @@ export async function updatePropertyDealStage(
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ dealStage, estimatedDealValue, offerAmount, expectedCloseDate }),
   });
