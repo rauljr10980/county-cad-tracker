@@ -282,15 +282,37 @@ export function PreForeclosureView() {
     // Don't automatically optimize route - let user draw area first, then optimize manually
   };
 
-  const handleCreateRouteWithDepot = async (depotRecord?: PreForeclosureRecord, depotLocation?: { lat: number; lng: number }) => {
-    // Get selected records with valid coordinates
-    // Filter out records that are already in existing routes
-    let availableRecords = filteredRecords.filter(r => 
-      selectedRecordIds.has(r.document_number) && 
-      r.latitude != null && 
-      r.longitude != null &&
-      !recordsInRoutes.has(r.document_number) // Exclude records already in routes
-    );
+  const handleCreateRouteWithDepot = async (depotRecord?: PreForeclosureRecord, depotLocation?: { lat: number; lng: number }, providedRecords?: PreForeclosureRecord[]) => {
+    // If providedRecords is passed (from area selector), use those directly
+    // Otherwise, get selected records with valid coordinates
+    let availableRecords: PreForeclosureRecord[];
+    
+    if (providedRecords && providedRecords.length > 0) {
+      // Use the limited records from area selector
+      console.log('[PreForeclosure] Using providedRecords from area selector:', providedRecords.length);
+      availableRecords = providedRecords.filter(r => 
+        r.latitude != null && 
+        r.longitude != null &&
+        !recordsInRoutes.has(r.document_number) // Exclude records already in routes
+      );
+    } else {
+      // Use selected records, but enforce 26-property limit for main optimize button
+      const selectedFromFiltered = filteredRecords.filter(r => 
+        selectedRecordIds.has(r.document_number) && 
+        r.latitude != null && 
+        r.longitude != null &&
+        !recordsInRoutes.has(r.document_number) // Exclude records already in routes
+      );
+      
+      // CRITICAL: Limit to 26 properties (1 depot + 25 to visit) when using main optimize button
+      if (selectedFromFiltered.length > 26) {
+        console.warn('[PreForeclosure] Too many selected records (' + selectedFromFiltered.length + '). Limiting to 26 for optimization.');
+        // Take first 26 records (sorted by distance from depot if depot is set, otherwise just first 26)
+        availableRecords = selectedFromFiltered.slice(0, 26);
+      } else {
+        availableRecords = selectedFromFiltered;
+      }
+    }
 
     // Use custom depot if provided, otherwise use default (first record)
     const depotLat = depotLocation?.lat || customDepot?.lat;
@@ -307,7 +329,6 @@ export function PreForeclosureView() {
         // Check if depot record is already in available records
         const depotInList = availableRecords.find(r => r.document_number === depotPropertyId);
         if (!depotInList) {
-          // Add depot record to the list (it will be the starting point)
           // Remove it from recordsInRoutes temporarily so it's not filtered out
           const wasInRoutes = recordsInRoutes.has(depotPropertyId);
           if (wasInRoutes) {
@@ -318,15 +339,43 @@ export function PreForeclosureView() {
               return newSet;
             });
           }
+          // CRITICAL: Ensure we don't exceed 26 properties when adding depot
+          // If we already have 26, remove the last one to make room for depot
+          if (availableRecords.length >= 26) {
+            console.warn('[PreForeclosure] availableRecords already at limit (26), removing last record to make room for depot');
+            availableRecords = availableRecords.slice(0, 25); // Keep 25 to make room for depot (total 26)
+          }
+          // Add depot record as the first item (starting point)
           availableRecords = [depotRec, ...availableRecords];
           // Also add it to selectedRecordIds if not already there
           if (!selectedRecordIds.has(depotPropertyId)) {
             setSelectedRecordIds(new Set([...selectedRecordIds, depotPropertyId]));
           }
+        } else {
+          // Depot is already in the list, ensure it's first
+          const depotIndex = availableRecords.findIndex(r => r.document_number === depotPropertyId);
+          if (depotIndex > 0) {
+            availableRecords.splice(depotIndex, 1);
+            availableRecords.unshift(depotRec);
+          }
         }
       } else {
         console.error('[PreForeclosure] Depot record not found:', depotPropertyId);
       }
+    }
+
+    // FINAL SAFETY CHECK: Ensure we never exceed 26 properties total
+    if (availableRecords.length > 26) {
+      console.error('[PreForeclosure] CRITICAL: availableRecords exceeds 26 after depot handling!', availableRecords.length);
+      // Keep depot first if exists, then take first 25 others
+      if (depotPropertyId) {
+        const depotRec = availableRecords.find(r => r.document_number === depotPropertyId);
+        const others = availableRecords.filter(r => r.document_number !== depotPropertyId).slice(0, 25);
+        availableRecords = depotRec ? [depotRec, ...others] : availableRecords.slice(0, 26);
+      } else {
+        availableRecords = availableRecords.slice(0, 26);
+      }
+      console.warn('[PreForeclosure] Force-limited to 26 after depot handling:', availableRecords.length);
     }
 
     // Check if any selected records are already in routes
@@ -361,6 +410,30 @@ export function PreForeclosureView() {
       return;
     }
 
+    // CRITICAL: Enforce 26 property limit (1 depot + 25 to visit) when using main optimize button
+    // If providedRecords was passed, it should already be limited, but double-check
+    if (!providedRecords && availableRecords.length > 26) {
+      console.error('[PreForeclosure] CRITICAL: More than 26 records after filtering!', availableRecords.length);
+      toast({
+        title: "Too many records selected",
+        description: `You selected ${selectedRecordIds.size} records, but only 26 are allowed for optimization (1 starting point + 25 properties). Please use the "Select Area" button to limit your selection, or manually select 25 or fewer records.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // For area selector path (providedRecords), backend will validate, but also check here
+    if (providedRecords && availableRecords.length > 26) {
+      console.error('[PreForeclosure] ERROR: Area selector provided more than 26 records!', availableRecords.length);
+      toast({
+        title: "Too many records",
+        description: `Area selector returned ${availableRecords.length} records, but maximum 26 allowed (1 starting point + 25 properties).`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Legacy check for very large selections (should not happen with limits above)
     if (availableRecords.length > 500) {
       toast({
         title: "Too many records",
@@ -1598,12 +1671,89 @@ export function PreForeclosureView() {
             return;
           }
 
-          // Auto-select all selected properties
-          const propertyIds = new Set(selectedProperties.map(p => p.id));
+          // Convert selectedProperties (PropertyLike) to PreForeclosureRecord objects
+          const propertyMap = new Map(records.map(r => [r.document_number, r]));
+          const selectedRecords: PreForeclosureRecord[] = [];
+          
+          console.log('[PreForeclosure] Area selector received:', {
+            selectedPropertiesCount: selectedProperties.length,
+            depotId: depotRecord.document_number
+          });
+
+          // CRITICAL: AreaSelectorMap should already limit to 26, but if it didn't, limit here
+          const limitedProperties = selectedProperties.length > 26 
+            ? selectedProperties.slice(0, 26) 
+            : selectedProperties;
+          
+          if (selectedProperties.length > 26) {
+            console.error('[PreForeclosure] WARNING: Area selector returned more than 26 properties!', selectedProperties.length, '-> limiting to 26');
+          }
+
+          for (const sp of limitedProperties) {
+            const record = propertyMap.get(sp.id);
+            if (record && record.latitude != null && record.longitude != null) {
+              selectedRecords.push(record);
+            }
+          }
+
+          console.log('[PreForeclosure] Area selector optimization:', {
+            selectedPropertiesCount: selectedProperties.length,
+            limitedPropertiesCount: limitedProperties.length,
+            convertedRecordsCount: selectedRecords.length,
+            depotId: depotRecord.document_number
+          });
+
+          // Ensure depot is included and first
+          const depotIndex = selectedRecords.findIndex(r => r.document_number === depotRecord.document_number);
+          if (depotIndex > 0) {
+            // Depot exists but not first - move to first
+            selectedRecords.splice(depotIndex, 1);
+            selectedRecords.unshift(depotRecord);
+          } else if (depotIndex === -1) {
+            // Depot not in list - add it first, remove last if needed
+            if (selectedRecords.length >= 26) {
+              selectedRecords.pop(); // Remove last to make room
+            }
+            selectedRecords.unshift(depotRecord);
+          }
+
+          // FINAL CHECK: Ensure exactly 26 or less (1 depot + up to 25 others)
+          if (selectedRecords.length > 26) {
+            console.error('[PreForeclosure] CRITICAL: selectedRecords still exceeds 26 after depot handling!', selectedRecords.length);
+            const depotInFinal = selectedRecords[0]?.document_number === depotRecord.document_number;
+            if (depotInFinal) {
+              selectedRecords.splice(26); // Keep first 26 (depot + 25 others)
+            } else {
+              // Depot not first - fix it
+              const finalDepotIndex = selectedRecords.findIndex(r => r.document_number === depotRecord.document_number);
+              if (finalDepotIndex >= 0) {
+                selectedRecords.splice(finalDepotIndex, 1);
+                selectedRecords.unshift(depotRecord);
+              }
+              selectedRecords.splice(26); // Keep first 26
+            }
+            console.error('[PreForeclosure] Force-limited to 26:', selectedRecords.length);
+          }
+
+          // Final validation before sending to backend
+          if (selectedRecords.length > 26) {
+            toast({
+              title: "Route Optimization Failed",
+              description: `Too many records selected (${selectedRecords.length}). Maximum 26 allowed (1 starting point + 25 properties). Please select a smaller area.`,
+              variant: "destructive",
+            });
+            console.error('[PreForeclosure] Aborting route creation - too many records:', selectedRecords.length);
+            return;
+          }
+
+          console.log('[PreForeclosure] Final selectedRecords count before route creation:', selectedRecords.length);
+          
+          // Auto-select all selected properties (for UI consistency)
+          const propertyIds = new Set(selectedRecords.map(r => r.document_number));
           setSelectedRecordIds(propertyIds);
           
-          // Create route with depot
-          await handleCreateRouteWithDepot(depotRecord, startingPoint.pinLocation);
+          // Create route with depot, passing the limited records from area selector
+          await handleCreateRouteWithDepot(depotRecord, startingPoint.pinLocation, selectedRecords);
         }}
         properties={filteredRecords.filter(r => r.latitude != null && r.longitude != null).map(r => ({
           id: r.document_number,
