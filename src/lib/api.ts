@@ -666,10 +666,28 @@ export async function getPreForeclosures(filters?: { address?: string; city?: st
   if (filters?.zip) params.append('zip', filters.zip);
   
   const url = `${API_BASE_URL}/api/preforeclosure${params.toString() ? `?${params.toString()}` : ''}`;
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: getAuthHeaders(),
+  });
+  
   if (!response.ok) {
-    throw new Error('Failed to fetch pre-foreclosure records');
+    let errorMessage = 'Failed to fetch pre-foreclosure records';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error || errorMessage;
+    } catch {
+      // If response is not JSON, use status text
+      errorMessage = response.statusText || errorMessage;
+    }
+    console.error('[API] Pre-foreclosure fetch error:', {
+      status: response.status,
+      statusText: response.statusText,
+      url,
+      errorMessage
+    });
+    throw new Error(errorMessage);
   }
+  
   return response.json();
 }
 
