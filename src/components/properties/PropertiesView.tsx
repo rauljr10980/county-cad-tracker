@@ -912,11 +912,16 @@ export function PropertiesView() {
       });
     }
 
-    if (availableProperties.length === 0) {
+    // Check if we only have the depot property (no other properties to visit)
+    const hasOnlyDepot = availableProperties.length === 1 && 
+                         depotPropertyId && 
+                         availableProperties[0].id === depotPropertyId;
+
+    if (availableProperties.length === 0 || hasOnlyDepot) {
       toast({
         title: "No valid locations",
-        description: duplicateCount > 0 
-          ? "All selected properties are already in existing routes. Please select different properties."
+        description: hasOnlyDepot || duplicateCount > 0
+          ? "All selected properties are already in existing routes. The starting point cannot be the only property. Please select additional properties that are not already in routes."
           : "Please select properties with latitude and longitude coordinates, or use the area selector.",
         variant: "destructive",
       });

@@ -331,11 +331,16 @@ export function PreForeclosureView() {
       });
     }
 
-    if (availableRecords.length === 0) {
+    // Check if we only have the depot record (no other records to visit)
+    const hasOnlyDepot = availableRecords.length === 1 && 
+                         depotPropertyId && 
+                         availableRecords[0].document_number === depotPropertyId;
+
+    if (availableRecords.length === 0 || hasOnlyDepot) {
       toast({
         title: "No valid locations",
-        description: duplicateCount > 0 
-          ? "All selected records are already in existing routes. Please select different records."
+        description: hasOnlyDepot || duplicateCount > 0
+          ? "All selected records are already in existing routes. The starting point cannot be the only record. Please select additional records that are not already in routes."
           : "Please select records with latitude and longitude coordinates, or use the area selector.",
         variant: "destructive",
       });
