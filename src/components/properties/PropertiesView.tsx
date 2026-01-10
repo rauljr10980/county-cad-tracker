@@ -836,6 +836,10 @@ export function PropertiesView() {
 
   const handleStartingPointSelected = (property: Property, pinLocation: { lat: number; lng: number }) => {
     setCustomDepot(pinLocation);
+    // Ensure the closest property is selected
+    if (!selectedPropertyIds.has(property.id)) {
+      setSelectedPropertyIds(new Set([...selectedPropertyIds, property.id]));
+    }
     toast({
       title: "Starting Point Selected",
       description: `Starting point set. Route will begin from the closest property: ${property.propertyAddress}`,
