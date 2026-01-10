@@ -285,6 +285,7 @@ export function PreForeclosureView() {
 
     // IMPORTANT: If a custom depot record is specified, ensure it's included in the route
     // even if it's not in the selected area (it will be the starting point)
+    // Also, ensure it's NOT filtered out even if it's already in routes (it's the starting point)
     if (depotPropertyId) {
       const depotRec = filteredRecords.find(r => r.document_number === depotPropertyId) ||
                        records.find(r => r.document_number === depotPropertyId); // Also check all records
@@ -293,12 +294,24 @@ export function PreForeclosureView() {
         const depotInList = availableRecords.find(r => r.document_number === depotPropertyId);
         if (!depotInList) {
           // Add depot record to the list (it will be the starting point)
+          // Remove it from recordsInRoutes temporarily so it's not filtered out
+          const wasInRoutes = recordsInRoutes.has(depotPropertyId);
+          if (wasInRoutes) {
+            // Temporarily remove from tracking so it can be used as starting point
+            setRecordsInRoutes(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(depotPropertyId);
+              return newSet;
+            });
+          }
           availableRecords = [depotRec, ...availableRecords];
           // Also add it to selectedRecordIds if not already there
           if (!selectedRecordIds.has(depotPropertyId)) {
             setSelectedRecordIds(new Set([...selectedRecordIds, depotPropertyId]));
           }
         }
+      } else {
+        console.error('[PreForeclosure] Depot record not found:', depotPropertyId);
       }
     }
 

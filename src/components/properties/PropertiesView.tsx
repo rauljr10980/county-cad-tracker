@@ -867,6 +867,7 @@ export function PropertiesView() {
 
     // IMPORTANT: If a custom depot property is specified, ensure it's included in the route
     // even if it's not in the selected area (it will be the starting point)
+    // Also, ensure it's NOT filtered out even if it's already in routes (it's the starting point)
     if (depotPropertyId) {
       const depotProp = rawProperties.find(p => p.id === depotPropertyId);
       if (depotProp && depotProp.latitude != null && depotProp.longitude != null) {
@@ -874,12 +875,24 @@ export function PropertiesView() {
         const depotInList = availableProperties.find(p => p.id === depotPropertyId);
         if (!depotInList) {
           // Add depot property to the list (it will be the starting point)
+          // Remove it from propertiesInRoutes temporarily so it's not filtered out
+          const wasInRoutes = propertiesInRoutes.has(depotPropertyId);
+          if (wasInRoutes) {
+            // Temporarily remove from tracking so it can be used as starting point
+            setPropertiesInRoutes(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(depotPropertyId);
+              return newSet;
+            });
+          }
           availableProperties = [depotProp, ...availableProperties];
           // Also add it to selectedPropertyIds if not already there
           if (!selectedPropertyIds.has(depotPropertyId)) {
             setSelectedPropertyIds(new Set([...selectedPropertyIds, depotPropertyId]));
           }
         }
+      } else {
+        console.error('[Properties] Depot property not found:', depotPropertyId);
       }
     }
 
@@ -957,6 +970,10 @@ export function PropertiesView() {
       });
 
       // Update the set of properties in routes
+      // Include the depot property ID if it was used (it should be tracked too)
+      if (depotPropertyId) {
+        routePropertyIds.add(depotPropertyId);
+      }
       setPropertiesInRoutes(prev => new Set([...prev, ...routePropertyIds]));
 
       // Store routes and show map visualization

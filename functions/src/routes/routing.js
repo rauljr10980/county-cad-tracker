@@ -491,6 +491,23 @@ router.post('/solve', async (req, res) => {
       depotExcluded: !otherProperties.find(p => p.id === depotProperty.id)
     });
     
+    // Validate that we have properties to visit
+    if (otherProperties.length === 0) {
+      console.error('[ROUTING] No properties to visit after excluding depot:', {
+        totalProperties: validProperties.length,
+        depotId: depotProperty.id,
+        depotAccountNumber: depotProperty.accountNumber
+      });
+      return res.status(400).json({ 
+        error: 'No properties to visit. The starting point property is the only selected property, or all other properties are already in routes.',
+        depotProperty: {
+          id: depotProperty.id,
+          address: depot.address,
+          accountNumber: depotProperty.accountNumber
+        }
+      });
+    }
+
     const locations = [
       depot,
       ...otherProperties.map(p => ({
@@ -498,9 +515,20 @@ router.post('/solve', async (req, res) => {
         lon: p.longitude,
         id: p.id,
         address: p.propertyAddress || p.address || '',
+        accountNumber: p.accountNumber,
         property: p
       }))
     ];
+
+    console.log('[ROUTING] Building route with:', {
+      totalLocations: locations.length,
+      depotAddress: depot.address,
+      propertiesToVisit: otherProperties.length,
+      firstProperty: otherProperties[0] ? {
+        id: otherProperties[0].id,
+        address: otherProperties[0].propertyAddress || otherProperties[0].address
+      } : null
+    });
 
     // Build distance matrix
     const dist = buildDistanceMatrix(locations);
@@ -508,6 +536,12 @@ router.post('/solve', async (req, res) => {
     // Solve VRP
     const depots = numVehicles === 1 ? [0] : [0, 0]; // Both vehicles start at depot (index 0)
     const solution = solveVRP(dist, depots, numVehicles);
+    
+    console.log('[ROUTING] Solution generated:', {
+      numRoutes: solution.routes.length,
+      routeLengths: solution.routes.map(r => r.length),
+      totalCost: solution.totalCost
+    });
 
     // Map routes back to property data
     const optimizedRoutes = solution.routes.map((route, routeIdx) => {

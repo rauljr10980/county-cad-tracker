@@ -74,24 +74,34 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }
     if (!isOpen) return;
 
     try {
-      // Extract all waypoints from all routes
+      // Extract all waypoints from all routes (include depot for bounds calculation)
       const waypoints: Waypoint[] = [];
       routes.forEach(route => {
         route.waypoints.forEach(wp => {
-          if (wp.id !== 'depot') {
-            waypoints.push(wp);
-          }
+          waypoints.push(wp);
         });
       });
 
-      if (waypoints.length === 0) {
+      // Check if we have any non-depot waypoints
+      const nonDepotWaypoints = waypoints.filter(wp => wp.id !== 'depot');
+      
+      if (nonDepotWaypoints.length === 0 && waypoints.length === 0) {
         setError('No waypoints to display');
+        setIsLoading(false);
+        return;
+      }
+
+      // If we only have depot waypoints, that's an error
+      if (nonDepotWaypoints.length === 0) {
+        console.error('[RouteMap] Route has only depot waypoints, no properties in route');
+        setError('Route generated but contains no properties. Please check your selection.');
         setIsLoading(false);
         return;
       }
 
       setAllWaypoints(waypoints);
       setIsLoading(false);
+      setError(null);
     } catch (err) {
       console.error('[RouteMap] Error processing routes:', err);
       setError(err instanceof Error ? err.message : 'Failed to process routes');
