@@ -66,16 +66,7 @@ router.get('/', optionalAuth, async (req, res) => {
     res.json(mappedRecords);
   } catch (error) {
     console.error('[PRE-FORECLOSURE] Fetch error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PRE-FORECLOSURE] Error details:', {
-      message: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined
-    });
-    res.status(500).json({ 
-      error: 'Failed to fetch pre-foreclosure records',
-      details: errorMessage
-    });
+    res.status(500).json({ error: 'Failed to fetch pre-foreclosure records' });
   }
 });
 
