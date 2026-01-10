@@ -388,12 +388,30 @@ export function AreaSelectorMap({
 
       // Ensure starting point property is included
       const startingPointProp = propsInArea.find(p => p.id === closestProperty.id) || closestProperty;
-      if (!propsInArea.find(p => p.id === startingPointProp.id)) {
-        propsInArea.unshift(startingPointProp);
-      }
+      
+      // Remove starting point from the list if it exists, we'll add it back first
+      const propsWithoutStart = propsInArea.filter(p => p.id !== startingPointProp.id);
+      
+      // Sort remaining properties by distance from starting point (closest first)
+      // Use the existing startingPoint variable defined earlier
+      const sortedProps = propsWithoutStart.sort((a, b) => {
+        const distA = calculateDistance(startingPoint.lat, startingPoint.lng, a.latitude!, a.longitude!);
+        const distB = calculateDistance(startingPoint.lat, startingPoint.lng, b.latitude!, b.longitude!);
+        return distA - distB;
+      });
+      
+      // Limit to 25 properties total (starting point + 24 closest)
+      const limitedProps = sortedProps.slice(0, 24);
+      
+      // Add starting point as the first property
+      const finalProps = [startingPointProp, ...limitedProps];
 
-      setSelectedProperties(propsInArea);
-      setStartingPointValidation({ valid: true, message: `Found ${propsInArea.length} properties in the area.` });
+      setSelectedProperties(finalProps);
+      const totalFound = propsInArea.length;
+      const limitedMessage = totalFound > 25 
+        ? `Found ${totalFound} properties in the area. Limiting to 25 closest (including starting point) for optimization.`
+        : `Found ${totalFound} properties in the area. All will be optimized.`;
+      setStartingPointValidation({ valid: true, message: limitedMessage });
       setStep(3);
     } else if (step === 3) {
       setStep(4);
@@ -627,13 +645,16 @@ export function AreaSelectorMap({
             {step === 3 && (
               <div className="space-y-4">
                 <div className="text-sm font-medium">
-                  Selected Properties: {selectedProperties.length}
+                  Selected Properties: {selectedProperties.length} / 25
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Starting Point: {closestProperty?.propertyAddress || closestProperty?.address || 'N/A'}
                 </div>
+                <div className="text-xs text-muted-foreground">
+                  {selectedProperties.length === 25 ? 'Maximum of 25 properties selected (closest to starting point)' : 'All properties within area will be optimized'}
+                </div>
                 <div className="max-h-64 overflow-y-auto space-y-1">
-                  {selectedProperties.slice(0, 50).map((p) => (
+                  {selectedProperties.map((p) => (
                     <div key={p.id} className="text-xs p-2 bg-muted rounded">
                       {p.propertyAddress || p.address || 'N/A'}
                       {p.id === closestProperty?.id && (
@@ -641,11 +662,6 @@ export function AreaSelectorMap({
                       )}
                     </div>
                   ))}
-                  {selectedProperties.length > 50 && (
-                    <div className="text-xs text-muted-foreground p-2">
-                      ...and {selectedProperties.length - 50} more properties
-                    </div>
-                  )}
                 </div>
               </div>
             )}
