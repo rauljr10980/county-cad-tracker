@@ -865,6 +865,14 @@ export function PropertiesView() {
   };
 
   const handleCreateRouteWithDepot = async (depotProperty?: Property, depotLocation?: { lat: number; lng: number }, providedProperties?: Property[]) => {
+    console.log('[handleCreateRouteWithDepot] Called with:', {
+      hasProvidedProperties: !!providedProperties,
+      providedPropertiesCount: providedProperties?.length || 0,
+      selectedPropertyIdsCount: selectedPropertyIds.size,
+      hasDepotProperty: !!depotProperty,
+      depotPropertyId: depotProperty?.id || customDepotPropertyId
+    });
+
     // Use custom depot if provided, otherwise use default (first property)
     const depotLat = depotLocation?.lat || customDepot?.lat;
     const depotLon = depotLocation?.lng || customDepot?.lng;
@@ -872,24 +880,40 @@ export function PropertiesView() {
 
     // Get selected properties with valid coordinates
     // Filter out properties that are already in existing routes
-    // If providedProperties is passed, use those directly (e.g., from area selector with 25 property limit)
-    // Note: We filter out properties in routes, but the depot (if specified) will be added back below
-    let availableProperties = providedProperties 
-      ? providedProperties.filter(p => {
-          if (p.latitude == null || p.longitude == null) return false;
-          // Allow depot property even if it's in routes (it's the starting point)
-          if (depotPropertyId && p.id === depotPropertyId) return true;
-          // Filter out properties already in routes
-          return !propertiesInRoutes.has(p.id);
-        })
-      : rawProperties.filter(p => {
-          if (!selectedPropertyIds.has(p.id)) return false;
-          if (p.latitude == null || p.longitude == null) return false;
-          // Allow depot property even if it's in routes (it's the starting point)
-          if (depotPropertyId && p.id === depotPropertyId) return true;
-          // Filter out properties already in routes
-          return !propertiesInRoutes.has(p.id);
-        });
+    // IMPORTANT: If providedProperties is passed, ONLY use those - do NOT fall back to selectedPropertyIds
+    // This ensures the area selector's 25-property limit is respected
+    let availableProperties: Property[];
+    
+    if (providedProperties && providedProperties.length > 0) {
+      console.log('[handleCreateRouteWithDepot] Using providedProperties (from area selector):', providedProperties.length);
+      availableProperties = providedProperties.filter(p => {
+        if (p.latitude == null || p.longitude == null) {
+          console.warn('[handleCreateRouteWithDepot] Property missing coordinates:', p.id);
+          return false;
+        }
+        // Allow depot property even if it's in routes (it's the starting point)
+        if (depotPropertyId && p.id === depotPropertyId) return true;
+        // Filter out properties already in routes
+        const inRoutes = propertiesInRoutes.has(p.id);
+        if (inRoutes) {
+          console.log('[handleCreateRouteWithDepot] Property already in routes, filtering out:', p.id);
+        }
+        return !inRoutes;
+      });
+      console.log('[handleCreateRouteWithDepot] After filtering providedProperties:', availableProperties.length);
+    } else {
+      console.log('[handleCreateRouteWithDepot] No providedProperties, using selectedPropertyIds (legacy behavior)');
+      console.warn('[handleCreateRouteWithDepot] WARNING: This should not happen when using area selector!');
+      availableProperties = rawProperties.filter(p => {
+        if (!selectedPropertyIds.has(p.id)) return false;
+        if (p.latitude == null || p.longitude == null) return false;
+        // Allow depot property even if it's in routes (it's the starting point)
+        if (depotPropertyId && p.id === depotPropertyId) return true;
+        // Filter out properties already in routes
+        return !propertiesInRoutes.has(p.id);
+      });
+      console.log('[handleCreateRouteWithDepot] Filtered from selectedPropertyIds:', availableProperties.length);
+    }
 
     // IMPORTANT: If a custom depot property is specified, ensure it's included in the route
     // If providedProperties is passed (from area selector), only use properties from that list
@@ -979,7 +1003,17 @@ export function PropertiesView() {
       return;
     }
 
-    if (availableProperties.length > 500) {
+    // IMPORTANT: If providedProperties was passed (from area selector), enforce 25 property limit
+    if (providedProperties && providedProperties.length > 0) {
+      if (availableProperties.length > 25) {
+        console.warn('[handleCreateRouteWithDepot] More than 25 properties after filtering. Limiting to 25.');
+        // Keep depot first, then limit to 24 more
+        const depot = availableProperties.find(p => p.id === depotPropertyId);
+        const others = availableProperties.filter(p => p.id !== depotPropertyId).slice(0, 24);
+        availableProperties = depot ? [depot, ...others] : others.slice(0, 25);
+        console.log('[handleCreateRouteWithDepot] Limited to:', availableProperties.length);
+      }
+    } else if (availableProperties.length > 500) {
       toast({
         title: "Too many properties",
         description: "Maximum 500 properties allowed for route optimization. For larger batches, please select fewer properties.",
@@ -988,6 +1022,8 @@ export function PropertiesView() {
       return;
     }
 
+    console.log('[handleCreateRouteWithDepot] Final availableProperties count:', availableProperties.length);
+    
     const selectedProperties = availableProperties;
 
     setIsOptimizingRoute(true);
@@ -1345,6 +1381,12 @@ export function PropertiesView() {
         isOpen={areaSelectorOpen}
         onClose={() => setAreaSelectorOpen(false)}
         onOptimize={async ({ startingPoint, area, selectedProperties }) => {
+          console.log('[onOptimize] Called from AreaSelectorMap:', {
+            selectedPropertiesCount: selectedProperties.length,
+            startingPointId: startingPoint.property.id,
+            areaType: area.polygon ? 'polygon' : area.radius !== undefined ? 'circle' : 'rectangle'
+          });
+
           // Find the property that matches the starting point
           const depotProperty = rawProperties.find(p => p.id === startingPoint.property.id);
           
@@ -1396,6 +1438,11 @@ export function PropertiesView() {
             }
             return inside;
           };
+
+          console.log('[onOptimize] selectedProperties from AreaSelectorMap:', {
+            count: selectedProperties.length,
+            firstFew: selectedProperties.slice(0, 3).map(p => ({ id: p.id, lat: p.latitude, lng: p.longitude }))
+          });
 
           // Convert selectedProperties (PropertyLike) to full Property objects from rawProperties
           // selectedProperties is already limited to 25 and includes the depot as the first property
@@ -1485,18 +1532,44 @@ export function PropertiesView() {
             }
           }
 
+          // CRITICAL: Enforce 25 property limit for area selector
+          // Even if selectedProperties has more, limit to 25 (depot + 24 closest)
+          if (propertiesToOptimize.length > 25) {
+            console.warn('[onOptimize] WARNING: More than 25 properties received from area selector. Limiting to 25.');
+            // Keep depot first, then take 24 closest
+            const depot = propertiesToOptimize.find(p => p.id === depotProperty.id);
+            const others = propertiesToOptimize.filter(p => p.id !== depotProperty.id).slice(0, 24);
+            propertiesToOptimize.length = 0; // Clear array
+            if (depot) {
+              propertiesToOptimize.push(depot, ...others);
+            } else {
+              propertiesToOptimize.push(...others.slice(0, 25));
+            }
+          }
+
           console.log('[Route Optimization] Final properties to optimize:', {
             count: propertiesToOptimize.length,
             depotId: depotProperty.id,
             depotAddress: depotProperty.propertyAddress,
-            propertyIds: propertiesToOptimize.map(p => p.id).slice(0, 5) + (propertiesToOptimize.length > 5 ? '...' : '')
+            propertyIds: propertiesToOptimize.map(p => p.id).slice(0, 5).join(',') + (propertiesToOptimize.length > 5 ? `... (+${propertiesToOptimize.length - 5} more)` : ''),
+            maxAllowed: 25
           });
+
+          if (propertiesToOptimize.length === 0) {
+            toast({
+              title: "Error",
+              description: "No valid properties found to optimize. Please try again.",
+              variant: "destructive",
+            });
+            return;
+          }
 
           // Auto-select all selected properties (for UI consistency)
           const propertyIds = new Set(propertiesToOptimize.map(p => p.id));
           setSelectedPropertyIds(propertyIds);
           
           // Create route with depot, passing the limited and validated properties directly
+          // IMPORTANT: This MUST use propertiesToOptimize (limited to 25), not selectedPropertyIds
           await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation, propertiesToOptimize);
         }}
         properties={rawProperties.filter(p => p.latitude != null && p.longitude != null).map(p => ({
