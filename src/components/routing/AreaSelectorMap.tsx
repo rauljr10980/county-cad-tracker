@@ -5,12 +5,12 @@
  */
 
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, useMap, Rectangle, Circle, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Rectangle, Circle, Polygon, useMapEvents } from 'react-leaflet';
 import { LatLngBounds, LatLng } from 'leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
-import { Loader2, Square, Circle as CircleIcon, Check, X } from 'lucide-react';
+import { Loader2, Square, Circle as CircleIcon, Check, X, PenTool } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,29 +33,44 @@ interface AreaSelectorMapProps {
     west: number;
     center?: { lat: number; lng: number };
     radius?: number; // For circle
+    polygon?: LatLng[]; // For custom polygon
   }) => void;
   initialCenter?: { lat: number; lng: number };
   initialZoom?: number;
 }
 
-// Component to handle drawing (both rectangle and circle)
+// Component to handle drawing (rectangle, circle, and polygon)
 function ShapeDrawer({ 
   drawingMode, 
   onRectangleComplete,
-  onCircleComplete
+  onCircleComplete,
+  onPolygonComplete,
+  onPolygonPointAdd
 }: { 
-  drawingMode: 'rectangle' | 'circle' | null;
+  drawingMode: 'rectangle' | 'circle' | 'polygon' | null;
   onRectangleComplete: (bounds: LatLngBounds) => void;
   onCircleComplete: (center: LatLng, radius: number) => void;
+  onPolygonComplete: (points: LatLng[]) => void;
+  onPolygonPointAdd: (points: LatLng[]) => void;
 }) {
   const map = useMap();
   const [startPos, setStartPos] = useState<LatLng | null>(null);
   const [currentPos, setCurrentPos] = useState<LatLng | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [polygonPoints, setPolygonPoints] = useState<LatLng[]>([]);
 
   useMapEvents({
     mousedown(e) {
-      if (drawingMode && !isDrawing) {
+      if (drawingMode === 'polygon') {
+        // Add point to polygon
+        const newPoints = [...polygonPoints, e.latlng];
+        setPolygonPoints(newPoints);
+        onPolygonPointAdd(newPoints);
+        // Prevent map panning while drawing polygon
+        map.dragging.disable();
+        map.doubleClickZoom.disable();
+        e.originalEvent.stopPropagation();
+      } else if (drawingMode && !isDrawing) {
         setIsDrawing(true);
         setStartPos(e.latlng);
         setCurrentPos(e.latlng);
@@ -65,12 +80,16 @@ function ShapeDrawer({
       }
     },
     mousemove(e) {
-      if (drawingMode && isDrawing && startPos) {
+      if (drawingMode === 'rectangle' && isDrawing && startPos) {
+        setCurrentPos(e.latlng);
+      } else if (drawingMode === 'circle' && isDrawing && startPos) {
+        setCurrentPos(e.latlng);
+      } else if (drawingMode === 'polygon' && polygonPoints.length > 0) {
         setCurrentPos(e.latlng);
       }
     },
     mouseup(e) {
-      if (drawingMode && isDrawing && startPos) {
+      if ((drawingMode === 'rectangle' || drawingMode === 'circle') && isDrawing && startPos) {
         if (drawingMode === 'rectangle') {
           const bounds = new LatLngBounds([startPos, e.latlng]);
           onRectangleComplete(bounds);
@@ -86,7 +105,31 @@ function ShapeDrawer({
         map.doubleClickZoom.enable();
       }
     },
+    dblclick(e) {
+      // Double-click to finish polygon
+      if (drawingMode === 'polygon' && polygonPoints.length >= 3) {
+        // Close the polygon by adding the first point again
+        const closedPoints = [...polygonPoints, polygonPoints[0]];
+        onPolygonComplete(closedPoints);
+        setPolygonPoints([]);
+        setCurrentPos(null);
+        // Re-enable map interactions
+        map.dragging.enable();
+        map.doubleClickZoom.enable();
+      }
+    },
   });
+
+  // Reset polygon when mode changes
+  useEffect(() => {
+    if (drawingMode !== 'polygon') {
+      setPolygonPoints([]);
+      setCurrentPos(null);
+      onPolygonPointAdd([]);
+      map.dragging.enable();
+      map.doubleClickZoom.enable();
+    }
+  }, [drawingMode, map, onPolygonPointAdd]);
 
   // Render preview shape while drawing
   if (drawingMode === 'rectangle' && startPos && currentPos && isDrawing) {
@@ -96,6 +139,12 @@ function ShapeDrawer({
   if (drawingMode === 'circle' && startPos && currentPos && isDrawing) {
     const radius = startPos.distanceTo(currentPos);
     return <Circle center={startPos} radius={radius} pathOptions={{ color: '#EA4335', fillColor: '#EA4335', fillOpacity: 0.2, weight: 2, dashArray: '5, 5' }} />;
+  }
+
+  // Render polygon preview
+  if (drawingMode === 'polygon' && polygonPoints.length > 0) {
+    const previewPoints = currentPos ? [...polygonPoints, currentPos] : polygonPoints;
+    return <Polygon positions={previewPoints} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2, dashArray: '5, 5' }} />;
   }
 
   return null;
@@ -121,14 +170,16 @@ export function AreaSelectorMap({
   initialCenter = { lat: 29.4241, lng: -98.4936 }, // San Antonio default
   initialZoom = 11
 }: AreaSelectorMapProps) {
-  const [drawingMode, setDrawingMode] = useState<'rectangle' | 'circle' | null>(null);
-  const [selectedShape, setSelectedShape] = useState<{ type: 'rectangle' | 'circle'; bounds: LatLngBounds; center?: LatLng; radius?: number } | null>(null);
+  const [drawingMode, setDrawingMode] = useState<'rectangle' | 'circle' | 'polygon' | null>(null);
+  const [selectedShape, setSelectedShape] = useState<{ type: 'rectangle' | 'circle' | 'polygon'; bounds: LatLngBounds; center?: LatLng; radius?: number; polygon?: LatLng[] } | null>(null);
   const [drawnRectangle, setDrawnRectangle] = useState<LatLngBounds | null>(null);
   const [drawnCircle, setDrawnCircle] = useState<{ center: LatLng; radius: number } | null>(null);
+  const [drawnPolygon, setDrawnPolygon] = useState<LatLng[] | null>(null);
 
   const handleRectangleComplete = (bounds: LatLngBounds) => {
     setDrawnRectangle(bounds);
     setDrawnCircle(null);
+    setDrawnPolygon(null);
     setSelectedShape({ type: 'rectangle', bounds });
     setDrawingMode(null);
   };
@@ -136,6 +187,7 @@ export function AreaSelectorMap({
   const handleCircleComplete = (center: LatLng, radius: number) => {
     setDrawnCircle({ center, radius });
     setDrawnRectangle(null);
+    setDrawnPolygon(null);
     // For circle, create bounds from center and radius
     const radiusDegrees = radius / 111000; // Approximate conversion: 1 degree ≈ 111 km
     const bounds = new LatLngBounds(
@@ -146,11 +198,30 @@ export function AreaSelectorMap({
     setDrawingMode(null);
   };
 
+  const handlePolygonComplete = (points: LatLng[]) => {
+    // Calculate bounds from polygon points
+    if (points.length < 3) return;
+    
+    // Remove the duplicate closing point if present
+    const uniquePoints = points[0].equals(points[points.length - 1]) 
+      ? points.slice(0, -1) 
+      : points;
+    
+    const bounds = new LatLngBounds(uniquePoints);
+    setDrawnPolygon(uniquePoints);
+    setDrawnRectangle(null);
+    setDrawnCircle(null);
+    setSelectedShape({ type: 'polygon', bounds, polygon: uniquePoints });
+    setDrawingMode(null);
+  };
+
   const handleClearSelection = () => {
     setSelectedShape(null);
     setDrawingMode(null);
     setDrawnRectangle(null);
     setDrawnCircle(null);
+    setDrawnPolygon(null);
+    setPolygonPointsBeingDrawn([]);
   };
 
   const handleDone = () => {
@@ -169,11 +240,28 @@ export function AreaSelectorMap({
         lat: (ne.lat + sw.lat) / 2,
         lng: (ne.lng + sw.lng) / 2
       },
-      radius: selectedShape.radius ? selectedShape.radius / 1000 : undefined // Convert to km
+      radius: selectedShape.radius ? selectedShape.radius / 1000 : undefined, // Convert to km
+      polygon: selectedShape.polygon || undefined
     };
 
     onAreaSelected(result);
     onClose();
+  };
+
+  // Track polygon points being drawn (for showing finish button)
+  const [polygonPointsBeingDrawn, setPolygonPointsBeingDrawn] = useState<LatLng[]>([]);
+
+  const handlePolygonPointAdd = (points: LatLng[]) => {
+    setPolygonPointsBeingDrawn(points);
+  };
+
+  const handleFinishPolygon = () => {
+    // Manual finish button for polygon (alternative to double-click)
+    if (polygonPointsBeingDrawn.length >= 3) {
+      const closedPoints = [...polygonPointsBeingDrawn, polygonPointsBeingDrawn[0]];
+      handlePolygonComplete(closedPoints);
+      setPolygonPointsBeingDrawn([]);
+    }
   };
 
   if (!isOpen) return null;
@@ -220,6 +308,31 @@ export function AreaSelectorMap({
                   <CircleIcon className="h-4 w-4 mr-2" />
                   Draw Circle
                 </Button>
+                <Button
+                  variant={drawingMode === 'polygon' ? 'default' : 'outline'}
+                  className="w-full justify-start"
+                  onClick={() => {
+                    handleClearSelection();
+                    setDrawingMode('polygon');
+                  }}
+                >
+                  <PenTool className="h-4 w-4 mr-2" />
+                  Custom Drawing
+                </Button>
+                {drawingMode === 'polygon' && (
+                  <div className="pt-2 text-xs text-muted-foreground">
+                    Click on the map to add points. Double-click or click "Finish" to complete.
+                  </div>
+                )}
+                {drawingMode === 'polygon' && polygonPointsBeingDrawn.length >= 3 && (
+                  <Button
+                    variant="secondary"
+                    className="w-full mt-2"
+                    onClick={handleFinishPolygon}
+                  >
+                    Finish Polygon ({polygonPointsBeingDrawn.length} points)
+                  </Button>
+                )}
               </TabsContent>
               
               <TabsContent value="clear" className="mt-4">
@@ -271,12 +384,17 @@ export function AreaSelectorMap({
                 drawingMode={drawingMode}
                 onRectangleComplete={handleRectangleComplete}
                 onCircleComplete={handleCircleComplete}
+                onPolygonComplete={handlePolygonComplete}
+                onPolygonPointAdd={handlePolygonPointAdd}
               />
               {drawnRectangle && (
                 <Rectangle bounds={drawnRectangle} pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.2, weight: 2 }} />
               )}
               {drawnCircle && (
                 <Circle center={drawnCircle.center} radius={drawnCircle.radius} pathOptions={{ color: '#EA4335', fillColor: '#EA4335', fillOpacity: 0.2, weight: 2 }} />
+              )}
+              {drawnPolygon && drawnPolygon.length >= 3 && (
+                <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
               )}
               {selectedShape && <MapBoundsFitter bounds={selectedShape.bounds} />}
             </MapContainer>
