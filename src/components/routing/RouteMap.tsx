@@ -124,7 +124,7 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }
         <DialogHeader>
           <DialogTitle>Optimized Route</DialogTitle>
           <DialogDescription>
-            {numVehicles === 1 ? 'Single vehicle route' : `${numVehicles} vehicle routes`} • 
+            {routes.length === 1 ? 'Single vehicle route' : `${routes.length} vehicle routes`} • 
             Total distance: {totalDistance.toFixed(2)} km • 
             {routes.reduce((sum, r) => sum + r.waypoints.filter(wp => wp.id !== 'depot').length, 0)} stops
           </DialogDescription>
@@ -237,17 +237,23 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }
             ))}
           </div>
           <div className="flex gap-2">
-            {routes.map((route, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                size="sm"
-                onClick={() => handleOpenInMaps(index)}
-                title={`Open route in Google Maps with ${Math.min(routes[index].waypoints.filter(wp => wp.id !== 'depot').length, 25)} stops`}
-              >
-                Open Route {index + 1} in Maps ({Math.min(routes[index].waypoints.filter(wp => wp.id !== 'depot').length, 25)} stops)
-              </Button>
-            ))}
+            {routes.map((route, index) => {
+              const stopCount = route.waypoints.filter(wp => wp.id !== 'depot').length;
+              const limitedCount = Math.min(stopCount, 25);
+              return (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOpenInMaps(index)}
+                  title={stopCount > 25 ? 
+                    `Open route in Google Maps with first ${limitedCount} stops (out of ${stopCount} total. Google Maps limit is 25 waypoints)` :
+                    `Open route in Google Maps with ${stopCount} stops`}
+                >
+                  Open Route {index + 1} in Maps ({stopCount > 25 ? `first ${limitedCount}/${stopCount}` : stopCount} stops)
+                </Button>
+              );
+            })}
             <Button onClick={onClose}>Close</Button>
           </div>
         </div>
