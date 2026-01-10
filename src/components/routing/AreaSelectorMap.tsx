@@ -104,13 +104,17 @@ function ShapeDrawer({
         map.dragging.disable();
         map.doubleClickZoom.disable();
         e.originalEvent.stopPropagation();
-      } else if (drawingMode && !isDrawing) {
+      } else if ((drawingMode === 'rectangle' || drawingMode === 'circle') && !isDrawing) {
         setIsDrawing(true);
         setStartPos(e.latlng);
         setCurrentPos(e.latlng);
         // Prevent map panning while drawing
         map.dragging.disable();
         map.doubleClickZoom.disable();
+      } else if (!drawingMode) {
+        // If no drawing mode is active, ensure interactions are enabled
+        map.dragging.enable();
+        map.doubleClickZoom.enable();
       }
     },
     mousemove(e) {
@@ -345,11 +349,11 @@ export function AreaSelectorMap({
   const handleConfirmStartingPoint = () => {
     if (!closestProperty || !pinLocation || !onStartingPointSelected) return;
     onStartingPointSelected(closestProperty, { lat: pinLocation.lat, lng: pinLocation.lng });
-    // Don't clear everything - allow user to continue drawing
-    // Only clear the pin-related state, keep the pin visible as confirmation
-    // setDrawingMode(null); // Don't disable drawing mode
-    // Keep pinLocation and closestProperty visible for reference
-    // User can clear manually if needed
+    // Reset drawing mode to allow user to continue drawing shapes
+    // Keep pin location and closest property visible for reference
+    setDrawingMode(null);
+    // Ensure map interactions are restored
+    // The map interactions will be restored when drawingMode becomes null
   };
 
   if (!isOpen) return null;
