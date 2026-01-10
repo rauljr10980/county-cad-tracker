@@ -241,7 +241,7 @@ export function AreaSelectorMap({
         lng: (ne.lng + sw.lng) / 2
       },
       radius: selectedShape.radius ? selectedShape.radius / 1000 : undefined, // Convert to km
-      polygon: selectedShape.polygon || undefined
+      polygon: selectedShape.polygon ? selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })) : undefined
     };
 
     onAreaSelected(result);
