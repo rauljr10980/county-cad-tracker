@@ -930,6 +930,18 @@ export function PropertiesView() {
         return !propertiesInRoutes.has(p.id);
       });
       console.log('[handleCreateRouteWithDepot] Filtered from selectedPropertyIds:', availableProperties.length);
+      
+      // Safety limit: If using legacy path (no area selector), warn if too many properties
+      if (availableProperties.length > 25) {
+        console.error('[handleCreateRouteWithDepot] ERROR: Too many properties selected via legacy path!', availableProperties.length);
+        toast({
+          title: "Too Many Properties",
+          description: `You have ${availableProperties.length} properties selected. Please use "Optimize by Area" to limit to 25 properties, or manually select up to 25 properties.`,
+          variant: "destructive",
+        });
+        setIsOptimizingRoute(false);
+        return;
+      }
     }
 
     // IMPORTANT: If a custom depot property is specified, ensure it's included in the route
@@ -1104,6 +1116,28 @@ export function PropertiesView() {
         console.log('[Route Optimization] Properties before depot exclusion:', finalPropertiesForOptimization.length);
       }
 
+      // CRITICAL: Final validation - ensure we never send more than 26 properties (1 depot + 25 to visit)
+      // This is the absolute final check before sending to backend
+      if (validatedProvidedProperties && validatedProvidedProperties.length > 0) {
+        // For area selector, we must have exactly 26 or fewer (1 depot + 25 properties)
+        if (finalPropertiesForOptimization.length > 26) {
+          console.error('[Route Optimization] FATAL: Still more than 26 properties! Force limiting now.');
+          const depot = finalPropertiesForOptimization.find(p => p.id === depotPropertyId);
+          const others = finalPropertiesForOptimization.filter(p => p.id !== depotPropertyId).slice(0, 25);
+          finalPropertiesForOptimization = depot ? [depot, ...others] : finalPropertiesForOptimization.slice(0, 26);
+        }
+        
+        // ABSOLUTE HARD LIMIT: Slice to exactly 26 max
+        finalPropertiesForOptimization = finalPropertiesForOptimization.slice(0, 26);
+        
+        console.error('[Route Optimization] FINAL VALIDATION - Properties being sent to backend:', {
+          count: finalPropertiesForOptimization.length,
+          expected: '26 (1 depot + 25 properties)',
+          depotIncluded: finalPropertiesForOptimization.some(p => p.id === depotPropertyId),
+          nonDepotCount: finalPropertiesForOptimization.filter(p => p.id !== depotPropertyId).length
+        });
+      }
+
       // IMPORTANT: Include the depot property in the properties array so the backend can identify it
       // The backend will exclude it from the visitable stops list, but needs it to:
       // 1. Find the depot property when depotPropertyId is provided
@@ -1128,12 +1162,19 @@ export function PropertiesView() {
         note: 'Depot is included in array so backend can find it, but backend will exclude it from visitable stops'
       });
       
+      // FINAL SAFETY CHECK: Throw error if still too many (should never happen)
+      if (validatedProvidedProperties && propertiesForVRP.length > 26) {
+        console.error('[Route Optimization] CRITICAL ERROR: About to send too many properties to backend!', propertiesForVRP.length);
+        throw new Error(`Cannot optimize: ${propertiesForVRP.length} properties exceeds maximum of 26 (1 depot + 25 properties). Please use area selector to limit properties.`);
+      }
+      
       console.log('[Route Optimization] Calling solveVRP with:', {
         propertyCount: propertiesForVRP.length,
         numVehicles,
         depotLat,
         depotLon,
-        depotPropertyId
+        depotPropertyId,
+        expectedResult: `${propertiesWithoutDepot.length} visitable stops (depot excluded)`
       });
       
       const solution = await solveVRP(propertiesForVRP, numVehicles, depotLat, depotLon, depotPropertyId);
@@ -1181,6 +1222,15 @@ export function PropertiesView() {
   };
 
   const handleCreateRoute = async () => {
+    // Safety check: If too many properties are selected, warn user to use area selector
+    if (selectedPropertyIds.size > 25) {
+      toast({
+        title: "Too Many Properties Selected",
+        description: `You have ${selectedPropertyIds.size} properties selected. Please use the "Optimize by Area" button to optimize up to 25 properties within a selected area, or select fewer properties manually.`,
+        variant: "destructive",
+      });
+      return;
+    }
     // If no custom depot is set, just proceed with optimization
     await handleCreateRouteWithDepot();
   };
@@ -1531,113 +1581,68 @@ export function PropertiesView() {
           });
 
           // Convert selectedProperties (PropertyLike) to full Property objects from rawProperties
-          // selectedProperties is already limited to 25 and includes the depot as the first property
-          // Also re-validate that each property is actually within the drawn area
+          // IMPORTANT: selectedProperties from AreaSelectorMap is ALREADY limited to 26 (1 depot + 25 properties)
+          // and has already been validated against the area. We should trust this limit.
           const propertyMap = new Map(rawProperties.map(p => [p.id, p]));
           const propertiesToOptimize: Property[] = [];
           
+          console.log('[onOptimize] Converting selectedProperties from AreaSelectorMap:', {
+            selectedPropertiesCount: selectedProperties.length,
+            expectedMax: 26
+          });
+          
+          // Convert to Property objects - trust that AreaSelectorMap already limited and validated
           for (const sp of selectedProperties) {
             const fullProperty = propertyMap.get(sp.id);
             if (!fullProperty || fullProperty.latitude == null || fullProperty.longitude == null) {
               console.warn(`[Route Optimization] Property ${sp.id} not found or missing coordinates, skipping`);
               continue;
             }
-
-            const point = { lat: fullProperty.latitude, lng: fullProperty.longitude };
-            let isWithinArea = false;
-
-            // Check if property is within the drawn area based on area type
-            if (area.polygon && area.polygon.length >= 3) {
-              isWithinArea = isPointInPolygon(point, area.polygon);
-            } else if (area.center && area.radius !== undefined) {
-              isWithinArea = isPointInCircle(point, area.center, area.radius);
-            } else {
-              // Rectangle bounds
-              isWithinArea = isPointInBounds(point, {
-                north: area.north,
-                south: area.south,
-                east: area.east,
-                west: area.west
-              });
-            }
-
-            if (isWithinArea) {
-              propertiesToOptimize.push(fullProperty);
-            } else {
-              console.warn(`[Route Optimization] Property ${sp.id} (${fullProperty.propertyAddress}) is outside the drawn area, skipping`);
-            }
+            propertiesToOptimize.push(fullProperty);
           }
 
-          console.log('[Route Optimization] Area validation:', {
+          console.log('[Route Optimization] Converted to Property objects:', {
             selectedPropertiesCount: selectedProperties.length,
-            validatedCount: propertiesToOptimize.length,
-            areaType: area.polygon ? 'polygon' : area.radius !== undefined ? 'circle' : 'rectangle',
-            areaBounds: { north: area.north, south: area.south, east: area.east, west: area.west }
+            convertedCount: propertiesToOptimize.length
           });
 
           if (propertiesToOptimize.length === 0) {
             toast({
               title: "Error",
-              description: "No properties found within the drawn area. Please redraw the area.",
+              description: "No valid properties found. Please try selecting the area again.",
               variant: "destructive",
             });
             return;
           }
 
-          // IMPORTANT: Depot property should NOT be in the optimization list
-          // The depot is the starting point only (passed as depotLat/depotLon/depotPropertyId)
-          // Remove depot from the list if it's present - we'll pass it separately as the depot
-          let finalPropertiesToOptimize = propertiesToOptimize.filter(p => p.id !== depotProperty.id);
-          
-          // Ensure we have exactly 24 properties (since depot is excluded)
-          // The 25-property limit includes depot, so we should have 24 after excluding it
-          if (finalPropertiesToOptimize.length > 24) {
-            console.warn('[onOptimize] More than 24 properties (excluding depot). Limiting to 24.');
-            finalPropertiesToOptimize = finalPropertiesToOptimize.slice(0, 24);
-          }
-          
-          // If we somehow have fewer than expected, that's okay - just log it
-          if (finalPropertiesToOptimize.length === 0) {
-            // Depot not in validated list, but it should be - verify it's within area
-            const depotPoint = { lat: depotProperty.latitude!, lng: depotProperty.longitude! };
-            let depotInArea = false;
-            if (area.polygon && area.polygon.length >= 3) {
-              depotInArea = isPointInPolygon(depotPoint, area.polygon);
-            } else if (area.center && area.radius !== undefined) {
-              depotInArea = isPointInCircle(depotPoint, area.center, area.radius);
-            } else {
-              depotInArea = isPointInBounds(depotPoint, {
-                north: area.north,
-                south: area.south,
-                east: area.east,
-                west: area.west
-              });
-            }
-            
-            if (depotInArea) {
-              // Add depot to beginning if it's within area
-              propertiesToOptimize.unshift(depotProperty);
-            } else {
-              console.warn('[Route Optimization] Depot property is outside the drawn area, but adding as starting point');
-              // Still add it as it's the starting point, but log warning
-              propertiesToOptimize.unshift(depotProperty);
-            }
+          // Ensure depot is included and is first
+          const depotIndex = propertiesToOptimize.findIndex(p => p.id === depotProperty.id);
+          if (depotIndex > 0) {
+            // Move depot to first position
+            propertiesToOptimize.splice(depotIndex, 1);
+            propertiesToOptimize.unshift(depotProperty);
+          } else if (depotIndex === -1) {
+            // Depot not in list, add it first
+            propertiesToOptimize.unshift(depotProperty);
           }
 
-          // CRITICAL: Enforce 26 property limit for area selector (1 depot + 25 properties to visit)
+          // CRITICAL: Enforce 26 property limit (1 depot + 25 properties to visit)
+          // selectedProperties from AreaSelectorMap should already be limited, but double-check here
           // The backend will exclude the depot from visitable stops, so we need 26 total
-          // After backend excludes depot, we'll have 25 properties to visit
+          // After backend excludes depot, we'll have exactly 25 properties to visit
           if (propertiesToOptimize.length > 26) {
-            console.warn('[onOptimize] WARNING: More than 26 properties received from area selector. Limiting to 26 (1 depot + 25 properties).');
+            console.error('[onOptimize] ERROR: More than 26 properties! Force limiting to 26 (1 depot + 25 properties).');
             // Keep depot first, then take 25 closest
-            const depot = propertiesToOptimize.find(p => p.id === depotProperty.id);
+            const depot = propertiesToOptimize[0]?.id === depotProperty.id ? propertiesToOptimize[0] : propertiesToOptimize.find(p => p.id === depotProperty.id) || depotProperty;
             const others = propertiesToOptimize.filter(p => p.id !== depotProperty.id).slice(0, 25);
             propertiesToOptimize.length = 0; // Clear array
-            if (depot) {
-              propertiesToOptimize.push(depot, ...others); // 26 total: 1 depot + 25 properties
-            } else {
-              propertiesToOptimize.push(...others.slice(0, 26));
-            }
+            propertiesToOptimize.push(depot, ...others); // 26 total: 1 depot + 25 properties
+            console.error('[onOptimize] Force-limited to:', propertiesToOptimize.length);
+          }
+          
+          // Final hard limit: slice to exactly 26
+          if (propertiesToOptimize.length > 26) {
+            propertiesToOptimize.splice(26);
           }
 
           // IMPORTANT: Keep the depot in the properties array

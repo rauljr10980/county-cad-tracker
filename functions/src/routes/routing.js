@@ -396,10 +396,28 @@ function solveVRP(dist, depots, numVehicles) {
  */
 router.post('/solve', async (req, res) => {
   try {
-    const { properties, numVehicles = 1, depotLat, depotLon } = req.body;
+    const { properties, numVehicles = 1, depotLat, depotLon, depotPropertyId } = req.body;
+
+    console.log('[ROUTING] Received solve request:', {
+      propertyCount: properties?.length || 0,
+      numVehicles,
+      hasDepotLat: depotLat != null,
+      hasDepotLon: depotLon != null,
+      depotPropertyId: depotPropertyId || 'not provided'
+    });
 
     if (!properties || !Array.isArray(properties) || properties.length === 0) {
       return res.status(400).json({ error: 'Properties array is required' });
+    }
+
+    // For area selector optimization, enforce 26 property limit (1 depot + 25 properties)
+    // This ensures only 25 properties are optimized (depot excluded from visitable stops)
+    if (depotPropertyId && properties.length > 26) {
+      console.error('[ROUTING] ERROR: Received more than 26 properties with depotPropertyId (area selector mode)');
+      console.error('[ROUTING] Properties count:', properties.length, 'Expected max: 26 (1 depot + 25 properties)');
+      return res.status(400).json({ 
+        error: `Too many properties for area selector optimization. Maximum 26 properties allowed (1 starting point + 25 properties to visit). Received ${properties.length}.` 
+      });
     }
 
     if (properties.length > 500) {
@@ -545,31 +563,61 @@ router.post('/solve', async (req, res) => {
 
     // Map routes back to property data
     const optimizedRoutes = solution.routes.map((route, routeIdx) => {
-      const waypoints = route.map(idx => {
+      // Remove duplicate depot at the end if present (route returns to depot, but we don't need to show it twice)
+      // The route structure is: [depot (0), ...stops..., depot (0)]
+      // We keep the starting depot but remove the ending depot return
+      let filteredRoute = route;
+      if (route.length > 1 && route[0] === 0 && route[route.length - 1] === 0) {
+        // Route returns to depot - remove the final depot return (it's redundant)
+        filteredRoute = route.slice(0, -1);
+        console.log(`[ROUTING] Route ${routeIdx + 1}: Removed duplicate depot return. Route length: ${route.length} -> ${filteredRoute.length}`);
+      }
+      
+      const waypoints = filteredRoute.map((idx, waypointIdx) => {
         const location = locations[idx];
+        const isDepot = idx === 0; // Depot is always at index 0
         return {
           ...location,
           index: idx,
-          isDepot: idx === 0 // Mark depot waypoint
+          waypointIndex: waypointIdx, // Position in route (0 = start, last = end)
+          isDepot,
+          // Mark if this is the return-to-depot (shouldn't happen after filtering, but just in case)
+          isReturnDepot: isDepot && waypointIdx === filteredRoute.length - 1 && filteredRoute.length > 1
         };
       });
       
-      // Log the first waypoint to verify it's the depot
-      if (route.length > 0) {
-        const firstWaypoint = waypoints[0];
-        console.log(`[ROUTING] Route ${routeIdx + 1} first waypoint:`, {
-          isDepot: firstWaypoint.isDepot,
-          address: firstWaypoint.address,
-          originalId: firstWaypoint.originalId,
-          accountNumber: firstWaypoint.accountNumber,
-          index: firstWaypoint.index
-        });
-      }
+      // Filter out return-to-depot waypoints (keep only the starting depot)
+      const finalWaypoints = waypoints.filter((wp, idx) => {
+        // Keep starting depot (first waypoint), but filter out return depot at the end
+        if (wp.isDepot && idx > 0 && idx === waypoints.length - 1) {
+          console.log(`[ROUTING] Filtering out return-to-depot waypoint at position ${idx}`);
+          return false;
+        }
+        return true;
+      });
+      
+      console.log(`[ROUTING] Route ${routeIdx + 1} waypoints:`, {
+        originalRouteLength: route.length,
+        filteredRouteLength: filteredRoute.length,
+        finalWaypointsLength: finalWaypoints.length,
+        depotsInRoute: finalWaypoints.filter(wp => wp.isDepot).length,
+        nonDepotStops: finalWaypoints.filter(wp => !wp.isDepot).length,
+        firstWaypoint: finalWaypoints[0] ? {
+          isDepot: finalWaypoints[0].isDepot,
+          address: finalWaypoints[0].address,
+          originalId: finalWaypoints[0].originalId
+        } : null,
+        lastWaypoint: finalWaypoints[finalWaypoints.length - 1] ? {
+          isDepot: finalWaypoints[finalWaypoints.length - 1].isDepot,
+          address: finalWaypoints[finalWaypoints.length - 1].address,
+          originalId: finalWaypoints[finalWaypoints.length - 1].originalId
+        } : null
+      });
       
       return {
-        waypoints,
-        cost: routeCost(route, dist),
-        distance: routeCost(route, dist) // In kilometers
+        waypoints: finalWaypoints,
+        cost: routeCost(filteredRoute, dist),
+        distance: routeCost(filteredRoute, dist) // In kilometers
       };
     });
 
