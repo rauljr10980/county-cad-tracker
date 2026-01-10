@@ -50,6 +50,7 @@ export function PreForeclosureView() {
   const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
   const [startingPointSelectorOpen, setStartingPointSelectorOpen] = useState(false);
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
+  const [customDepotRecordId, setCustomDepotRecordId] = useState<string | null>(null);
   const [recordsInRoutes, setRecordsInRoutes] = useState<Set<string>>(new Set());
 
   // Get unique values for filters
@@ -255,13 +256,14 @@ export function PreForeclosureView() {
 
   const handleStartingPointSelected = (record: PreForeclosureRecord, pinLocation: { lat: number; lng: number }) => {
     setCustomDepot(pinLocation);
+    setCustomDepotRecordId(record.document_number); // Store the specific record ID to use as depot
     // Ensure the closest record is selected
     if (!selectedRecordIds.has(record.document_number)) {
       setSelectedRecordIds(new Set([...selectedRecordIds, record.document_number]));
     }
     toast({
       title: "Starting Point Selected",
-      description: `Starting point set. Route will begin from the closest record: ${record.address}. You can now draw an area or select records, then click "Optimize Route".`,
+      description: `Starting point set. Route will begin from: ${record.address}. You can now draw an area or select records, then click "Optimize Route".`,
     });
     // Don't automatically optimize route - let user draw area first, then optimize manually
   };
@@ -319,6 +321,7 @@ export function PreForeclosureView() {
       // Use custom depot if provided, otherwise use default (first record)
       const depotLat = depotLocation?.lat || customDepot?.lat;
       const depotLon = depotLocation?.lng || customDepot?.lng;
+      const depotPropertyId = depotRecord?.document_number || customDepotRecordId; // Use the specific record ID
 
       // Convert pre-foreclosure records to property format for VRP solver
       const properties = selectedRecords.map(r => ({
@@ -330,7 +333,7 @@ export function PreForeclosureView() {
       }));
 
       // Solve VRP using the backend solver
-      const solution = await solveVRP(properties, numVehicles, depotLat, depotLon);
+      const solution = await solveVRP(properties, numVehicles, depotLat, depotLon, depotPropertyId);
 
       if (!solution.success || !solution.routes || solution.routes.length === 0) {
         throw new Error('No routes generated');
@@ -541,6 +544,7 @@ export function PreForeclosureView() {
               <Button
                 onClick={() => {
                   setCustomDepot(null);
+                  setCustomDepotRecordId(null);
                   toast({
                     title: "Starting Point Cleared",
                     description: "Starting point has been cleared. Route will use default starting point.",

@@ -36,6 +36,7 @@ export function PropertiesView() {
   const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
   const [startingPointSelectorOpen, setStartingPointSelectorOpen] = useState(false);
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
+  const [customDepotPropertyId, setCustomDepotPropertyId] = useState<string | null>(null);
   const [propertiesInRoutes, setPropertiesInRoutes] = useState<Set<string>>(new Set());
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({
     statuses: [],
@@ -837,13 +838,14 @@ export function PropertiesView() {
 
   const handleStartingPointSelected = (property: Property, pinLocation: { lat: number; lng: number }) => {
     setCustomDepot(pinLocation);
+    setCustomDepotPropertyId(property.id); // Store the specific property ID to use as depot
     // Ensure the closest property is selected
     if (!selectedPropertyIds.has(property.id)) {
       setSelectedPropertyIds(new Set([...selectedPropertyIds, property.id]));
     }
     toast({
       title: "Starting Point Selected",
-      description: `Starting point set. Route will begin from the closest property: ${property.propertyAddress}. You can now draw an area or select properties, then click "Optimize Route".`,
+      description: `Starting point set. Route will begin from: ${property.propertyAddress}. You can now draw an area or select properties, then click "Optimize Route".`,
     });
     // Don't automatically optimize route - let user draw area first, then optimize manually
   };
@@ -901,9 +903,10 @@ export function PropertiesView() {
       // Use custom depot if provided, otherwise use default (first property)
       const depotLat = depotLocation?.lat || customDepot?.lat;
       const depotLon = depotLocation?.lng || customDepot?.lng;
+      const depotPropertyId = depotProperty?.id || customDepotPropertyId; // Use the specific property ID
 
       // Solve VRP using the backend solver
-      const solution = await solveVRP(selectedProperties, numVehicles, depotLat, depotLon);
+      const solution = await solveVRP(selectedProperties, numVehicles, depotLat, depotLon, depotPropertyId);
 
       if (!solution.success || !solution.routes || solution.routes.length === 0) {
         throw new Error('No routes generated');
@@ -996,6 +999,7 @@ export function PropertiesView() {
                 <Button
                   onClick={() => {
                     setCustomDepot(null);
+                    setCustomDepotPropertyId(null);
                     toast({
                       title: "Starting Point Cleared",
                       description: "Starting point has been cleared. Route will use default starting point.",

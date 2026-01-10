@@ -683,7 +683,7 @@ export async function solveVRP(properties: Array<{
   propertyAddress?: string;
   address?: string;
   [key: string]: any;
-}>, numVehicles: 1 | 2 = 1, depotLat?: number, depotLon?: number) {
+}>, numVehicles: 1 | 2 = 1, depotLat?: number, depotLon?: number, depotPropertyId?: string) {
   const response = await fetch(`${API_BASE_URL}/api/routing/solve`, {
     method: 'POST',
     headers: {
@@ -695,6 +695,7 @@ export async function solveVRP(properties: Array<{
       numVehicles,
       depotLat,
       depotLon,
+      depotPropertyId, // Pass the specific property ID to use as depot
     }),
   });
   

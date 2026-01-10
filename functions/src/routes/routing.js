@@ -423,8 +423,17 @@ router.post('/solve', async (req, res) => {
     }
 
     // Find depot: if custom depot coordinates provided, find closest property
+    // OR if a specific depot property ID is provided, use that
     let depotProperty;
-    if (depotLat != null && depotLon != null) {
+    const { depotPropertyId } = req.body; // Optional: specific property ID to use as depot
+    
+    if (depotPropertyId) {
+      // Use the specified property as depot
+      depotProperty = validProperties.find(p => p.id === depotPropertyId);
+      if (!depotProperty) {
+        return res.status(400).json({ error: `Specified depot property (ID: ${depotPropertyId}) not found in selected properties` });
+      }
+    } else if (depotLat != null && depotLon != null) {
       // Find the closest property to the custom depot location
       let minDistance = Infinity;
       for (const prop of validProperties) {
