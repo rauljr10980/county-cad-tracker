@@ -36,6 +36,7 @@ export function PropertiesView() {
   const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
   const [startingPointSelectorOpen, setStartingPointSelectorOpen] = useState(false);
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
+  const [propertiesInRoutes, setPropertiesInRoutes] = useState<Set<string>>(new Set());
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({
     statuses: [],
     amountDueMin: undefined,
@@ -850,22 +851,41 @@ export function PropertiesView() {
 
   const handleCreateRouteWithDepot = async (depotProperty?: Property, depotLocation?: { lat: number; lng: number }) => {
     // Get selected properties with valid coordinates
-    const selectedProperties = rawProperties.filter(p => 
+    // Filter out properties that are already in existing routes
+    const availableProperties = rawProperties.filter(p => 
       selectedPropertyIds.has(p.id) && 
       p.latitude != null && 
-      p.longitude != null
+      p.longitude != null &&
+      !propertiesInRoutes.has(p.id) // Exclude properties already in routes
     );
 
-    if (selectedProperties.length === 0) {
+    // Check if any selected properties are already in routes
+    const duplicateCount = Array.from(selectedPropertyIds).filter(id => 
+      propertiesInRoutes.has(id) && 
+      rawProperties.find(p => p.id === id)?.latitude != null &&
+      rawProperties.find(p => p.id === id)?.longitude != null
+    ).length;
+
+    if (duplicateCount > 0) {
+      toast({
+        title: "Properties Already in Routes",
+        description: `${duplicateCount} selected properties are already in existing routes. They will be excluded from this route.`,
+        variant: "default",
+      });
+    }
+
+    if (availableProperties.length === 0) {
       toast({
         title: "No valid locations",
-        description: "Please select properties with latitude and longitude coordinates, or use the area selector.",
+        description: duplicateCount > 0 
+          ? "All selected properties are already in existing routes. Please select different properties."
+          : "Please select properties with latitude and longitude coordinates, or use the area selector.",
         variant: "destructive",
       });
       return;
     }
 
-    if (selectedProperties.length > 500) {
+    if (availableProperties.length > 500) {
       toast({
         title: "Too many properties",
         description: "Maximum 500 properties allowed for route optimization. For larger batches, please select fewer properties.",
@@ -873,6 +893,8 @@ export function PropertiesView() {
       });
       return;
     }
+
+    const selectedProperties = availableProperties;
 
     setIsOptimizingRoute(true);
 
@@ -888,13 +910,26 @@ export function PropertiesView() {
         throw new Error('No routes generated');
       }
 
+      // Extract all property IDs from the generated routes to track them
+      const routePropertyIds = new Set<string>();
+      solution.routes.forEach((route: any) => {
+        route.waypoints.forEach((wp: any) => {
+          if (wp.id && wp.id !== 'depot') {
+            routePropertyIds.add(wp.id);
+          }
+        });
+      });
+
+      // Update the set of properties in routes
+      setPropertiesInRoutes(prev => new Set([...prev, ...routePropertyIds]));
+
       // Store routes and show map visualization
       setOptimizedRoutes(solution);
       setRouteMapOpen(true);
       
       toast({
         title: "Route Optimized",
-        description: `Optimized route for ${selectedProperties.length} properties using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km.`,
+        description: `Optimized route for ${selectedProperties.length} properties using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. ${routePropertyIds.size} properties added to routes.`,
       });
     } catch (error) {
       console.error('[Route Optimization] Error:', error);

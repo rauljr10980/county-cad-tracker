@@ -345,9 +345,11 @@ export function AreaSelectorMap({
   const handleConfirmStartingPoint = () => {
     if (!closestProperty || !pinLocation || !onStartingPointSelected) return;
     onStartingPointSelected(closestProperty, { lat: pinLocation.lat, lng: pinLocation.lng });
-    setPinLocation(null);
-    setClosestProperty(null);
-    setDrawingMode(null);
+    // Don't clear everything - allow user to continue drawing
+    // Only clear the pin-related state, keep the pin visible as confirmation
+    // setDrawingMode(null); // Don't disable drawing mode
+    // Keep pinLocation and closestProperty visible for reference
+    // User can clear manually if needed
   };
 
   if (!isOpen) return null;
@@ -377,7 +379,14 @@ export function AreaSelectorMap({
                   variant={drawingMode === 'rectangle' ? 'default' : 'outline'}
                   className="w-full justify-start"
                   onClick={() => {
-                    handleClearSelection();
+                    // Only clear shape selection (not starting point)
+                    if (selectedShape) {
+                      setSelectedShape(null);
+                      setDrawnRectangle(null);
+                      setDrawnCircle(null);
+                      setDrawnPolygon(null);
+                      setPolygonPointsBeingDrawn([]);
+                    }
                     setDrawingMode('rectangle');
                   }}
                 >
@@ -388,7 +397,14 @@ export function AreaSelectorMap({
                   variant={drawingMode === 'circle' ? 'default' : 'outline'}
                   className="w-full justify-start"
                   onClick={() => {
-                    handleClearSelection();
+                    // Only clear shape selection (not starting point)
+                    if (selectedShape) {
+                      setSelectedShape(null);
+                      setDrawnRectangle(null);
+                      setDrawnCircle(null);
+                      setDrawnPolygon(null);
+                      setPolygonPointsBeingDrawn([]);
+                    }
                     setDrawingMode('circle');
                   }}
                 >
@@ -399,7 +415,14 @@ export function AreaSelectorMap({
                   variant={drawingMode === 'polygon' ? 'default' : 'outline'}
                   className="w-full justify-start"
                   onClick={() => {
-                    handleClearSelection();
+                    // Only clear shape selection (not starting point)
+                    if (selectedShape) {
+                      setSelectedShape(null);
+                      setDrawnRectangle(null);
+                      setDrawnCircle(null);
+                      setDrawnPolygon(null);
+                      setPolygonPointsBeingDrawn([]);
+                    }
                     setDrawingMode('polygon');
                   }}
                 >
@@ -432,14 +455,14 @@ export function AreaSelectorMap({
                       variant={drawingMode === 'pin' ? 'default' : 'outline'}
                       className="w-full justify-start"
                       onClick={() => {
-                        handleClearSelection();
+                        // Don't clear shape selection when setting starting point
+                        // Allow both area selection and starting point to coexist
                         setDrawingMode('pin');
-                        setPinLocation(null);
-                        setClosestProperty(null);
+                        // Don't clear pin location if already set - allow keeping it as reference
                       }}
                     >
                       <MapPin className="h-4 w-4 mr-2" />
-                      Drop Pin
+                      {pinLocation ? 'Drop New Pin' : 'Drop Pin'}
                     </Button>
                     {pinLocation && (
                       <>
@@ -492,6 +515,11 @@ export function AreaSelectorMap({
                             setPinLocation(null);
                             setClosestProperty(null);
                             setDrawingMode(null);
+                            // Restore map interactions
+                            const map = document.querySelector('.leaflet-container');
+                            if (map) {
+                              // The map will automatically restore interactions when drawingMode is null
+                            }
                           }}
                         >
                           <X className="h-4 w-4 mr-2" />

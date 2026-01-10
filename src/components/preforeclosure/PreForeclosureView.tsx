@@ -50,6 +50,7 @@ export function PreForeclosureView() {
   const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
   const [startingPointSelectorOpen, setStartingPointSelectorOpen] = useState(false);
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
+  const [recordsInRoutes, setRecordsInRoutes] = useState<Set<string>>(new Set());
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -268,22 +269,41 @@ export function PreForeclosureView() {
 
   const handleCreateRouteWithDepot = async (depotRecord?: PreForeclosureRecord, depotLocation?: { lat: number; lng: number }) => {
     // Get selected records with valid coordinates
-    const selectedRecords = filteredRecords.filter(r => 
+    // Filter out records that are already in existing routes
+    const availableRecords = filteredRecords.filter(r => 
       selectedRecordIds.has(r.document_number) && 
       r.latitude != null && 
-      r.longitude != null
+      r.longitude != null &&
+      !recordsInRoutes.has(r.document_number) // Exclude records already in routes
     );
 
-    if (selectedRecords.length === 0) {
+    // Check if any selected records are already in routes
+    const duplicateCount = Array.from(selectedRecordIds).filter(id => 
+      recordsInRoutes.has(id) && 
+      filteredRecords.find(r => r.document_number === id)?.latitude != null &&
+      filteredRecords.find(r => r.document_number === id)?.longitude != null
+    ).length;
+
+    if (duplicateCount > 0) {
+      toast({
+        title: "Records Already in Routes",
+        description: `${duplicateCount} selected records are already in existing routes. They will be excluded from this route.`,
+        variant: "default",
+      });
+    }
+
+    if (availableRecords.length === 0) {
       toast({
         title: "No valid locations",
-        description: "Please select records with latitude and longitude coordinates, or use the area selector.",
+        description: duplicateCount > 0 
+          ? "All selected records are already in existing routes. Please select different records."
+          : "Please select records with latitude and longitude coordinates, or use the area selector.",
         variant: "destructive",
       });
       return;
     }
 
-    if (selectedRecords.length > 500) {
+    if (availableRecords.length > 500) {
       toast({
         title: "Too many records",
         description: "Maximum 500 records allowed for route optimization. For larger batches, please select fewer records.",
@@ -291,6 +311,8 @@ export function PreForeclosureView() {
       });
       return;
     }
+
+    const selectedRecords = availableRecords;
 
     setIsOptimizingRoute(true);
 
@@ -315,13 +337,26 @@ export function PreForeclosureView() {
         throw new Error('No routes generated');
       }
 
+      // Extract all record IDs from the generated routes to track them
+      const routeRecordIds = new Set<string>();
+      solution.routes.forEach((route: any) => {
+        route.waypoints.forEach((wp: any) => {
+          if (wp.id && wp.id !== 'depot') {
+            routeRecordIds.add(wp.id);
+          }
+        });
+      });
+
+      // Update the set of records in routes
+      setRecordsInRoutes(prev => new Set([...prev, ...routeRecordIds]));
+
       // Store routes and show map visualization
       setOptimizedRoutes(solution);
       setRouteMapOpen(true);
       
       toast({
         title: "Route Optimized",
-        description: `Optimized route for ${selectedRecords.length} records using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km.`,
+        description: `Optimized route for ${selectedRecords.length} records using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. ${routeRecordIds.size} records added to routes.`,
       });
     } catch (error) {
       console.error('[Route Optimization] Error:', error);
