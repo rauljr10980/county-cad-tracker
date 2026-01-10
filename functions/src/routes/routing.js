@@ -474,34 +474,37 @@ router.post('/solve', async (req, res) => {
       accountNumber: depotProperty.accountNumber // Keep account number for reference
     };
 
-    // Build locations array: [depot, ...all properties including depot if selected]
-    // The depot property can be BOTH the starting point AND a visitable stop
-    // This allows routes even when the starting point is the only property selected
-    const otherProperties = validProperties; // Include ALL properties, including depot if it's in the selection
+    // Build locations array: [depot, ...properties to visit (EXCLUDING depot)]
+    // IMPORTANT: The depot property should NOT be in the visitable stops list
+    // The depot is the starting/ending point, not a stop to visit
+    // Exclude the depot property from the visitable stops
+    const otherProperties = validProperties.filter(p => p.id !== depotProperty.id);
     
     console.log('[ROUTING] Depot setup:', {
       depotAddress: depot.address,
       depotId: depotProperty.id,
       depotAccountNumber: depotProperty.accountNumber,
-      totalProperties: validProperties.length,
+      totalPropertiesReceived: validProperties.length,
       propertiesToVisit: otherProperties.length,
-      depotIncludedAsStop: otherProperties.some(p => p.id === depotProperty.id)
+      depotExcludedFromStops: true,
+      note: 'Depot is the starting point only, not a visitable stop'
     });
     
-    // Validate that we have properties to visit
+    // Validate that we have properties to visit (excluding the depot)
     if (otherProperties.length === 0) {
-      console.error('[ROUTING] No properties to visit:', {
-        totalProperties: validProperties.length,
+      console.error('[ROUTING] No properties to visit (excluding depot):', {
+        totalPropertiesReceived: validProperties.length,
         depotId: depotProperty.id,
         depotAccountNumber: depotProperty.accountNumber
       });
       return res.status(400).json({ 
-        error: 'No properties to visit. Please select at least one property.',
+        error: 'No properties to visit (excluding starting point). Please select at least one property other than the starting point.',
         depotProperty: {
           id: depotProperty.id,
           address: depot.address,
           accountNumber: depotProperty.accountNumber
-        }
+        },
+        receivedProperties: validProperties.length
       });
     }
 

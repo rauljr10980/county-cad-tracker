@@ -1021,8 +1021,13 @@ export function PropertiesView() {
     }
 
     // IMPORTANT: If validatedProvidedProperties was passed (from area selector), allow up to 26 total
-    // This is 1 depot + 25 properties. After excluding depot, we'll have 25 properties to optimize.
+    // This is 1 depot + 25 properties. The backend will exclude the depot from visitable stops.
+    // Note: We filter out properties already in routes, which might reduce the count
     if (validatedProvidedProperties && validatedProvidedProperties.length > 0) {
+      // Don't filter out the depot from availableProperties - we need it for the backend to identify it
+      // But count how many non-depot properties we have for validation
+      const nonDepotProperties = availableProperties.filter(p => p.id !== depotPropertyId);
+      
       if (availableProperties.length > 26) {
         console.error('[handleCreateRouteWithDepot] CRITICAL ERROR: More than 26 properties after filtering!');
         console.error('[handleCreateRouteWithDepot] validatedProvidedProperties:', validatedProvidedProperties.length, 'availableProperties:', availableProperties.length);
@@ -1032,12 +1037,21 @@ export function PropertiesView() {
         availableProperties = depot ? [depot, ...others] : others.slice(0, 26);
         console.warn('[handleCreateRouteWithDepot] Force-limited to 26 (1 depot + 25 properties):', availableProperties.length);
       }
+      
       // ABSOLUTE HARD CAP: Never allow more than 26 properties for area selector (1 depot + 25 properties)
       if (availableProperties.length > 26) {
         console.error('[handleCreateRouteWithDepot] CRITICAL: Still more than 26 after filtering! Force limiting.');
-        availableProperties = availableProperties.slice(0, 26);
+        const depot = availableProperties.find(p => p.id === depotPropertyId);
+        const others = availableProperties.filter(p => p.id !== depotPropertyId).slice(0, 25);
+        availableProperties = depot ? [depot, ...others] : availableProperties.slice(0, 26);
       }
-      console.log('[handleCreateRouteWithDepot] Final count after hard cap (area selector):', availableProperties.length, '(will exclude depot, leaving 25 properties to optimize)');
+      
+      console.log('[handleCreateRouteWithDepot] Final count (area selector):', {
+        total: availableProperties.length,
+        depotIncluded: availableProperties.some(p => p.id === depotPropertyId),
+        nonDepotProperties: availableProperties.filter(p => p.id !== depotPropertyId).length,
+        note: 'Backend will exclude depot from visitable stops, leaving these properties to visit'
+      });
     } else if (availableProperties.length > 500) {
       toast({
         title: "Too many properties",
@@ -1090,36 +1104,36 @@ export function PropertiesView() {
         console.log('[Route Optimization] Properties before depot exclusion:', finalPropertiesForOptimization.length);
       }
 
-      // IMPORTANT: Exclude the depot property from the properties list
-      // The depot is the starting point (passed as depotLat/depotLon/depotPropertyId), NOT a stop to visit
-      // If the depot is included in the properties list, it will be treated as a regular stop (e.g., stop 427)
-      const propertiesWithoutDepot = depotPropertyId 
-        ? finalPropertiesForOptimization.filter(p => p.id !== depotPropertyId)
-        : finalPropertiesForOptimization;
-      
-      console.log('[Route Optimization] Depot exclusion:', {
-        totalProperties: finalPropertiesForOptimization.length,
-        depotPropertyId,
-        propertiesWithoutDepot: propertiesWithoutDepot.length,
-        depotIncluded: finalPropertiesForOptimization.some(p => p.id === depotPropertyId)
-      });
-
-      // Solve VRP using the backend solver
-      // Map properties to match solveVRP type signature (latitude/longitude required)
-      // NOTE: Depot is NOT in this list - it's passed separately as depotLat/depotLon/depotPropertyId
-      const propertiesForVRP = propertiesWithoutDepot.map(p => ({
+      // IMPORTANT: Include the depot property in the properties array so the backend can identify it
+      // The backend will exclude it from the visitable stops list, but needs it to:
+      // 1. Find the depot property when depotPropertyId is provided
+      // 2. Use its coordinates as the depot location
+      // The backend code will filter it out from the visitable stops (otherProperties)
+      const propertiesForVRP = finalPropertiesForOptimization.map(p => ({
         ...p,
         latitude: p.latitude!,
         longitude: p.longitude!,
       }));
+      
+      // Count properties excluding depot for logging
+      const propertiesWithoutDepot = depotPropertyId 
+        ? propertiesForVRP.filter(p => p.id !== depotPropertyId)
+        : propertiesForVRP;
+      
+      console.log('[Route Optimization] Preparing for solveVRP:', {
+        totalPropertiesIncludingDepot: propertiesForVRP.length,
+        propertiesToVisitExcludingDepot: propertiesWithoutDepot.length,
+        depotPropertyId,
+        depotIncludedInArray: propertiesForVRP.some(p => p.id === depotPropertyId),
+        note: 'Depot is included in array so backend can find it, but backend will exclude it from visitable stops'
+      });
       
       console.log('[Route Optimization] Calling solveVRP with:', {
         propertyCount: propertiesForVRP.length,
         numVehicles,
         depotLat,
         depotLon,
-        depotPropertyId,
-        note: 'Depot is NOT in properties list - it is the starting point only'
+        depotPropertyId
       });
       
       const solution = await solveVRP(propertiesForVRP, numVehicles, depotLat, depotLon, depotPropertyId);
@@ -1610,34 +1624,38 @@ export function PropertiesView() {
             }
           }
 
-          // CRITICAL: Enforce 25 property limit for area selector (depot + 24 others)
-          // Note: Depot will be excluded from optimization list later, so this gives us 24 properties to optimize
-          if (propertiesToOptimize.length > 25) {
-            console.warn('[onOptimize] WARNING: More than 25 properties received from area selector. Limiting to 25.');
-            // Keep depot first, then take 24 closest
+          // CRITICAL: Enforce 26 property limit for area selector (1 depot + 25 properties to visit)
+          // The backend will exclude the depot from visitable stops, so we need 26 total
+          // After backend excludes depot, we'll have 25 properties to visit
+          if (propertiesToOptimize.length > 26) {
+            console.warn('[onOptimize] WARNING: More than 26 properties received from area selector. Limiting to 26 (1 depot + 25 properties).');
+            // Keep depot first, then take 25 closest
             const depot = propertiesToOptimize.find(p => p.id === depotProperty.id);
-            const others = propertiesToOptimize.filter(p => p.id !== depotProperty.id).slice(0, 24);
+            const others = propertiesToOptimize.filter(p => p.id !== depotProperty.id).slice(0, 25);
             propertiesToOptimize.length = 0; // Clear array
             if (depot) {
-              propertiesToOptimize.push(depot, ...others); // 25 total: depot + 24 others
+              propertiesToOptimize.push(depot, ...others); // 26 total: 1 depot + 25 properties
             } else {
-              propertiesToOptimize.push(...others.slice(0, 25));
+              propertiesToOptimize.push(...others.slice(0, 26));
             }
           }
 
-          // IMPORTANT: Remove depot from the optimization list
-          // The depot is the starting point (passed as depotLat/depotLon/depotPropertyId), NOT a stop to visit
-          // This ensures the depot appears as stop 0/START, not as the last stop
+          // IMPORTANT: Keep the depot in the properties array
+          // The backend needs the depot in the array to identify it via depotPropertyId
+          // The backend will then exclude it from the visitable stops list
+          // This ensures the depot appears as stop 0/START, not as a visitable stop
+          
+          // Count properties excluding depot for validation
           const propertiesWithoutDepot = propertiesToOptimize.filter(p => p.id !== depotProperty.id);
           
-          console.log('[Route Optimization] Final properties to optimize (excluding depot):', {
-            totalWithDepot: propertiesToOptimize.length,
-            propertiesWithoutDepot: propertiesWithoutDepot.length,
+          console.log('[Route Optimization] Final properties to send to backend:', {
+            totalIncludingDepot: propertiesToOptimize.length,
+            propertiesToVisitExcludingDepot: propertiesWithoutDepot.length,
             depotId: depotProperty.id,
             depotAddress: depotProperty.propertyAddress,
             propertyIds: propertiesWithoutDepot.map(p => p.id).slice(0, 5).join(',') + (propertiesWithoutDepot.length > 5 ? `... (+${propertiesWithoutDepot.length - 5} more)` : ''),
-            maxAllowed: 24,
-            note: 'Depot is excluded from optimization list - it is the starting point only'
+            maxAllowed: 25,
+            note: 'Depot is included in array so backend can find it, but backend will exclude it from visitable stops'
           });
 
           if (propertiesWithoutDepot.length === 0) {
@@ -1653,9 +1671,9 @@ export function PropertiesView() {
           const propertyIds = new Set(propertiesToOptimize.map(p => p.id));
           setSelectedPropertyIds(propertyIds);
           
-          // Create route with depot, passing properties WITHOUT the depot
-          // The depot will be passed separately as depotLat/depotLon/depotPropertyId
-          await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation, propertiesWithoutDepot);
+          // Create route with depot, passing properties INCLUDING the depot
+          // The backend will exclude the depot from visitable stops, so it won't appear as a stop
+          await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation, propertiesToOptimize);
         }}
         properties={rawProperties.filter(p => p.latitude != null && p.longitude != null).map(p => ({
           id: p.id,
