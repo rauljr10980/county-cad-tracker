@@ -18,7 +18,6 @@ import { toast } from '@/hooks/use-toast';
 import { solveVRP } from '@/lib/api';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
-import { StartingPointSelector } from '@/components/routing/StartingPointSelector';
 
 export function PreForeclosureView() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,7 +47,6 @@ export function PreForeclosureView() {
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
   const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
-  const [startingPointSelectorOpen, setStartingPointSelectorOpen] = useState(false);
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotRecordId, setCustomDepotRecordId] = useState<string | null>(null);
   const [recordsInRoutes, setRecordsInRoutes] = useState<Set<string>>(new Set());
@@ -584,15 +582,6 @@ export function PreForeclosureView() {
               title="Select area on map to filter records"
             >
               Select Area
-            </Button>
-            <Button
-              onClick={() => setStartingPointSelectorOpen(true)}
-              variant="outline"
-              size="sm"
-              title="Drop a pin to set starting point"
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              Set Starting Point
             </Button>
             {customDepot && (
               <Button
@@ -1628,27 +1617,6 @@ export function PreForeclosureView() {
         numVehicles={numVehicles}
       />
 
-      {/* Starting Point Selector */}
-      <StartingPointSelector
-        isOpen={startingPointSelectorOpen}
-        onClose={() => setStartingPointSelectorOpen(false)}
-        onStartingPointSelected={(property, pinLocation) => {
-          // Find the record that matches the property (it should have document_number as id)
-          const record = filteredRecords.find(r => r.document_number === property.id);
-          if (record) {
-            handleStartingPointSelected(record, pinLocation);
-          }
-        }}
-        properties={filteredRecords.filter(r => r.latitude != null && r.longitude != null).map(r => ({
-          id: r.document_number,
-          latitude: r.latitude!,
-          longitude: r.longitude!,
-          propertyAddress: r.address || '',
-          address: r.address || '',
-          ownerName: r.property_owner || '',
-          accountNumber: r.document_number
-        }))}
-      />
       </div>
     );
   }
