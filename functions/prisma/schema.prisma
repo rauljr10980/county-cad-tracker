@@ -90,6 +90,9 @@ model Property {
   phoneNumbers      String[]  // Array of phone numbers
   ownerPhoneIndex   Int?      // Index of owner's primary phone
 
+  // Notes (simple string field for quick notes, separate from Note relation for detailed notes)
+  notes             String?   @db.Text
+
   // Deal Pipeline
   dealStage         DealStage?
   estimatedDealValue Float?
@@ -106,7 +109,7 @@ model Property {
   updatedAt         DateTime  @updatedAt
 
   // Relations
-  notes             Note[]
+  noteRecords       Note[]       @relation("PropertyNotes")  // Detailed notes with authors
   tasks             Task[]
   paymentHistory    PaymentHistory[]
 
@@ -151,7 +154,7 @@ model Note {
 
   // Relations
   propertyId String
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property   Property @relation("PropertyNotes", fields: [propertyId], references: [id], onDelete: Cascade)
 
   authorId   String
   author     User     @relation(fields: [authorId], references: [id])

@@ -106,7 +106,7 @@ router.get('/',
         include: {
           _count: {
             select: {
-              notes: true,
+              noteRecords: true,  // Count of Note relation records
               tasks: true
             }
           }
@@ -132,10 +132,12 @@ router.get('/',
 
       // Map database fields to frontend format
       // Map totalDue (database) to totalAmountDue (frontend)
+      // Map percentageDue (database) to totalPercentage (frontend)
       const mappedProperties = properties.map(prop => ({
         ...prop,
         totalAmountDue: prop.totalDue || 0, // Map totalDue to totalAmountDue for frontend
-        // Keep totalDue for backward compatibility but prioritize totalAmountDue
+        totalPercentage: prop.percentageDue || 0, // Map percentageDue to totalPercentage for frontend
+        // Keep original fields for backward compatibility but prioritize mapped fields
       }));
 
       // Format status counts to match BOTH old and new frontend (backward compatible)
@@ -203,7 +205,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     const property = await prisma.property.findUnique({
       where: { id: req.params.id },
       include: {
-        notes: {
+        noteRecords: {  // Detailed notes with authors (relation)
           include: {
             author: {
               select: { id: true, username: true }
@@ -235,10 +237,12 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
     // Map database fields to frontend format
     // Map totalDue (database) to totalAmountDue (frontend)
+    // Map percentageDue (database) to totalPercentage (frontend)
     const mappedProperty = {
       ...property,
       totalAmountDue: property.totalDue || 0, // Map totalDue to totalAmountDue for frontend
-      // Keep totalDue for backward compatibility but prioritize totalAmountDue
+      totalPercentage: property.percentageDue || 0, // Map percentageDue to totalPercentage for frontend
+      // Keep original fields for backward compatibility but prioritize mapped fields
     };
 
     res.json(mappedProperty);
@@ -271,6 +275,12 @@ router.post('/',
 
       const data = req.body;
 
+      // Map frontend field names to database field names
+      // Frontend uses totalAmountDue, database uses totalDue
+      // Frontend uses totalPercentage, database uses percentageDue
+      const totalDue = data.totalDue !== undefined ? data.totalDue : (data.totalAmountDue || 0);
+      const percentageDue = data.percentageDue !== undefined ? data.percentageDue : (data.totalPercentage || 0);
+
       // Check if property already exists
       const existing = await prisma.property.findUnique({
         where: { accountNumber: data.accountNumber }
@@ -284,16 +294,17 @@ router.post('/',
         data: {
           accountNumber: data.accountNumber,
           ownerName: data.ownerName,
-          propertyAddress: data.propertyAddress,
+          propertyAddress: data.propertyAddress || '',
           mailingAddress: data.mailingAddress,
-          totalDue: data.totalDue,
-          percentageDue: data.percentageDue,
+          totalDue: totalDue,
+          percentageDue: percentageDue,
           status: data.status,
           previousStatus: data.previousStatus,
           taxYear: data.taxYear,
           legalDescription: data.legalDescription,
           phoneNumbers: data.phoneNumbers || [],
           ownerPhoneIndex: data.ownerPhoneIndex,
+          notes: data.notes || null,
           dealStage: data.dealStage,
           estimatedDealValue: data.estimatedDealValue,
           offerAmount: data.offerAmount,
@@ -322,17 +333,39 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
+    // Map frontend field names to database field names
+    const updateData = { ...updates };
+    
+    // Map totalAmountDue (frontend) to totalDue (database)
+    if (updateData.totalAmountDue !== undefined && updateData.totalDue === undefined) {
+      updateData.totalDue = updateData.totalAmountDue;
+      delete updateData.totalAmountDue;
+    }
+    
+    // Map totalPercentage (frontend) to percentageDue (database)
+    if (updateData.totalPercentage !== undefined && updateData.percentageDue === undefined) {
+      updateData.percentageDue = updateData.totalPercentage;
+      delete updateData.totalPercentage;
+    }
+
     // Convert date fields if present
-    if (updates.expectedCloseDate) {
-      updates.expectedCloseDate = new Date(updates.expectedCloseDate);
+    if (updateData.expectedCloseDate) {
+      updateData.expectedCloseDate = new Date(updateData.expectedCloseDate);
     }
 
     const property = await prisma.property.update({
       where: { id },
-      data: updates
+      data: updateData
     });
 
-    res.json(property);
+    // Map response back to frontend format
+    const mappedProperty = {
+      ...property,
+      totalAmountDue: property.totalDue || 0,
+      totalPercentage: property.percentageDue || 0
+    };
+
+    res.json(mappedProperty);
   } catch (error) {
     if (error.code === 'P2025') {
       return res.status(404).json({ error: 'Property not found' });
@@ -354,14 +387,21 @@ router.post('/bulk-update', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Properties array is required' });
     }
 
+    // Map frontend field names to database field names
+    const mappedProperties = properties.map(prop => ({
+      ...prop,
+      totalDue: prop.totalDue !== undefined ? prop.totalDue : (prop.totalAmountDue || 0),
+      percentageDue: prop.percentageDue !== undefined ? prop.percentageDue : (prop.totalPercentage || 0)
+    }));
+
     // Use transaction for bulk updates
     const results = await prisma.$transaction(
-      properties.map(prop =>
+      mappedProperties.map(prop =>
         prisma.property.upsert({
           where: { accountNumber: prop.accountNumber },
           update: {
             ownerName: prop.ownerName,
-            propertyAddress: prop.propertyAddress,
+            propertyAddress: prop.propertyAddress || '',
             totalDue: prop.totalDue,
             percentageDue: prop.percentageDue,
             status: prop.status,
@@ -371,7 +411,7 @@ router.post('/bulk-update', authenticateToken, async (req, res) => {
           create: {
             accountNumber: prop.accountNumber,
             ownerName: prop.ownerName,
-            propertyAddress: prop.propertyAddress,
+            propertyAddress: prop.propertyAddress || '',
             totalDue: prop.totalDue,
             percentageDue: prop.percentageDue,
             status: prop.status,
@@ -830,9 +870,7 @@ router.put('/:id/followup', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'followUpDate is required' });
     }
 
-    // Check if property exists - Note: Property model doesn't have followUpDate directly
-    // This might need to update a related task or be stored elsewhere
-    // For now, we'll just validate the property exists
+    // Check if property exists
     const property = await prisma.property.findUnique({
       where: { id }
     });
@@ -841,12 +879,56 @@ router.put('/:id/followup', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Property not found' });
     }
 
-    // Note: Since Property doesn't have followUpDate, we might need to update the most recent task
-    // or add this field to the schema. For now, return success to match frontend expectation.
+    // Update the most recent pending task's dueTime, or create a new task if none exists
+    const existingTask = await prisma.task.findFirst({
+      where: {
+        propertyId: id,
+        status: 'PENDING'
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const followUpDateTime = new Date(followUpDate);
+
+    if (existingTask) {
+      // Update existing task's due time
+      await prisma.task.update({
+        where: { id: existingTask.id },
+        data: { dueTime: followUpDateTime }
+      });
+    } else {
+      // Create a new task for follow-up (use system user if no auth)
+      let userId = req.user?.id;
+      if (!userId) {
+        const systemUser = await prisma.user.findFirst({ where: { username: 'system' } }) ||
+          await prisma.user.create({
+            data: {
+              username: 'system',
+              email: 'system@countycadtracker.com',
+              password: 'default',
+              role: 'OPERATOR'
+            }
+          });
+        userId = systemUser.id;
+      }
+
+      await prisma.task.create({
+        data: {
+          propertyId: id,
+          actionType: 'CALL',
+          priority: 'MEDIUM',
+          status: 'PENDING',
+          dueTime: followUpDateTime,
+          createdById: userId
+        }
+      });
+    }
+
     res.json({ 
       success: true, 
-      message: 'Follow-up date updated (stored in related task if available)',
-      propertyId: id 
+      message: 'Follow-up date updated',
+      propertyId: id,
+      followUpDate: followUpDateTime.toISOString()
     });
   } catch (error) {
     console.error('[PROPERTIES] Follow-up update error:', error);
