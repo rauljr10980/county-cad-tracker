@@ -447,13 +447,32 @@ export function AreaSelectorMap({
       polygon: selectedShape.polygon ? selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })) : undefined
     };
 
+    // CRITICAL: Ensure selectedProperties is limited to 25 (depot + 24 closest)
+    // This is a safety check in case the state was somehow modified
+    let finalSelectedProperties = selectedProperties;
+    if (finalSelectedProperties.length > 25) {
+      console.warn('[AreaSelectorMap] WARNING: selectedProperties has more than 25 properties. Limiting now.');
+      // Find and keep depot first
+      const depotIndex = finalSelectedProperties.findIndex(p => p.id === closestProperty.id);
+      const depot = depotIndex >= 0 ? finalSelectedProperties[depotIndex] : closestProperty;
+      const others = finalSelectedProperties.filter(p => p.id !== closestProperty.id).slice(0, 24);
+      finalSelectedProperties = [depot, ...others];
+      console.log('[AreaSelectorMap] Limited to:', finalSelectedProperties.length, 'properties');
+    }
+
+    console.log('[AreaSelectorMap] handleOptimize called with:', {
+      selectedPropertiesCount: finalSelectedProperties.length,
+      areaType: area.polygon ? 'polygon' : area.radius !== undefined ? 'circle' : 'rectangle',
+      depotId: closestProperty.id
+    });
+
     onOptimize({
       startingPoint: {
         property: closestProperty,
         pinLocation: { lat: pinLocation.lat, lng: pinLocation.lng }
       },
       area,
-      selectedProperties
+      selectedProperties: finalSelectedProperties
     });
 
     onClose();
