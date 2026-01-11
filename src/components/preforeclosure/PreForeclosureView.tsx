@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -304,14 +304,14 @@ export function PreForeclosureView() {
     loadActiveRoutes();
   }, []);
 
-  const handleMarkVisited = async (documentNumber: string, driver: 'Luciano' | 'Raul') => {
+  const handleMarkVisited = async (documentNumber: string, driver: 'Luciano' | 'Raul', visited: boolean = true) => {
     setMarkingVisited(documentNumber);
     try {
-      console.log('[PreForeclosure] Marking as visited:', { documentNumber, driver });
-      await markPreForeclosureVisited(documentNumber, driver);
+      console.log('[PreForeclosure] Updating visited status:', { documentNumber, driver, visited });
+      await markPreForeclosureVisited(documentNumber, driver, visited);
       toast({
-        title: 'Record Marked as Visited',
-        description: `Document ${documentNumber} has been marked as visited.`,
+        title: visited ? 'Record Marked as Visited' : 'Record Unmarked',
+        description: `Document ${documentNumber} has been ${visited ? 'marked as visited' : 'set back to pending'}.`,
       });
       // Reload active routes to refresh the visited status
       await loadActiveRoutes();
@@ -324,10 +324,10 @@ export function PreForeclosureView() {
         }
       }
     } catch (error) {
-      console.error('Error marking record as visited:', error);
+      console.error('Error updating visited status:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to mark record as visited',
+        description: error instanceof Error ? error.message : 'Failed to update visited status',
         variant: 'destructive',
       });
     } finally {
@@ -2026,26 +2026,53 @@ export function PreForeclosureView() {
                                 </td>
                                 <td className="px-4 py-2 text-sm">
                                   <div className="flex items-center gap-2">
-                                    {!record.visited && !routeRecord.isDepot && documentNumber && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleMarkVisited(documentNumber, viewRoute.driver);
-                                        }}
-                                        disabled={markingVisited === documentNumber}
-                                        className="h-7 text-xs"
-                                      >
-                                        {markingVisited === documentNumber ? (
-                                          <>
-                                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                            Marking...
-                                          </>
+                                    {!routeRecord.isDepot && documentNumber && (
+                                      <>
+                                        {!record.visited ? (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleMarkVisited(documentNumber, viewRoute.driver, true);
+                                            }}
+                                            disabled={markingVisited === documentNumber}
+                                            className="h-7 text-xs"
+                                          >
+                                            {markingVisited === documentNumber ? (
+                                              <>
+                                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                                Marking...
+                                              </>
+                                            ) : (
+                                              'Mark Visited'
+                                            )}
+                                          </Button>
                                         ) : (
-                                          'Mark Visited'
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleMarkVisited(documentNumber, viewRoute.driver, false);
+                                            }}
+                                            disabled={markingVisited === documentNumber}
+                                            className="h-7 text-xs text-muted-foreground"
+                                          >
+                                            {markingVisited === documentNumber ? (
+                                              <>
+                                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                                Updating...
+                                              </>
+                                            ) : (
+                                              <>
+                                                <RotateCcw className="h-3 w-3 mr-1" />
+                                                Set Pending
+                                              </>
+                                            )}
+                                          </Button>
                                         )}
-                                      </Button>
+                                      </>
                                     )}
                                     {documentNumber && (
                                       <Button

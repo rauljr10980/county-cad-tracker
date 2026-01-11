@@ -804,11 +804,11 @@ export async function deletePreForeclosures(): Promise<{ success: boolean; messa
 }
 
 /**
- * Mark pre-foreclosure record as visited
+ * Mark or unmark pre-foreclosure record as visited
  */
-export async function markPreForeclosureVisited(documentNumber: string, driver?: 'Luciano' | 'Raul') {
+export async function markPreForeclosureVisited(documentNumber: string, driver?: 'Luciano' | 'Raul', visited: boolean = true) {
   const url = `${API_BASE_URL}/api/preforeclosure/${encodeURIComponent(documentNumber)}/visit`;
-  console.log('[API] Marking pre-foreclosure as visited:', { url, documentNumber, driver });
+  console.log('[API] Updating pre-foreclosure visited status:', { url, documentNumber, driver, visited });
   
   const response = await fetch(url, {
     method: 'PUT',
@@ -816,13 +816,13 @@ export async function markPreForeclosureVisited(documentNumber: string, driver?:
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
-    body: JSON.stringify({ driver }),
+    body: JSON.stringify({ driver, visited }),
   });
   
   if (!response.ok) {
     const error = await response.json();
-    console.error('[API] Error marking as visited:', error);
-    throw new Error(error.error || 'Failed to mark record as visited');
+    console.error('[API] Error updating visited status:', error);
+    throw new Error(error.error || 'Failed to update visited status');
   }
   
   return response.json();

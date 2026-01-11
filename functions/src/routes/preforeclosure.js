@@ -507,7 +507,7 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
 router.put('/:documentNumber/visit', optionalAuth, async (req, res) => {
   try {
     const { documentNumber } = req.params;
-    const { driver } = req.body; // Optional: who visited (defaults to assigned driver)
+    const { driver, visited } = req.body; // visited: true/false (optional, defaults to true)
 
     const record = await prisma.preForeclosure.findUnique({
       where: { documentNumber }
@@ -517,14 +517,17 @@ router.put('/:documentNumber/visit', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Pre-foreclosure record not found' });
     }
 
-    // Update visited status
+    // Update visited status (can be set to true or false)
+    const visitedStatus = visited !== undefined ? visited : true;
+    const updateData = {
+      visited: visitedStatus,
+      visitedAt: visitedStatus ? new Date() : null,
+      visitedBy: visitedStatus ? (driver || record.assignedTo || null) : null
+    };
+
     const updated = await prisma.preForeclosure.update({
       where: { documentNumber },
-      data: {
-        visited: true,
-        visitedAt: new Date(),
-        visitedBy: driver || record.assignedTo || null
-      },
+      data: updateData,
       select: {
         id: true,
         documentNumber: true,
