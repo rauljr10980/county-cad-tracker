@@ -56,14 +56,17 @@ router.get('/', optionalAuth, async (req, res) => {
         record: rr.preForeclosure ? {
           id: rr.preForeclosure.id,
           document_number: rr.preForeclosure.documentNumber,
+          documentNumber: rr.preForeclosure.documentNumber, // Also include camelCase for compatibility
           address: rr.preForeclosure.address,
           city: rr.preForeclosure.city,
           zip: rr.preForeclosure.zip,
           latitude: rr.preForeclosure.latitude,
           longitude: rr.preForeclosure.longitude,
-          visited: rr.preForeclosure.visited,
+          visited: rr.preForeclosure.visited || false,
           visited_at: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null,
-          visited_by: rr.preForeclosure.visitedBy
+          visited_by: rr.preForeclosure.visitedBy || null,
+          visitedAt: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null, // Also include camelCase
+          visitedBy: rr.preForeclosure.visitedBy || null // Also include camelCase
         } : null
       }))
     }));
@@ -125,14 +128,17 @@ router.get('/active', optionalAuth, async (req, res) => {
         record: rr.preForeclosure ? {
           id: rr.preForeclosure.id,
           document_number: rr.preForeclosure.documentNumber,
+          documentNumber: rr.preForeclosure.documentNumber, // Also include camelCase for compatibility
           address: rr.preForeclosure.address,
           city: rr.preForeclosure.city,
           zip: rr.preForeclosure.zip,
           latitude: rr.preForeclosure.latitude,
           longitude: rr.preForeclosure.longitude,
-          visited: rr.preForeclosure.visited,
+          visited: rr.preForeclosure.visited || false,
           visited_at: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null,
-          visited_by: rr.preForeclosure.visitedBy
+          visited_by: rr.preForeclosure.visitedBy || null,
+          visitedAt: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null, // Also include camelCase
+          visitedBy: rr.preForeclosure.visitedBy || null // Also include camelCase
         } : null
       }))
     }));
