@@ -18,6 +18,9 @@ import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute } from '@/lib/api';
 import type { Route } from '@/lib/api';
+
+// Local type alias to avoid runtime reference issues
+type RouteType = Route;
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 
@@ -54,9 +57,9 @@ export function PreForeclosureView() {
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotRecordId, setCustomDepotRecordId] = useState<string | null>(null);
   const [recordsInRoutes, setRecordsInRoutes] = useState<Set<string>>(new Set());
-  const [activeRoutes, setActiveRoutes] = useState<import('@/lib/api').Route[]>([]);
+  const [activeRoutes, setActiveRoutes] = useState<RouteType[]>([]);
   const [isLoadingActiveRoutes, setIsLoadingActiveRoutes] = useState(false);
-  const [viewRoute, setViewRoute] = useState<import('@/lib/api').Route | null>(null);
+  const [viewRoute, setViewRoute] = useState<RouteType | null>(null);
   const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
   const [markingVisited, setMarkingVisited] = useState<string | null>(null);
   const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
@@ -1112,9 +1115,9 @@ export function PreForeclosureView() {
             <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
             <span className="text-sm text-muted-foreground">Loading routes...</span>
           </div>
-        ) : activeRoutes.length > 0 ? (
+        ) : activeRoutes && activeRoutes.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeRoutes.map((route) => {
+            {activeRoutes.map((route: any) => {
               const stopCount = route.records?.length || 0;
               const driverColor = route.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500';
               return (
