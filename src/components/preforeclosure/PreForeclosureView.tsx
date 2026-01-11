@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +34,7 @@ export function PreForeclosureView() {
   const [viewRecord, setViewRecord] = useState<PreForeclosureRecord | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
 
+  const queryClient = useQueryClient();
   const { data: records = [], isLoading, error } = usePreForeclosures();
   const updateMutation = useUpdatePreForeclosure();
   const uploadMutation = useUploadPreForeclosureFile();
@@ -314,6 +316,8 @@ export function PreForeclosureView() {
         title: visited ? 'Record Marked as Visited' : 'Record Unmarked',
         description: `Document ${documentNumber} has been ${visited ? 'marked as visited' : 'set back to pending'}.`,
       });
+      // Invalidate pre-foreclosure query to refresh the table
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
       // Reload active routes to refresh the visited status
       await loadActiveRoutes();
       // Update the viewRoute if it's the current route
@@ -1296,6 +1300,7 @@ export function PreForeclosureView() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">ZIP</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Filing Month</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Internal Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Visited</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Last Action</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Next Follow-Up</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</th>
@@ -1345,6 +1350,17 @@ export function PreForeclosureView() {
                           <SelectItem value="Dead">Dead</SelectItem>
                         </SelectContent>
                       </Select>
+                    </td>
+                    <td className="px-4 py-3">
+                      {record.visited ? (
+                        <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
+                          Visited
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-muted text-muted-foreground">
+                          Pending
+                        </Badge>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
                       {record.last_action_date
