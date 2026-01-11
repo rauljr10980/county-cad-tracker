@@ -2362,7 +2362,13 @@ export function PreForeclosureView() {
                       </thead>
                       <tbody>
                         {viewRoute.records
-                          ?.sort((a, b) => a.orderIndex - b.orderIndex)
+                          ?.sort((a, b) => {
+                            // Always put depot first
+                            if (a.isDepot && !b.isDepot) return -1;
+                            if (!a.isDepot && b.isDepot) return 1;
+                            // Then sort by orderIndex for non-depot records
+                            return a.orderIndex - b.orderIndex;
+                          })
                           .map((routeRecord, index) => {
                             const record = routeRecord.record;
                             // Handle both camelCase (from backend) and snake_case (from interface)
