@@ -692,7 +692,13 @@ export function PreForeclosureView() {
               )}
             </Button>
             <Button
-              onClick={() => setSelectedRecordIds(new Set())}
+              onClick={() => {
+                setSelectedRecordIds(new Set());
+                setRecordsInRoutes(new Set()); // Clear routes tracking so records can be selected/optimized again
+                setOptimizedRoutes(null); // Clear optimized routes
+                setCustomDepot(null); // Clear custom depot
+                setCustomDepotRecordId(null); // Clear custom depot record ID
+              }}
               variant="outline"
               size="sm"
               disabled={isOptimizingRoute}
