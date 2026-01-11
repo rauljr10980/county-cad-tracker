@@ -280,8 +280,10 @@ export function PreForeclosureView() {
       // Update recordsInRoutes based on active routes
       const activeRecordIds = new Set<string>();
       routes.forEach(route => {
-        route.routeRecords?.forEach((record: any) => {
-          activeRecordIds.add(record.documentNumber);
+        route.records?.forEach((rr: any) => {
+          if (rr.record?.documentNumber) {
+            activeRecordIds.add(rr.record.documentNumber);
+          }
         });
       });
       setRecordsInRoutes(activeRecordIds);
@@ -919,7 +921,7 @@ export function PreForeclosureView() {
           <h3 className="text-lg font-semibold mb-4">Active Routes</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeRoutes.map((route) => {
-              const stopCount = route.routeRecords?.length || 0;
+              const stopCount = route.records?.length || 0;
               const driverColor = route.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500';
               return (
                 <div
