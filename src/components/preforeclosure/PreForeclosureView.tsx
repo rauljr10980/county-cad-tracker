@@ -274,7 +274,9 @@ export function PreForeclosureView() {
   const loadActiveRoutes = async () => {
     setIsLoadingActiveRoutes(true);
     try {
+      console.log('[PreForeclosure] Loading active routes...');
       const routes = await getActiveRoutes();
+      console.log('[PreForeclosure] Loaded active routes:', routes.length, routes);
       setActiveRoutes(routes);
       
       // Update recordsInRoutes based on active routes
@@ -916,39 +918,50 @@ export function PreForeclosureView() {
       {headerSection}
       
       {/* Active Routes Dashboard */}
-      {activeRoutes.length > 0 && (
+      {(activeRoutes.length > 0 || isLoadingActiveRoutes) && (
         <div className="mb-6 p-4 bg-card border border-border rounded-lg">
           <h3 className="text-lg font-semibold mb-4">Active Routes</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeRoutes.map((route) => {
-              const stopCount = route.records?.length || 0;
-              const driverColor = route.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500';
-              return (
-                <div
-                  key={route.id}
-                  className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${driverColor}`} />
-                      <span className="font-semibold">{route.driver}</span>
+          {isLoadingActiveRoutes ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+              <span className="text-sm text-muted-foreground">Loading routes...</span>
+            </div>
+          ) : activeRoutes.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeRoutes.map((route) => {
+                const stopCount = route.records?.length || 0;
+                const driverColor = route.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500';
+                return (
+                  <div
+                    key={route.id}
+                    className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${driverColor}`} />
+                        <span className="font-semibold">{route.driver}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(route.createdAt).toLocaleDateString()}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(route.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {stopCount} {stopCount === 1 ? 'stop' : 'stops'}
-                  </div>
-                  {route.routeData?.totalDistance && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {route.routeData.totalDistance.toFixed(2)} km
+                    <div className="text-sm text-muted-foreground">
+                      {stopCount} {stopCount === 1 ? 'stop' : 'stops'}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    {route.routeData?.totalDistance && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {route.routeData.totalDistance.toFixed(2)} km
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              No active routes
+            </div>
+          )}
         </div>
       )}
 
