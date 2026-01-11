@@ -53,6 +53,8 @@ export function PreForeclosureView() {
   const [recordsInRoutes, setRecordsInRoutes] = useState<Set<string>>(new Set());
   const [activeRoutes, setActiveRoutes] = useState<Route[]>([]);
   const [isLoadingActiveRoutes, setIsLoadingActiveRoutes] = useState(false);
+  const [viewRoute, setViewRoute] = useState<Route | null>(null);
+  const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -995,7 +997,11 @@ export function PreForeclosureView() {
               return (
                 <div
                   key={route.id}
-                  className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                  onClick={() => {
+                    setViewRoute(route);
+                    setRouteDetailsOpen(true);
+                  }}
+                  className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -1870,6 +1876,112 @@ export function PreForeclosureView() {
         }))}
         numVehicles={numVehicles}
       />
+
+      {/* Route Details Modal */}
+      <Dialog open={routeDetailsOpen} onOpenChange={setRouteDetailsOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Route className="h-5 w-5" />
+              Route Details
+            </DialogTitle>
+            <DialogDescription>
+              {viewRoute && (
+                <>
+                  Driver: {viewRoute.driver} • {viewRoute.records?.length || 0} stops • 
+                  {viewRoute.routeData?.totalDistance ? ` ${viewRoute.routeData.totalDistance.toFixed(2)} km` : ''}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewRoute && (
+            <div className="space-y-4">
+              {/* Route Summary */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-secondary/30 rounded-lg">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Driver</div>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${viewRoute.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500'}`} />
+                    <span className="font-semibold">{viewRoute.driver}</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Status</div>
+                  <div className="font-semibold">{viewRoute.status}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Created</div>
+                  <div className="font-semibold">{new Date(viewRoute.createdAt).toLocaleDateString()}</div>
+                </div>
+                {viewRoute.routeData?.totalDistance && (
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Distance</div>
+                    <div className="font-semibold">{viewRoute.routeData.totalDistance.toFixed(2)} km</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Route Records List */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Route Stops ({viewRoute.records?.length || 0})</h3>
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-secondary/50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Order</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Document #</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">City</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">ZIP</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {viewRoute.records
+                          ?.sort((a, b) => a.orderIndex - b.orderIndex)
+                          .map((routeRecord, index) => {
+                            const record = routeRecord.record;
+                            return (
+                              <tr
+                                key={routeRecord.id}
+                                className={`border-t border-border hover:bg-secondary/30 ${
+                                  routeRecord.isDepot ? 'bg-primary/10' : ''
+                                }`}
+                              >
+                                <td className="px-4 py-2 text-sm">
+                                  {routeRecord.isDepot ? (
+                                    <Badge variant="default" className="bg-primary">Depot</Badge>
+                                  ) : (
+                                    routeRecord.orderIndex
+                                  )}
+                                </td>
+                                <td className="px-4 py-2 text-sm font-mono">{record.document_number}</td>
+                                <td className="px-4 py-2 text-sm">{record.address}</td>
+                                <td className="px-4 py-2 text-sm">{record.city}</td>
+                                <td className="px-4 py-2 text-sm">{record.zip}</td>
+                                <td className="px-4 py-2 text-sm">
+                                  {record.visited ? (
+                                    <Badge variant="outline" className="bg-green-500/20 text-green-600 border-green-500">
+                                      Visited
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline">Pending</Badge>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       </div>
     );
