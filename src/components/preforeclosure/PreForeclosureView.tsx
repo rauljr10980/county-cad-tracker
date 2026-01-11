@@ -46,6 +46,7 @@ export function PreForeclosureView() {
   const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
+  const [optimizedRecordIds, setOptimizedRecordIds] = useState<string[]>([]); // Track record IDs for current optimized routes
   const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotRecordId, setCustomDepotRecordId] = useState<string | null>(null);
@@ -476,6 +477,10 @@ export function PreForeclosureView() {
 
       // Update the set of records in routes
       setRecordsInRoutes(prev => new Set([...prev, ...routeRecordIds]));
+
+      // Store the record IDs for the current optimized routes (for saving)
+      const currentRecordIds = Array.from(routeRecordIds);
+      setOptimizedRecordIds(currentRecordIds);
 
       // Store routes and show map visualization
       setOptimizedRoutes(solution);
@@ -1655,11 +1660,14 @@ export function PreForeclosureView() {
           onClose={() => {
             setRouteMapOpen(false);
             setOptimizedRoutes(null);
+            setOptimizedRecordIds([]);
           }}
-          recordIds={Array.from(selectedRecordIds)}
+          recordIds={optimizedRecordIds}
           onRouteSaved={() => {
             // Reload active routes or update state after route is saved
             // Routes are now tracked in the database
+            setOptimizedRoutes(null);
+            setOptimizedRecordIds([]);
           }}
           />
         )}
