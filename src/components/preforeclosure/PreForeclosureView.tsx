@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route, Check } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,7 +15,7 @@ import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, type Route } from '@/lib/api';
+import { solveVRP, getActiveRoutes, type Route, markPreForeclosureVisited } from '@/lib/api';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 
@@ -55,6 +55,7 @@ export function PreForeclosureView() {
   const [isLoadingActiveRoutes, setIsLoadingActiveRoutes] = useState(false);
   const [viewRoute, setViewRoute] = useState<Route | null>(null);
   const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
+  const [markingVisited, setMarkingVisited] = useState<string | null>(null);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -302,6 +303,51 @@ export function PreForeclosureView() {
   useEffect(() => {
     loadActiveRoutes();
   }, []);
+
+  const handleMarkVisited = async (documentNumber: string, driver: 'Luciano' | 'Raul') => {
+    setMarkingVisited(documentNumber);
+    try {
+      await markPreForeclosureVisited(documentNumber, driver);
+      toast({
+        title: 'Record Marked as Visited',
+        description: `Document ${documentNumber} has been marked as visited.`,
+      });
+      // Reload active routes to refresh the visited status
+      await loadActiveRoutes();
+      // Update the viewRoute if it's the current route
+      if (viewRoute) {
+        const updatedRoutes = await getActiveRoutes();
+        const updatedRoute = updatedRoutes.find(r => r.id === viewRoute.id);
+        if (updatedRoute) {
+          setViewRoute(updatedRoute);
+        }
+      }
+    } catch (error) {
+      console.error('Error marking record as visited:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to mark record as visited',
+        variant: 'destructive',
+      });
+    } finally {
+      setMarkingVisited(null);
+    }
+  };
+
+  const handleViewRecordDetails = async (documentNumber: string) => {
+    // Find the record in the records array
+    const record = records.find(r => r.document_number === documentNumber);
+    if (record) {
+      setViewRecord(record);
+      setViewOpen(true);
+    } else {
+      toast({
+        title: 'Record Not Found',
+        description: `Could not find record with document number ${documentNumber}`,
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleStartingPointSelected = (record: PreForeclosureRecord, pinLocation: { lat: number; lng: number }) => {
     setCustomDepot(pinLocation);
@@ -997,9 +1043,13 @@ export function PreForeclosureView() {
               return (
                 <div
                   key={route.id}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Route card clicked:', route.id);
                     setViewRoute(route);
                     setRouteDetailsOpen(true);
+                    console.log('Modal should open, routeDetailsOpen:', true);
                   }}
                   className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
                 >
@@ -1882,7 +1932,7 @@ export function PreForeclosureView() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Route className="h-5 w-5" />
+              <RouteIcon className="h-5 w-5" />
               Route Details
             </DialogTitle>
             <DialogDescription>
@@ -1936,6 +1986,7 @@ export function PreForeclosureView() {
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">City</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">ZIP</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1969,6 +2020,43 @@ export function PreForeclosureView() {
                                   ) : (
                                     <Badge variant="outline">Pending</Badge>
                                   )}
+                                </td>
+                                <td className="px-4 py-2 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    {!record.visited && !routeRecord.isDepot && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleMarkVisited(record.document_number, viewRoute.driver);
+                                        }}
+                                        disabled={markingVisited === record.document_number}
+                                        className="h-7 text-xs"
+                                      >
+                                        {markingVisited === record.document_number ? (
+                                          <>
+                                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                            Marking...
+                                          </>
+                                        ) : (
+                                          'Mark Visited'
+                                        )}
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleViewRecordDetails(record.document_number);
+                                      }}
+                                      className="h-7 text-xs"
+                                    >
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      Details
+                                    </Button>
+                                  </div>
                                 </td>
                               </tr>
                             );
