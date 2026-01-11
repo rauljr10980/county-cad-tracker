@@ -209,9 +209,11 @@ export function PreForeclosureView() {
     radius?: number;
     polygon?: { lat: number; lng: number }[];
   }) => {
-    // Filter records within the selected area
+    // Filter records within the selected area (exclude visited and in-progress)
     const recordsInArea = filteredRecords.filter(r => {
       if (!r.latitude || !r.longitude) return false;
+      if (r.visited) return false; // Skip visited records
+      if (recordsInRoutes.has(r.document_number)) return false; // Skip records already in routes (in progress)
       
       // If polygon is provided, use point-in-polygon check
       if (bounds.polygon && bounds.polygon.length >= 3) {
@@ -234,13 +236,46 @@ export function PreForeclosureView() {
              r.longitude <= bounds.east;
     });
 
+    // Count excluded records for user feedback
+    const allRecordsInArea = filteredRecords.filter(r => {
+      if (!r.latitude || !r.longitude) return false;
+      if (bounds.polygon && bounds.polygon.length >= 3) {
+        return isPointInPolygon({ lat: r.latitude, lng: r.longitude }, bounds.polygon);
+      }
+      if (bounds.center && bounds.radius) {
+        const distance = Math.sqrt(
+          Math.pow(r.latitude - bounds.center.lat, 2) + 
+          Math.pow(r.longitude - bounds.center.lng, 2)
+        ) * 111;
+        return distance <= bounds.radius;
+      }
+      return r.latitude >= bounds.south &&
+             r.latitude <= bounds.north &&
+             r.longitude >= bounds.west &&
+             r.longitude <= bounds.east;
+    });
+    const visitedCount = allRecordsInArea.filter(r => r.visited).length;
+    const inProgressCount = allRecordsInArea.filter(r => recordsInRoutes.has(r.document_number)).length;
+
     if (recordsInArea.length === 0) {
+      let message = "No available records found within the selected area.";
+      if (visitedCount > 0 || inProgressCount > 0) {
+        message += ` (${visitedCount} visited, ${inProgressCount} in progress excluded)`;
+      }
       toast({
         title: "No records in area",
-        description: "No records found within the selected area. Try selecting a different area.",
+        description: message + " Try selecting a different area.",
         variant: "destructive",
       });
       return;
+    }
+
+    // Inform user if some records were excluded
+    if (visitedCount > 0 || inProgressCount > 0) {
+      toast({
+        title: "Some records excluded",
+        description: `Found ${recordsInArea.length} available records. ${visitedCount} visited and ${inProgressCount} in-progress records were excluded.`,
+      });
     }
 
     if (recordsInArea.length > 500) {
@@ -289,8 +324,10 @@ export function PreForeclosureView() {
       const activeRecordIds = new Set<string>();
       routes.forEach(route => {
         route.records?.forEach((rr: any) => {
-          if (rr.record?.documentNumber) {
-            activeRecordIds.add(rr.record.documentNumber);
+          // Handle both camelCase and snake_case document number fields
+          const docNumber = rr.record?.documentNumber || rr.record?.document_number || rr.documentNumber || rr.document_number;
+          if (docNumber) {
+            activeRecordIds.add(docNumber);
           }
         });
       });
@@ -411,7 +448,8 @@ export function PreForeclosureView() {
       availableRecords = providedRecords.filter(r => 
         r.latitude != null && 
         r.longitude != null &&
-        !recordsInRoutes.has(r.document_number) // Exclude records already in routes
+        !r.visited && // Exclude visited records
+        !recordsInRoutes.has(r.document_number) // Exclude records already in routes (in progress)
       );
     } else {
       // Use selected records, but enforce 25-property limit for main optimize button
@@ -419,7 +457,8 @@ export function PreForeclosureView() {
         selectedRecordIds.has(r.document_number) && 
         r.latitude != null && 
         r.longitude != null &&
-        !recordsInRoutes.has(r.document_number) // Exclude records already in routes
+        !r.visited && // Exclude visited records
+        !recordsInRoutes.has(r.document_number) // Exclude records already in routes (in progress)
       );
       
       // CRITICAL: Limit to 25 properties (1 depot + 24 to visit) when using main optimize button
@@ -1356,9 +1395,13 @@ export function PreForeclosureView() {
                         <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
                           Visited
                         </Badge>
+                      ) : recordsInRoutes.has(record.document_number) ? (
+                        <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                          In Progress
+                        </Badge>
                       ) : (
                         <Badge variant="outline" className="bg-muted text-muted-foreground">
-                          Pending
+                          Not in Route
                         </Badge>
                       )}
                     </td>
@@ -1700,6 +1743,137 @@ export function PreForeclosureView() {
                     <Label className="text-muted-foreground text-xs">County</Label>
                     <p className="text-sm">{viewRecord.county}</p>
                   </div>
+                </div>
+              </div>
+
+              {/* Route Status Section */}
+              <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                  Route Status
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-muted-foreground text-xs mb-2 block">Current Status</Label>
+                    <div className="flex items-center gap-2">
+                      {viewRecord.visited ? (
+                        <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
+                          Visited
+                        </Badge>
+                      ) : recordsInRoutes.has(viewRecord.document_number) ? (
+                        <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                          In Progress
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-muted text-muted-foreground">
+                          Not in Route
+                        </Badge>
+                      )}
+                      {viewRecord.visited && viewRecord.visited_by && (
+                        <span className="text-xs text-muted-foreground">
+                          by {viewRecord.visited_by}
+                        </span>
+                      )}
+                      {viewRecord.visited && viewRecord.visited_at && (
+                        <span className="text-xs text-muted-foreground">
+                          on {format(new Date(viewRecord.visited_at), 'MMM d, yyyy')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {viewRecord.visited ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          const driver = viewRecord.visited_by || 'Luciano';
+                          await handleMarkVisited(viewRecord.document_number, driver as 'Luciano' | 'Raul', false);
+                          // Update local state
+                          setViewRecord({
+                            ...viewRecord,
+                            visited: false,
+                            visited_at: undefined,
+                            visited_by: undefined,
+                          });
+                        }}
+                        disabled={markingVisited === viewRecord.document_number}
+                      >
+                        {markingVisited === viewRecord.document_number ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Set Not Visited
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            await handleMarkVisited(viewRecord.document_number, 'Luciano', true);
+                            // Update local state
+                            setViewRecord({
+                              ...viewRecord,
+                              visited: true,
+                              visited_at: new Date().toISOString(),
+                              visited_by: 'Luciano',
+                            });
+                          }}
+                          disabled={markingVisited === viewRecord.document_number}
+                        >
+                          {markingVisited === viewRecord.document_number ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Updating...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Mark Visited (Luciano)
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            await handleMarkVisited(viewRecord.document_number, 'Raul', true);
+                            // Update local state
+                            setViewRecord({
+                              ...viewRecord,
+                              visited: true,
+                              visited_at: new Date().toISOString(),
+                              visited_by: 'Raul',
+                            });
+                          }}
+                          disabled={markingVisited === viewRecord.document_number}
+                        >
+                          {markingVisited === viewRecord.document_number ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Updating...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Mark Visited (Raul)
+                            </>
+                          )}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  {recordsInRoutes.has(viewRecord.document_number) && (
+                    <div className="text-xs text-muted-foreground">
+                      This property is currently in an active route
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -108,7 +108,7 @@ export function PreForeclosureTable({
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="bg-muted text-muted-foreground">
-                    Pending
+                    Not in Route
                   </Badge>
                 )}
               </TableCell>
