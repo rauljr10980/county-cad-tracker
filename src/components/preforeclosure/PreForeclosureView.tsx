@@ -17,10 +17,38 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute } from '@/lib/api';
-import type { Route } from '@/lib/api';
 
 // Local type alias to avoid runtime reference issues
-type RouteType = Route;
+type RouteType = {
+  id: string;
+  driver: 'Luciano' | 'Raul';
+  status: 'ACTIVE' | 'FINISHED' | 'CANCELLED';
+  routeData: any;
+  createdAt: string;
+  finishedAt?: string;
+  updatedAt: string;
+  recordCount: number;
+  records: Array<{
+    id: string;
+    orderIndex: number;
+    isDepot: boolean;
+    record: {
+      id: string;
+      document_number?: string;
+      documentNumber?: string;
+      address: string;
+      city: string;
+      zip: string;
+      latitude?: number;
+      longitude?: number;
+      visited: boolean;
+      visited_at?: string;
+      visited_by?: string;
+      visitedAt?: string;
+      visitedBy?: string;
+    };
+  }>;
+};
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 
