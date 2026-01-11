@@ -1369,11 +1369,16 @@ export function PreForeclosureView() {
                       checked={selectedRecordIds.size > 0 && selectedRecordIds.size === filteredRecords.length && filteredRecords.length > 0}
                       onCheckedChange={(checked) => {
                         try {
-                          filteredRecords.forEach(record => {
-                            if (record && record.document_number) {
-                              handleRecordSelect(record.document_number, checked as boolean);
-                            }
-                          });
+                          // Batch update: create a new Set with all selected/unselected IDs at once
+                          const newSelectedIds = new Set<string>();
+                          if (checked) {
+                            filteredRecords.forEach(record => {
+                              if (record && record.document_number) {
+                                newSelectedIds.add(record.document_number);
+                              }
+                            });
+                          }
+                          setSelectedRecordIds(newSelectedIds);
                         } catch (error) {
                           console.error('[PreForeclosure] Error in select all:', error);
                         }
