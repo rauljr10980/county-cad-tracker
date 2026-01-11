@@ -230,6 +230,7 @@ export function AreaSelectorMap({
   isOpen, 
   onClose, 
   onOptimize,
+  unavailablePropertyIds = new Set(),
   properties = [],
   initialCenter = { lat: 29.4241, lng: -98.4936 },
   initialZoom = 11,
