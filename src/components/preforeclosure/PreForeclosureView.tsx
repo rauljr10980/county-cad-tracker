@@ -51,6 +51,8 @@ export function PreForeclosureView() {
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotRecordId, setCustomDepotRecordId] = useState<string | null>(null);
   const [recordsInRoutes, setRecordsInRoutes] = useState<Set<string>>(new Set());
+  const [activeRoutes, setActiveRoutes] = useState<Route[]>([]);
+  const [isLoadingActiveRoutes, setIsLoadingActiveRoutes] = useState(false);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -1670,9 +1672,9 @@ export function PreForeclosureView() {
             setOptimizedRecordIds([]);
           }}
           recordIds={optimizedRecordIds}
-          onRouteSaved={() => {
-            // Reload active routes or update state after route is saved
-            // Routes are now tracked in the database
+          onRouteSaved={async () => {
+            // Reload active routes after route is saved
+            await loadActiveRoutes();
             setOptimizedRoutes(null);
             setOptimizedRecordIds([]);
           }}
