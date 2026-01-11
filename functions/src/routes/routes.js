@@ -53,7 +53,18 @@ router.get('/', optionalAuth, async (req, res) => {
         id: rr.id,
         orderIndex: rr.orderIndex,
         isDepot: rr.isDepot,
-        record: rr.preForeclosure
+        record: rr.preForeclosure ? {
+          id: rr.preForeclosure.id,
+          document_number: rr.preForeclosure.documentNumber,
+          address: rr.preForeclosure.address,
+          city: rr.preForeclosure.city,
+          zip: rr.preForeclosure.zip,
+          latitude: rr.preForeclosure.latitude,
+          longitude: rr.preForeclosure.longitude,
+          visited: rr.preForeclosure.visited,
+          visited_at: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null,
+          visited_by: rr.preForeclosure.visitedBy
+        } : null
       }))
     }));
 
@@ -111,7 +122,18 @@ router.get('/active', optionalAuth, async (req, res) => {
         id: rr.id,
         orderIndex: rr.orderIndex,
         isDepot: rr.isDepot,
-        record: rr.preForeclosure
+        record: rr.preForeclosure ? {
+          id: rr.preForeclosure.id,
+          document_number: rr.preForeclosure.documentNumber,
+          address: rr.preForeclosure.address,
+          city: rr.preForeclosure.city,
+          zip: rr.preForeclosure.zip,
+          latitude: rr.preForeclosure.latitude,
+          longitude: rr.preForeclosure.longitude,
+          visited: rr.preForeclosure.visited,
+          visited_at: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null,
+          visited_by: rr.preForeclosure.visitedBy
+        } : null
       }))
     }));
 

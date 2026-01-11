@@ -807,7 +807,10 @@ export async function deletePreForeclosures(): Promise<{ success: boolean; messa
  * Mark pre-foreclosure record as visited
  */
 export async function markPreForeclosureVisited(documentNumber: string, driver?: 'Luciano' | 'Raul') {
-  const response = await fetch(`${API_BASE_URL}/api/preforeclosure/${documentNumber}/visit`, {
+  const url = `${API_BASE_URL}/api/preforeclosure/${encodeURIComponent(documentNumber)}/visit`;
+  console.log('[API] Marking pre-foreclosure as visited:', { url, documentNumber, driver });
+  
+  const response = await fetch(url, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -818,6 +821,7 @@ export async function markPreForeclosureVisited(documentNumber: string, driver?:
   
   if (!response.ok) {
     const error = await response.json();
+    console.error('[API] Error marking as visited:', error);
     throw new Error(error.error || 'Failed to mark record as visited');
   }
   
@@ -843,7 +847,8 @@ export interface Route {
     isDepot: boolean;
     record: {
       id: string;
-      document_number: string;
+      document_number?: string; // snake_case (from interface)
+      documentNumber?: string; // camelCase (from backend)
       address: string;
       city: string;
       zip: string;
@@ -852,6 +857,8 @@ export interface Route {
       visited: boolean;
       visited_at?: string;
       visited_by?: string;
+      visitedAt?: string; // camelCase (from backend)
+      visitedBy?: string; // camelCase (from backend)
     };
   }>;
 }

@@ -307,6 +307,7 @@ export function PreForeclosureView() {
   const handleMarkVisited = async (documentNumber: string, driver: 'Luciano' | 'Raul') => {
     setMarkingVisited(documentNumber);
     try {
+      console.log('[PreForeclosure] Marking as visited:', { documentNumber, driver });
       await markPreForeclosureVisited(documentNumber, driver);
       toast({
         title: 'Record Marked as Visited',
@@ -1994,6 +1995,8 @@ export function PreForeclosureView() {
                           ?.sort((a, b) => a.orderIndex - b.orderIndex)
                           .map((routeRecord, index) => {
                             const record = routeRecord.record;
+                            // Handle both camelCase (from backend) and snake_case (from interface)
+                            const documentNumber = record.document_number || record.documentNumber || '';
                             return (
                               <tr
                                 key={routeRecord.id}
@@ -2008,7 +2011,7 @@ export function PreForeclosureView() {
                                     routeRecord.orderIndex
                                   )}
                                 </td>
-                                <td className="px-4 py-2 text-sm font-mono">{record.document_number}</td>
+                                <td className="px-4 py-2 text-sm font-mono">{documentNumber}</td>
                                 <td className="px-4 py-2 text-sm">{record.address}</td>
                                 <td className="px-4 py-2 text-sm">{record.city}</td>
                                 <td className="px-4 py-2 text-sm">{record.zip}</td>
@@ -2023,18 +2026,18 @@ export function PreForeclosureView() {
                                 </td>
                                 <td className="px-4 py-2 text-sm">
                                   <div className="flex items-center gap-2">
-                                    {!record.visited && !routeRecord.isDepot && (
+                                    {!record.visited && !routeRecord.isDepot && documentNumber && (
                                       <Button
                                         size="sm"
                                         variant="outline"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleMarkVisited(record.document_number, viewRoute.driver);
+                                          handleMarkVisited(documentNumber, viewRoute.driver);
                                         }}
-                                        disabled={markingVisited === record.document_number}
+                                        disabled={markingVisited === documentNumber}
                                         className="h-7 text-xs"
                                       >
-                                        {markingVisited === record.document_number ? (
+                                        {markingVisited === documentNumber ? (
                                           <>
                                             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                                             Marking...
@@ -2044,18 +2047,20 @@ export function PreForeclosureView() {
                                         )}
                                       </Button>
                                     )}
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleViewRecordDetails(record.document_number);
-                                      }}
-                                      className="h-7 text-xs"
-                                    >
-                                      <Eye className="h-3 w-3 mr-1" />
-                                      Details
-                                    </Button>
+                                    {documentNumber && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleViewRecordDetails(documentNumber);
+                                        }}
+                                        className="h-7 text-xs"
+                                      >
+                                        <Eye className="h-3 w-3 mr-1" />
+                                        Details
+                                      </Button>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
