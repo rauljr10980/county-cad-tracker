@@ -203,15 +203,23 @@ export function PreForeclosureView() {
   }, [viewRecord]);
 
   const handleRecordSelect = (documentNumber: string, selected: boolean) => {
-    setSelectedRecordIds(prev => {
-      const newSet = new Set(prev);
-      if (selected) {
-        newSet.add(documentNumber);
-      } else {
-        newSet.delete(documentNumber);
+    try {
+      if (!documentNumber) {
+        console.warn('[PreForeclosure] handleRecordSelect called with invalid documentNumber');
+        return;
       }
-      return newSet;
-    });
+      setSelectedRecordIds(prev => {
+        const newSet = new Set(prev);
+        if (selected) {
+          newSet.add(documentNumber);
+        } else {
+          newSet.delete(documentNumber);
+        }
+        return newSet;
+      });
+    } catch (error) {
+      console.error('[PreForeclosure] Error in handleRecordSelect:', error);
+    }
   };
 
   // Point-in-polygon algorithm (ray casting)
@@ -1360,9 +1368,15 @@ export function PreForeclosureView() {
                     <Checkbox
                       checked={selectedRecordIds.size > 0 && selectedRecordIds.size === filteredRecords.length && filteredRecords.length > 0}
                       onCheckedChange={(checked) => {
-                        filteredRecords.forEach(record => {
-                          handleRecordSelect(record.document_number, checked as boolean);
-                        });
+                        try {
+                          filteredRecords.forEach(record => {
+                            if (record && record.document_number) {
+                              handleRecordSelect(record.document_number, checked as boolean);
+                            }
+                          });
+                        } catch (error) {
+                          console.error('[PreForeclosure] Error in select all:', error);
+                        }
                       }}
                       title="Select all"
                     />
