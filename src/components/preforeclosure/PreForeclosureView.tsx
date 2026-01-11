@@ -271,6 +271,32 @@ export function PreForeclosureView() {
     });
   };
 
+  const loadActiveRoutes = async () => {
+    setIsLoadingActiveRoutes(true);
+    try {
+      const routes = await getActiveRoutes();
+      setActiveRoutes(routes);
+      
+      // Update recordsInRoutes based on active routes
+      const activeRecordIds = new Set<string>();
+      routes.forEach(route => {
+        route.routeRecords?.forEach(record => {
+          activeRecordIds.add(record.documentNumber);
+        });
+      });
+      setRecordsInRoutes(activeRecordIds);
+    } catch (error) {
+      console.error('[PreForeclosure] Error loading active routes:', error);
+    } finally {
+      setIsLoadingActiveRoutes(false);
+    }
+  };
+
+  // Load active routes on component mount
+  useEffect(() => {
+    loadActiveRoutes();
+  }, []);
+
   const handleStartingPointSelected = (record: PreForeclosureRecord, pinLocation: { lat: number; lng: number }) => {
     setCustomDepot(pinLocation);
     setCustomDepotRecordId(record.document_number); // Store the specific record ID to use as depot
