@@ -400,19 +400,19 @@ export function AreaSelectorMap({
         return distA - distB;
       });
       
-      // Limit to 25 properties to optimize (starting point/depot is excluded from optimization list)
-      // Total selected: 1 depot (starting point) + 25 properties to visit = 26 total
-      // After excluding depot from optimization list, we'll have exactly 25 properties to optimize
-      const limitedProps = sortedProps.slice(0, 25);
+      // Limit to 24 properties to optimize (starting point/depot is excluded from optimization list)
+      // Total selected: 1 depot (starting point) + 24 properties to visit = 25 total
+      // After excluding depot from optimization list, we'll have exactly 24 properties to optimize
+      const limitedProps = sortedProps.slice(0, 24);
       
       // Add starting point as the first property (will be excluded from optimization list later)
       const finalProps = [startingPointProp, ...limitedProps];
 
       setSelectedProperties(finalProps);
       const totalFound = propsInArea.length;
-      const propertiesToOptimize = Math.min(25, totalFound - (propsInArea.find(p => p.id === closestProperty.id) ? 1 : 0));
-      const limitedMessage = totalFound > 26 
-        ? `Found ${totalFound} properties in the area. Limiting to 25 properties for optimization (starting point is not a stop).`
+      const propertiesToOptimize = Math.min(24, totalFound - (propsInArea.find(p => p.id === closestProperty.id) ? 1 : 0));
+      const limitedMessage = totalFound > 25 
+        ? `Found ${totalFound} properties in the area. Limiting to 24 properties for optimization (starting point is not a stop).`
         : totalFound > 1
         ? `Found ${totalFound} properties in the area. Will optimize ${propertiesToOptimize} properties (starting point is not a stop).`
         : `Found ${totalFound} property in the area. Starting point only - please select more properties.`;
@@ -452,18 +452,18 @@ export function AreaSelectorMap({
       polygon: selectedShape.polygon ? selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })) : undefined
     };
 
-    // CRITICAL: Ensure selectedProperties is limited to 26 (depot + 25 properties to optimize)
-    // After excluding depot, this gives us 25 properties for optimization
+    // CRITICAL: Ensure selectedProperties is limited to 25 (depot + 24 properties to optimize)
+    // After excluding depot, this gives us 24 properties for optimization
     // This is a safety check in case the state was somehow modified
     let finalSelectedProperties = selectedProperties;
-    if (finalSelectedProperties.length > 26) {
-      console.warn('[AreaSelectorMap] WARNING: selectedProperties has more than 26 properties. Limiting now.');
+    if (finalSelectedProperties.length > 25) {
+      console.warn('[AreaSelectorMap] WARNING: selectedProperties has more than 25 properties. Limiting now.');
       // Find and keep depot first
       const depotIndex = finalSelectedProperties.findIndex(p => p.id === closestProperty.id);
       const depot = depotIndex >= 0 ? finalSelectedProperties[depotIndex] : closestProperty;
-      const others = finalSelectedProperties.filter(p => p.id !== closestProperty.id).slice(0, 25);
+      const others = finalSelectedProperties.filter(p => p.id !== closestProperty.id).slice(0, 24);
       finalSelectedProperties = [depot, ...others];
-      console.log('[AreaSelectorMap] Limited to:', finalSelectedProperties.length, 'properties (1 depot + 25 to optimize)');
+      console.log('[AreaSelectorMap] Limited to:', finalSelectedProperties.length, 'properties (1 depot + 24 to optimize)');
     }
 
     console.log('[AreaSelectorMap] handleOptimize called with:', {
@@ -676,7 +676,7 @@ export function AreaSelectorMap({
                   Starting Point: {closestProperty?.propertyAddress || closestProperty?.address || 'N/A'}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {selectedProperties.length === 25 ? 'Maximum of 25 properties selected (closest to starting point)' : 'All properties within area will be optimized'}
+                  {selectedProperties.length === 24 ? 'Maximum of 24 properties selected (closest to starting point)' : 'All properties within area will be optimized'}
                 </div>
                 <div className="max-h-64 overflow-y-auto space-y-1">
                   {selectedProperties.map((p) => (

@@ -410,13 +410,13 @@ router.post('/solve', async (req, res) => {
       return res.status(400).json({ error: 'Properties array is required' });
     }
 
-    // For area selector optimization, enforce 26 property limit (1 depot + 25 properties)
-    // This ensures only 25 properties are optimized (depot excluded from visitable stops)
-    if (depotPropertyId && properties.length > 26) {
-      console.error('[ROUTING] ERROR: Received more than 26 properties with depotPropertyId (area selector mode)');
-      console.error('[ROUTING] Properties count:', properties.length, 'Expected max: 26 (1 depot + 25 properties)');
+    // For area selector optimization, enforce 25 property limit (1 depot + 24 properties)
+    // This ensures only 24 properties are optimized (depot excluded from visitable stops)
+    if (depotPropertyId && properties.length > 25) {
+      console.error('[ROUTING] ERROR: Received more than 25 properties with depotPropertyId (area selector mode)');
+      console.error('[ROUTING] Properties count:', properties.length, 'Expected max: 25 (1 depot + 24 properties)');
       return res.status(400).json({ 
-        error: `Too many properties for area selector optimization. Maximum 26 properties allowed (1 starting point + 25 properties to visit). Received ${properties.length}.` 
+        error: `Too many properties for area selector optimization. Maximum 25 properties allowed (1 starting point + 24 properties to visit). Received ${properties.length}.` 
       });
     }
 
