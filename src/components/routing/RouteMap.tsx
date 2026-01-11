@@ -12,6 +12,9 @@ import 'leaflet/dist/leaflet.css';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { createRoute } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 
 // Fix for default marker icons in Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -41,6 +44,8 @@ interface RouteMapProps {
   totalDistance: number;
   isOpen: boolean;
   onClose: () => void;
+  recordIds?: string[]; // Optional: pre-foreclosure record IDs for route tracking
+  onRouteSaved?: () => void; // Optional: callback when route is saved
 }
 
 // Route colors for different vehicles
@@ -65,10 +70,12 @@ function MapBoundsFitter({ waypoints }: { waypoints: Waypoint[] }) {
   return null;
 }
 
-export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }: RouteMapProps) {
+export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose, recordIds, onRouteSaved }: RouteMapProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allWaypoints, setAllWaypoints] = useState<Waypoint[]>([]);
+  const [selectedDriver, setSelectedDriver] = useState<'Luciano' | 'Raul' | ''>('');
+  const [isSavingRoute, setIsSavingRoute] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -128,6 +135,57 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }
     const mapsUrl = `https://www.google.com/maps/dir/${waypointStrings.join('/')}`;
     
     window.open(mapsUrl, '_blank');
+  };
+
+  const handleSaveRoute = async () => {
+    if (!selectedDriver) {
+      toast({
+        title: "Driver Required",
+        description: "Please select a driver before saving the route.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!recordIds || recordIds.length === 0) {
+      toast({
+        title: "No Records",
+        description: "No records available to save route.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingRoute(true);
+    try {
+      // Prepare route data (full VRP solution)
+      const routeData = {
+        routes: routes,
+        totalDistance: totalDistance,
+        numVehicles: numVehicles,
+      };
+
+      await createRoute(selectedDriver, routeData, recordIds);
+      
+      toast({
+        title: "Route Saved",
+        description: `Route assigned to ${selectedDriver} and saved successfully.`,
+      });
+
+      // Call callback if provided
+      if (onRouteSaved) {
+        onRouteSaved();
+      }
+    } catch (error) {
+      console.error('[RouteMap] Error saving route:', error);
+      toast({
+        title: "Failed to Save Route",
+        description: error instanceof Error ? error.message : 'Failed to save route. Please try again.',
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingRoute(false);
+    }
   };
 
   if (!isOpen) return null;

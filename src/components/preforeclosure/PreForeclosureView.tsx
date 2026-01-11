@@ -1656,6 +1656,11 @@ export function PreForeclosureView() {
             setRouteMapOpen(false);
             setOptimizedRoutes(null);
           }}
+          recordIds={Array.from(selectedRecordIds)}
+          onRouteSaved={() => {
+            // Reload active routes or update state after route is saved
+            // Routes are now tracked in the database
+          }}
           />
         )}
 

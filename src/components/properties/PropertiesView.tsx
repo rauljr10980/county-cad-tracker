@@ -1499,18 +1499,23 @@ export function PropertiesView() {
       />
       
       {/* Route Map Modal */}
-      {optimizedRoutes && (
-        <RouteMap
-          routes={optimizedRoutes.routes}
-          numVehicles={numVehicles}
-          totalDistance={optimizedRoutes.totalDistance}
-          isOpen={routeMapOpen}
-          onClose={() => {
-            setRouteMapOpen(false);
-            setOptimizedRoutes(null);
-          }}
-        />
-      )}
+          {optimizedRoutes && (
+            <RouteMap
+              routes={optimizedRoutes.routes}
+              numVehicles={numVehicles}
+              totalDistance={optimizedRoutes.totalDistance}
+              isOpen={routeMapOpen}
+              onClose={() => {
+                setRouteMapOpen(false);
+                setOptimizedRoutes(null);
+              }}
+              recordIds={Array.from(selectedPropertyIds)}
+              onRouteSaved={() => {
+                // Reload active routes or update state after route is saved
+                // Routes are now tracked in the database
+              }}
+            />
+          )}
 
       {/* Area Selector Map */}
       <AreaSelectorMap
