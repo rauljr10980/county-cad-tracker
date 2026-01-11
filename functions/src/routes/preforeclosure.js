@@ -57,6 +57,9 @@ router.get('/', optionalAuth, async (req, res) => {
       dueTime: record.dueTime ? record.dueTime.toISOString() : undefined,
       assignedTo: record.assignedTo,
       inactive: record.inactive,
+      visited: record.visited,
+      visited_at: record.visitedAt ? record.visitedAt.toISOString() : null,
+      visited_by: record.visitedBy,
       first_seen_month: record.firstSeenMonth,
       last_seen_month: record.lastSeenMonth,
       created_at: record.createdAt.toISOString(),
@@ -494,6 +497,58 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
     });
     const errorMessage = error.message || 'Failed to update pre-foreclosure record';
     res.status(500).json({ error: errorMessage });
+  }
+});
+
+// ============================================================================
+// MARK RECORD AS VISITED
+// ============================================================================
+
+router.put('/:documentNumber/visit', optionalAuth, async (req, res) => {
+  try {
+    const { documentNumber } = req.params;
+    const { driver } = req.body; // Optional: who visited (defaults to assigned driver)
+
+    const record = await prisma.preForeclosure.findUnique({
+      where: { documentNumber }
+    });
+
+    if (!record) {
+      return res.status(404).json({ error: 'Pre-foreclosure record not found' });
+    }
+
+    // Update visited status
+    const updated = await prisma.preForeclosure.update({
+      where: { documentNumber },
+      data: {
+        visited: true,
+        visitedAt: new Date(),
+        visitedBy: driver || record.assignedTo || null
+      },
+      select: {
+        id: true,
+        documentNumber: true,
+        address: true,
+        visited: true,
+        visitedAt: true,
+        visitedBy: true
+      }
+    });
+
+    // Map to frontend format
+    res.json({
+      document_number: updated.documentNumber,
+      address: updated.address,
+      visited: updated.visited,
+      visited_at: updated.visitedAt?.toISOString(),
+      visited_by: updated.visitedBy
+    });
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Visit update error:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Pre-foreclosure record not found' });
+    }
+    res.status(500).json({ error: 'Failed to mark record as visited' });
   }
 });
 

@@ -25,6 +25,7 @@ const uploadRoutes = require('./routes/upload');
 const fileRoutes = require('./routes/files');
 const preforeclosureRoutes = require('./routes/preforeclosure');
 const routingRoutes = require('./routes/routing');
+const routesRoutes = require('./routes/routes');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -154,6 +155,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/preforeclosure', preforeclosureRoutes);
 app.use('/api/routing', routingRoutes);
+app.use('/api/routes', routesRoutes);
 
 // ============================================================================
 // ERROR HANDLING

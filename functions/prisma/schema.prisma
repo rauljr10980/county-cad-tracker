@@ -2,7 +2,7 @@
 // Production-ready schema with proper indexing and relationships
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "windows"]
 }
 
@@ -16,20 +16,20 @@ datasource db {
 // ============================================================================
 
 model User {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  email     String   @unique
-  password  String   // Hashed password
-  role      UserRole @default(OPERATOR)
+  id       String   @id @default(cuid())
+  username String   @unique
+  email    String   @unique
+  password String // Hashed password
+  role     UserRole @default(OPERATOR)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  assignedTasks    Task[]           @relation("AssignedTasks")
-  createdTasks     Task[]           @relation("CreatedTasks")
-  notes            Note[]
-  taskActivities   TaskActivity[]
+  assignedTasks  Task[]         @relation("AssignedTasks")
+  createdTasks   Task[]         @relation("CreatedTasks")
+  notes          Note[]
+  taskActivities TaskActivity[]
 
   @@index([email])
   @@index([username])
@@ -47,71 +47,71 @@ enum UserRole {
 // ============================================================================
 
 model Property {
-  id                String   @id @default(cuid())
-  accountNumber     String
+  id            String @id @default(cuid())
+  accountNumber String
 
   // Owner Information
-  ownerName         String
-  propertyAddress   String  @default("")  // Allow empty string for properties without address
-  mailingAddress    String?
+  ownerName       String
+  propertyAddress String  @default("") // Allow empty string for properties without address
+  mailingAddress  String?
 
   // Financial Information
-  totalDue          Float
-  percentageDue     Float
-  status            PropertyStatus
-  previousStatus    PropertyStatus?
+  totalDue       Float
+  percentageDue  Float
+  status         PropertyStatus
+  previousStatus PropertyStatus?
 
   // Tax Information
-  taxYear           Int?
-  legalDescription  String?
+  taxYear          Int?
+  legalDescription String?
 
   // Scraped Data (NEW- columns from Excel)
-  marketValue              Float?
-  landValue                Float?
-  improvementValue         Float?
-  cappedValue              Float?
-  agriculturalValue        Float?
-  exemptions               String[]  // Array of exemption types
-  jurisdictions            String[]  // Array of jurisdiction names
-  lastPaymentDate          String?   // Date as string (e.g., "12/16/2025")
-  lastPaymentAmount        Float?
-  lastPayer                String?
-  delinquentAfter          String?   // Date as string
-  halfPaymentOptionAmount  Float?
-  priorYearsAmountDue      Float?
-  yearAmountDue            Float?
-  yearTaxLevy              Float?
-  link                     String?   // URL to property detail page
-  ownerAddress             String?   // Owner mailing address
-  latitude                 Float?
-  longitude                Float?
+  marketValue             Float?
+  landValue               Float?
+  improvementValue        Float?
+  cappedValue             Float?
+  agriculturalValue       Float?
+  exemptions              String[] // Array of exemption types
+  jurisdictions           String[] // Array of jurisdiction names
+  lastPaymentDate         String? // Date as string (e.g., "12/16/2025")
+  lastPaymentAmount       Float?
+  lastPayer               String?
+  delinquentAfter         String? // Date as string
+  halfPaymentOptionAmount Float?
+  priorYearsAmountDue     Float?
+  yearAmountDue           Float?
+  yearTaxLevy             Float?
+  link                    String? // URL to property detail page
+  ownerAddress            String? // Owner mailing address
+  latitude                Float?
+  longitude               Float?
 
   // Contact Information
-  phoneNumbers      String[]  // Array of phone numbers
-  ownerPhoneIndex   Int?      // Index of owner's primary phone
+  phoneNumbers    String[] // Array of phone numbers
+  ownerPhoneIndex Int? // Index of owner's primary phone
 
   // Notes (simple string field for quick notes, separate from Note relation for detailed notes)
-  notes             String?   @db.Text
+  notes String? @db.Text
 
   // Deal Pipeline
-  dealStage         DealStage?
+  dealStage          DealStage?
   estimatedDealValue Float?
-  offerAmount       Float?
-  expectedCloseDate DateTime?
+  offerAmount        Float?
+  expectedCloseDate  DateTime?
 
   // Metadata
-  isNew             Boolean   @default(false)
-  isRemoved         Boolean   @default(false)
-  statusChanged     Boolean   @default(false)
-  percentageChanged Boolean   @default(false)
+  isNew             Boolean @default(false)
+  isRemoved         Boolean @default(false)
+  statusChanged     Boolean @default(false)
+  percentageChanged Boolean @default(false)
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  noteRecords       Note[]       @relation("PropertyNotes")  // Detailed notes with authors
-  tasks             Task[]
-  paymentHistory    PaymentHistory[]
+  noteRecords    Note[]           @relation("PropertyNotes") // Detailed notes with authors
+  tasks          Task[]
+  paymentHistory PaymentHistory[]
 
   // Indexes for performance (50k+ properties)
   @@index([accountNumber])
@@ -149,18 +149,18 @@ enum DealStage {
 // ============================================================================
 
 model Note {
-  id         String   @id @default(cuid())
-  content    String   @db.Text
+  id      String @id @default(cuid())
+  content String @db.Text
 
   // Relations
   propertyId String
   property   Property @relation("PropertyNotes", fields: [propertyId], references: [id], onDelete: Cascade)
 
-  authorId   String
-  author     User     @relation(fields: [authorId], references: [id])
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Indexes
   @@index([propertyId])
@@ -174,12 +174,12 @@ model Note {
 // ============================================================================
 
 model Task {
-  id          String       @id @default(cuid())
+  id String @id @default(cuid())
 
   // Task Details
-  actionType  ActionType
-  priority    Priority     @default(MEDIUM)
-  status      TaskStatus   @default(PENDING)
+  actionType ActionType
+  priority   Priority   @default(MEDIUM)
+  status     TaskStatus @default(PENDING)
 
   // Scheduling
   dueTime     DateTime
@@ -187,14 +187,14 @@ model Task {
 
   // Assignment
   assignedToId String?
-  assignedTo   User?        @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  assignedTo   User?   @relation("AssignedTasks", fields: [assignedToId], references: [id])
 
-  createdById  String
-  createdBy    User         @relation("CreatedTasks", fields: [createdById], references: [id])
+  createdById String
+  createdBy   User   @relation("CreatedTasks", fields: [createdById], references: [id])
 
   // Relations
-  propertyId   String
-  property     Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   // Task Metadata
   attempts     Int          @default(0)
@@ -202,10 +202,10 @@ model Task {
   snoozedUntil DateTime?
 
   // Audit Trail
-  activities   TaskActivity[]
+  activities TaskActivity[]
 
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Indexes for efficient querying
   @@index([propertyId])
@@ -258,23 +258,23 @@ enum TaskOutcome {
 // ============================================================================
 
 model TaskActivity {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // What changed
   action      TaskAction
-  oldValue    String?   @db.Text
-  newValue    String?   @db.Text
-  description String?   @db.Text
+  oldValue    String?    @db.Text
+  newValue    String?    @db.Text
+  description String?    @db.Text
 
   // Relations
-  taskId      String
-  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   // Metadata (append-only, never updated)
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   // Indexes
   @@index([taskId])
@@ -303,15 +303,15 @@ enum TaskAction {
 // ============================================================================
 
 model PaymentHistory {
-  id         String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  amount     Float
-  date       DateTime
+  amount Float
+  date   DateTime
 
   propertyId String
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
-  createdAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([propertyId])
   @@index([date])
@@ -323,21 +323,21 @@ model PaymentHistory {
 // ============================================================================
 
 model FileUpload {
-  id              String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  filename        String
-  fileId          String   @unique
-  status          FileStatus @default(PROCESSING)
+  filename String
+  fileId   String     @unique
+  status   FileStatus @default(PROCESSING)
 
   // Processing stats
-  totalRecords    Int?
+  totalRecords     Int?
   processedRecords Int?
-  errorCount      Int       @default(0)
-  errorMessage    String?   @db.Text
+  errorCount       Int     @default(0)
+  errorMessage     String? @db.Text
 
   // Metadata
-  uploadedAt      DateTime  @default(now())
-  completedAt     DateTime?
+  uploadedAt  DateTime  @default(now())
+  completedAt DateTime?
 
   @@index([status])
   @@index([uploadedAt])
@@ -355,34 +355,102 @@ enum FileStatus {
 // ============================================================================
 
 model PreForeclosure {
-  id                String     @id @default(cuid())
-  documentNumber    String     @unique
-  type              String     // "Mortgage" or "Tax"
-  address           String
-  city              String
-  zip               String
-  filingMonth       String
-  county            String     @default("Bexar")
-  latitude          Float?
-  longitude         Float?
-  schoolDistrict    String?
-  internalStatus    String     @default("New") // "New", "Contact Attempted", "Monitoring", "Dead"
-  notes             String?    @db.Text
-  lastActionDate    DateTime?
-  nextFollowUpDate  DateTime?
-  actionType        ActionType?
-  priority          Priority?
-  dueTime           DateTime?
-  assignedTo        String?    // "Luciano" or "Raul"
-  inactive          Boolean    @default(false)
-  firstSeenMonth    String
-  lastSeenMonth     String
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  id               String      @id @default(cuid())
+  documentNumber   String      @unique
+  type             String // "Mortgage" or "Tax"
+  address          String
+  city             String
+  zip              String
+  filingMonth      String
+  county           String      @default("Bexar")
+  latitude         Float?
+  longitude        Float?
+  schoolDistrict   String?
+  internalStatus   String      @default("New") // "New", "Contact Attempted", "Monitoring", "Dead"
+  notes            String?     @db.Text
+  lastActionDate   DateTime?
+  nextFollowUpDate DateTime?
+  actionType       ActionType?
+  priority         Priority?
+  dueTime          DateTime?
+  assignedTo       String? // "Luciano" or "Raul"
+  inactive         Boolean     @default(false)
+  visited          Boolean     @default(false) // Mark if property has been visited
+  visitedAt        DateTime? // When the property was visited
+  visitedBy        String? // Who visited (driver name)
+  firstSeenMonth   String
+  lastSeenMonth    String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  // Relations
+  routeRecords RouteRecord[]
 
   @@index([documentNumber])
   @@index([type])
   @@index([inactive])
   @@index([internalStatus])
+  @@index([visited])
+  @@index([visitedAt])
   @@map("foreclosed")
+}
+
+// ============================================================================
+// ROUTE TRACKING
+// ============================================================================
+
+model Route {
+  id String @id @default(cuid())
+
+  // Route Details
+  driver String // "Luciano" or "Raul"
+  status RouteStatus @default(ACTIVE)
+
+  // Route Data (stored as JSON)
+  routeData Json // Full route optimization result
+
+  // Metadata
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  records RouteRecord[]
+
+  @@index([status])
+  @@index([driver])
+  @@index([createdAt])
+  @@index([status, driver])
+  @@map("routes")
+}
+
+enum RouteStatus {
+  ACTIVE
+  FINISHED
+  CANCELLED
+}
+
+model RouteRecord {
+  id String @id @default(cuid())
+
+  // Relations
+  routeId String
+  route   Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  preForeclosureId String
+  preForeclosure   PreForeclosure @relation(fields: [preForeclosureId], references: [id], onDelete: Cascade)
+
+  // Position in route (for ordering)
+  orderIndex Int @default(0)
+
+  // Whether this is the starting point/depot
+  isDepot Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([routeId, preForeclosureId])
+  @@index([routeId])
+  @@index([preForeclosureId])
+  @@index([routeId, orderIndex])
+  @@map("route_records")
 }

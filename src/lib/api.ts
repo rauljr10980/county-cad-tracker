@@ -803,3 +803,155 @@ export async function deletePreForeclosures(): Promise<{ success: boolean; messa
   return response.json();
 }
 
+/**
+ * Mark pre-foreclosure record as visited
+ */
+export async function markPreForeclosureVisited(documentNumber: string, driver?: 'Luciano' | 'Raul') {
+  const response = await fetch(`${API_BASE_URL}/api/preforeclosure/${documentNumber}/visit`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ driver }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to mark record as visited');
+  }
+  
+  return response.json();
+}
+
+// ============================================================================
+// ROUTE MANAGEMENT
+// ============================================================================
+
+export interface Route {
+  id: string;
+  driver: 'Luciano' | 'Raul';
+  status: 'ACTIVE' | 'FINISHED' | 'CANCELLED';
+  routeData: any;
+  createdAt: string;
+  finishedAt?: string;
+  updatedAt: string;
+  recordCount: number;
+  records: Array<{
+    id: string;
+    orderIndex: number;
+    isDepot: boolean;
+    record: {
+      id: string;
+      document_number: string;
+      address: string;
+      city: string;
+      zip: string;
+      latitude?: number;
+      longitude?: number;
+      visited: boolean;
+      visited_at?: string;
+      visited_by?: string;
+    };
+  }>;
+}
+
+/**
+ * Get all routes (optionally filtered by status)
+ */
+export async function getRoutes(status?: 'ACTIVE' | 'FINISHED' | 'CANCELLED'): Promise<Route[]> {
+  const url = status 
+    ? `${API_BASE_URL}/api/routes?status=${status}`
+    : `${API_BASE_URL}/api/routes`;
+  
+  const response = await fetch(url, {
+    headers: getAuthHeaders(),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch routes');
+  }
+  
+  return response.json();
+}
+
+/**
+ * Get only active routes
+ */
+export async function getActiveRoutes(): Promise<Route[]> {
+  const response = await fetch(`${API_BASE_URL}/api/routes/active`, {
+    headers: getAuthHeaders(),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch active routes');
+  }
+  
+  return response.json();
+}
+
+/**
+ * Create a new route
+ */
+export async function createRoute(
+  driver: 'Luciano' | 'Raul',
+  routeData: any,
+  recordIds: string[]
+): Promise<{ id: string; driver: string; status: string; createdAt: string; recordCount: number }> {
+  const response = await fetch(`${API_BASE_URL}/api/routes`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ driver, routeData, recordIds }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create route');
+  }
+  
+  return response.json();
+}
+
+/**
+ * Finish a route (mark as finished)
+ */
+export async function finishRoute(routeId: string): Promise<Route> {
+  const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}/finish`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to finish route');
+  }
+  
+  return response.json();
+}
+
+/**
+ * Cancel a route
+ */
+export async function cancelRoute(routeId: string): Promise<Route> {
+  const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}/cancel`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to cancel route');
+  }
+  
+  return response.json();
+}
+
