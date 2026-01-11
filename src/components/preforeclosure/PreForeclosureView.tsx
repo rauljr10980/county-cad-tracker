@@ -912,6 +912,43 @@ export function PreForeclosureView() {
     <div className="p-6 space-y-6">
       {/* Header */}
       {headerSection}
+      
+      {/* Active Routes Dashboard */}
+      {activeRoutes.length > 0 && (
+        <div className="mb-6 p-4 bg-card border border-border rounded-lg">
+          <h3 className="text-lg font-semibold mb-4">Active Routes</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {activeRoutes.map((route) => {
+              const stopCount = route.routeRecords?.length || 0;
+              const driverColor = route.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500';
+              return (
+                <div
+                  key={route.id}
+                  className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${driverColor}`} />
+                      <span className="font-semibold">{route.driver}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(route.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {stopCount} {stopCount === 1 ? 'stop' : 'stops'}
+                  </div>
+                  {route.routeData?.totalDistance && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {route.routeData.totalDistance.toFixed(2)} km
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Actions Panel */}
       <div className="bg-secondary/30 rounded-lg p-4">
