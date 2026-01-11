@@ -1762,11 +1762,11 @@ export function PreForeclosureView() {
                   <div>
                     <Label className="text-muted-foreground text-xs mb-2 block">Current Status</Label>
                     <div className="flex items-center gap-2">
-                      {viewRecord.visited ? (
+                      {viewRecord.visited === true ? (
                         <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
                           Visited
                         </Badge>
-                      ) : recordsInRoutes.has(viewRecord.document_number) ? (
+                      ) : recordsInRoutes && recordsInRoutes.has(viewRecord.document_number) ? (
                         <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
                           In Progress
                         </Badge>
@@ -1775,12 +1775,12 @@ export function PreForeclosureView() {
                           Not in Route
                         </Badge>
                       )}
-                      {viewRecord.visited && viewRecord.visited_by && (
+                      {viewRecord.visited === true && viewRecord.visited_by && (
                         <span className="text-xs text-muted-foreground">
                           by {viewRecord.visited_by}
                         </span>
                       )}
-                      {viewRecord.visited && viewRecord.visited_at && (
+                      {viewRecord.visited === true && viewRecord.visited_at && (
                         <span className="text-xs text-muted-foreground">
                           on {format(new Date(viewRecord.visited_at), 'MMM d, yyyy')}
                         </span>
@@ -1788,7 +1788,7 @@ export function PreForeclosureView() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    {viewRecord.visited ? (
+                    {viewRecord.visited === true ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1876,7 +1876,7 @@ export function PreForeclosureView() {
                       </>
                     )}
                   </div>
-                  {recordsInRoutes.has(viewRecord.document_number) && (
+                  {recordsInRoutes && recordsInRoutes.has(viewRecord.document_number) && (
                     <div className="text-xs text-muted-foreground">
                       This property is currently in an active route
                     </div>
