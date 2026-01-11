@@ -85,6 +85,7 @@ export function PreForeclosureView() {
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotRecordId, setCustomDepotRecordId] = useState<string | null>(null);
   const [recordsInRoutes, setRecordsInRoutes] = useState<Set<string>>(new Set());
+  const [depotRecordIds, setDepotRecordIds] = useState<Set<string>>(new Set()); // Track which properties are depots (starting points)
   const [activeRoutes, setActiveRoutes] = useState<RouteType[]>([]);
   const [isLoadingActiveRoutes, setIsLoadingActiveRoutes] = useState(false);
   const [viewRoute, setViewRoute] = useState<RouteType | null>(null);
@@ -362,17 +363,24 @@ export function PreForeclosureView() {
       setActiveRoutes(routes);
       
       // Update recordsInRoutes based on active routes
+      // Also track which properties are depots (starting points)
       const activeRecordIds = new Set<string>();
+      const depotIds = new Set<string>();
       routes.forEach(route => {
         route.records?.forEach((rr: any) => {
           // Handle both camelCase and snake_case document number fields
           const docNumber = rr.record?.documentNumber || rr.record?.document_number || rr.documentNumber || rr.document_number;
           if (docNumber) {
             activeRecordIds.add(docNumber);
+            // Track depots (starting points)
+            if (rr.isDepot === true) {
+              depotIds.add(docNumber);
+            }
           }
         });
       });
       setRecordsInRoutes(activeRecordIds);
+      setDepotRecordIds(depotIds);
     } catch (error) {
       console.error('[PreForeclosure] Error loading active routes:', error);
     } finally {
@@ -465,11 +473,33 @@ export function PreForeclosureView() {
   };
 
   const handleStartingPointSelected = (record: PreForeclosureRecord, pinLocation: { lat: number; lng: number }) => {
+    const documentNumber = record.document_number;
+    
+    // Check if property is already a depot (starting point) in an active route
+    if (depotRecordIds.has(documentNumber)) {
+      toast({
+        title: "Property Already Used as Starting Point",
+        description: `This property (${documentNumber}) is already being used as a starting point in an active route. Please select a different property.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check if property is already in progress (part of an active route)
+    if (recordsInRoutes && recordsInRoutes.has(documentNumber)) {
+      toast({
+        title: "Property Already in Progress",
+        description: `This property (${documentNumber}) is already part of an active route. Please select a different property.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setCustomDepot(pinLocation);
-    setCustomDepotRecordId(record.document_number); // Store the specific record ID to use as depot
+    setCustomDepotRecordId(documentNumber); // Store the specific record ID to use as depot
     // Ensure the closest record is selected
-    if (!selectedRecordIds.has(record.document_number)) {
-      setSelectedRecordIds(new Set([...selectedRecordIds, record.document_number]));
+    if (!selectedRecordIds.has(documentNumber)) {
+      setSelectedRecordIds(new Set([...selectedRecordIds, documentNumber]));
     }
     toast({
       title: "Starting Point Selected",
