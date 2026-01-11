@@ -735,7 +735,7 @@ export function PreForeclosureView() {
       // This array should have depot first, then other stops in order
       setOptimizedRecordIds(routeRecordIdsOrdered);
       
-      console.log('[PreForeclosure] Stored optimized record IDs:', currentRecordIds.length, 'ids:', currentRecordIds.slice(0, 5));
+      console.log('[PreForeclosure] Stored optimized record IDs:', routeRecordIdsOrdered.length, 'ids:', routeRecordIdsOrdered.slice(0, 5));
 
       // Store routes and show map visualization
       setOptimizedRoutes(solution);
