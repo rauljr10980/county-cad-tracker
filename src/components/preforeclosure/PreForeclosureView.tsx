@@ -475,12 +475,19 @@ export function PreForeclosureView() {
         });
       });
 
+      // Also include the depot record ID if there is one (it's part of the route)
+      if (depotPropertyId) {
+        routeRecordIds.add(depotPropertyId);
+      }
+
       // Update the set of records in routes
       setRecordsInRoutes(prev => new Set([...prev, ...routeRecordIds]));
 
       // Store the record IDs for the current optimized routes (for saving)
       const currentRecordIds = Array.from(routeRecordIds);
       setOptimizedRecordIds(currentRecordIds);
+      
+      console.log('[PreForeclosure] Stored optimized record IDs:', currentRecordIds.length, 'ids:', currentRecordIds.slice(0, 5));
 
       // Store routes and show map visualization
       setOptimizedRoutes(solution);
