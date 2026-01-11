@@ -1115,7 +1115,7 @@ export function PreForeclosureView() {
             <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
             <span className="text-sm text-muted-foreground">Loading routes...</span>
           </div>
-        ) : activeRoutes && activeRoutes.length > 0 ? (
+        ) : Array.isArray(activeRoutes) && activeRoutes.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeRoutes.map((route: any) => {
               const stopCount = route.records?.length || 0;
