@@ -320,10 +320,23 @@ export function AreaSelectorMap({
       return;
     }
 
+    // Filter out unavailable properties (depots or in progress)
+    const availableProperties = validProperties.filter(p => {
+      if (!p.id) return false;
+      return !unavailablePropertyIds.has(p.id);
+    });
+
+    if (availableProperties.length === 0) {
+      setClosestProperty(null);
+      setIsFindingClosest(false);
+      return;
+    }
+
+    // Find the closest available property
     let closest: PropertyLike | null = null;
     let minDistance = Infinity;
 
-    for (const property of validProperties) {
+    for (const property of availableProperties) {
       if (!property.latitude || !property.longitude) continue;
       const distance = calculateDistance(latlng.lat, latlng.lng, property.latitude, property.longitude);
       if (distance < minDistance) {
