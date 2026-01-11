@@ -15,7 +15,7 @@ import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, type Route, markPreForeclosureVisited } from '@/lib/api';
+import { solveVRP, getActiveRoutes, type Route, markPreForeclosureVisited, deleteRoute } from '@/lib/api';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 
@@ -56,6 +56,7 @@ export function PreForeclosureView() {
   const [viewRoute, setViewRoute] = useState<Route | null>(null);
   const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
   const [markingVisited, setMarkingVisited] = useState<string | null>(null);
+  const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -347,6 +348,37 @@ export function PreForeclosureView() {
         description: `Could not find record with document number ${documentNumber}`,
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDeleteRoute = async (routeId: string) => {
+    if (!confirm('Are you sure you want to delete this route? This will remove the route but preserve all property visited status and details.')) {
+      return;
+    }
+
+    setDeletingRoute(routeId);
+    try {
+      await deleteRoute(routeId);
+      toast({
+        title: 'Route Deleted',
+        description: 'Route has been deleted. Property visited status and details are preserved.',
+      });
+      // Reload active routes to refresh the list
+      await loadActiveRoutes();
+      // Close route details modal if it was open for this route
+      if (viewRoute?.id === routeId) {
+        setRouteDetailsOpen(false);
+        setViewRoute(null);
+      }
+    } catch (error) {
+      console.error('Error deleting route:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to delete route',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingRoute(null);
     }
   };
 
@@ -1044,33 +1076,55 @@ export function PreForeclosureView() {
               return (
                 <div
                   key={route.id}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('Route card clicked:', route.id);
-                    setViewRoute(route);
-                    setRouteDetailsOpen(true);
-                    console.log('Modal should open, routeDetailsOpen:', true);
-                  }}
-                  className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
+                  className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors relative group"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${driverColor}`} />
-                      <span className="font-semibold">{route.driver}</span>
+                  <div
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('Route card clicked:', route.id);
+                      setViewRoute(route);
+                      setRouteDetailsOpen(true);
+                      console.log('Modal should open, routeDetailsOpen:', true);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${driverColor}`} />
+                        <span className="font-semibold">{route.driver}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(route.createdAt).toLocaleDateString()}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(route.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {stopCount} {stopCount === 1 ? 'stop' : 'stops'}
-                  </div>
-                  {route.routeData?.totalDistance && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {route.routeData.totalDistance.toFixed(2)} km
+                    <div className="text-sm text-muted-foreground">
+                      {stopCount} {stopCount === 1 ? 'stop' : 'stops'}
                     </div>
-                  )}
+                    {route.routeData?.totalDistance && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {route.routeData.totalDistance.toFixed(2)} km
+                      </div>
+                    )}
+                  </div>
+                  {/* Delete button - appears on hover */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteRoute(route.id);
+                    }}
+                    disabled={deletingRoute === route.id}
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                    title="Delete route"
+                  >
+                    {deletingRoute === route.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    )}
+                  </Button>
                 </div>
               );
             })}
@@ -1971,6 +2025,28 @@ export function PreForeclosureView() {
                     <div className="font-semibold">{viewRoute.routeData.totalDistance.toFixed(2)} km</div>
                   </div>
                 )}
+              </div>
+
+              {/* Delete Route Button */}
+              <div className="flex justify-end">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleDeleteRoute(viewRoute.id)}
+                  disabled={deletingRoute === viewRoute.id}
+                >
+                  {deletingRoute === viewRoute.id ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Route
+                    </>
+                  )}
+                </Button>
               </div>
 
               {/* Route Records List */}

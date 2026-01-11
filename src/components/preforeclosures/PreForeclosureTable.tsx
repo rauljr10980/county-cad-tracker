@@ -68,6 +68,7 @@ export function PreForeclosureTable({
             <SortHeader column="zip">ZIP</SortHeader>
             <SortHeader column="filing_month">Filing Month</SortHeader>
             <SortHeader column="internal_status">Internal Status</SortHeader>
+            <SortHeader column="visited">Visited</SortHeader>
             <SortHeader column="last_action_date">Last Action</SortHeader>
             <SortHeader column="next_follow_up_date">Next Follow-Up</SortHeader>
             <TableHead className="w-[60px]">Notes</TableHead>
@@ -99,6 +100,17 @@ export function PreForeclosureTable({
                 <Badge variant="outline" className={statusColors[pf.internal_status]}>
                   {pf.internal_status}
                 </Badge>
+              </TableCell>
+              <TableCell>
+                {pf.visited ? (
+                  <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
+                    Visited
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-muted text-muted-foreground">
+                    Pending
+                  </Badge>
+                )}
               </TableCell>
               <TableCell className="text-muted-foreground text-sm">
                 {formatDate(pf.last_action_date)}

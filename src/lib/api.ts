@@ -962,3 +962,23 @@ export async function cancelRoute(routeId: string): Promise<Route> {
   return response.json();
 }
 
+/**
+ * Delete a route (preserves pre-foreclosure records and their visited status)
+ */
+export async function deleteRoute(routeId: string): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete route');
+  }
+  
+  return response.json();
+}
+

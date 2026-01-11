@@ -197,4 +197,13 @@ export interface PreForeclosureRecord {
   last_seen_month: string; // System-tracked
   created_at: string; // ISO timestamp
   updated_at: string; // ISO timestamp
+  
+  // Visit tracking
+  visited?: boolean;
+  visited_at?: string; // ISO date string
+  visited_by?: 'Luciano' | 'Raul';
 }
+
+// Type alias for backward compatibility
+export type PreForeclosure = PreForeclosureRecord;
+export type PreForeclosureInternalStatus = PreForeclosureStatus;

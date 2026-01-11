@@ -271,5 +271,26 @@ router.put('/:id/cancel', optionalAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/routes/:id - Delete route (preserves pre-foreclosure records and their visited status)
+router.delete('/:id', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Delete the route - this will cascade delete RouteRecord entries
+    // but NOT the PreForeclosure records themselves, preserving visited status and details
+    await prisma.route.delete({
+      where: { id }
+    });
+
+    res.json({ success: true, message: 'Route deleted successfully' });
+  } catch (error) {
+    console.error('[ROUTES] Delete route error:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+    res.status(500).json({ error: 'Failed to delete route' });
+  }
+});
+
 module.exports = router;
 
