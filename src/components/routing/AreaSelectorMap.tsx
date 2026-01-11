@@ -49,6 +49,7 @@ interface AreaSelectorMapProps {
     };
     selectedProperties: PropertyLike[];
   }) => void;
+  unavailablePropertyIds?: Set<string>; // Properties that are depots or in progress
   properties?: PropertyLike[];
   initialCenter?: { lat: number; lng: number };
   initialZoom?: number;
