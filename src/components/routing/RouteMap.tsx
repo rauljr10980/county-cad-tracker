@@ -324,7 +324,27 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose, 
               </div>
             ))}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {recordIds && recordIds.length > 0 && (
+              <>
+                <Select value={selectedDriver} onValueChange={(value) => setSelectedDriver(value as 'Luciano' | 'Raul')}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Assign to..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Luciano">Luciano</SelectItem>
+                    <SelectItem value="Raul">Raul</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleSaveRoute}
+                  disabled={!selectedDriver || isSavingRoute}
+                  className="bg-primary text-primary-foreground"
+                >
+                  {isSavingRoute ? 'Saving...' : 'Save Route'}
+                </Button>
+              </>
+            )}
             {routes.map((route, index) => {
               const stopCount = route.waypoints.filter(wp => wp.id !== 'depot').length;
               const limitedCount = Math.min(stopCount, 25);
