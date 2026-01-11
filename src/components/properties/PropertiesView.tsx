@@ -1032,8 +1032,8 @@ export function PropertiesView() {
       return;
     }
 
-    // IMPORTANT: If validatedProvidedProperties was passed (from area selector), allow up to 26 total
-    // This is 1 depot + 25 properties. The backend will exclude the depot from visitable stops.
+    // IMPORTANT: If validatedProvidedProperties was passed (from area selector), allow up to 25 total
+    // This is 1 depot + 24 properties. The backend will exclude the depot from visitable stops.
     // Note: We filter out properties already in routes, which might reduce the count
     if (validatedProvidedProperties && validatedProvidedProperties.length > 0) {
       // Don't filter out the depot from availableProperties - we need it for the backend to identify it
