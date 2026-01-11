@@ -215,9 +215,10 @@ export function PreForeclosureView() {
   }) => {
     // Filter records within the selected area (exclude visited and in-progress)
     const recordsInArea = filteredRecords.filter(r => {
+      if (!r || !r.document_number) return false;
       if (!r.latitude || !r.longitude) return false;
-      if (r.visited) return false; // Skip visited records
-      if (recordsInRoutes.has(r.document_number)) return false; // Skip records already in routes (in progress)
+      if (r.visited === true) return false; // Skip visited records
+      if (recordsInRoutes && recordsInRoutes.has(r.document_number)) return false; // Skip records already in routes (in progress)
       
       // If polygon is provided, use point-in-polygon check
       if (bounds.polygon && bounds.polygon.length >= 3) {
@@ -258,8 +259,8 @@ export function PreForeclosureView() {
              r.longitude >= bounds.west &&
              r.longitude <= bounds.east;
     });
-    const visitedCount = allRecordsInArea.filter(r => r.visited).length;
-    const inProgressCount = allRecordsInArea.filter(r => recordsInRoutes.has(r.document_number)).length;
+    const visitedCount = allRecordsInArea.filter(r => r && r.visited === true).length;
+    const inProgressCount = allRecordsInArea.filter(r => r && r.document_number && recordsInRoutes && recordsInRoutes.has(r.document_number)).length;
 
     if (recordsInArea.length === 0) {
       let message = "No available records found within the selected area.";
@@ -449,21 +450,23 @@ export function PreForeclosureView() {
     if (providedRecords && providedRecords.length > 0) {
       // Use the limited records from area selector
       console.log('[PreForeclosure] Using providedRecords from area selector:', providedRecords.length);
-      availableRecords = providedRecords.filter(r => 
-        r.latitude != null && 
-        r.longitude != null &&
-        !r.visited && // Exclude visited records
-        !recordsInRoutes.has(r.document_number) // Exclude records already in routes (in progress)
-      );
+      availableRecords = providedRecords.filter(r => {
+        if (!r || !r.document_number) return false;
+        if (r.latitude == null || r.longitude == null) return false;
+        if (r.visited === true) return false; // Exclude visited records
+        if (recordsInRoutes && recordsInRoutes.has(r.document_number)) return false; // Exclude records already in routes (in progress)
+        return true;
+      });
     } else {
       // Use selected records, but enforce 25-property limit for main optimize button
-      const selectedFromFiltered = filteredRecords.filter(r => 
-        selectedRecordIds.has(r.document_number) && 
-        r.latitude != null && 
-        r.longitude != null &&
-        !r.visited && // Exclude visited records
-        !recordsInRoutes.has(r.document_number) // Exclude records already in routes (in progress)
-      );
+      const selectedFromFiltered = filteredRecords.filter(r => {
+        if (!r || !r.document_number) return false;
+        if (!selectedRecordIds.has(r.document_number)) return false;
+        if (r.latitude == null || r.longitude == null) return false;
+        if (r.visited === true) return false; // Exclude visited records
+        if (recordsInRoutes && recordsInRoutes.has(r.document_number)) return false; // Exclude records already in routes (in progress)
+        return true;
+      });
       
       // CRITICAL: Limit to 25 properties (1 depot + 24 to visit) when using main optimize button
       if (selectedFromFiltered.length > 25) {
@@ -540,12 +543,12 @@ export function PreForeclosureView() {
     }
 
     // Check if any selected records are already in routes
-    const duplicateCount = Array.from(selectedRecordIds).filter(id => 
-      recordsInRoutes.has(id) && 
-      filteredRecords.find(r => r.document_number === id)?.latitude != null &&
-      filteredRecords.find(r => r.document_number === id)?.longitude != null &&
-      id !== depotPropertyId // Don't count depot record as duplicate if it's already in routes
-    ).length;
+    const duplicateCount = Array.from(selectedRecordIds).filter(id => {
+      if (!id || id === depotPropertyId) return false; // Don't count depot record as duplicate
+      if (!recordsInRoutes || !recordsInRoutes.has(id)) return false;
+      const record = filteredRecords.find(r => r && r.document_number === id);
+      return record && record.latitude != null && record.longitude != null;
+    }).length;
 
     if (duplicateCount > 0) {
       toast({
@@ -1395,11 +1398,11 @@ export function PreForeclosureView() {
                       </Select>
                     </td>
                     <td className="px-4 py-3">
-                      {record.visited ? (
+                      {record.visited === true ? (
                         <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
                           Visited
                         </Badge>
-                      ) : recordsInRoutes.has(record.document_number) ? (
+                      ) : recordsInRoutes && recordsInRoutes.has(record.document_number) ? (
                         <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
                           In Progress
                         </Badge>
