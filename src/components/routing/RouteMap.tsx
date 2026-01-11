@@ -111,15 +111,19 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose }
 
   const handleOpenInMaps = (routeIndex: number) => {
     const route = routes[routeIndex];
-    const waypoints = route.waypoints.filter(wp => wp.id !== 'depot');
+    // Include depot as the first waypoint (it's the starting point)
+    // The route.waypoints array already has depot as the first element
+    // We need to include it in the Google Maps URL so the route starts at the starting point
+    const waypoints = route.waypoints; // Include all waypoints including depot
     
     if (waypoints.length === 0) return;
 
     // Google Maps URL format: /dir/{origin}/{waypoint1}/{waypoint2}/.../{destination}
-    // Limit to 25 waypoints (Google Maps limit)
+    // Limit to 25 waypoints total (Google Maps limit) - this includes the depot as the first waypoint
+    // With depot + 24 stops = 25 total waypoints (our new limit)
     const limitedWaypoints = waypoints.slice(0, 25);
     
-    // Build URL with all waypoints
+    // Build URL with all waypoints (including depot as first waypoint)
     const waypointStrings = limitedWaypoints.map(wp => `${wp.lat},${wp.lon}`);
     const mapsUrl = `https://www.google.com/maps/dir/${waypointStrings.join('/')}`;
     
