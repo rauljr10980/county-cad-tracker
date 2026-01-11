@@ -665,26 +665,45 @@ export function PreForeclosureView() {
       }
 
       // Extract all record IDs from the generated routes to track them
-      const routeRecordIds = new Set<string>();
+      // Build the array in order from waypoints (depot first, then others in order)
+      const routeRecordIdsOrdered: string[] = [];
+      const seenIds = new Set<string>();
+      
       solution.routes.forEach((route: any) => {
         route.waypoints.forEach((wp: any) => {
-          if (wp.id && wp.id !== 'depot') {
-            routeRecordIds.add(wp.id);
+          // Skip 'depot' string placeholder, but include actual depot document number
+          if (wp.id && wp.id !== 'depot' && !seenIds.has(wp.id)) {
+            routeRecordIdsOrdered.push(wp.id);
+            seenIds.add(wp.id);
+          }
+          // Also check originalId for depot
+          if (wp.originalId && wp.originalId !== 'depot' && !seenIds.has(wp.originalId)) {
+            routeRecordIdsOrdered.push(wp.originalId);
+            seenIds.add(wp.originalId);
           }
         });
       });
 
-      // Also include the depot record ID if there is one (it's part of the route)
-      if (depotPropertyId) {
-        routeRecordIds.add(depotPropertyId);
+      // Ensure depot is first if it exists and is not already first
+      if (depotPropertyId && !seenIds.has(depotPropertyId)) {
+        routeRecordIdsOrdered.unshift(depotPropertyId);
+        seenIds.add(depotPropertyId);
+      } else if (depotPropertyId && routeRecordIdsOrdered[0] !== depotPropertyId) {
+        // Depot is in the list but not first - move it to the front
+        const depotIndex = routeRecordIdsOrdered.indexOf(depotPropertyId);
+        if (depotIndex > 0) {
+          routeRecordIdsOrdered.splice(depotIndex, 1);
+          routeRecordIdsOrdered.unshift(depotPropertyId);
+        }
       }
 
-      // Update the set of records in routes
-      setRecordsInRoutes(prev => new Set([...prev, ...routeRecordIds]));
+      // Update the set of records in routes (for tracking)
+      const routeRecordIdsSet = new Set(routeRecordIdsOrdered);
+      setRecordsInRoutes(prev => new Set([...prev, ...routeRecordIdsSet]));
 
       // Store the record IDs for the current optimized routes (for saving)
-      const currentRecordIds = Array.from(routeRecordIds);
-      setOptimizedRecordIds(currentRecordIds);
+      // This array should have depot first, then other stops in order
+      setOptimizedRecordIds(routeRecordIdsOrdered);
       
       console.log('[PreForeclosure] Stored optimized record IDs:', currentRecordIds.length, 'ids:', currentRecordIds.slice(0, 5));
 
