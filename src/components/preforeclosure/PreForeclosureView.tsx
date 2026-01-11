@@ -54,9 +54,9 @@ export function PreForeclosureView() {
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotRecordId, setCustomDepotRecordId] = useState<string | null>(null);
   const [recordsInRoutes, setRecordsInRoutes] = useState<Set<string>>(new Set());
-  const [activeRoutes, setActiveRoutes] = useState<Route[]>([]);
+  const [activeRoutes, setActiveRoutes] = useState<import('@/lib/api').Route[]>([]);
   const [isLoadingActiveRoutes, setIsLoadingActiveRoutes] = useState(false);
-  const [viewRoute, setViewRoute] = useState<Route | null>(null);
+  const [viewRoute, setViewRoute] = useState<import('@/lib/api').Route | null>(null);
   const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
   const [markingVisited, setMarkingVisited] = useState<string | null>(null);
   const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
