@@ -16,7 +16,8 @@ import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, type Route, markPreForeclosureVisited, deleteRoute } from '@/lib/api';
+import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute } from '@/lib/api';
+import type { Route } from '@/lib/api';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 
