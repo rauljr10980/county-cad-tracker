@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -1849,143 +1850,153 @@ export function PreForeclosureView() {
                 </div>
               </div>
 
-              {/* Route Status Section */}
-              <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
-                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                  Route Status
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-muted-foreground text-xs mb-2 block">Current Status</Label>
-                    <div className="flex items-center gap-2">
-                      {viewRecord.visited === true ? (
-                        <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
-                          Visited
-                        </Badge>
-                      ) : recordsInRoutes && recordsInRoutes.has(viewRecord.document_number) ? (
-                        <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                          In Progress
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-muted text-muted-foreground">
-                          Not in Route
-                        </Badge>
-                      )}
-                      {viewRecord.visited === true && viewRecord.visited_by && (
-                        <span className="text-xs text-muted-foreground">
-                          by {viewRecord.visited_by}
-                        </span>
-                      )}
-                      {viewRecord.visited === true && viewRecord.visited_at && (
-                        <span className="text-xs text-muted-foreground">
-                          on {format(new Date(viewRecord.visited_at), 'MMM d, yyyy')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {viewRecord.visited === true ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          const driver = viewRecord.visited_by || 'Luciano';
-                          await handleMarkVisited(viewRecord.document_number, driver as 'Luciano' | 'Raul', false);
-                          // Update local state
-                          setViewRecord({
-                            ...viewRecord,
-                            visited: false,
-                            visited_at: undefined,
-                            visited_by: undefined,
-                          });
-                        }}
-                        disabled={markingVisited === viewRecord.document_number}
-                      >
-                        {markingVisited === viewRecord.document_number ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Updating...
-                          </>
+              {/* Tabs for Details and Tasks */}
+              <Tabs defaultValue="details" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="details">Details</TabsTrigger>
+                  <TabsTrigger value="tasks">Tasks</TabsTrigger>
+                </TabsList>
+                <TabsContent value="details" className="space-y-4 mt-4">
+                  {/* Details tab content - just empty for now, property info is already shown above */}
+                </TabsContent>
+                <TabsContent value="tasks" className="space-y-4 mt-4">
+                  {/* Route Status Section in Tasks Tab */}
+                  <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                    <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                      Route Status
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-muted-foreground text-xs mb-2 block">Current Status</Label>
+                        <div className="flex items-center gap-2">
+                          {viewRecord.visited === true ? (
+                            <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
+                              Visited
+                            </Badge>
+                          ) : recordsInRoutes && recordsInRoutes.has(viewRecord.document_number) ? (
+                            <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                              In Progress
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-muted text-muted-foreground">
+                              Not in Route
+                            </Badge>
+                          )}
+                          {viewRecord.visited === true && viewRecord.visited_by && (
+                            <span className="text-xs text-muted-foreground">
+                              by {viewRecord.visited_by}
+                            </span>
+                          )}
+                          {viewRecord.visited === true && viewRecord.visited_at && (
+                            <span className="text-xs text-muted-foreground">
+                              on {format(new Date(viewRecord.visited_at), 'MMM d, yyyy')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {viewRecord.visited === true ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              const driver = viewRecord.visited_by || 'Luciano';
+                              await handleMarkVisited(viewRecord.document_number, driver as 'Luciano' | 'Raul', false);
+                              // Update local state
+                              setViewRecord({
+                                ...viewRecord,
+                                visited: false,
+                                visited_at: undefined,
+                                visited_by: undefined,
+                              });
+                            }}
+                            disabled={markingVisited === viewRecord.document_number}
+                          >
+                            {markingVisited === viewRecord.document_number ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Updating...
+                              </>
+                            ) : (
+                              <>
+                                <RotateCcw className="h-4 w-4 mr-2" />
+                                Set Not Visited
+                              </>
+                            )}
+                          </Button>
                         ) : (
                           <>
-                            <RotateCcw className="h-4 w-4 mr-2" />
-                            Set Not Visited
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                await handleMarkVisited(viewRecord.document_number, 'Luciano', true);
+                                // Update local state
+                                setViewRecord({
+                                  ...viewRecord,
+                                  visited: true,
+                                  visited_at: new Date().toISOString(),
+                                  visited_by: 'Luciano',
+                                });
+                              }}
+                              disabled={markingVisited === viewRecord.document_number}
+                            >
+                              {markingVisited === viewRecord.document_number ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Updating...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Mark Visited (Luciano)
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                await handleMarkVisited(viewRecord.document_number, 'Raul', true);
+                                // Update local state
+                                setViewRecord({
+                                  ...viewRecord,
+                                  visited: true,
+                                  visited_at: new Date().toISOString(),
+                                  visited_by: 'Raul',
+                                });
+                              }}
+                              disabled={markingVisited === viewRecord.document_number}
+                            >
+                              {markingVisited === viewRecord.document_number ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Updating...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Mark Visited (Raul)
+                                </>
+                              )}
+                            </Button>
                           </>
                         )}
-                      </Button>
-                    ) : (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            await handleMarkVisited(viewRecord.document_number, 'Luciano', true);
-                            // Update local state
-                            setViewRecord({
-                              ...viewRecord,
-                              visited: true,
-                              visited_at: new Date().toISOString(),
-                              visited_by: 'Luciano',
-                            });
-                          }}
-                          disabled={markingVisited === viewRecord.document_number}
-                        >
-                          {markingVisited === viewRecord.document_number ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Updating...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Mark Visited (Luciano)
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            await handleMarkVisited(viewRecord.document_number, 'Raul', true);
-                            // Update local state
-                            setViewRecord({
-                              ...viewRecord,
-                              visited: true,
-                              visited_at: new Date().toISOString(),
-                              visited_by: 'Raul',
-                            });
-                          }}
-                          disabled={markingVisited === viewRecord.document_number}
-                        >
-                          {markingVisited === viewRecord.document_number ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Updating...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Mark Visited (Raul)
-                            </>
-                          )}
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  {recordsInRoutes && recordsInRoutes.has(viewRecord.document_number) && (
-                    <div className="text-xs text-muted-foreground">
-                      This property is currently in an active route
+                      </div>
+                      {recordsInRoutes && recordsInRoutes.has(viewRecord.document_number) && (
+                        <div className="text-xs text-muted-foreground">
+                          This property is currently in an active route
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
 
-              {/* Actions & Tasks Section */}
-              <div className="bg-secondary/30 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">Actions & Tasks</span>
-                </div>
+                  {/* Actions & Tasks Section */}
+                  <div className="bg-secondary/30 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CheckCircle className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Actions & Tasks</span>
+                    </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -2097,37 +2108,39 @@ export function PreForeclosureView() {
                 </div>
               </div>
 
-              {/* Current Status */}
-              {viewRecord.actionType && (
-                <div className="bg-secondary/30 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Current Task</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-muted-foreground">Action:</span>
-                      <div className="font-medium capitalize">{viewRecord.actionType}</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Priority:</span>
-                      <div className="font-medium capitalize">{viewRecord.priority}</div>
-                    </div>
-                    {viewRecord.dueTime && (
-                      <div>
-                        <span className="text-muted-foreground">Due:</span>
-                        <div className="font-medium">{format(new Date(viewRecord.dueTime), 'MMM d, yyyy h:mm a')}</div>
+                  {/* Current Status */}
+                  {viewRecord.actionType && (
+                    <div className="bg-secondary/30 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Target className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">Current Task</span>
                       </div>
-                    )}
-                    {viewRecord.assignedTo && (
-                      <div>
-                        <span className="text-muted-foreground">Assigned To:</span>
-                        <div className="font-medium">{viewRecord.assignedTo}</div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Action:</span>
+                          <div className="font-medium capitalize">{viewRecord.actionType}</div>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Priority:</span>
+                          <div className="font-medium capitalize">{viewRecord.priority}</div>
+                        </div>
+                        {viewRecord.dueTime && (
+                          <div>
+                            <span className="text-muted-foreground">Due:</span>
+                            <div className="font-medium">{format(new Date(viewRecord.dueTime), 'MMM d, yyyy h:mm a')}</div>
+                          </div>
+                        )}
+                        {viewRecord.assignedTo && (
+                          <div>
+                            <span className="text-muted-foreground">Assigned To:</span>
+                            <div className="font-medium">{viewRecord.assignedTo}</div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           )}
 
