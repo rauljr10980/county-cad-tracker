@@ -2321,8 +2321,21 @@ export function PreForeclosureView() {
                 )}
               </div>
 
-              {/* Delete Route Button */}
-              <div className="flex justify-end">
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (viewRoute?.routeData) {
+                      setOptimizedRoutes(viewRoute.routeData);
+                      setRouteMapOpen(true);
+                    }
+                  }}
+                >
+                  <RouteIcon className="h-4 w-4 mr-2" />
+                  Optimize Route
+                </Button>
                 <Button
                   variant="destructive"
                   size="sm"
