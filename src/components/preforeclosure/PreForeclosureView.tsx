@@ -2328,13 +2328,21 @@ export function PreForeclosureView() {
                   size="sm"
                   onClick={() => {
                     if (viewRoute?.routeData) {
+                      // Extract record IDs from the route
+                      const routeRecordIds = viewRoute.records
+                        ?.map((rr: any) => {
+                          const docNumber = rr.record?.documentNumber || rr.record?.document_number || rr.documentNumber || rr.document_number;
+                          return docNumber;
+                        })
+                        .filter(Boolean) || [];
+                      setOptimizedRecordIds(routeRecordIds);
                       setOptimizedRoutes(viewRoute.routeData);
                       setRouteMapOpen(true);
                     }
                   }}
                 >
                   <RouteIcon className="h-4 w-4 mr-2" />
-                  Optimize Route
+                  View Route Map
                 </Button>
                 <Button
                   variant="destructive"
