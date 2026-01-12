@@ -2423,7 +2423,7 @@ export function PreForeclosureView() {
                                 </td>
                                 <td className="px-4 py-2 text-sm">
                                   <div className="flex items-center gap-2">
-                                    {!routeRecord.isDepot && documentNumber && (
+                                    {documentNumber && (
                                       <>
                                         {!record.visited ? (
                                           <Button
