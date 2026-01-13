@@ -1901,16 +1901,8 @@ export function PreForeclosureView() {
                 </div>
               </div>
 
-              {/* Tabs for Details and Tasks */}
-              <Tabs defaultValue="details" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="tasks">Tasks</TabsTrigger>
-                </TabsList>
-                <TabsContent value="details" className="space-y-4 mt-4">
-                  {/* Details tab content - just empty for now, property info is already shown above */}
-                </TabsContent>
-                <TabsContent value="tasks" className="space-y-4 mt-4">
+              {/* Tasks Section */}
+              <div className="space-y-4">
                   {/* Route Status Section in Tasks Tab */}
                   <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
                     <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
@@ -2190,8 +2182,7 @@ export function PreForeclosureView() {
                       </div>
                     </div>
                   )}
-                </TabsContent>
-              </Tabs>
+              </div>
             </div>
           )}
 
