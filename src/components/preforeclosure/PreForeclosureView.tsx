@@ -17,7 +17,7 @@ import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute } from '@/lib/api';
+import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute } from '@/lib/api';
 
 // Local type alias to avoid runtime reference issues
 type RouteType = {
@@ -93,6 +93,7 @@ export function PreForeclosureView() {
   const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
   const [markingVisited, setMarkingVisited] = useState<string | null>(null);
   const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
+  const [removingRecordId, setRemovingRecordId] = useState<string | null>(null);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -2496,6 +2497,31 @@ export function PreForeclosureView() {
                                       >
                                         <Eye className="h-3 w-3 mr-1" />
                                         Details
+                                      </Button>
+                                    )}
+                                    {!routeRecord.isDepot && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
+                                        }}
+                                        disabled={removingRecordId === routeRecord.id}
+                                        className="h-7 text-xs text-destructive hover:text-destructive"
+                                        title="Remove from route"
+                                      >
+                                        {removingRecordId === routeRecord.id ? (
+                                          <>
+                                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                            Removing...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <X className="h-3 w-3 mr-1" />
+                                            Remove
+                                          </>
+                                        )}
                                       </Button>
                                     )}
                                   </div>

@@ -298,5 +298,124 @@ router.delete('/:id', optionalAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/routes/:routeId/records/:recordId - Remove a specific record from a route
+router.delete('/:routeId/records/:recordId', optionalAuth, async (req, res) => {
+  try {
+    const { routeId, recordId } = req.params;
+
+    // Verify route exists
+    const route = await prisma.route.findUnique({
+      where: { id: routeId },
+      include: {
+        records: {
+          where: { id: recordId }
+        }
+      }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    if (route.records.length === 0) {
+      return res.status(404).json({ error: 'Record not found in route' });
+    }
+
+    const recordToRemove = route.records[0];
+
+    // Don't allow removing the depot
+    if (recordToRemove.isDepot) {
+      return res.status(400).json({ error: 'Cannot remove depot from route' });
+    }
+
+    // Delete the RouteRecord entry
+    await prisma.routeRecord.delete({
+      where: { id: recordId }
+    });
+
+    // Get updated route with remaining records
+    const updatedRoute = await prisma.route.findUnique({
+      where: { id: routeId },
+      include: {
+        records: {
+          include: {
+            preForeclosure: {
+              select: {
+                id: true,
+                documentNumber: true,
+                address: true,
+                city: true,
+                zip: true,
+                latitude: true,
+                longitude: true,
+                visited: true,
+                visitedAt: true,
+                visitedBy: true,
+              }
+            }
+          },
+          orderBy: {
+            orderIndex: 'asc'
+          }
+        }
+      }
+    });
+
+    // Reorder remaining records (update orderIndex to be sequential)
+    if (updatedRoute && updatedRoute.records.length > 0) {
+      await Promise.all(
+        updatedRoute.records.map((rr, index) => {
+          // Skip depot, it stays at index 0
+          if (rr.isDepot) return Promise.resolve();
+          return prisma.routeRecord.update({
+            where: { id: rr.id },
+            data: { orderIndex: index }
+          });
+        })
+      );
+    }
+
+    // Format response
+    const formattedRoute = {
+      id: updatedRoute.id,
+      driver: updatedRoute.driver,
+      status: updatedRoute.status,
+      routeData: updatedRoute.routeData,
+      createdAt: updatedRoute.createdAt,
+      finishedAt: updatedRoute.finishedAt,
+      updatedAt: updatedRoute.updatedAt,
+      recordCount: updatedRoute.records.length,
+      records: updatedRoute.records.map(rr => ({
+        id: rr.id,
+        orderIndex: rr.orderIndex,
+        isDepot: rr.isDepot,
+        record: rr.preForeclosure ? {
+          id: rr.preForeclosure.id,
+          document_number: rr.preForeclosure.documentNumber,
+          documentNumber: rr.preForeclosure.documentNumber,
+          address: rr.preForeclosure.address,
+          city: rr.preForeclosure.city,
+          zip: rr.preForeclosure.zip,
+          latitude: rr.preForeclosure.latitude,
+          longitude: rr.preForeclosure.longitude,
+          visited: rr.preForeclosure.visited || false,
+          visited_at: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null,
+          visited_by: rr.preForeclosure.visitedBy || null,
+          visitedAt: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null,
+          visitedBy: rr.preForeclosure.visitedBy || null
+        } : null
+      }))
+    };
+
+    res.json({ success: true, route: formattedRoute, message: 'Record removed from route successfully' });
+  } catch (error) {
+    console.error('[ROUTES] Remove record from route error:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Route or record not found' });
+    }
+    res.status(500).json({ error: 'Failed to remove record from route' });
+  }
+});
+
 module.exports = router;
 
