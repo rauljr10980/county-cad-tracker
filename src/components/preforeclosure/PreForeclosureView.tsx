@@ -1922,15 +1922,15 @@ export function PreForeclosureView() {
                           // Auto-save on blur
                           try {
                             await updateMutation.mutateAsync({
-                              documentNumber: viewRecord.document_number,
-                              updates: {
-                                notes: viewRecord.notes || '',
-                              },
+                              document_number: viewRecord.document_number,
+                              notes: viewRecord.notes || '',
                             });
                             toast({
                               title: 'Notes Saved',
                               description: 'Notes have been saved successfully.',
                             });
+                            // Invalidate query to refresh the data
+                            queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
                           } catch (error) {
                             console.error('Error saving notes:', error);
                             toast({
