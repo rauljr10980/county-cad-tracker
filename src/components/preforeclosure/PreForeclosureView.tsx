@@ -2508,70 +2508,70 @@ export function PreForeclosureView() {
                                   )}
                                 </td>
                                 <td className="px-4 py-2 text-sm">
-                                  <div className="flex items-center gap-2">
-                                    {documentNumber && (
-                                      <>
-                                        {!record.visited ? (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleMarkVisited(documentNumber, viewRoute.driver, true);
-                                            }}
-                                            disabled={markingVisited === documentNumber}
-                                            className="h-7 text-xs"
-                                          >
-                                            {markingVisited === documentNumber ? (
-                                              <>
-                                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                                Marking...
-                                              </>
-                                            ) : (
-                                              'Mark Visited'
-                                            )}
-                                          </Button>
-                                        ) : (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleMarkVisited(documentNumber, viewRoute.driver, false);
-                                            }}
-                                            disabled={markingVisited === documentNumber}
-                                            className="h-7 text-xs text-muted-foreground"
-                                          >
-                                            {markingVisited === documentNumber ? (
-                                              <>
-                                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                                Updating...
-                                              </>
-                                            ) : (
-                                              <>
-                                                <RotateCcw className="h-3 w-3 mr-1" />
-                                                Set Pending
-                                              </>
-                                            )}
-                                          </Button>
-                                        )}
-                                      </>
-                                    )}
-                                    {documentNumber && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleViewRecordDetails(documentNumber);
-                                        }}
-                                        className="h-7 text-xs"
-                                      >
-                                        <Eye className="h-3 w-3 mr-1" />
-                                        Details
-                                      </Button>
-                                    )}
-                                  </div>
+                                  {documentNumber && (
+                                    <>
+                                      {!record.visited ? (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMarkVisited(documentNumber, viewRoute.driver, true);
+                                          }}
+                                          disabled={markingVisited === documentNumber}
+                                          className="h-7 text-xs"
+                                        >
+                                          {markingVisited === documentNumber ? (
+                                            <>
+                                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                              Marking...
+                                            </>
+                                          ) : (
+                                            'Mark Visited'
+                                          )}
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMarkVisited(documentNumber, viewRoute.driver, false);
+                                          }}
+                                          disabled={markingVisited === documentNumber}
+                                          className="h-7 text-xs text-muted-foreground"
+                                        >
+                                          {markingVisited === documentNumber ? (
+                                            <>
+                                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                              Updating...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <RotateCcw className="h-3 w-3 mr-1" />
+                                              Set Pending
+                                            </>
+                                          )}
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2 text-sm">
+                                  {documentNumber && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleViewRecordDetails(documentNumber);
+                                      }}
+                                      className="h-7 text-xs"
+                                    >
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      Details
+                                    </Button>
+                                  )}
                                 </td>
                               </tr>
                             );
