@@ -76,6 +76,7 @@ export function PreForeclosureView() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
+  const [editingDateField, setEditingDateField] = useState<{ documentNumber: string; field: 'last_action_date' | 'next_follow_up_date' } | null>(null);
   const [numVehicles, setNumVehicles] = useState<1 | 2>(1);
   const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
   const [routeMapOpen, setRouteMapOpen] = useState(false);
@@ -1435,7 +1436,6 @@ export function PreForeclosureView() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Visited</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Last Action</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Next Follow-Up</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
