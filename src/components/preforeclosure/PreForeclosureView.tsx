@@ -2386,6 +2386,7 @@ export function PreForeclosureView() {
                     <table className="w-full">
                       <thead className="bg-secondary/50">
                         <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Order</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Document #</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
@@ -2497,31 +2498,6 @@ export function PreForeclosureView() {
                                       >
                                         <Eye className="h-3 w-3 mr-1" />
                                         Details
-                                      </Button>
-                                    )}
-                                    {!routeRecord.isDepot && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
-                                        }}
-                                        disabled={removingRecordId === routeRecord.id}
-                                        className="h-7 text-xs text-destructive hover:text-destructive"
-                                        title="Remove from route"
-                                      >
-                                        {removingRecordId === routeRecord.id ? (
-                                          <>
-                                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                            Removing...
-                                          </>
-                                        ) : (
-                                          <>
-                                            <X className="h-3 w-3 mr-1" />
-                                            Remove
-                                          </>
-                                        )}
                                       </Button>
                                     )}
                                   </div>
