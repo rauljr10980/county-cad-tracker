@@ -1230,14 +1230,11 @@ export function PreForeclosureView() {
                     }}
                     className="cursor-pointer"
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center mb-2">
                       <div className="flex items-center gap-2">
                         <div className={`w-3 h-3 rounded-full ${driverColor}`} />
                         <span className="font-semibold">{route.driver}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(route.createdAt).toLocaleDateString()}
-                      </span>
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {stopCount} {stopCount === 1 ? 'stop' : 'stops'}
@@ -1266,6 +1263,12 @@ export function PreForeclosureView() {
                       <Trash2 className="h-3 w-3 text-destructive" />
                     )}
                   </Button>
+                  {/* Date - always visible in bottom right */}
+                  <div className="absolute bottom-2 right-2">
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(route.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
               );
             })}
