@@ -163,10 +163,25 @@ export function PreForeclosureView() {
   }, [records, searchQuery, typeFilter, cityFilter, zipFilter, monthFilter, statusFilter, needsFollowUp]);
 
   const handleStatusChange = async (record: PreForeclosureRecord, newStatus: PreForeclosureStatus) => {
-    await updateMutation.mutateAsync({
-      document_number: record.document_number,
-      internal_status: newStatus,
-    });
+    try {
+      await updateMutation.mutateAsync({
+        document_number: record.document_number,
+        internal_status: newStatus,
+      });
+      toast({
+        title: 'Status Updated',
+        description: `Status changed to "${newStatus}" for document ${record.document_number}`,
+      });
+      // Invalidate query to refresh the table
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update status',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleNotesClick = (record: PreForeclosureRecord) => {
