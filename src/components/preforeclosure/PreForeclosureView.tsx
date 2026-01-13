@@ -443,6 +443,56 @@ export function PreForeclosureView() {
     }
   };
 
+  const handleRemoveRecordFromRoute = async (routeId: string, recordId: string, documentNumber: string) => {
+    if (!confirm(`Are you sure you want to remove this property (${documentNumber}) from the route?`)) {
+      return;
+    }
+
+    setRemovingRecordId(recordId);
+    try {
+      const result = await removeRecordFromRoute(routeId, recordId);
+      
+      // Update the viewRoute with the updated route
+      if (result.route) {
+        setViewRoute(result.route);
+      }
+
+      // Reload active routes to update the list
+      await loadActiveRoutes();
+
+      // Remove from recordsInRoutes if it's no longer in any route
+      if (recordsInRoutes) {
+        const updatedRecordsInRoutes = new Set(recordsInRoutes);
+        // Check if this document number is still in any active route
+        const activeRoutes = await getActiveRoutes();
+        const stillInRoute = activeRoutes.some(route => 
+          route.records?.some(rr => {
+            const docNum = rr.record?.documentNumber || rr.record?.document_number;
+            return docNum === documentNumber;
+          })
+        );
+        if (!stillInRoute) {
+          updatedRecordsInRoutes.delete(documentNumber);
+          setRecordsInRoutes(updatedRecordsInRoutes);
+        }
+      }
+
+      toast({
+        title: 'Property Removed',
+        description: `Property ${documentNumber} has been removed from the route.`,
+      });
+    } catch (error: any) {
+      console.error('[PreForeclosure] Error removing record from route:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to remove property from route',
+        variant: 'destructive',
+      });
+    } finally {
+      setRemovingRecordId(null);
+    }
+  };
+
   const handleDeleteRoute = async (routeId: string) => {
     if (!confirm('Are you sure you want to delete this route? This will remove the route but preserve all property visited status and details.')) {
       return;
@@ -2416,6 +2466,27 @@ export function PreForeclosureView() {
                                   routeRecord.isDepot ? 'bg-primary/10' : ''
                                 }`}
                               >
+                                <td className="px-4 py-2 text-sm">
+                                  {!routeRecord.isDepot && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
+                                      }}
+                                      disabled={removingRecordId === routeRecord.id}
+                                      className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      title="Remove from route"
+                                    >
+                                      {removingRecordId === routeRecord.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <X className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </td>
                                 <td className="px-4 py-2 text-sm">
                                   {routeRecord.isDepot ? (
                                     <Badge variant="default" className="bg-primary">Depot</Badge>
