@@ -124,8 +124,48 @@ router.get('/',
         orderBy: { dueTime: 'asc' }
       });
 
-      // Transform tasks to Property format expected by frontend
-      // Frontend expects an array of Properties with task information embedded
+      // Also fetch pre-foreclosure records with tasks (actionType and dueTime)
+      const preForeclosureWhere = {
+        actionType: { not: null },
+        dueTime: { not: null }
+      };
+
+      // Apply filters to pre-foreclosure records
+      if (actionType) {
+        preForeclosureWhere.actionType = actionType;
+      }
+      if (priority) {
+        // Map priority filter: HIGH -> HIGH, MEDIUM -> MEDIUM, LOW -> LOW
+        preForeclosureWhere.priority = priority;
+      }
+      // Note: assignedToId filter is not applied to pre-foreclosure records
+      // since pre-foreclosure uses string assignment ('Luciano' or 'Raul')
+      // and the frontend filters client-side by assignedTo string
+      if (dueFrom || dueTo) {
+        preForeclosureWhere.dueTime = {};
+        if (dueFrom) preForeclosureWhere.dueTime.gte = new Date(dueFrom);
+        if (dueTo) preForeclosureWhere.dueTime.lte = new Date(dueTo);
+      }
+
+      const preForeclosureTasks = await prisma.preForeclosure.findMany({
+        where: preForeclosureWhere,
+        select: {
+          id: true,
+          documentNumber: true,
+          address: true,
+          city: true,
+          zip: true,
+          actionType: true,
+          priority: true,
+          dueTime: true,
+          assignedTo: true,
+          internalStatus: true,
+          notes: true
+        },
+        orderBy: { dueTime: 'asc' }
+      });
+
+      // Transform property tasks to Property format expected by frontend
       const propertiesWithTasks = tasks.map(task => {
         const property = task.property;
         // Get last outcome from activities
@@ -146,8 +186,53 @@ router.get('/',
         };
       });
 
+      // Transform pre-foreclosure tasks to Property format expected by frontend
+      const preForeclosurePropertiesWithTasks = preForeclosureTasks.map(pf => {
+        // Map pre-foreclosure to Property-like format
+        return {
+          id: pf.id,
+          accountNumber: pf.documentNumber, // Use documentNumber as accountNumber
+          ownerName: '', // Pre-foreclosure doesn't have ownerName
+          propertyAddress: pf.address || '', // Use address as propertyAddress
+          mailingAddress: '',
+          status: pf.internalStatus || 'UNKNOWN',
+          totalAmountDue: 0, // Pre-foreclosure doesn't have amount due
+          marketValue: null,
+          notes: pf.notes || null,
+          phoneNumbers: null,
+          ownerPhoneIndex: null,
+          link: null,
+          exemptions: null,
+          jurisdictions: null,
+          lastPaymentDate: null,
+          lastPaymentAmount: null,
+          taxYear: null,
+          legalDescription: null,
+          // Map task fields
+          actionType: pf.actionType ? pf.actionType.toLowerCase() : null,
+          priority: pf.priority === 'MEDIUM' ? 'med' : (pf.priority ? pf.priority.toLowerCase() : 'med'),
+          dueTime: pf.dueTime ? pf.dueTime.toISOString() : null,
+          assignedTo: pf.assignedTo || null,
+          attempts: 0,
+          lastOutcome: null,
+          lastOutcomeDate: null,
+          // Add pre-foreclosure specific fields
+          documentNumber: pf.documentNumber,
+          city: pf.city,
+          zip: pf.zip,
+        };
+      });
+
+      // Combine both arrays and sort by dueTime
+      const allTasks = [...propertiesWithTasks, ...preForeclosurePropertiesWithTasks];
+      allTasks.sort((a, b) => {
+        if (!a.dueTime) return 1;
+        if (!b.dueTime) return -1;
+        return new Date(a.dueTime).getTime() - new Date(b.dueTime).getTime();
+      });
+
       // Frontend expects array directly (not wrapped in object)
-      res.json(propertiesWithTasks);
+      res.json(allTasks);
     } catch (error) {
       console.error('[TASKS] Fetch error:', error);
       res.status(500).json({ error: 'Failed to fetch tasks' });

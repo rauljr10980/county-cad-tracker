@@ -862,6 +862,9 @@ export function PreForeclosureView() {
       viewRecord.priority = priority;
       viewRecord.dueTime = isoDateTime;
       viewRecord.assignedTo = assignedTo || undefined;
+      
+      // Invalidate tasks query so Tasks tab shows the new task
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     } catch (error) {
       console.error('[PreForeclosure] Schedule action error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to schedule action';
