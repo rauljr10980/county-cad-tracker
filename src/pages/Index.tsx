@@ -62,10 +62,10 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <Header onRefresh={handleRefresh} isRefreshing={isRefreshing} />
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-      <main className="container mx-auto animate-fade-in">
+      <main className="container mx-auto animate-fade-in overflow-x-hidden">
         {renderContent()}
       </main>
     </div>

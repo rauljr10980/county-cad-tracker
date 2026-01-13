@@ -189,46 +189,47 @@ export function PreForeclosuresView() {
   const hasActiveFilters = typeFilter !== 'all' || statusFilter !== 'all' || cityFilter !== 'all' || zipFilter !== 'all' || showNeedsFollowUp || searchQuery;
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Home className="h-5 w-5" />
-              Pre-Foreclosures
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {stats.total.toLocaleString()} total filings • {stats.mortgage.toLocaleString()} Mortgage • {stats.tax.toLocaleString()} Tax
-            </p>
+    <div className="p-3 md:p-6">
+      {/* Header - Mobile First */}
+      <div className="mb-4 md:mb-6">
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <Home className="h-5 w-5" />
+            <h2 className="text-lg md:text-xl font-semibold">Pre-Foreclosures</h2>
           </div>
-          
-          {/* Quick Stats Badges */}
-          <div className="flex gap-2">
-            <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/30">
-              {stats.active} Active
-            </Badge>
-            <Badge variant="outline" className="bg-muted text-muted-foreground">
-              {stats.inactive} Inactive
-            </Badge>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-xs md:text-sm text-muted-foreground">
+              {stats.total.toLocaleString()} total • {stats.mortgage.toLocaleString()} Mortgage • {stats.tax.toLocaleString()} Tax
+            </p>
+
+            {/* Quick Stats Badges */}
+            <div className="flex gap-2">
+              <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/30 text-xs">
+                {stats.active} Active
+              </Badge>
+              <Badge variant="outline" className="bg-muted text-muted-foreground text-xs">
+                {stats.inactive} Inactive
+              </Badge>
+            </div>
           </div>
         </div>
 
-        {/* Search Bar */}
+        {/* Search Bar - Full Width on Mobile */}
         <div className="mb-4">
-          <div className="relative max-w-md">
+          <div className="relative w-full md:max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search by document #, address, city, or ZIP..."
+              placeholder="Search pre-foreclosures..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-10"
+              className="pl-10 pr-10 w-full mobile-input"
             />
             {searchQuery && (
               <button
                 onClick={() => { setSearchQuery(''); setDebouncedSearchQuery(''); }}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground mobile-touch-target"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -236,83 +237,103 @@ export function PreForeclosuresView() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 bg-card/50 border border-border rounded-lg p-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        {/* Filters - Mobile Optimized */}
+        <div className="space-y-3 bg-card/50 border border-border rounded-lg p-3 md:p-4">
+          <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground mb-2">
             <Filter className="h-4 w-4" />
-            <span>Filters:</span>
+            <span>Filters</span>
+            {hasActiveFilters && (
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {[typeFilter !== 'all', statusFilter !== 'all', cityFilter !== 'all', zipFilter !== 'all', showNeedsFollowUp].filter(Boolean).length}
+              </Badge>
+            )}
           </div>
 
-          <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v as PreForeclosureType | 'all'); setPage(1); }}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="Mortgage">Mortgage</SelectItem>
-              <SelectItem value="Tax">Tax</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Filter Grid - Stacks on Mobile */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v as PreForeclosureType | 'all'); setPage(1); }}>
+              <SelectTrigger className="w-full mobile-input">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="Mortgage">Mortgage</SelectItem>
+                <SelectItem value="Tax">Tax</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as PreForeclosureInternalStatus | 'all'); setPage(1); }}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="New">New</SelectItem>
-              <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-              <SelectItem value="Monitoring">Monitoring</SelectItem>
-              <SelectItem value="Dead">Dead</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as PreForeclosureInternalStatus | 'all'); setPage(1); }}>
+              <SelectTrigger className="w-full mobile-input">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="New">New</SelectItem>
+                <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
+                <SelectItem value="Monitoring">Monitoring</SelectItem>
+                <SelectItem value="Dead">Dead</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={cityFilter} onValueChange={(v) => { setCityFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="City" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Cities</SelectItem>
-              {uniqueCities.map(city => (
-                <SelectItem key={city} value={city}>{city}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={cityFilter} onValueChange={(v) => { setCityFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-full mobile-input">
+                <SelectValue placeholder="City" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Cities</SelectItem>
+                {uniqueCities.map(city => (
+                  <SelectItem key={city} value={city}>{city}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Select value={zipFilter} onValueChange={(v) => { setZipFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="ZIP" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All ZIPs</SelectItem>
-              {uniqueZips.map(zip => (
-                <SelectItem key={zip} value={zip}>{zip}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={zipFilter} onValueChange={(v) => { setZipFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-full mobile-input">
+                <SelectValue placeholder="ZIP" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All ZIPs</SelectItem>
+                {uniqueZips.map(zip => (
+                  <SelectItem key={zip} value={zip}>{zip}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <Button 
-            variant={showNeedsFollowUp ? "default" : "outline"} 
-            size="sm"
-            onClick={() => { setShowNeedsFollowUp(!showNeedsFollowUp); setPage(1); }}
-            className={cn(
-              showNeedsFollowUp && "bg-yellow-500 hover:bg-yellow-600"
-            )}
-          >
-            Needs Follow-Up
-          </Button>
-
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters}>
-              <X className="h-4 w-4 mr-1" />
-              Clear
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <Button
+              variant={showNeedsFollowUp ? "default" : "outline"}
+              size="sm"
+              onClick={() => { setShowNeedsFollowUp(!showNeedsFollowUp); setPage(1); }}
+              className={cn(
+                "w-full sm:w-auto mobile-touch-target",
+                showNeedsFollowUp && "bg-yellow-500 hover:bg-yellow-600"
+              )}
+            >
+              Needs Follow-Up
             </Button>
-          )}
 
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="w-full sm:w-auto mobile-touch-target"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {/* Results Count */}
           {filteredData.length !== allData.length && (
-            <span className="text-sm text-muted-foreground ml-auto">
-              Showing {filteredData.length.toLocaleString()} of {allData.length.toLocaleString()}
-            </span>
+            <div className="pt-2 border-t border-border/50">
+              <span className="text-xs md:text-sm text-muted-foreground">
+                Showing {filteredData.length.toLocaleString()} of {allData.length.toLocaleString()}
+              </span>
+            </div>
           )}
         </div>
       </div>

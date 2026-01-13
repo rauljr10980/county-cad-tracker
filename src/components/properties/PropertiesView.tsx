@@ -1236,103 +1236,131 @@ export function PropertiesView() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-semibold">Property List</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Browse and filter tax-delinquent properties. Click on a property to view details.
-              {totalUnfiltered && typeof totalUnfiltered === 'number' && totalUnfiltered > 0 && ` ${totalUnfiltered.toLocaleString()} total properties.`}
-            </p>
-          </div>
-          {selectedPropertyIds.size > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {selectedPropertyIds.size} selected
+    <div className="p-3 md:p-6">
+      <div className="mb-4 md:mb-6">
+        {/* Header - Mobile First */}
+        <div className="mb-4">
+          <h2 className="text-lg md:text-xl font-semibold">Property List</h2>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">
+            Browse and filter tax-delinquent properties.
+            <span className="hidden sm:inline"> Click on a property to view details.</span>
+            {totalUnfiltered && typeof totalUnfiltered === 'number' && totalUnfiltered > 0 && (
+              <span className="block sm:inline mt-1 sm:mt-0">
+                {' '}{totalUnfiltered.toLocaleString()} total properties.
               </span>
-              <Select
-                value={numVehicles.toString()}
-                onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
-              >
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 Vehicle</SelectItem>
-                  <SelectItem value="2">2 Vehicles</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                onClick={() => setAreaSelectorOpen(true)}
-                variant="outline"
-                size="sm"
-                title="Select area on map to filter properties"
-              >
-                Select Area
-              </Button>
-              {customDepot && (
+            )}
+          </p>
+        </div>
+
+        {/* Route Actions - Mobile Optimized */}
+        {selectedPropertyIds.size > 0 && (
+          <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+            <div className="flex flex-col gap-3">
+              {/* Selection Count */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-primary">
+                  {selectedPropertyIds.size} selected
+                </span>
                 <Button
-                  onClick={() => {
-                    setCustomDepot(null);
-                    setCustomDepotPropertyId(null);
-                    toast({
-                      title: "Starting Point Cleared",
-                      description: "Starting point has been cleared. Route will use default starting point.",
-                    });
-                  }}
+                  onClick={() => setSelectedPropertyIds(new Set())}
                   variant="ghost"
                   size="sm"
-                  title="Clear custom starting point"
+                  disabled={isOptimizingRoute}
+                  className="h-8"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4 mr-1" />
+                  Clear
                 </Button>
-              )}
+              </div>
+
+              {/* Route Controls - Stacked on Mobile */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                {/* Vehicle Select */}
+                <Select
+                  value={numVehicles.toString()}
+                  onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
+                >
+                  <SelectTrigger className="w-full sm:w-36 mobile-input">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 Vehicle</SelectItem>
+                    <SelectItem value="2">2 Vehicles</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Area Selector Button */}
+                <Button
+                  onClick={() => setAreaSelectorOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto mobile-touch-target"
+                  title="Select area on map to filter properties"
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Select Area
+                </Button>
+
+                {/* Custom Depot Clear */}
+                {customDepot && (
+                  <Button
+                    onClick={() => {
+                      setCustomDepot(null);
+                      setCustomDepotPropertyId(null);
+                      toast({
+                        title: "Starting Point Cleared",
+                        description: "Starting point has been cleared. Route will use default starting point.",
+                      });
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto mobile-touch-target"
+                    title="Clear custom starting point"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear Start
+                  </Button>
+                )}
+              </div>
+
+              {/* Primary Action - Full Width on Mobile */}
               <Button
                 onClick={handleCreateRoute}
-                className="bg-primary text-primary-foreground"
+                className="bg-primary text-primary-foreground w-full mobile-touch-target"
                 size="sm"
                 disabled={isOptimizingRoute}
               >
                 {isOptimizingRoute ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Optimizing...
+                    Optimizing Route...
                   </>
                 ) : (
                   <>
                     <Route className="h-4 w-4 mr-2" />
-                    Optimize Route
+                    Optimize Route ({selectedPropertyIds.size})
                   </>
                 )}
               </Button>
-              <Button
-                onClick={() => setSelectedPropertyIds(new Set())}
-                variant="outline"
-                size="sm"
-                disabled={isOptimizingRoute}
-              >
-                Clear Selection
-              </Button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Search Bar */}
+        {/* Search Bar - Full Width on Mobile */}
         <div className="mb-4">
-          <div className="relative max-w-md">
+          <div className="relative w-full md:max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search by account number, owner name, address, notes, or phone..."
+              placeholder="Search properties..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-10"
+              className="pl-10 pr-10 w-full mobile-input"
             />
             {searchQuery && (
               <button
                 onClick={handleClearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground mobile-touch-target"
                 title="Clear search"
               >
                 <X className="h-4 w-4" />
@@ -1340,30 +1368,34 @@ export function PropertiesView() {
             )}
           </div>
           {debouncedSearchQuery && (
-            <p className="text-sm text-muted-foreground mt-2">
-              Searching for "{debouncedSearchQuery}"... {total && typeof total === 'number' && total > 0 && `Found ${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
+            <p className="text-xs md:text-sm text-muted-foreground mt-2">
+              {total && typeof total === 'number' && total > 0 ? (
+                <>Found {total.toLocaleString()} result{total !== 1 ? 's' : ''}</>
+              ) : (
+                <>Searching for "{debouncedSearchQuery}"...</>
+              )}
             </p>
           )}
         </div>
         
-        {/* Advanced Filters */}
-        <div className="mt-4 p-3 border border-border rounded-lg bg-card/50">
-          <div className="flex items-center gap-2 flex-wrap">
-            <AdvancedFiltersPanel
-              filters={advancedFilters}
-              onFiltersChange={handleFiltersChange}
-              onClear={clearAllFilters}
-              statusCounts={statusCounts}
-              totalUnfiltered={totalUnfiltered}
-              activeFilterCount={activeFilterCount}
-            />
-            
-            {activeFilterCount > 0 && (
-              <span className="text-sm text-muted-foreground">
+        {/* Advanced Filters - Mobile Optimized */}
+        <div className="mt-4">
+          <AdvancedFiltersPanel
+            filters={advancedFilters}
+            onFiltersChange={handleFiltersChange}
+            onClear={clearAllFilters}
+            statusCounts={statusCounts}
+            totalUnfiltered={totalUnfiltered}
+            activeFilterCount={activeFilterCount}
+          />
+
+          {activeFilterCount > 0 && (
+            <div className="mt-3 p-2 bg-secondary/30 rounded-lg">
+              <span className="text-xs md:text-sm text-muted-foreground">
                 Showing {total && typeof total === 'number' ? total.toLocaleString() : 0} filtered {total === 1 ? 'property' : 'properties'}
               </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1423,69 +1455,114 @@ export function PropertiesView() {
             onPropertySelect={handlePropertySelect}
           />
           
-          {/* Pagination controls */}
+          {/* Pagination controls - Mobile First */}
           {totalPages > 0 && (
-            <div className="mt-6 flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Showing {(startItem || 0).toLocaleString()} to {(endItem || 0).toLocaleString()} of {(total || 0).toLocaleString()} properties
+            <div className="mt-6 space-y-3">
+              {/* Info Text */}
+              <div className="text-xs md:text-sm text-muted-foreground text-center md:text-left">
+                Showing {(startItem || 0).toLocaleString()} to {(endItem || 0).toLocaleString()} of {(total || 0).toLocaleString()}
               </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(1)}
-                  disabled={page === 1}
-                >
-                  <ChevronsLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                
-                {/* Page number buttons */}
-                {getPageNumbers(page, totalPages).map((pageNum, index) => {
-                  if (pageNum === '...') {
-                    return (
-                      <span key={`ellipsis-${index}`} className="px-2 text-sm text-muted-foreground">
-                        ...
-                      </span>
-                    );
-                  }
-                  const pageNumber = pageNum as number;
-                  return (
-                    <Button
-                      key={pageNumber}
-                      variant={pageNumber === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setPage(pageNumber)}
-                      className={pageNumber === page ? "" : "min-w-[2.5rem]"}
-                    >
-                      {pageNumber}
-                    </Button>
-                  );
-                })}
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(page + 1)}
-                  disabled={page === totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(totalPages)}
-                  disabled={page === totalPages}
-                >
-                  <ChevronsRight className="h-4 w-4" />
-                </Button>
+
+              {/* Controls */}
+              <div className="flex items-center justify-center md:justify-between gap-2">
+                {/* First/Prev - Hidden on mobile, shown on desktop */}
+                <div className="hidden md:flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(1)}
+                    disabled={page === 1}
+                    className="mobile-touch-target"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(page - 1)}
+                    disabled={page === 1}
+                    className="mobile-touch-target"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    <span className="hidden lg:inline">Previous</span>
+                  </Button>
+                </div>
+
+                {/* Center: Page info and page numbers */}
+                <div className="flex items-center gap-2">
+                  {/* Mobile: Just Prev/Next with page indicator */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(page - 1)}
+                    disabled={page === 1}
+                    className="md:hidden mobile-touch-target"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  <span className="text-sm font-medium px-3 py-1 bg-secondary/30 rounded min-w-[100px] text-center">
+                    Page {page} of {totalPages}
+                  </span>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(page + 1)}
+                    disabled={page === totalPages}
+                    className="md:hidden mobile-touch-target"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+
+                  {/* Desktop: Page number buttons */}
+                  <div className="hidden md:flex items-center gap-1">
+                    {getPageNumbers(page, totalPages).map((pageNum, index) => {
+                      if (pageNum === '...') {
+                        return (
+                          <span key={`ellipsis-${index}`} className="px-2 text-sm text-muted-foreground">
+                            ...
+                          </span>
+                        );
+                      }
+                      const pageNumber = pageNum as number;
+                      return (
+                        <Button
+                          key={pageNumber}
+                          variant={pageNumber === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setPage(pageNumber)}
+                          className={pageNumber === page ? "" : "min-w-[2.5rem]"}
+                        >
+                          {pageNumber}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Next/Last - Hidden on mobile, shown on desktop */}
+                <div className="hidden md:flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(page + 1)}
+                    disabled={page === totalPages}
+                    className="mobile-touch-target"
+                  >
+                    <span className="hidden lg:inline mr-1">Next</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(totalPages)}
+                    disabled={page === totalPages}
+                    className="mobile-touch-target"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           )}

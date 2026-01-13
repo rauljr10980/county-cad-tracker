@@ -105,10 +105,10 @@ export function AdvancedFiltersPanel({
         <Button
           variant={hasActiveFilters ? "default" : "outline"}
           size="sm"
-          className="min-w-[120px]"
+          className="w-full sm:w-auto min-w-[120px] mobile-touch-target"
         >
           <Filter className="h-4 w-4 mr-2" />
-          Advanced Filters
+          <span className="flex-1 sm:flex-initial">Filters</span>
           {hasActiveFilters && (
             <span className="ml-2 px-1.5 py-0.5 text-xs bg-background text-foreground rounded-full">
               {activeFilterCount}
@@ -222,7 +222,7 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="amountDueMin" className="text-xs text-muted-foreground">
                   Min ($)
                 </Label>
-                <Input
+                <Input className="mobile-input"
                   id="amountDueMin"
                   type="number"
                   placeholder="0"
@@ -237,7 +237,7 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="amountDueMax" className="text-xs text-muted-foreground">
                   Max ($)
                 </Label>
-                <Input
+                <Input className="mobile-input"
                   id="amountDueMax"
                   type="number"
                   placeholder="No limit"
@@ -259,7 +259,7 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="marketValueMin" className="text-xs text-muted-foreground">
                   Min ($)
                 </Label>
-                <Input
+                <Input className="mobile-input"
                   id="marketValueMin"
                   type="number"
                   placeholder="0"
@@ -274,7 +274,7 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="marketValueMax" className="text-xs text-muted-foreground">
                   Max ($)
                 </Label>
-                <Input
+                <Input className="mobile-input"
                   id="marketValueMax"
                   type="number"
                   placeholder="No limit"
@@ -296,7 +296,7 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="ratioMin" className="text-xs text-muted-foreground">
                   Min (%)
                 </Label>
-                <Input
+                <Input className="mobile-input"
                   id="ratioMin"
                   type="number"
                   placeholder="0"
@@ -312,7 +312,7 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="ratioMax" className="text-xs text-muted-foreground">
                   Max (%)
                 </Label>
-                <Input
+                <Input className="mobile-input"
                   id="ratioMax"
                   type="number"
                   placeholder="No limit"
@@ -330,7 +330,7 @@ export function AdvancedFiltersPanel({
           {/* Tax Year */}
           <div className="space-y-3">
             <Label htmlFor="taxYear">Tax Year</Label>
-            <Input
+            <Input className="mobile-input"
               id="taxYear"
               type="text"
               placeholder="e.g., 2024"
@@ -440,7 +440,7 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="followUpDateFrom" className="text-xs text-muted-foreground">
                   From
                 </Label>
-                <Input
+                <Input className="mobile-input"
                   id="followUpDateFrom"
                   type="date"
                   value={filters.followUpDateFrom || ''}
@@ -451,7 +451,7 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="followUpDateTo" className="text-xs text-muted-foreground">
                   To
                 </Label>
-                <Input
+                <Input className="mobile-input"
                   id="followUpDateTo"
                   type="date"
                   value={filters.followUpDateTo || ''}
@@ -469,7 +469,7 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="lastPaymentDateFrom" className="text-xs text-muted-foreground">
                   From
                 </Label>
-                <Input
+                <Input className="mobile-input"
                   id="lastPaymentDateFrom"
                   type="date"
                   value={filters.lastPaymentDateFrom || ''}
@@ -480,7 +480,7 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="lastPaymentDateTo" className="text-xs text-muted-foreground">
                   To
                 </Label>
-                <Input
+                <Input className="mobile-input"
                   id="lastPaymentDateTo"
                   type="date"
                   value={filters.lastPaymentDateTo || ''}
