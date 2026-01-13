@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { PreForeclosureCard } from './PreForeclosureCard';
 
 interface PreForeclosureTableProps {
   preforeclosures: PreForeclosure[];
@@ -26,15 +27,15 @@ const typeColors: Record<'Mortgage' | 'Tax', string> = {
   'Tax': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
 };
 
-export function PreForeclosureTable({ 
-  preforeclosures, 
+export function PreForeclosureTable({
+  preforeclosures,
   onViewDetails,
   sortBy,
   sortOrder,
-  onSortChange 
+  onSortChange
 }: PreForeclosureTableProps) {
   const SortHeader = ({ column, children }: { column: string; children: React.ReactNode }) => (
-    <TableHead 
+    <TableHead
       className="cursor-pointer hover:bg-muted/50 select-none"
       onClick={() => onSortChange(column)}
     >
@@ -57,92 +58,106 @@ export function PreForeclosureTable({
   };
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/30">
-            <SortHeader column="document_number">Document #</SortHeader>
-            <SortHeader column="type">Type</SortHeader>
-            <SortHeader column="address">Address</SortHeader>
-            <SortHeader column="city">City</SortHeader>
-            <SortHeader column="zip">ZIP</SortHeader>
-            <SortHeader column="filing_month">Filing Month</SortHeader>
-            <SortHeader column="internal_status">Internal Status</SortHeader>
-            <SortHeader column="visited">Visited</SortHeader>
-            <SortHeader column="last_action_date">Last Action</SortHeader>
-            <SortHeader column="next_follow_up_date">Next Follow-Up</SortHeader>
-            <TableHead className="w-[60px]">Notes</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {preforeclosures.map((pf) => (
-            <TableRow 
-              key={pf.document_number}
-              className={cn(
-                "cursor-pointer hover:bg-muted/50 transition-colors",
-                pf.inactive && "opacity-50"
-              )}
-              onClick={() => onViewDetails(pf)}
-            >
-              <TableCell className="font-mono text-sm">{pf.document_number}</TableCell>
-              <TableCell>
-                <Badge variant="outline" className={typeColors[pf.type]}>
-                  {pf.type}
-                </Badge>
-              </TableCell>
-              <TableCell className="max-w-[200px] truncate" title={pf.address}>
-                {pf.address}
-              </TableCell>
-              <TableCell>{pf.city}</TableCell>
-              <TableCell>{pf.zip}</TableCell>
-              <TableCell>{pf.filing_month}</TableCell>
-              <TableCell>
-                <Badge variant="outline" className={statusColors[pf.internal_status]}>
-                  {pf.internal_status}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {pf.visited ? (
-                  <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
-                    Visited
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="bg-muted text-muted-foreground">
-                    Not in Route
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {formatDate(pf.last_action_date)}
-              </TableCell>
-              <TableCell className="text-sm">
-                {pf.next_follow_up_date ? (
-                  <span className={cn(
-                    new Date(pf.next_follow_up_date) <= new Date() && "text-yellow-400 font-medium"
-                  )}>
-                    {formatDate(pf.next_follow_up_date)}
-                  </span>
-                ) : '-'}
-              </TableCell>
-              <TableCell>
-                {pf.notes && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onViewDetails(pf);
-                    }}
-                  >
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                )}
-              </TableCell>
+    <>
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-3">
+        {preforeclosures.map((pf) => (
+          <PreForeclosureCard
+            key={pf.document_number}
+            preforeclosure={pf}
+            onViewDetails={onViewDetails}
+          />
+        ))}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden lg:block border border-border rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/30">
+              <SortHeader column="document_number">Document #</SortHeader>
+              <SortHeader column="type">Type</SortHeader>
+              <SortHeader column="address">Address</SortHeader>
+              <SortHeader column="city">City</SortHeader>
+              <SortHeader column="zip">ZIP</SortHeader>
+              <SortHeader column="filing_month">Filing Month</SortHeader>
+              <SortHeader column="internal_status">Internal Status</SortHeader>
+              <SortHeader column="visited">Visited</SortHeader>
+              <SortHeader column="last_action_date">Last Action</SortHeader>
+              <SortHeader column="next_follow_up_date">Next Follow-Up</SortHeader>
+              <TableHead className="w-[60px]">Notes</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {preforeclosures.map((pf) => (
+              <TableRow
+                key={pf.document_number}
+                className={cn(
+                  "cursor-pointer hover:bg-muted/50 transition-colors",
+                  pf.inactive && "opacity-50"
+                )}
+                onClick={() => onViewDetails(pf)}
+              >
+                <TableCell className="font-mono text-sm">{pf.document_number}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className={typeColors[pf.type]}>
+                    {pf.type}
+                  </Badge>
+                </TableCell>
+                <TableCell className="max-w-[200px] truncate" title={pf.address}>
+                  {pf.address}
+                </TableCell>
+                <TableCell>{pf.city}</TableCell>
+                <TableCell>{pf.zip}</TableCell>
+                <TableCell>{pf.filing_month}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className={statusColors[pf.internal_status]}>
+                    {pf.internal_status}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {pf.visited ? (
+                    <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
+                      Visited
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-muted text-muted-foreground">
+                      Not in Route
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {formatDate(pf.last_action_date)}
+                </TableCell>
+                <TableCell className="text-sm">
+                  {pf.next_follow_up_date ? (
+                    <span className={cn(
+                      new Date(pf.next_follow_up_date) <= new Date() && "text-yellow-400 font-medium"
+                    )}>
+                      {formatDate(pf.next_follow_up_date)}
+                    </span>
+                  ) : '-'}
+                </TableCell>
+                <TableCell>
+                  {pf.notes && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewDetails(pf);
+                      }}
+                    >
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }

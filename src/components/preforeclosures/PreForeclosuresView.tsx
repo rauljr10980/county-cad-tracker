@@ -372,67 +372,103 @@ export function PreForeclosuresView() {
             onSortChange={handleSortChange}
           />
 
-          {/* Pagination */}
+          {/* Pagination - Mobile First */}
           {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-between bg-card border border-border rounded-lg p-4">
-              <div className="text-sm text-muted-foreground">
+            <div className="mt-6 space-y-3">
+              {/* Info Text */}
+              <div className="text-xs md:text-sm text-muted-foreground text-center md:text-left">
                 Showing <span className="font-medium text-foreground">{startItem.toLocaleString()}</span> to{' '}
                 <span className="font-medium text-foreground">{endItem.toLocaleString()}</span> of{' '}
-                <span className="font-medium text-foreground">{filteredData.length.toLocaleString()}</span> records
+                <span className="font-medium text-foreground">{filteredData.length.toLocaleString()}</span>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(1)}
-                  disabled={page === 1}
-                >
-                  <ChevronsLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  <span className="ml-1">Previous</span>
-                </Button>
-                
-                <div className="flex items-center gap-2 px-3">
-                  <span className="text-sm">Page</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={totalPages}
-                    value={page}
-                    onChange={(e) => {
-                      const newPage = parseInt(e.target.value) || 1;
-                      setPage(Math.max(1, Math.min(totalPages, newPage)));
-                    }}
-                    className="w-16 px-2 py-1 text-center text-sm border border-border rounded bg-background"
-                  />
-                  <span className="text-sm text-muted-foreground">of {totalPages}</span>
+
+              {/* Controls */}
+              <div className="flex items-center justify-center md:justify-between gap-2">
+                {/* First/Prev - Hidden on mobile */}
+                <div className="hidden md:flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(1)}
+                    disabled={page === 1}
+                    className="mobile-touch-target"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="mobile-touch-target"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="ml-1">Previous</span>
+                  </Button>
                 </div>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                >
-                  <span className="mr-1">Next</span>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(totalPages)}
-                  disabled={page === totalPages}
-                >
-                  <ChevronsRight className="h-4 w-4" />
-                </Button>
+
+                {/* Center: Page controls */}
+                <div className="flex items-center gap-2">
+                  {/* Mobile: Simple prev/next */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="md:hidden mobile-touch-target"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  <div className="flex items-center gap-2 px-2 md:px-3 py-1 bg-secondary/30 rounded">
+                    <span className="text-xs md:text-sm">Page</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalPages}
+                      value={page}
+                      onChange={(e) => {
+                        const newPage = parseInt(e.target.value) || 1;
+                        setPage(Math.max(1, Math.min(totalPages, newPage)));
+                      }}
+                      className="w-12 md:w-16 px-1 md:px-2 py-1 text-center text-xs md:text-sm border border-border rounded bg-background mobile-input"
+                    />
+                    <span className="text-xs md:text-sm text-muted-foreground">of {totalPages}</span>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="md:hidden mobile-touch-target"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Next/Last - Hidden on mobile */}
+                <div className="hidden md:flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="mobile-touch-target"
+                  >
+                    <span className="mr-1">Next</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(totalPages)}
+                    disabled={page === totalPages}
+                    className="mobile-touch-target"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           )}
