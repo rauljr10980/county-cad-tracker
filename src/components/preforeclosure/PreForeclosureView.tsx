@@ -2466,32 +2466,32 @@ export function PreForeclosureView() {
                                 }`}
                               >
                                 <td className="px-4 py-2 text-sm">
-                                  {!routeRecord.isDepot && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
-                                      }}
-                                      disabled={removingRecordId === routeRecord.id}
-                                      className="h-8 w-8 p-0 text-red-500 border-red-500/30 hover:text-red-600 hover:bg-red-500/10 hover:border-red-500/50"
-                                      title="Remove from route"
-                                    >
-                                      {removingRecordId === routeRecord.id ? (
-                                        <Loader2 className="h-4 w-4 animate-spin text-red-500" />
-                                      ) : (
-                                        <X className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2 text-sm">
-                                  {routeRecord.isDepot ? (
-                                    <Badge variant="default" className="bg-primary">Depot</Badge>
-                                  ) : (
-                                    routeRecord.orderIndex
-                                  )}
+                                  <div className="flex items-center gap-2">
+                                    {routeRecord.isDepot ? (
+                                      <Badge variant="default" className="bg-primary">Depot</Badge>
+                                    ) : (
+                                      <>
+                                        <span className="font-medium">{routeRecord.orderIndex}</span>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
+                                          }}
+                                          disabled={removingRecordId === routeRecord.id}
+                                          className="h-7 w-7 p-0 text-red-500 border-red-500/50 hover:text-red-600 hover:bg-red-500/20 hover:border-red-500"
+                                          title="Remove from route"
+                                        >
+                                          {removingRecordId === routeRecord.id ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-red-500" />
+                                          ) : (
+                                            <X className="h-3.5 w-3.5" />
+                                          )}
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="px-4 py-2 text-sm font-mono">{documentNumber}</td>
                                 <td className="px-4 py-2 text-sm">{record.address}</td>
