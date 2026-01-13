@@ -459,7 +459,7 @@ export function PreForeclosureView() {
   };
 
   const handleRemoveRecordFromRoute = async (routeId: string, recordId: string, documentNumber: string) => {
-    if (!confirm(`Are you sure you want to remove this property (${documentNumber}) from the route?`)) {
+    if (!confirm(`Are you sure you want to remove this property (${documentNumber}) from the route?\n\nNote: This will only remove it from the route. All property information (visited status, notes, dates) will be preserved.`)) {
       return;
     }
 

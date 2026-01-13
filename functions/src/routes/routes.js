@@ -328,7 +328,9 @@ router.delete('/:routeId/records/:recordId', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'Cannot remove depot from route' });
     }
 
-    // Delete the RouteRecord entry
+    // IMPORTANT: Only delete the RouteRecord entry (the association between route and pre-foreclosure record)
+    // DO NOT delete the PreForeclosure record itself - this preserves all property information
+    // including visited status, notes, dates, and other details
     await prisma.routeRecord.delete({
       where: { id: recordId }
     });
