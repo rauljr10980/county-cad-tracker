@@ -957,7 +957,7 @@ export function PreForeclosureView() {
       
       toast({
         title: "Route Optimized",
-        description: `Optimized route for ${selectedRecords.length} records using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. ${routeRecordIds.size} records added to routes.`,
+        description: `Optimized route for ${selectedRecords.length} records using ${numVehicles} vehicle(s). Total distance: ${solution.totalDistance.toFixed(2)} km. ${routeRecordIdsOrdered.length} records added to routes.`,
       });
     } catch (error) {
       console.error('[Route Optimization] Error:', error);
@@ -2609,6 +2609,16 @@ export function PreForeclosureView() {
                         })
                         .filter(Boolean) || [];
                       
+                      // Ensure we have record IDs
+                      if (routeRecordIds.length === 0) {
+                        toast({
+                          title: "Error",
+                          description: "No records found in route. Cannot display route map.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      
                       // Filter routeData waypoints to only include records that are still in the route
                       const currentRecordIds = new Set(routeRecordIds);
                       const filteredRouteData = {
@@ -2632,6 +2642,7 @@ export function PreForeclosureView() {
                         0
                       );
                       
+                      // Set optimizedRecordIds BEFORE setting optimizedRoutes to ensure it's available when RouteMap opens
                       setOptimizedRecordIds(routeRecordIds);
                       setOptimizedRoutes(filteredRouteData);
                       setRouteMapOpen(true);
