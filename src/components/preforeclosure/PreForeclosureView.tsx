@@ -2442,6 +2442,7 @@ export function PreForeclosureView() {
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">City</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">ZIP</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Actions</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Details</th>
                         </tr>
                       </thead>
