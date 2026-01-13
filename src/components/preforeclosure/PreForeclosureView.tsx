@@ -2470,17 +2470,17 @@ export function PreForeclosureView() {
                                   {!routeRecord.isDepot && (
                                     <Button
                                       size="sm"
-                                      variant="ghost"
+                                      variant="outline"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
                                       }}
                                       disabled={removingRecordId === routeRecord.id}
-                                      className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      className="h-8 w-8 p-0 text-red-500 border-red-500/30 hover:text-red-600 hover:bg-red-500/10 hover:border-red-500/50"
                                       title="Remove from route"
                                     >
                                       {removingRecordId === routeRecord.id ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <Loader2 className="h-4 w-4 animate-spin text-red-500" />
                                       ) : (
                                         <X className="h-4 w-4" />
                                       )}
