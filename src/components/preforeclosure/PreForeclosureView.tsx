@@ -469,7 +469,57 @@ export function PreForeclosureView() {
       
       // Update the viewRoute with the updated route
       if (result.route) {
+        // Get the removed record's address for matching waypoints (before updating viewRoute)
+        const removedRecord = viewRoute?.records?.find((rr: any) => {
+          const docNum = rr.record?.documentNumber || rr.record?.document_number;
+          return docNum === documentNumber;
+        });
+        const removedAddress = removedRecord?.record?.address;
+        
         setViewRoute(result.route);
+        
+        // Update optimizedRoutes if it contains the removed document number
+        // This ensures the RouteMap (if open) reflects the updated route
+        if (optimizedRoutes) {
+          // Check if the current optimizedRoutes contains the removed document number
+          const currentRouteIds = new Set(
+            optimizedRoutes.routes?.flatMap((r: any) => 
+              r.waypoints?.map((wp: any) => {
+                const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
+                return wpId;
+              }).filter(Boolean)
+            ) || []
+          );
+          
+          // If the removed document number was in the current optimizedRoutes, update it
+          if (currentRouteIds.has(documentNumber)) {
+            // Remove the waypoint from optimizedRoutes
+            const updatedRoutes = optimizedRoutes.routes?.map((route: any) => ({
+              ...route,
+              waypoints: route.waypoints.filter((wp: any) => {
+                // Remove waypoint if it matches the removed document number
+                const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
+                const wpAddress = wp.address || wp.propertyAddress;
+                
+                // Check if this waypoint matches the removed record
+                const matchesId = wpId === documentNumber || wpId === recordId;
+                const matchesAddress = removedAddress && wpAddress && 
+                                       wpAddress.toLowerCase().trim() === removedAddress.toLowerCase().trim();
+                
+                return !matchesId && !matchesAddress;
+              })
+            })).filter((route: any) => route.waypoints.length > 0) || [];
+            
+            // Recalculate total distance (rough estimate - actual distance would need re-optimization)
+            const updatedTotalDistance = updatedRoutes.reduce((sum: number, route: any) => sum + (route.distance || 0), 0);
+            
+            setOptimizedRoutes({
+              ...optimizedRoutes,
+              routes: updatedRoutes,
+              totalDistance: updatedTotalDistance
+            });
+          }
+        }
       }
 
       // Reload active routes to update the list
