@@ -982,3 +982,22 @@ export async function deleteRoute(routeId: string): Promise<{ success: boolean; 
   return response.json();
 }
 
+/**
+ * Remove a specific record from a route
+ */
+export async function removeRecordFromRoute(routeId: string, recordId: string): Promise<{ success: boolean; route: Route; message: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}/records/${recordId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to remove record from route');
+  }
+  
+  return response.json();
+}
