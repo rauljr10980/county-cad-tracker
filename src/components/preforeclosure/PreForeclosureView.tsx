@@ -2561,7 +2561,7 @@ export function PreForeclosureView() {
                                   {documentNumber && (
                                     <Button
                                       size="sm"
-                                      variant="ghost"
+                                      variant="outline"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleViewRecordDetails(documentNumber);
