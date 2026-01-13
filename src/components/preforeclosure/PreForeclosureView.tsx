@@ -479,28 +479,46 @@ export function PreForeclosureView() {
         setViewRoute(result.route);
         
         // Also update routeData in viewRoute if it exists
-        if (result.route.routeData) {
-          const removedIdentifiers = new Set([
-            documentNumber,
-            recordId,
-            removedAddress?.toLowerCase().trim()
-          ].filter(Boolean));
+        // Filter waypoints to only include records that are still in the route
+        if (result.route.routeData && result.route.records) {
+          // Get all document numbers that are still in the route
+          const currentRecordIds = new Set(
+            result.route.records
+              .map((rr: any) => {
+                const docNum = rr.record?.documentNumber || rr.record?.document_number;
+                return docNum;
+              })
+              .filter(Boolean)
+          );
           
-          // Remove waypoints from routeData
+          console.log('[PreForeclosure] Filtering routeData waypoints:', {
+            removedDocumentNumber: documentNumber,
+            currentRecordIds: Array.from(currentRecordIds),
+            routeDataWaypointCount: result.route.routeData.routes?.reduce((sum: number, r: any) => sum + (r.waypoints?.length || 0), 0) || 0
+          });
+          
+          // Remove waypoints that are not in the current route records
           const updatedRouteData = {
             ...result.route.routeData,
             routes: result.route.routeData.routes?.map((route: any) => ({
               ...route,
               waypoints: route.waypoints.filter((wp: any) => {
+                // Always keep depot waypoints
+                if (wp.id === 'depot' || wp.isDepot) return true;
+                
+                // Check if this waypoint's ID matches any current record
                 const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
-                const wpAddress = (wp.address || wp.propertyAddress || '').toLowerCase().trim();
+                const isInRoute = currentRecordIds.has(wpId);
                 
-                const matchesId = removedIdentifiers.has(wpId) || removedIdentifiers.has(wpId?.toString());
-                const matchesAddress = removedAddress && wpAddress && removedIdentifiers.has(wpAddress);
-                const partialAddressMatch = removedAddress && wpAddress && 
-                                           wpAddress.includes(removedAddress.toLowerCase().trim());
+                if (!isInRoute) {
+                  console.log('[PreForeclosure] Filtering out waypoint:', {
+                    wpId,
+                    address: wp.address || wp.propertyAddress,
+                    isInRoute
+                  });
+                }
                 
-                return !matchesId && !matchesAddress && !partialAddressMatch;
+                return isInRoute;
               })
             })).filter((route: any) => route.waypoints.length > 0) || []
           };
@@ -510,6 +528,12 @@ export function PreForeclosureView() {
             (sum: number, route: any) => sum + (route.distance || 0), 
             0
           );
+          
+          console.log('[PreForeclosure] Updated routeData:', {
+            waypointCountBefore: result.route.routeData.routes?.reduce((sum: number, r: any) => sum + (r.waypoints?.length || 0), 0) || 0,
+            waypointCountAfter: updatedRouteData.routes.reduce((sum: number, r: any) => sum + (r.waypoints?.length || 0), 0),
+            totalDistance: updatedRouteData.totalDistance
+          });
           
           // Update viewRoute with cleaned routeData
           setViewRoute({
@@ -2577,15 +2601,39 @@ export function PreForeclosureView() {
                   size="sm"
                   onClick={() => {
                     if (viewRoute?.routeData) {
-                      // Extract record IDs from the route
+                      // Extract record IDs from the route (current records in the route)
                       const routeRecordIds = viewRoute.records
                         ?.map((rr: any) => {
                           const docNumber = rr.record?.documentNumber || rr.record?.document_number || rr.documentNumber || rr.document_number;
                           return docNumber;
                         })
                         .filter(Boolean) || [];
+                      
+                      // Filter routeData waypoints to only include records that are still in the route
+                      const currentRecordIds = new Set(routeRecordIds);
+                      const filteredRouteData = {
+                        ...viewRoute.routeData,
+                        routes: viewRoute.routeData.routes?.map((route: any) => ({
+                          ...route,
+                          waypoints: route.waypoints.filter((wp: any) => {
+                            // Keep depot waypoint
+                            if (wp.id === 'depot' || wp.isDepot) return true;
+                            
+                            // Check if this waypoint's ID matches any current record
+                            const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
+                            return currentRecordIds.has(wpId);
+                          })
+                        })).filter((route: any) => route.waypoints.length > 0) || []
+                      };
+                      
+                      // Recalculate total distance
+                      filteredRouteData.totalDistance = filteredRouteData.routes.reduce(
+                        (sum: number, route: any) => sum + (route.distance || 0), 
+                        0
+                      );
+                      
                       setOptimizedRecordIds(routeRecordIds);
-                      setOptimizedRoutes(viewRoute.routeData);
+                      setOptimizedRoutes(filteredRouteData);
                       setRouteMapOpen(true);
                     }
                   }}
