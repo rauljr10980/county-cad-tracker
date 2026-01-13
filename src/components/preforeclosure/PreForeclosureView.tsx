@@ -1498,38 +1498,105 @@ export function PreForeclosureView() {
                         </Badge>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {record.last_action_date
-                        ? format(new Date(record.last_action_date), 'MMM d, yyyy')
-                        : '—'}
+                    <td className="px-4 py-3 text-sm">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-auto p-1 text-xs font-normal",
+                              record.last_action_date ? "text-foreground" : "text-muted-foreground"
+                            )}
+                          >
+                            {record.last_action_date
+                              ? format(new Date(record.last_action_date), 'MMM d, yyyy')
+                              : 'Click to set'}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={record.last_action_date ? new Date(record.last_action_date) : undefined}
+                            onSelect={async (date) => {
+                              if (date) {
+                                try {
+                                  await updateMutation.mutateAsync({
+                                    document_number: record.document_number,
+                                    last_action_date: date.toISOString(),
+                                  });
+                                  toast({
+                                    title: 'Last Action Date Updated',
+                                    description: `Last action date set to ${format(date, 'MMM d, yyyy')}`,
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                                } catch (error) {
+                                  console.error('Error updating last action date:', error);
+                                  toast({
+                                    title: 'Error',
+                                    description: 'Failed to update last action date',
+                                    variant: 'destructive',
+                                  });
+                                }
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {record.next_follow_up_date ? (
-                        <span className={cn(
-                          "font-medium",
-                          new Date(record.next_follow_up_date) <= new Date()
-                            ? "text-red-500"
-                            : "text-muted-foreground"
-                        )}>
-                          {format(new Date(record.next_follow_up_date), 'MMM d, yyyy')}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleNotesClick(record)}
-                        title={record.notes ? 'View/Edit Notes' : 'Add Notes'}
-                      >
-                        <FileText className={cn(
-                          "h-4 w-4",
-                          record.notes ? "text-primary" : "text-muted-foreground"
-                        )} />
-                      </Button>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-auto p-1 text-xs font-normal",
+                              record.next_follow_up_date 
+                                ? new Date(record.next_follow_up_date) <= new Date()
+                                  ? "text-red-500 font-medium"
+                                  : "text-foreground"
+                                : "text-muted-foreground"
+                            )}
+                          >
+                            {record.next_follow_up_date ? (
+                              format(new Date(record.next_follow_up_date), 'MMM d, yyyy')
+                            ) : (
+                              'Click to set'
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={record.next_follow_up_date ? new Date(record.next_follow_up_date) : undefined}
+                            onSelect={async (date) => {
+                              if (date) {
+                                try {
+                                  await updateMutation.mutateAsync({
+                                    document_number: record.document_number,
+                                    next_follow_up_date: date.toISOString(),
+                                  });
+                                  toast({
+                                    title: 'Next Follow-Up Date Updated',
+                                    description: `Next follow-up date set to ${format(date, 'MMM d, yyyy')}`,
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                                } catch (error) {
+                                  console.error('Error updating next follow-up date:', error);
+                                  toast({
+                                    title: 'Error',
+                                    description: 'Failed to update next follow-up date',
+                                    variant: 'destructive',
+                                  });
+                                }
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
