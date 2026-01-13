@@ -2436,7 +2436,7 @@ export function PreForeclosureView() {
                     <table className="w-full">
                       <thead className="bg-secondary/50">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Order</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Document #</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">City</th>
