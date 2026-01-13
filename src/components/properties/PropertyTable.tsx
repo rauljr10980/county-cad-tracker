@@ -10,6 +10,7 @@ import { toast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { updatePropertyFollowUp } from '@/lib/api';
+import { PropertyCard } from './PropertyCard';
 
 interface PropertyTableProps {
   properties: Property[];
@@ -190,10 +191,32 @@ export function PropertyTable({
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden">
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="data-table">
+    <>
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-3">
+        {displayProperties.map((property) => {
+          const followUpDate = localFollowUps[property.id] || property.lastFollowUp;
+
+          return (
+            <PropertyCard
+              key={property.id}
+              property={property}
+              onViewProperty={onViewProperty}
+              onOpenMap={openGoogleMaps}
+              onSetFollowUp={handleSetFollowUp}
+              savingFollowUp={savingFollowUp === property.id}
+              localFollowUp={followUpDate}
+              isSelected={selectedPropertyIds.has(property.id)}
+              onSelect={onPropertySelect ? (checked) => onPropertySelect(property.id, checked) : undefined}
+            />
+          );
+        })}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden lg:block bg-card border border-border rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="data-table">
           <thead>
             <tr>
               <th className="w-12">
@@ -402,5 +425,6 @@ export function PropertyTable({
         </table>
       </div>
     </div>
+    </>
   );
 }

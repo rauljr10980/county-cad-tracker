@@ -1,4 +1,4 @@
-import { Building2, RefreshCw, Settings, LogIn, LogOut, User } from 'lucide-react';
+import { Building2, RefreshCw, Settings, LogIn, LogOut, User, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
@@ -12,6 +12,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 interface HeaderProps {
   onRefresh?: () => void;
@@ -22,10 +29,12 @@ export function Header({ onRefresh, isRefreshing }: HeaderProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isSignupOpen, setIsSignupOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
       await logout();
+      setIsMobileMenuOpen(false);
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -35,19 +44,25 @@ export function Header({ onRefresh, isRefreshing }: HeaderProps) {
     <>
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10 glow-primary">
-              <Building2 className="h-6 w-6 text-primary" />
+          {/* Logo and Title */}
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+            <div className="p-2 rounded-lg bg-primary/10 glow-primary flex-shrink-0">
+              <Building2 className="h-5 w-5 md:h-6 md:w-6 text-primary" />
             </div>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight">Real Estate Acquisitions</h1>
-              <p className="text-xs text-muted-foreground">Bexar County Tax Delinquent Manager</p>
+            <div className="min-w-0">
+              <h1 className="text-sm md:text-lg font-semibold tracking-tight truncate">
+                Real Estate Acquisitions
+              </h1>
+              <p className="text-xs text-muted-foreground hidden sm:block truncate">
+                Bexar County Tax Delinquent Manager
+              </p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-2">
+            <Button
+              variant="ghost"
               size="sm"
               onClick={onRefresh}
               disabled={isRefreshing}
@@ -86,8 +101,8 @@ export function Header({ onRefresh, isRefreshing }: HeaderProps) {
                 </Button>
               </>
             ) : (
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => setIsLoginOpen(true)}
                 className="text-muted-foreground hover:text-foreground"
@@ -97,10 +112,82 @@ export function Header({ onRefresh, isRefreshing }: HeaderProps) {
               </Button>
             )}
           </div>
+
+          {/* Mobile Navigation */}
+          <div className="md:hidden flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="text-muted-foreground hover:text-foreground mobile-touch-target"
+            >
+              <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-foreground mobile-touch-target"
+                >
+                  {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[280px] sm:w-[320px]">
+                <SheetHeader>
+                  <SheetTitle>Menu</SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-4 mt-6">
+                  {isAuthenticated ? (
+                    <>
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
+                        <User className="h-5 w-5 text-muted-foreground" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{user?.username}</p>
+                          {user?.email && (
+                            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        className="justify-start mobile-touch-target"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <Settings className="h-5 w-5 mr-3" />
+                        Settings
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="justify-start text-destructive hover:text-destructive hover:bg-destructive/10 mobile-touch-target"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="h-5 w-5 mr-3" />
+                        Logout
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      className="justify-start mobile-touch-target"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        setIsLoginOpen(true);
+                      }}
+                    >
+                      <LogIn className="h-5 w-5 mr-3" />
+                      Login
+                    </Button>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </header>
-      <LoginModal 
-        isOpen={isLoginOpen} 
+      <LoginModal
+        isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
         onSwitchToSignup={() => {
           setIsLoginOpen(false);

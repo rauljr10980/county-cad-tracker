@@ -84,9 +84,9 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
     : parseFloat(String(pipelineData.conversionRate || 0)) || 0;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Top Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -179,7 +179,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       </Card>
 
       {/* Bottom Row - Status Distribution, Amount Ranges, and Tasks */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Property Status Distribution */}
         <Card>
           <CardHeader>
@@ -299,7 +299,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       </div>
 
       {/* Pipeline Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -368,7 +368,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       </div>
 
       {/* Sales Funnel and Pipeline Progression Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Sales Funnel Chart */}
         <Card>
           <CardHeader>
