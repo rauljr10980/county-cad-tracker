@@ -1902,6 +1902,51 @@ export function PreForeclosureView() {
 
               {/* Tasks Section */}
               <div className="space-y-4">
+                  {/* Notes Section */}
+                  <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                    <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                      Notes
+                    </h3>
+                    <div className="space-y-2">
+                      <Textarea
+                        value={viewRecord.notes || ''}
+                        onChange={(e) => {
+                          setViewRecord({
+                            ...viewRecord,
+                            notes: e.target.value,
+                          });
+                        }}
+                        placeholder="Add notes about this property..."
+                        className="min-h-[100px] resize-none"
+                        onBlur={async () => {
+                          // Auto-save on blur
+                          try {
+                            await updateMutation.mutateAsync({
+                              documentNumber: viewRecord.document_number,
+                              updates: {
+                                notes: viewRecord.notes || '',
+                              },
+                            });
+                            toast({
+                              title: 'Notes Saved',
+                              description: 'Notes have been saved successfully.',
+                            });
+                          } catch (error) {
+                            console.error('Error saving notes:', error);
+                            toast({
+                              title: 'Error',
+                              description: 'Failed to save notes. Please try again.',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Notes are automatically saved when you click away from the text area.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Route Status Section in Tasks Tab */}
                   <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
                     <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
