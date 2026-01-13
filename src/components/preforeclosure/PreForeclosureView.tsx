@@ -1184,67 +1184,6 @@ export function PreForeclosureView() {
       {/* Header */}
       {headerSection}
 
-      {/* Actions Panel */}
-      <div className="bg-secondary/30 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-sm font-medium">Actions</span>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={activeAction === 'view' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveAction('view')}
-            className={cn(
-              "flex-1",
-              activeAction === 'view' && "bg-primary text-primary-foreground"
-            )}
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={activeAction === 'send' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => {
-              setActiveAction('send');
-              // If there's a selected record, open Google Maps
-              if (selectedRecord && selectedRecord.latitude != null && selectedRecord.longitude != null) {
-                const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(selectedRecord.address)},+${encodeURIComponent(selectedRecord.city)},+TX+${selectedRecord.zip}/@${selectedRecord.latitude},${selectedRecord.longitude},16z`;
-                window.open(mapsUrl, '_blank');
-              } else if (viewRecord && viewRecord.latitude != null && viewRecord.longitude != null) {
-                const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(viewRecord.address)},+${encodeURIComponent(viewRecord.city)},+TX+${viewRecord.zip}/@${viewRecord.latitude},${viewRecord.longitude},16z`;
-                window.open(mapsUrl, '_blank');
-              } else {
-                toast({
-                  title: 'No location available',
-                  description: 'Please select a record with latitude and longitude to open in Google Maps',
-                  variant: 'destructive',
-                });
-              }
-            }}
-            className={cn(
-              "flex-1",
-              activeAction === 'send' && "bg-primary text-primary-foreground"
-            )}
-            title="Open selected record in Google Maps"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={activeAction === 'external' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => {
-              setActiveAction('external');
-              window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
-            }}
-            className={cn(
-              "flex-1",
-              activeAction === 'external' && "bg-primary text-primary-foreground"
-            )}
-          >
-            <ExternalLink className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
 
       {/* Active Routes Dashboard */}
       <div className="bg-card border border-border rounded-lg p-4">
