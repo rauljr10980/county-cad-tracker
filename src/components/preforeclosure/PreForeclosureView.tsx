@@ -478,37 +478,110 @@ export function PreForeclosureView() {
         
         setViewRoute(result.route);
         
+        // Also update routeData in viewRoute if it exists
+        if (result.route.routeData) {
+          const removedIdentifiers = new Set([
+            documentNumber,
+            recordId,
+            removedAddress?.toLowerCase().trim()
+          ].filter(Boolean));
+          
+          // Remove waypoints from routeData
+          const updatedRouteData = {
+            ...result.route.routeData,
+            routes: result.route.routeData.routes?.map((route: any) => ({
+              ...route,
+              waypoints: route.waypoints.filter((wp: any) => {
+                const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
+                const wpAddress = (wp.address || wp.propertyAddress || '').toLowerCase().trim();
+                
+                const matchesId = removedIdentifiers.has(wpId) || removedIdentifiers.has(wpId?.toString());
+                const matchesAddress = removedAddress && wpAddress && removedIdentifiers.has(wpAddress);
+                const partialAddressMatch = removedAddress && wpAddress && 
+                                           wpAddress.includes(removedAddress.toLowerCase().trim());
+                
+                return !matchesId && !matchesAddress && !partialAddressMatch;
+              })
+            })).filter((route: any) => route.waypoints.length > 0) || []
+          };
+          
+          // Recalculate total distance
+          updatedRouteData.totalDistance = updatedRouteData.routes.reduce(
+            (sum: number, route: any) => sum + (route.distance || 0), 
+            0
+          );
+          
+          // Update viewRoute with cleaned routeData
+          setViewRoute({
+            ...result.route,
+            routeData: updatedRouteData
+          });
+        }
+        
         // Update optimizedRoutes if it contains the removed document number
         // This ensures the RouteMap (if open) reflects the updated route
         if (optimizedRoutes) {
-          // Check if the current optimizedRoutes contains the removed document number
-          const currentRouteIds = new Set(
-            optimizedRoutes.routes?.flatMap((r: any) => 
-              r.waypoints?.map((wp: any) => {
-                const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
-                return wpId;
-              }).filter(Boolean)
-            ) || []
-          );
+          // Get all possible identifiers for the removed record
+          const removedIdentifiers = new Set([
+            documentNumber,
+            recordId,
+            removedAddress?.toLowerCase().trim()
+          ].filter(Boolean));
           
-          // If the removed document number was in the current optimizedRoutes, update it
-          if (currentRouteIds.has(documentNumber)) {
-            // Remove the waypoint from optimizedRoutes
-            const updatedRoutes = optimizedRoutes.routes?.map((route: any) => ({
-              ...route,
-              waypoints: route.waypoints.filter((wp: any) => {
-                // Remove waypoint if it matches the removed document number
-                const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
-                const wpAddress = wp.address || wp.propertyAddress;
-                
-                // Check if this waypoint matches the removed record
-                const matchesId = wpId === documentNumber || wpId === recordId;
-                const matchesAddress = removedAddress && wpAddress && 
-                                       wpAddress.toLowerCase().trim() === removedAddress.toLowerCase().trim();
-                
-                return !matchesId && !matchesAddress;
-              })
-            })).filter((route: any) => route.waypoints.length > 0) || [];
+          // Check if the current optimizedRoutes contains the removed document number
+          // by checking all waypoints for any matching identifier
+          let shouldUpdate = false;
+          const waypointCountBefore = optimizedRoutes.routes?.reduce((sum: number, r: any) => 
+            sum + (r.waypoints?.length || 0), 0) || 0;
+          
+          // Remove the waypoint from optimizedRoutes
+          const updatedRoutes = optimizedRoutes.routes?.map((route: any) => ({
+            ...route,
+            waypoints: route.waypoints.filter((wp: any) => {
+              // Get all possible identifiers from the waypoint
+              const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
+              const wpAddress = (wp.address || wp.propertyAddress || '').toLowerCase().trim();
+              
+              // Check if this waypoint matches any of the removed identifiers
+              const matchesId = removedIdentifiers.has(wpId) || 
+                               removedIdentifiers.has(wpId?.toString());
+              const matchesAddress = removedAddress && wpAddress && 
+                                     removedIdentifiers.has(wpAddress);
+              
+              // Also check if the waypoint address contains the removed address (partial match)
+              const partialAddressMatch = removedAddress && wpAddress && 
+                                         wpAddress.includes(removedAddress.toLowerCase().trim());
+              
+              const shouldRemove = matchesId || matchesAddress || partialAddressMatch;
+              
+              if (shouldRemove) {
+                shouldUpdate = true;
+                console.log('[PreForeclosure] Removing waypoint from optimized route:', {
+                  wpId,
+                  wpAddress,
+                  documentNumber,
+                  removedAddress,
+                  matchesId,
+                  matchesAddress,
+                  partialAddressMatch
+                });
+              }
+              
+              return !shouldRemove;
+            })
+          })).filter((route: any) => route.waypoints.length > 0) || [];
+          
+          const waypointCountAfter = updatedRoutes.reduce((sum: number, r: any) => 
+            sum + (r.waypoints?.length || 0), 0);
+          
+          // If waypoints were removed, update optimizedRoutes
+          if (shouldUpdate || waypointCountBefore !== waypointCountAfter) {
+            console.log('[PreForeclosure] Updating optimized route:', {
+              waypointCountBefore,
+              waypointCountAfter,
+              removedDocumentNumber: documentNumber,
+              removedAddress
+            });
             
             // Recalculate total distance (rough estimate - actual distance would need re-optimization)
             const updatedTotalDistance = updatedRoutes.reduce((sum: number, route: any) => sum + (route.distance || 0), 0);
