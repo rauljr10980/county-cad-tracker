@@ -486,10 +486,10 @@ export function TasksView() {
               )}
               onClick={() => bulkMode && handleBulkToggle(property.id)}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex items-center justify-between gap-4">
                 {/* Checkbox (bulk mode) */}
                 {bulkMode && (
-                  <div className="pt-1">
+                  <div>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(property.id)}
@@ -500,142 +500,43 @@ export function TasksView() {
                   </div>
                 )}
 
-                {/* Action Type */}
-                <div className="shrink-0 pt-1">
-                  <span className="text-sm font-medium">{actionLabel}</span>
-                </div>
-
-                {/* Main Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-4 mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="font-semibold">{ownerName || property.ownerName}</span>
-                        {city && <span className="text-sm text-muted-foreground">• {city}</span>}
-                        <StatusBadge status={property.status} size="sm" />
-                        <Popover
-                          open={priorityPopoverOpen[property.id] || false}
-                          onOpenChange={(open) => {
-                            setPriorityPopoverOpen(prev => ({ ...prev, [property.id]: open }));
-                          }}
-                        >
-                          <PopoverTrigger asChild>
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-xs cursor-pointer transition-all hover:scale-105",
-                                PRIORITY_COLORS[priority],
-                                updatingPriority.has(property.id) && "opacity-50 animate-pulse"
-                              )}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPriorityPopoverOpen(prev => ({ ...prev, [property.id]: true }));
-                              }}
-                            >
-                              {updatingPriority.has(property.id) ? '...' : priority.toUpperCase()}
-                            </Badge>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-40 p-2" onClick={(e) => e.stopPropagation()}>
-                            <div className="space-y-1">
-                              <button
-                                className={cn(
-                                  "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                  priority === 'high' 
-                                    ? "bg-red-500/20 text-red-500 font-medium" 
-                                    : "hover:bg-secondary"
-                                )}
-                                onClick={() => handlePriorityChange(property, 'high')}
-                              >
-                                High
-                              </button>
-                              <button
-                                className={cn(
-                                  "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                  priority === 'med'
-                                    ? "bg-yellow-500/20 text-yellow-500 font-medium"
-                                    : "hover:bg-secondary"
-                                )}
-                                onClick={() => handlePriorityChange(property, 'med')}
-                              >
-                                Med
-                              </button>
-                              <button
-                                className={cn(
-                                  "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                  priority === 'low'
-                                    ? "bg-green-500/20 text-green-500 font-medium"
-                                    : "hover:bg-secondary"
-                                )}
-                                onClick={() => handlePriorityChange(property, 'low')}
-                              >
-                                Low
-                              </button>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                        {status.icon && <span className="text-lg">{status.icon}</span>}
-                        {property.attempts && property.attempts > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            📞 x{property.attempts}
-                          </span>
-                        )}
-                        {property.lastOutcome && (
-                          <span className="text-xs text-muted-foreground">
-                            Last: {OUTCOME_OPTIONS.find(o => o.value === property.lastOutcome)?.label}
-                          </span>
-                        )}
-                        {property.assignedTo && (
-                          <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/30">
-                            👤 {property.assignedTo}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {address || property.propertyAddress}
-                      </p>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <p className="font-mono font-semibold text-judgment mb-1">
-                        {formatCurrency(property.totalAmountDue)}
-                      </p>
-                      {dueTime && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          <span>{format(dueTime, 'MMM d, h:mm a')}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedProperty(property);
-                    }}
-                    title="View details"
+                {/* Simplified Content: CALL HIGH LUCIANO MARKETVALUE/AMOUNT DUE */}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <span className="text-sm font-semibold uppercase">
+                    {actionLabel.replace(/[📞💬✉️🚗]/g, '').trim()}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs",
+                      PRIORITY_COLORS[priority]
+                    )}
                   >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedForOutcome(property);
-                      setSelectedOutcome(property.lastOutcome || '');
-                    }}
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-1" />
-                    Mark Done
-                  </Button>
+                    {priority.toUpperCase()}
+                  </Badge>
+                  {property.assignedTo && (
+                    <span className="text-sm font-medium uppercase">
+                      {property.assignedTo}
+                    </span>
+                  )}
+                  <span className="text-sm font-mono font-semibold text-judgment ml-auto">
+                    {formatCurrency(property.totalAmountDue)}
+                  </span>
                 </div>
+
+                {/* Mark Done Button */}
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedForOutcome(property);
+                    setSelectedOutcome(property.lastOutcome || '');
+                  }}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Mark Done
+                </Button>
               </div>
             </div>
           );
