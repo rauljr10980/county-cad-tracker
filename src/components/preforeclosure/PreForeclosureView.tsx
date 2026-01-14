@@ -432,14 +432,32 @@ export function PreForeclosureView() {
 
   const handleStatusChange = async (record: PreForeclosureRecord, newStatus: PreForeclosureStatus) => {
     try {
-    await updateMutation.mutateAsync({
-      document_number: record.document_number,
-      internal_status: newStatus,
-    });
+      await updateMutation.mutateAsync({
+        document_number: record.document_number,
+        internal_status: newStatus,
+      });
+      
+      // Update local record state
+      record.internal_status = newStatus;
+      
+      // If we're viewing a route, update the route record as well
+      if (viewRoute) {
+        const routeRecord = viewRoute.records?.find(rr => {
+          const docNum = rr.record?.document_number || rr.record?.documentNumber;
+          return docNum === record.document_number;
+        });
+        if (routeRecord && routeRecord.record) {
+          routeRecord.record.internal_status = newStatus;
+          // Update viewRoute to trigger re-render
+          setViewRoute({ ...viewRoute });
+        }
+      }
+      
       toast({
         title: 'Status Updated',
         description: `Status changed to "${newStatus}" for document ${record.document_number}`,
       });
+      
       // Invalidate query to refresh the table
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
     } catch (error) {
