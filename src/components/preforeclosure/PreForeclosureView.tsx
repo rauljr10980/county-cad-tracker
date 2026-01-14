@@ -165,7 +165,6 @@ function SortableRow({
             <Select
               value={(record as any).internal_status || (record as any).internalStatus || 'New'}
               onValueChange={(value) => {
-                e?.stopPropagation();
                 if (handleStatusChange) {
                   // Create a proper PreForeclosureRecord object for handleStatusChange
                   const fullRecord: PreForeclosureRecord = {
