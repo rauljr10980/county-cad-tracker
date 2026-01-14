@@ -1,6 +1,23 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -53,6 +70,183 @@ import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { AdvancedFiltersPanel, PreForeclosureAdvancedFilters } from './AdvancedFilters';
 
+// Sortable Row Component
+function SortableRow({ 
+  routeRecord, 
+  index, 
+  viewRoute, 
+  documentNumber, 
+  record, 
+  removingRecordId, 
+  reorderingRecordId,
+  handleRemoveRecordFromRoute,
+  handleMarkVisited,
+  handleViewRecordDetails,
+  markingVisited,
+}: any) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: routeRecord.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`border-t border-border hover:bg-secondary/30 ${
+        routeRecord.isDepot ? 'bg-primary/10' : ''
+      } ${isDragging ? 'bg-secondary/50' : ''}`}
+    >
+      <td className="px-4 py-2 text-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Drag Handle */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded"
+            title="Drag to reorder"
+          >
+            <GripVertical className="h-5 w-5 text-muted-foreground" />
+          </div>
+          
+          {routeRecord.isDepot ? (
+            <>
+              <Badge variant="default" className="bg-primary">Depot</Badge>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
+                }}
+                disabled={removingRecordId === routeRecord.id}
+                className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Remove from route"
+              >
+                {removingRecordId === routeRecord.id ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <X className="h-5 w-5" />
+                )}
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="font-medium">{routeRecord.orderIndex}</span>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
+                }}
+                disabled={removingRecordId === routeRecord.id}
+                className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Remove from route"
+              >
+                {removingRecordId === routeRecord.id ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <X className="h-5 w-5" />
+                )}
+              </Button>
+            </>
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-2 text-sm font-mono hidden">{documentNumber}</td>
+      <td className="px-4 py-2 text-sm">{record.address}</td>
+      <td className="px-4 py-2 text-sm hidden">{record.city}</td>
+      <td className="px-4 py-2 text-sm hidden">{record.zip}</td>
+      <td className="px-4 py-2 text-sm">
+        {record.visited ? (
+          <Badge variant="outline" className="bg-green-500/20 text-green-600 border-green-500">
+            Visited
+          </Badge>
+        ) : (
+          <Badge variant="outline">Pending</Badge>
+        )}
+      </td>
+      <td className="px-4 py-2 text-sm">
+        {documentNumber && (
+          <>
+            {!record.visited ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMarkVisited(documentNumber, viewRoute.driver, true);
+                }}
+                disabled={markingVisited === documentNumber}
+                className="h-7 text-xs"
+              >
+                {markingVisited === documentNumber ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Marking...
+                  </>
+                ) : (
+                  'Mark Visited'
+                )}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMarkVisited(documentNumber, viewRoute.driver, false);
+                }}
+                disabled={markingVisited === documentNumber}
+                className="h-7 text-xs text-muted-foreground"
+              >
+                {markingVisited === documentNumber ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Set Pending
+                  </>
+                )}
+              </Button>
+            )}
+          </>
+        )}
+      </td>
+      <td className="px-4 py-2 text-sm">
+        {documentNumber && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewRecordDetails(documentNumber);
+            }}
+            className="h-7 text-xs"
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            Details
+          </Button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 export function PreForeclosureView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [advancedFilters, setAdvancedFilters] = useState<PreForeclosureAdvancedFilters>({
@@ -98,6 +292,14 @@ export function PreForeclosureView() {
   const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
   const [removingRecordId, setRemovingRecordId] = useState<string | null>(null);
   const [reorderingRecordId, setReorderingRecordId] = useState<string | null>(null);
+  
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -198,10 +400,10 @@ export function PreForeclosureView() {
 
   const handleStatusChange = async (record: PreForeclosureRecord, newStatus: PreForeclosureStatus) => {
     try {
-      await updateMutation.mutateAsync({
-        document_number: record.document_number,
-        internal_status: newStatus,
-      });
+    await updateMutation.mutateAsync({
+      document_number: record.document_number,
+      internal_status: newStatus,
+    });
       toast({
         title: 'Status Updated',
         description: `Status changed to "${newStatus}" for document ${record.document_number}`,
@@ -260,15 +462,15 @@ export function PreForeclosureView() {
         console.warn('[PreForeclosure] handleRecordSelect called with invalid documentNumber');
         return;
       }
-      setSelectedRecordIds(prev => {
-        const newSet = new Set(prev);
-        if (selected) {
-          newSet.add(documentNumber);
-        } else {
-          newSet.delete(documentNumber);
-        }
-        return newSet;
-      });
+    setSelectedRecordIds(prev => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(documentNumber);
+      } else {
+        newSet.delete(documentNumber);
+      }
+      return newSet;
+    });
     } catch (error) {
       console.error('[PreForeclosure] Error in handleRecordSelect:', error);
     }
@@ -492,35 +694,40 @@ export function PreForeclosureView() {
     }
   };
 
-  const handleReorderRecord = async (routeId: string, recordId: string, direction: 'up' | 'down') => {
-    if (!viewRoute) return;
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over || !viewRoute) return;
+    
+    if (active.id === over.id) return;
     
     const sortedRecords = [...viewRoute.records].sort((a, b) => {
       return a.orderIndex - b.orderIndex;
     });
     
-    const currentIndex = sortedRecords.findIndex(rr => rr.id === recordId);
-    if (currentIndex === -1) return;
+    const oldIndex = sortedRecords.findIndex(rr => rr.id === active.id);
+    const newIndex = sortedRecords.findIndex(rr => rr.id === over.id);
     
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= sortedRecords.length) return;
+    if (oldIndex === -1 || newIndex === -1) return;
     
+    const recordId = active.id as string;
     setReorderingRecordId(recordId);
+    
     try {
-      const result = await reorderRecordInRoute(routeId, recordId, newIndex);
+      const result = await reorderRecordInRoute(viewRoute.id, recordId, newIndex);
       
       if (result.route) {
         setViewRoute(result.route);
         
         // Update activeRoutes to reflect the change
         setActiveRoutes(prev => prev.map(route => 
-          route.id === routeId ? result.route : route
+          route.id === viewRoute.id ? result.route : route
         ));
       }
       
       toast({
         title: 'Route updated',
-        description: `Record moved ${direction === 'up' ? 'up' : 'down'} in route.`,
+        description: 'Route order has been updated.',
       });
     } catch (error: any) {
       console.error('[PreForeclosure] Error reordering record:', error);
@@ -1178,117 +1385,117 @@ export function PreForeclosureView() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Pre-Foreclosure Records</h1>
-          {!isLoading && !error && (
+        {!isLoading && !error && (
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <span className="font-medium text-foreground">
-                {filteredRecords.length.toLocaleString()} active record{filteredRecords.length !== 1 ? 's' : ''}
+            {filteredRecords.length.toLocaleString()} active record{filteredRecords.length !== 1 ? 's' : ''}
               </span>
               {records.length > filteredRecords.length && (
                 <>
                   <span className="text-muted-foreground">•</span>
                   <span>{records.length - filteredRecords.length} inactive</span>
                 </>
-              )}
+            )}
             </div>
-          )}
-        </div>
+        )}
+      </div>
         <div className="flex flex-wrap gap-2 items-center">
-          {selectedRecordIds.size > 0 && (
-            <>
+        {selectedRecordIds.size > 0 && (
+          <>
               <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-md text-sm font-medium">
                 <CheckCircle className="h-4 w-4" />
-                {selectedRecordIds.size} selected
+              {selectedRecordIds.size} selected
               </div>
-              <Select
-                value={numVehicles.toString()}
-                onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
-              >
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 Vehicle</SelectItem>
-                  <SelectItem value="2">2 Vehicles</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                onClick={() => setAreaSelectorOpen(true)}
-                variant="outline"
-                size="sm"
-                title="Select area on map to filter records"
-              >
+            <Select
+              value={numVehicles.toString()}
+              onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
+            >
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 Vehicle</SelectItem>
+                <SelectItem value="2">2 Vehicles</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={() => setAreaSelectorOpen(true)}
+              variant="outline"
+              size="sm"
+              title="Select area on map to filter records"
+            >
                 <MapPin className="h-4 w-4 mr-2" />
-                Select Area
-              </Button>
-              {customDepot && (
-                <Button
-                  onClick={() => {
-                    setCustomDepot(null);
-                    setCustomDepotRecordId(null);
-                    toast({
-                      title: "Starting Point Cleared",
-                      description: "Starting point has been cleared. Route will use default starting point.",
-                    });
-                  }}
-                  variant="ghost"
-                  size="sm"
-                  title="Clear custom starting point"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-              <Button
-                onClick={handleCreateRoute}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-                size="sm"
-                disabled={isOptimizingRoute}
-              >
-                {isOptimizingRoute ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Optimizing...
-                  </>
-                ) : (
-                  <>
-                    <RouteIcon className="h-4 w-4 mr-2" />
-                    Optimize Route
-                  </>
-                )}
-              </Button>
+              Select Area
+            </Button>
+            {customDepot && (
               <Button
                 onClick={() => {
-                  setSelectedRecordIds(new Set());
-                  setRecordsInRoutes(new Set()); // Clear routes tracking so records can be selected/optimized again
-                  setOptimizedRoutes(null); // Clear optimized routes
-                  setCustomDepot(null); // Clear custom depot
-                  setCustomDepotRecordId(null); // Clear custom depot record ID
+                  setCustomDepot(null);
+                  setCustomDepotRecordId(null);
+                  toast({
+                    title: "Starting Point Cleared",
+                    description: "Starting point has been cleared. Route will use default starting point.",
+                  });
                 }}
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                disabled={isOptimizingRoute}
+                title="Clear custom starting point"
               >
-                Clear Selection
+                <X className="h-4 w-4" />
               </Button>
-            </>
-          )}
-          <Button 
-            onClick={() => setDeleteConfirmOpen(true)} 
-            variant="destructive" 
-            size="default"
-            disabled={records.length === 0}
+            )}
+            <Button
+              onClick={handleCreateRoute}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              size="sm"
+              disabled={isOptimizingRoute}
+            >
+              {isOptimizingRoute ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Optimizing...
+                </>
+              ) : (
+                <>
+                    <RouteIcon className="h-4 w-4 mr-2" />
+                  Optimize Route
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => {
+                setSelectedRecordIds(new Set());
+                setRecordsInRoutes(new Set()); // Clear routes tracking so records can be selected/optimized again
+                setOptimizedRoutes(null); // Clear optimized routes
+                setCustomDepot(null); // Clear custom depot
+                setCustomDepotRecordId(null); // Clear custom depot record ID
+              }}
+              variant="outline"
+              size="sm"
+              disabled={isOptimizingRoute}
+            >
+              Clear Selection
+            </Button>
+          </>
+        )}
+        <Button 
+          onClick={() => setDeleteConfirmOpen(true)} 
+          variant="destructive" 
+          size="default"
+          disabled={records.length === 0}
             className="shadow-sm"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
             Delete All
-          </Button>
+        </Button>
           <Button 
             onClick={() => setUploadOpen(true)} 
             size="default"
             className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
           >
-            <Upload className="h-4 w-4 mr-2" />
+          <Upload className="h-4 w-4 mr-2" />
             Upload File
-          </Button>
+        </Button>
         </div>
       </div>
     </div>
@@ -1442,7 +1649,7 @@ export function PreForeclosureView() {
     <div className="p-6 space-y-6">
       {/* Header */}
       {headerSection}
-
+      
 
       {/* Create Route Button - Always Visible */}
       <div className="flex justify-end mb-4">
@@ -1473,20 +1680,20 @@ export function PreForeclosureView() {
 
       {/* Active Routes Dashboard */}
       <div className="bg-card border border-border rounded-lg p-4">
-        <h3 className="text-lg font-semibold mb-4">Active Routes</h3>
-        {isLoadingActiveRoutes ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-            <span className="text-sm text-muted-foreground">Loading routes...</span>
-          </div>
+          <h3 className="text-lg font-semibold mb-4">Active Routes</h3>
+          {isLoadingActiveRoutes ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+              <span className="text-sm text-muted-foreground">Loading routes...</span>
+            </div>
         ) : Array.isArray(activeRoutes) && activeRoutes.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeRoutes.map((route: any) => {
-              const stopCount = route.records?.length || 0;
-              const driverColor = route.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500';
-              return (
-                <div
-                  key={route.id}
+                const stopCount = route.records?.length || 0;
+                const driverColor = route.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500';
+                return (
+                  <div
+                    key={route.id}
                   className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors relative group"
                 >
                   <div
@@ -1539,15 +1746,15 @@ export function PreForeclosureView() {
                       {new Date(route.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-sm text-muted-foreground">
-            No active routes
-          </div>
-        )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              No active routes
+            </div>
+          )}
       </div>
 
       {/* Search and Filters */}
@@ -1573,7 +1780,7 @@ export function PreForeclosureView() {
         </div>
 
         {/* Advanced Filters */}
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
           <AdvancedFiltersPanel
             filters={advancedFilters}
             onFiltersChange={handleFiltersChange}
@@ -1584,7 +1791,7 @@ export function PreForeclosureView() {
             activeFilterCount={activeFilterCount}
           />
         </div>
-      </div>
+          </div>
 
       {/* Select All Checkbox */}
       {filteredRecords.length > 0 && (
@@ -1633,23 +1840,23 @@ export function PreForeclosureView() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-full">
-          {filteredRecords.map((record) => (
+                {filteredRecords.map((record) => (
             <div
-              key={record.document_number}
-              className={cn(
+                    key={record.document_number} 
+                    className={cn(
                 "bg-card border border-border rounded-lg p-4 relative transition-colors w-full max-w-full overflow-hidden",
                 selectedRecordIds.has(record.document_number) && "bg-primary/10 border-primary/30"
-              )}
-            >
+                    )}
+                  >
               {/* Checkbox */}
               <div className="absolute top-4 left-4 z-10">
-                <Checkbox
-                  checked={selectedRecordIds.has(record.document_number)}
-                  onCheckedChange={(checked) => {
-                    handleRecordSelect(record.document_number, checked as boolean);
-                  }}
-                  title="Select record"
-                />
+                      <Checkbox
+                        checked={selectedRecordIds.has(record.document_number)}
+                        onCheckedChange={(checked) => {
+                          handleRecordSelect(record.document_number, checked as boolean);
+                        }}
+                        title="Select record"
+                      />
               </div>
 
               {/* Eye Icon - Hidden */}
@@ -1670,9 +1877,9 @@ export function PreForeclosureView() {
 
               {/* Type Badge */}
               <div className="flex items-center gap-2 mb-2 pr-8 pl-8">
-                <Badge variant="outline" className={getTypeColor(record.type)}>
-                  {record.type}
-                </Badge>
+                      <Badge variant="outline" className={getTypeColor(record.type)}>
+                        {record.type}
+                      </Badge>
               </div>
 
               {/* Document Number - Hidden on mobile */}
@@ -1696,20 +1903,20 @@ export function PreForeclosureView() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div className="min-w-0">
                   <div className="text-xs text-muted-foreground mb-1">Internal Status</div>
-                  <Select
-                    value={record.internal_status}
-                    onValueChange={(v) => handleStatusChange(record, v as PreForeclosureStatus)}
-                  >
+                      <Select
+                        value={record.internal_status}
+                        onValueChange={(v) => handleStatusChange(record, v as PreForeclosureStatus)}
+                      >
                     <SelectTrigger className="w-full h-8 text-xs min-w-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="New">New</SelectItem>
-                      <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-                      <SelectItem value="Monitoring">Monitoring</SelectItem>
-                      <SelectItem value="Dead">Dead</SelectItem>
-                    </SelectContent>
-                  </Select>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="New">New</SelectItem>
+                          <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
+                          <SelectItem value="Monitoring">Monitoring</SelectItem>
+                          <SelectItem value="Dead">Dead</SelectItem>
+                        </SelectContent>
+                      </Select>
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs text-muted-foreground mb-1">Route Status</div>
@@ -1746,8 +1953,8 @@ export function PreForeclosureView() {
                         )}
                       >
                         <span className="truncate">
-                          {record.last_action_date
-                            ? format(new Date(record.last_action_date), 'MMM d, yyyy')
+                      {record.last_action_date
+                        ? format(new Date(record.last_action_date), 'MMM d, yyyy')
                             : 'Click to set'}
                         </span>
                       </Button>
@@ -1843,53 +2050,53 @@ export function PreForeclosureView() {
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-                <Button
-                  variant="outline"
+                        <Button
+                          variant="outline"
                   size="sm"
                   className="flex-1 min-w-0"
-                  onClick={() => {
-                    setViewRecord(record);
-                    setViewOpen(true);
-                  }}
-                >
+                          onClick={() => {
+                            setViewRecord(record);
+                            setViewOpen(true);
+                          }}
+                        >
                   <Eye className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                   <span className="truncate">View</span>
-                </Button>
-                <Button
-                  variant="outline"
+                        </Button>
+                        <Button
+                          variant="outline"
                   size="sm"
                   className="flex-1 min-w-0"
-                  onClick={() => {
-                    if (record.latitude != null && record.longitude != null) {
-                      const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(record.address)},+${encodeURIComponent(record.city)},+TX+${record.zip}/@${record.latitude},${record.longitude},16z`;
-                      window.open(mapsUrl, '_blank');
-                    } else {
-                      toast({
-                        title: 'Location not available',
-                        description: 'Latitude and longitude are not available for this property',
-                        variant: 'destructive',
-                      });
-                    }
-                  }}
-                  disabled={record.latitude == null || record.longitude == null}
-                >
+                          onClick={() => {
+                            if (record.latitude != null && record.longitude != null) {
+                              const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(record.address)},+${encodeURIComponent(record.city)},+TX+${record.zip}/@${record.latitude},${record.longitude},16z`;
+                              window.open(mapsUrl, '_blank');
+                            } else {
+                              toast({
+                                title: 'Location not available',
+                                description: 'Latitude and longitude are not available for this property',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                          disabled={record.latitude == null || record.longitude == null}
+                        >
                   <Send className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                   <span className="truncate">Maps</span>
-                </Button>
+                        </Button>
                 {/* External Link Button - Hidden */}
                 {/* <Button
-                  variant="outline"
+                          variant="outline"
                   size="sm"
                   className="flex-shrink-0"
-                  onClick={() => {
-                    window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
-                  }}
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
+                          onClick={() => {
+                            window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+                          }}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
                 </Button> */}
-              </div>
+                      </div>
             </div>
-          ))}
+                ))}
         </div>
       )}
 
@@ -2320,15 +2527,15 @@ export function PreForeclosureView() {
                           This property is currently in an active route
                         </div>
                       )}
-                    </div>
-                  </div>
+                </div>
+              </div>
 
-                  {/* Actions & Tasks Section */}
-                  <div className="bg-secondary/30 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <CheckCircle className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Actions & Tasks</span>
-                    </div>
+              {/* Actions & Tasks Section */}
+              <div className="bg-secondary/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Actions & Tasks</span>
+                </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -2440,37 +2647,37 @@ export function PreForeclosureView() {
                 </div>
               </div>
 
-                  {/* Current Status */}
-                  {viewRecord.actionType && (
-                    <div className="bg-secondary/30 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Target className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium">Current Task</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="text-muted-foreground">Action:</span>
-                          <div className="font-medium capitalize">{viewRecord.actionType}</div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Priority:</span>
-                          <div className="font-medium capitalize">{viewRecord.priority}</div>
-                        </div>
-                        {viewRecord.dueTime && (
-                          <div>
-                            <span className="text-muted-foreground">Due:</span>
-                            <div className="font-medium">{format(new Date(viewRecord.dueTime), 'MMM d, yyyy h:mm a')}</div>
-                          </div>
-                        )}
-                        {viewRecord.assignedTo && (
-                          <div>
-                            <span className="text-muted-foreground">Assigned To:</span>
-                            <div className="font-medium">{viewRecord.assignedTo}</div>
-                          </div>
-                        )}
-                      </div>
+              {/* Current Status */}
+              {viewRecord.actionType && (
+                <div className="bg-secondary/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Current Task</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Action:</span>
+                      <div className="font-medium capitalize">{viewRecord.actionType}</div>
                     </div>
-                  )}
+                    <div>
+                      <span className="text-muted-foreground">Priority:</span>
+                      <div className="font-medium capitalize">{viewRecord.priority}</div>
+                    </div>
+                    {viewRecord.dueTime && (
+                      <div>
+                        <span className="text-muted-foreground">Due:</span>
+                        <div className="font-medium">{format(new Date(viewRecord.dueTime), 'MMM d, yyyy h:mm a')}</div>
+                      </div>
+                    )}
+                    {viewRecord.assignedTo && (
+                      <div>
+                        <span className="text-muted-foreground">Assigned To:</span>
+                        <div className="font-medium">{viewRecord.assignedTo}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               </div>
             </div>
           )}
@@ -2647,7 +2854,7 @@ export function PreForeclosureView() {
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${viewRoute.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500'}`} />
                     <span className="font-semibold">{viewRoute.driver}</span>
-                  </div>
+      </div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground mb-1">Status</div>
@@ -2761,196 +2968,47 @@ export function PreForeclosureView() {
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
                         </tr>
                       </thead>
-                      <tbody>
-                        {viewRoute.records
-                          ?.sort((a, b) => {
-                            // Sort by orderIndex (depot can be anywhere now)
-                            return a.orderIndex - b.orderIndex;
-                          })
-                          .map((routeRecord, index) => {
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <SortableContext
+                          items={viewRoute.records
+                            ?.sort((a, b) => a.orderIndex - b.orderIndex)
+                            .map(rr => rr.id) || []}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <tbody>
+                            {viewRoute.records
+                              ?.sort((a, b) => {
+                                // Sort by orderIndex (depot can be anywhere now)
+                                return a.orderIndex - b.orderIndex;
+                              })
+                              .map((routeRecord, index) => {
                             const record = routeRecord.record;
                             // Handle both camelCase (from backend) and snake_case (from interface)
                             const documentNumber = record.document_number || record.documentNumber || '';
                             return (
-                              <tr
+                              <SortableRow
                                 key={routeRecord.id}
-                                className={`border-t border-border hover:bg-secondary/30 ${
-                                  routeRecord.isDepot ? 'bg-primary/10' : ''
-                                }`}
-                              >
-                                <td className="px-4 py-2 text-sm">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    {routeRecord.isDepot ? (
-                                      <>
-                                        <Badge variant="default" className="bg-primary">Depot</Badge>
-                                        <Button
-                                          size="sm"
-                                          variant="default"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
-                                          }}
-                                          disabled={removingRecordId === routeRecord.id}
-                                          className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                          title="Remove from route"
-                                        >
-                                          {removingRecordId === routeRecord.id ? (
-                                            <Loader2 className="h-5 w-5 animate-spin" />
-                                          ) : (
-                                            <X className="h-5 w-5" />
-                                          )}
-                                        </Button>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <span className="font-medium">{routeRecord.orderIndex}</span>
-                                        <Button
-                                          size="sm"
-                                          variant="default"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
-                                          }}
-                                          disabled={removingRecordId === routeRecord.id}
-                                          className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                          title="Remove from route"
-                                        >
-                                          {removingRecordId === routeRecord.id ? (
-                                            <Loader2 className="h-5 w-5 animate-spin" />
-                                          ) : (
-                                            <X className="h-5 w-5" />
-                                          )}
-                                        </Button>
-                                      </>
-                                    )}
-                                    {/* Reorder buttons - Always visible for all stops including depot */}
-                                    <div className="flex flex-col gap-1 ml-2">
-                                      <Button
-                                        size="sm"
-                                        variant="default"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleReorderRecord(viewRoute.id, routeRecord.id, 'up');
-                                        }}
-                                        disabled={
-                                          reorderingRecordId === routeRecord.id ||
-                                          index === 0
-                                        }
-                                        className="h-9 w-9 p-0 bg-blue-600 hover:bg-blue-700 text-white border-2 border-blue-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title="Move up"
-                                      >
-                                        {reorderingRecordId === routeRecord.id ? (
-                                          <Loader2 className="h-5 w-5 animate-spin" />
-                                        ) : (
-                                          <ChevronUp className="h-5 w-5" />
-                                        )}
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="default"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleReorderRecord(viewRoute.id, routeRecord.id, 'down');
-                                        }}
-                                        disabled={
-                                          reorderingRecordId === routeRecord.id ||
-                                          index === (viewRoute.records?.length || 0) - 1
-                                        }
-                                        className="h-9 w-9 p-0 bg-blue-600 hover:bg-blue-700 text-white border-2 border-blue-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title="Move down"
-                                      >
-                                        {reorderingRecordId === routeRecord.id ? (
-                                          <Loader2 className="h-5 w-5 animate-spin" />
-                                        ) : (
-                                          <ChevronDown className="h-5 w-5" />
-                                        )}
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-2 text-sm font-mono hidden">{documentNumber}</td>
-                                <td className="px-4 py-2 text-sm">{record.address}</td>
-                                <td className="px-4 py-2 text-sm hidden">{record.city}</td>
-                                <td className="px-4 py-2 text-sm hidden">{record.zip}</td>
-                                <td className="px-4 py-2 text-sm">
-                                  {record.visited ? (
-                                    <Badge variant="outline" className="bg-green-500/20 text-green-600 border-green-500">
-                                      Visited
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline">Pending</Badge>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2 text-sm">
-                                  {documentNumber && (
-                                    <>
-                                      {!record.visited ? (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleMarkVisited(documentNumber, viewRoute.driver, true);
-                                          }}
-                                          disabled={markingVisited === documentNumber}
-                                          className="h-7 text-xs"
-                                        >
-                                          {markingVisited === documentNumber ? (
-                                            <>
-                                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                              Marking...
-                                            </>
-                                          ) : (
-                                            'Mark Visited'
-                                          )}
-                                        </Button>
-                                      ) : (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleMarkVisited(documentNumber, viewRoute.driver, false);
-                                          }}
-                                          disabled={markingVisited === documentNumber}
-                                          className="h-7 text-xs text-muted-foreground"
-                                        >
-                                          {markingVisited === documentNumber ? (
-                                            <>
-                                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                              Updating...
-                                            </>
-                                          ) : (
-                                            <>
-                                              <RotateCcw className="h-3 w-3 mr-1" />
-                                              Set Pending
-                                            </>
-                                          )}
-                                        </Button>
-                                      )}
-                                    </>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2 text-sm">
-                                  {documentNumber && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleViewRecordDetails(documentNumber);
-                                      }}
-                                      className="h-7 text-xs"
-                                    >
-                                      <Eye className="h-3 w-3 mr-1" />
-                                      Details
-                                    </Button>
-                                  )}
-                                </td>
-                              </tr>
+                                routeRecord={routeRecord}
+                                index={index}
+                                viewRoute={viewRoute}
+                                documentNumber={documentNumber}
+                                record={record}
+                                removingRecordId={removingRecordId}
+                                reorderingRecordId={reorderingRecordId}
+                                handleRemoveRecordFromRoute={handleRemoveRecordFromRoute}
+                                handleMarkVisited={handleMarkVisited}
+                                handleViewRecordDetails={handleViewRecordDetails}
+                                markingVisited={markingVisited}
+                              />
                             );
                           })}
                       </tbody>
+                        </SortableContext>
+                      </DndContext>
                     </table>
                   </div>
                 </div>
