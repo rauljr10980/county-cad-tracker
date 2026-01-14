@@ -535,7 +535,12 @@ export function PreForeclosureView() {
   };
 
   const handleRemoveRecordFromRoute = async (routeId: string, recordId: string, documentNumber: string) => {
-    if (!confirm(`Are you sure you want to remove this property (${documentNumber}) from the route?\n\nNote: This will only remove it from the route. All property information (visited status, notes, dates) will be preserved.`)) {
+    const isDepot = viewRoute?.records?.find(rr => rr.id === recordId)?.isDepot;
+    const message = isDepot 
+      ? `Are you sure you want to remove the depot (${documentNumber}) from the route?\n\nNote: This will only remove it from the route. All property information (visited status, notes, dates) will be preserved.`
+      : `Are you sure you want to remove this property (${documentNumber}) from the route?\n\nNote: This will only remove it from the route. All property information (visited status, notes, dates) will be preserved.`;
+    
+    if (!confirm(message)) {
       return;
     }
 
@@ -2774,7 +2779,7 @@ export function PreForeclosureView() {
                                 }`}
                               >
                                 <td className="px-4 py-2 text-sm">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     {routeRecord.isDepot ? (
                                       <>
                                         <Badge variant="default" className="bg-primary">Depot</Badge>
@@ -2822,7 +2827,7 @@ export function PreForeclosureView() {
                                     <div className="flex flex-col gap-0.5 ml-1">
                                       <Button
                                         size="sm"
-                                        variant="ghost"
+                                        variant="outline"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleReorderRecord(viewRoute.id, routeRecord.id, 'up');
@@ -2831,18 +2836,18 @@ export function PreForeclosureView() {
                                           reorderingRecordId === routeRecord.id ||
                                           index === 0
                                         }
-                                        className="h-5 w-5 p-0"
+                                        className="h-7 w-7 p-0 border-border hover:bg-secondary"
                                         title="Move up"
                                       >
                                         {reorderingRecordId === routeRecord.id ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                          <Loader2 className="h-4 w-4 animate-spin" />
                                         ) : (
-                                          <ChevronUp className="h-3 w-3" />
+                                          <ChevronUp className="h-4 w-4" />
                                         )}
                                       </Button>
                                       <Button
                                         size="sm"
-                                        variant="ghost"
+                                        variant="outline"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleReorderRecord(viewRoute.id, routeRecord.id, 'down');
@@ -2851,13 +2856,13 @@ export function PreForeclosureView() {
                                           reorderingRecordId === routeRecord.id ||
                                           index === (viewRoute.records?.length || 0) - 1
                                         }
-                                        className="h-5 w-5 p-0"
+                                        className="h-7 w-7 p-0 border-border hover:bg-secondary"
                                         title="Move down"
                                       >
                                         {reorderingRecordId === routeRecord.id ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                          <Loader2 className="h-4 w-4 animate-spin" />
                                         ) : (
-                                          <ChevronDown className="h-3 w-3" />
+                                          <ChevronDown className="h-4 w-4" />
                                         )}
                                       </Button>
                                     </div>
