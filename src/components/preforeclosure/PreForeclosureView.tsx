@@ -3329,14 +3329,14 @@ export function PreForeclosureView() {
                         onDragEnd={handleDragEnd}
                       >
                         <SortableContext
-                          items={viewRoute.records
-                            ?.sort((a, b) => a.orderIndex - b.orderIndex)
-                            .map(rr => rr.id) || []}
+                          items={(viewRoute.records || [])
+                            .sort((a, b) => a.orderIndex - b.orderIndex)
+                            .map(rr => rr.id)}
                           strategy={verticalListSortingStrategy}
                         >
                           <tbody>
-                            {viewRoute.records
-                              ?.sort((a, b) => {
+                            {(viewRoute.records || [])
+                              .sort((a, b) => {
                                 // Sort by orderIndex (depot can be anywhere now)
                                 return a.orderIndex - b.orderIndex;
                               })
