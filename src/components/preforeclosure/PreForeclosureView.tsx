@@ -1472,14 +1472,25 @@ export function PreForeclosureView() {
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground mb-4">No active routes</p>
             <Button
-              onClick={() => setAreaSelectorOpen(true)}
+              onClick={() => {
+                // Select all filtered records
+                const allRecordIds = new Set<string>();
+                filteredRecords.forEach(record => {
+                  if (record && record.document_number) {
+                    allRecordIds.add(record.document_number);
+                  }
+                });
+                setSelectedRecordIds(allRecordIds);
+                // Open area selector
+                setAreaSelectorOpen(true);
+              }}
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <MapPin className="h-4 w-4 mr-2" />
               Create Route
             </Button>
             <p className="text-xs text-muted-foreground mt-3">
-              Select an area on the map to filter records, then optimize your route
+              Automatically selects all records and opens area selector
             </p>
           </div>
         )}
