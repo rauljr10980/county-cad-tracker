@@ -51,15 +51,18 @@ type RouteType = {
 };
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
+import { AdvancedFiltersPanel, PreForeclosureAdvancedFilters } from './AdvancedFilters';
 
 export function PreForeclosureView() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<PreForeclosureType | 'all'>('all');
-  const [cityFilter, setCityFilter] = useState<string>('all');
-  const [zipFilter, setZipFilter] = useState<string>('all');
-  const [monthFilter, setMonthFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<PreForeclosureStatus | 'all'>('all');
-  const [needsFollowUp, setNeedsFollowUp] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<PreForeclosureAdvancedFilters>({
+    type: 'all',
+    city: 'all',
+    zip: 'all',
+    month: 'all',
+    status: 'all',
+    needsFollowUp: false,
+  });
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosureRecord | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<PreForeclosureRecord | null>(null);
@@ -127,40 +130,70 @@ export function PreForeclosureView() {
     }
 
     // Type filter
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(r => r.type === typeFilter);
+    if (advancedFilters.type !== 'all') {
+      filtered = filtered.filter(r => r.type === advancedFilters.type);
     }
 
     // City filter
-    if (cityFilter !== 'all') {
-      filtered = filtered.filter(r => r.city === cityFilter);
+    if (advancedFilters.city !== 'all') {
+      filtered = filtered.filter(r => r.city === advancedFilters.city);
     }
 
     // ZIP filter
-    if (zipFilter !== 'all') {
-      filtered = filtered.filter(r => r.zip === zipFilter);
+    if (advancedFilters.zip !== 'all') {
+      filtered = filtered.filter(r => r.zip === advancedFilters.zip);
     }
 
     // Month filter
-    if (monthFilter !== 'all') {
-      filtered = filtered.filter(r => r.filing_month === monthFilter);
+    if (advancedFilters.month !== 'all') {
+      filtered = filtered.filter(r => r.filing_month === advancedFilters.month);
     }
 
     // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(r => r.internal_status === statusFilter);
+    if (advancedFilters.status !== 'all') {
+      filtered = filtered.filter(r => r.internal_status === advancedFilters.status);
     }
 
     // Needs follow-up filter
-    if (needsFollowUp) {
+    if (advancedFilters.needsFollowUp) {
       const today = new Date().toISOString().split('T')[0];
       filtered = filtered.filter(r => 
-        r.next_follow_up_date && r.next_follow_up_date <= today
+        r.next_follow_up_date && new Date(r.next_follow_up_date).toISOString().split('T')[0] <= today
       );
     }
 
     return filtered;
-  }, [records, searchQuery, typeFilter, cityFilter, zipFilter, monthFilter, statusFilter, needsFollowUp]);
+  }, [records, searchQuery, advancedFilters]);
+
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (advancedFilters.type !== 'all') count++;
+    if (advancedFilters.city !== 'all') count++;
+    if (advancedFilters.zip !== 'all') count++;
+    if (advancedFilters.month !== 'all') count++;
+    if (advancedFilters.status !== 'all') count++;
+    if (advancedFilters.needsFollowUp) count++;
+    return count;
+  }, [advancedFilters]);
+
+  // Handle filter changes
+  const handleFiltersChange = (filters: PreForeclosureAdvancedFilters) => {
+    setAdvancedFilters(filters);
+  };
+
+  // Handle clear all filters
+  const handleClearFilters = () => {
+    setAdvancedFilters({
+      type: 'all',
+      city: 'all',
+      zip: 'all',
+      month: 'all',
+      status: 'all',
+      needsFollowUp: false,
+    });
+    setSearchQuery('');
+  };
 
   const handleStatusChange = async (record: PreForeclosureRecord, newStatus: PreForeclosureStatus) => {
     try {
@@ -1452,100 +1485,17 @@ export function PreForeclosureView() {
           )}
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3 items-center">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Filters:</span>
-          </div>
-
-          <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as PreForeclosureType | 'all')}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="Mortgage">Mortgage</SelectItem>
-              <SelectItem value="Tax">Tax</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={cityFilter} onValueChange={setCityFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="City" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Cities</SelectItem>
-              {uniqueCities.map(city => (
-                <SelectItem key={city} value={city}>{city}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={zipFilter} onValueChange={setZipFilter}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="ZIP" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All ZIPs</SelectItem>
-              {uniqueZips.map(zip => (
-                <SelectItem key={zip} value={zip}>{zip}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={monthFilter} onValueChange={setMonthFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filing Month" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Months</SelectItem>
-              {uniqueMonths.map(month => (
-                <SelectItem key={month} value={month}>{month}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as PreForeclosureStatus | 'all')}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="New">New</SelectItem>
-              <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-              <SelectItem value="Monitoring">Monitoring</SelectItem>
-              <SelectItem value="Dead">Dead</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant={needsFollowUp ? "default" : "outline"}
-            size="sm"
-            onClick={() => setNeedsFollowUp(!needsFollowUp)}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Needs Follow-Up
-          </Button>
-
-          {(typeFilter !== 'all' || cityFilter !== 'all' || zipFilter !== 'all' || monthFilter !== 'all' || statusFilter !== 'all' || needsFollowUp || searchQuery) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setTypeFilter('all');
-                setCityFilter('all');
-                setZipFilter('all');
-                setMonthFilter('all');
-                setStatusFilter('all');
-                setNeedsFollowUp(false);
-                setSearchQuery('');
-              }}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Clear All
-            </Button>
-          )}
+        {/* Advanced Filters */}
+        <div className="flex items-center gap-2">
+          <AdvancedFiltersPanel
+            filters={advancedFilters}
+            onFiltersChange={handleFiltersChange}
+            onClear={handleClearFilters}
+            uniqueCities={uniqueCities}
+            uniqueZips={uniqueZips}
+            uniqueMonths={uniqueMonths}
+            activeFilterCount={activeFilterCount}
+          />
         </div>
       </div>
 
