@@ -3187,7 +3187,9 @@ export function PreForeclosureView() {
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground mb-1">Created</div>
-                  <div className="font-semibold">{new Date(viewRoute.createdAt).toLocaleDateString()}</div>
+                  <div className="font-semibold">
+                    {viewRoute.createdAt ? new Date(viewRoute.createdAt).toLocaleDateString() : 'N/A'}
+                  </div>
                 </div>
                 {viewRoute.routeData?.totalDistance && (
                   <div>
