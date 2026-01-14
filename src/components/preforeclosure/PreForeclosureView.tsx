@@ -83,6 +83,7 @@ function SortableRow({
   handleMarkVisited,
   handleViewRecordDetails,
   markingVisited,
+  handleStatusChange,
 }: any) {
   const {
     attributes,
