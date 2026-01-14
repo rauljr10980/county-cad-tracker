@@ -2392,7 +2392,9 @@ export function PreForeclosureView() {
                 </div>
                 <div className="space-y-2">
                   {[0, 1, 2, 3, 4, 5].map((index) => {
-                    const phoneValue = viewRecord.phoneNumbers?.[index] || '';
+                    // Ensure phoneNumbers is always an array
+                    const phoneNumbersArray = Array.isArray(viewRecord.phoneNumbers) ? viewRecord.phoneNumbers : [];
+                    const phoneValue = phoneNumbersArray[index] || '';
                     const isOwnerPhone = viewRecord.ownerPhoneIndex === index;
                     return (
                       <div key={index} className="flex items-center gap-2">
@@ -2430,7 +2432,7 @@ export function PreForeclosureView() {
                               ownerPhoneIndex: newOwnerPhoneIndex,
                             });
                             // Auto-save on click
-                            const currentPhones = viewRecord.phoneNumbers || [];
+                            const currentPhones = Array.isArray(viewRecord.phoneNumbers) ? viewRecord.phoneNumbers : [];
                             updateMutation.mutateAsync({
                               document_number: viewRecord.document_number,
                               phoneNumbers: currentPhones,
@@ -2454,7 +2456,7 @@ export function PreForeclosureView() {
                       size="sm"
                       onClick={async () => {
                         try {
-                          const currentPhones = viewRecord.phoneNumbers || [];
+                          const currentPhones = Array.isArray(viewRecord.phoneNumbers) ? viewRecord.phoneNumbers : [];
                           await updateMutation.mutateAsync({
                             document_number: viewRecord.document_number,
                             phoneNumbers: currentPhones,
