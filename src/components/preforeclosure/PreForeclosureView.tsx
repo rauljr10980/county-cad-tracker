@@ -1375,6 +1375,53 @@ export function PreForeclosureView() {
     }
   };
 
+  const handleClearTask = async () => {
+    if (!viewRecord) return;
+
+    setSavingAction(true);
+    try {
+      // Clear all task fields by setting them to null/undefined
+      await updateMutation.mutateAsync({
+        document_number: viewRecord.document_number,
+        actionType: undefined,
+        priority: undefined,
+        dueTime: undefined,
+        assignedTo: undefined,
+      });
+      
+      toast({
+        title: "Task Cleared",
+        description: "Task has been cleared successfully.",
+      });
+      
+      // Update local record
+      viewRecord.actionType = undefined;
+      viewRecord.priority = undefined;
+      viewRecord.dueTime = undefined;
+      viewRecord.assignedTo = undefined;
+      
+      // Clear local state
+      setActionType('');
+      setPriority('med');
+      setDueDateTime(undefined);
+      setAssignedTo('');
+      
+      // Invalidate tasks query so Tasks tab updates
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+    } catch (error) {
+      console.error('[PreForeclosure] Clear task error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to clear task';
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingAction(false);
+    }
+  };
+
   const getStatusColor = (status: PreForeclosureStatus) => {
     switch (status) {
       case 'New':
