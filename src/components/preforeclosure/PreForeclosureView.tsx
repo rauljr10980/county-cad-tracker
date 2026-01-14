@@ -2846,9 +2846,21 @@ export function PreForeclosureView() {
               {/* Current Status */}
               {viewRecord.actionType && (
                 <div className="bg-secondary/30 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Current Task</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Current Task</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearTask}
+                      disabled={savingAction}
+                      className="h-7 text-xs"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Clear Task
+                    </Button>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
