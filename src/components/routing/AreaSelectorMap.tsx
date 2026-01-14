@@ -729,9 +729,7 @@ export function AreaSelectorMap({
           </div>
 
           {/* Map - Below Drop Pin button */}
-          <div className="flex-1 flex flex-col gap-4" style={{ minHeight: 0 }}>
-            {/* Map container */}
-            <div className="flex-1 relative" style={{ minHeight: '400px' }}>
+          <div className="flex-1 relative" style={{ minHeight: '400px', width: '100%' }}>
               <MapContainer
                 center={[initialCenter.lat, initialCenter.lng]}
                 zoom={initialZoom}
@@ -798,10 +796,10 @@ export function AreaSelectorMap({
                 )}
                 {selectedShape && <MapBoundsFitter bounds={selectedShape.bounds} />}
               </MapContainer>
-            </div>
+          </div>
 
-            {/* Navigation buttons - below map */}
-            <div className="flex-shrink-0 space-y-2">
+          {/* Navigation buttons - below map */}
+          <div className="flex-shrink-0 space-y-2">
               <div className="flex gap-2">
                 {step > 1 && (
                   <Button
