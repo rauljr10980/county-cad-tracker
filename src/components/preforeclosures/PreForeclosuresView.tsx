@@ -364,13 +364,15 @@ export function PreForeclosuresView() {
         </div>
       ) : (
         <>
-          <PreForeclosureTable
-            preforeclosures={paginatedData}
-            onViewDetails={setSelectedRecord}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onSortChange={handleSortChange}
-          />
+          <div className="overflow-x-hidden w-full">
+            <PreForeclosureTable
+              preforeclosures={paginatedData}
+              onViewDetails={setSelectedRecord}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSortChange={handleSortChange}
+            />
+          </div>
 
           {/* Pagination - Mobile First */}
           {totalPages > 1 && (

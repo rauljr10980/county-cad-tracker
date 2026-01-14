@@ -60,7 +60,7 @@ export function PreForeclosureTable({
   return (
     <>
       {/* Mobile/Tablet Card View */}
-      <div className="lg:hidden space-y-3">
+      <div className="xl:hidden space-y-3">
         {preforeclosures.map((pf) => (
           <PreForeclosureCard
             key={pf.document_number}
@@ -70,8 +70,8 @@ export function PreForeclosureTable({
         ))}
       </div>
 
-      {/* Desktop Table View (1024px+) */}
-      <div className="hidden lg:block border border-border rounded-lg overflow-hidden">
+      {/* Desktop Table View (1280px+ only) */}
+      <div className="hidden xl:block border border-border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">
