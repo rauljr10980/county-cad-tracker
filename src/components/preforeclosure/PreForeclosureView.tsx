@@ -165,12 +165,12 @@ function SortableRow({
       <td className="px-4 py-2 text-sm">{record.address}</td>
       <td className="px-4 py-2 text-sm hidden">{record.city}</td>
       <td className="px-4 py-2 text-sm hidden">{record.zip}</td>
-      <td className="px-4 py-2 text-sm">
+      <td className="px-4 py-2 text-sm" style={{ position: 'relative', zIndex: 1 }}>
         {documentNumber && record && handleStatusChange && (
           <Select
             value={(record as any).internal_status || (record as any).internalStatus || 'New'}
             onValueChange={async (value) => {
-              console.log('Select onValueChange called with:', value);
+              console.log('Select onValueChange called with:', value, 'for document:', documentNumber);
               if (handleStatusChange) {
                 try {
                   // Create a proper PreForeclosureRecord object for handleStatusChange
@@ -192,10 +192,12 @@ function SortableRow({
                   };
                   console.log('Calling handleStatusChange with:', fullRecord, value);
                   await handleStatusChange(fullRecord, value as PreForeclosureStatus);
-                  console.log('handleStatusChange completed');
+                  console.log('handleStatusChange completed successfully');
                 } catch (error) {
                   console.error('Error in onValueChange:', error);
                 }
+              } else {
+                console.error('handleStatusChange is not available');
               }
             }}
           >
@@ -204,7 +206,7 @@ function SortableRow({
             >
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[100]">
               <SelectItem value="New">New</SelectItem>
               <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
               <SelectItem value="Monitoring">Monitoring</SelectItem>
