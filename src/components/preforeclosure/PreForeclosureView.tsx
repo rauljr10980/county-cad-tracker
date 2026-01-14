@@ -656,7 +656,12 @@ export function PreForeclosureView() {
     // Find the record in the records array
     const record = records.find(r => r.document_number === documentNumber);
     if (record) {
-      setViewRecord(record);
+      // Ensure phoneNumbers is always an array
+      const recordWithPhones = {
+        ...record,
+        phoneNumbers: record.phoneNumbers || [],
+      };
+      setViewRecord(recordWithPhones);
       setViewOpen(true);
     } else {
       toast({
@@ -1887,7 +1892,10 @@ export function PreForeclosureView() {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => {
-                    setViewRecord(record);
+                    setViewRecord({
+                      ...record,
+                      phoneNumbers: record.phoneNumbers || [],
+                    });
                     setViewOpen(true);
                   }}
                   title="View details"
@@ -2076,7 +2084,10 @@ export function PreForeclosureView() {
                   size="sm"
                   className="flex-1 min-w-0"
                           onClick={() => {
-                            setViewRecord(record);
+                            setViewRecord({
+                              ...record,
+                              phoneNumbers: record.phoneNumbers || [],
+                            });
                             setViewOpen(true);
                           }}
                         >
@@ -2392,7 +2403,8 @@ export function PreForeclosureView() {
                           type="tel"
                           value={phoneValue}
                           onChange={(e) => {
-                            const newPhoneNumbers = [...(viewRecord.phoneNumbers || [])];
+                            const currentPhones = viewRecord.phoneNumbers || [];
+                            const newPhoneNumbers = [...currentPhones];
                             newPhoneNumbers[index] = e.target.value;
                             // Ensure array has max 6 elements
                             const trimmed = newPhoneNumbers.slice(0, 6);
@@ -2418,9 +2430,10 @@ export function PreForeclosureView() {
                               ownerPhoneIndex: newOwnerPhoneIndex,
                             });
                             // Auto-save on click
+                            const currentPhones = viewRecord.phoneNumbers || [];
                             updateMutation.mutateAsync({
                               document_number: viewRecord.document_number,
-                              phoneNumbers: viewRecord.phoneNumbers || [],
+                              phoneNumbers: currentPhones,
                               ownerPhoneIndex: newOwnerPhoneIndex,
                             }).catch((error) => {
                               console.error('Error saving owner phone index:', error);
@@ -2441,9 +2454,10 @@ export function PreForeclosureView() {
                       size="sm"
                       onClick={async () => {
                         try {
+                          const currentPhones = viewRecord.phoneNumbers || [];
                           await updateMutation.mutateAsync({
                             document_number: viewRecord.document_number,
-                            phoneNumbers: viewRecord.phoneNumbers || [],
+                            phoneNumbers: currentPhones,
                             ownerPhoneIndex: viewRecord.ownerPhoneIndex,
                           });
                           toast({
