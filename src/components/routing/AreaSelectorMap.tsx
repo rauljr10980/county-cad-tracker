@@ -730,10 +730,10 @@ export function AreaSelectorMap({
             </div>
           </div>
 
-          {/* Map - Right side */}
+          {/* Map - Below Drop Pin button */}
           <div className="flex-1 flex flex-col gap-4" style={{ minHeight: 0 }}>
             {/* Map container */}
-            <div className="flex-1 relative" style={{ minHeight: 0 }}>
+            <div className="flex-1 relative" style={{ minHeight: '400px' }}>
               <MapContainer
                 center={[initialCenter.lat, initialCenter.lng]}
                 zoom={initialZoom}
