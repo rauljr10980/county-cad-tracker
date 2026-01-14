@@ -1549,7 +1549,35 @@ export function PreForeclosureView() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Select All Checkbox */}
+      {filteredRecords.length > 0 && (
+        <div className="flex items-center gap-2 mb-4">
+          <Checkbox
+            checked={selectedRecordIds.size > 0 && selectedRecordIds.size === filteredRecords.length && filteredRecords.length > 0}
+            onCheckedChange={(checked) => {
+              try {
+                const newSelectedIds = new Set<string>();
+                if (checked) {
+                  filteredRecords.forEach(record => {
+                    if (record && record.document_number) {
+                      newSelectedIds.add(record.document_number);
+                    }
+                  });
+                }
+                setSelectedRecordIds(newSelectedIds);
+              } catch (error) {
+                console.error('[PreForeclosure] Error in select all:', error);
+              }
+            }}
+            title="Select all"
+          />
+          <span className="text-sm text-muted-foreground">
+            Select all ({filteredRecords.length} records)
+          </span>
+        </div>
+      )}
+
+      {/* Cards Grid */}
       {filteredRecords.length === 0 && records.length === 0 ? (
         <div className="bg-secondary/30 rounded-lg p-12 text-center">
           <FileSpreadsheet className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
@@ -1567,258 +1595,263 @@ export function PreForeclosureView() {
           </p>
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-secondary/50 border-b border-border">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-12">
-                    <Checkbox
-                      checked={selectedRecordIds.size > 0 && selectedRecordIds.size === filteredRecords.length && filteredRecords.length > 0}
-                      onCheckedChange={(checked) => {
-                        try {
-                          // Batch update: create a new Set with all selected/unselected IDs at once
-                          const newSelectedIds = new Set<string>();
-                          if (checked) {
-                            filteredRecords.forEach(record => {
-                              if (record && record.document_number) {
-                                newSelectedIds.add(record.document_number);
-                              }
-                            });
-                          }
-                          setSelectedRecordIds(newSelectedIds);
-                        } catch (error) {
-                          console.error('[PreForeclosure] Error in select all:', error);
-                        }
-                      }}
-                      title="Select all"
-                    />
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Document #</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Address</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">City</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">ZIP</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Filing Month</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Internal Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Visited</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Last Action</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Next Follow-Up</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredRecords.map((record) => (
-                  <tr 
-                    key={record.document_number} 
-                    className={cn(
-                      "hover:bg-secondary/30 transition-colors",
-                      selectedRecordIds.has(record.document_number) && "bg-primary/10"
-                    )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-full">
+          {filteredRecords.map((record) => (
+            <div
+              key={record.document_number}
+              className={cn(
+                "bg-card border border-border rounded-lg p-4 relative transition-colors w-full max-w-full overflow-hidden",
+                selectedRecordIds.has(record.document_number) && "bg-primary/10 border-primary/30"
+              )}
+            >
+              {/* Checkbox */}
+              <div className="absolute top-4 left-4 z-10">
+                <Checkbox
+                  checked={selectedRecordIds.has(record.document_number)}
+                  onCheckedChange={(checked) => {
+                    handleRecordSelect(record.document_number, checked as boolean);
+                  }}
+                  title="Select record"
+                />
+              </div>
+
+              {/* Eye Icon */}
+              <div className="absolute top-4 right-4 z-10">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    setViewRecord(record);
+                    setViewOpen(true);
+                  }}
+                  title="View details"
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Type Badge */}
+              <div className="flex items-center gap-2 mb-2 pr-8 pl-8">
+                <Badge variant="outline" className={getTypeColor(record.type)}>
+                  {record.type}
+                </Badge>
+              </div>
+
+              {/* Document Number - Hidden on mobile */}
+              <div className="mb-3 pr-8 pl-8 hidden sm:block">
+                <div className="font-semibold text-base break-words">{record.document_number}</div>
+                <div className="text-xs text-muted-foreground font-mono break-words">{record.filing_month}</div>
+              </div>
+
+              {/* Address */}
+              <div className="mb-4 pr-8 pl-8">
+                <div className="flex items-start gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-muted-foreground min-w-0 flex-1 break-words">
+                    <div className="break-words">{record.address}</div>
+                    <div className="text-xs mt-0.5 break-words">{record.city}, TX <span className="hidden sm:inline">{record.zip}</span></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status and Visited Info */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground mb-1">Internal Status</div>
+                  <Select
+                    value={record.internal_status}
+                    onValueChange={(v) => handleStatusChange(record, v as PreForeclosureStatus)}
                   >
-                    <td className="px-4 py-3">
-                      <Checkbox
-                        checked={selectedRecordIds.has(record.document_number)}
-                        onCheckedChange={(checked) => {
-                          handleRecordSelect(record.document_number, checked as boolean);
-                        }}
-                        title="Select record"
-                      />
-                    </td>
-                    <td className="px-4 py-3 font-mono text-sm">{record.document_number}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant="outline" className={getTypeColor(record.type)}>
-                        {record.type}
+                    <SelectTrigger className="w-full h-8 text-xs min-w-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="New">New</SelectItem>
+                      <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
+                      <SelectItem value="Monitoring">Monitoring</SelectItem>
+                      <SelectItem value="Dead">Dead</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground mb-1">Route Status</div>
+                  <div>
+                    {record.visited === true ? (
+                      <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30 text-xs whitespace-nowrap">
+                        Visited
                       </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-sm">{record.address}</td>
-                    <td className="px-4 py-3 text-sm">{record.city}</td>
-                    <td className="px-4 py-3 font-mono text-sm">{record.zip}</td>
-                    <td className="px-4 py-3 text-sm">{record.filing_month}</td>
-                    <td className="px-4 py-3">
-                      <Select
-                        value={record.internal_status}
-                        onValueChange={(v) => handleStatusChange(record, v as PreForeclosureStatus)}
+                    ) : recordsInRoutes && recordsInRoutes.has(record.document_number) ? (
+                      <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs whitespace-nowrap">
+                        In Progress
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-muted text-muted-foreground text-xs whitespace-nowrap">
+                        Not in Route
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground mb-1">Last Action</div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "h-auto p-1 text-xs font-normal w-full justify-start min-w-0",
+                          record.last_action_date ? "text-foreground" : "text-muted-foreground"
+                        )}
                       >
-                        <SelectTrigger className="w-[160px] h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="New">New</SelectItem>
-                          <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-                          <SelectItem value="Monitoring">Monitoring</SelectItem>
-                          <SelectItem value="Dead">Dead</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-4 py-3">
-                      {record.visited === true ? (
-                        <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
-                          Visited
-                        </Badge>
-                      ) : recordsInRoutes && recordsInRoutes.has(record.document_number) ? (
-                        <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                          In Progress
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-muted text-muted-foreground">
-                          Not in Route
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              "h-auto p-1 text-xs font-normal",
-                              record.last_action_date ? "text-foreground" : "text-muted-foreground"
-                            )}
-                          >
-                            {record.last_action_date
-                              ? format(new Date(record.last_action_date), 'MMM d, yyyy')
-                              : 'Click to set'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={record.last_action_date ? new Date(record.last_action_date) : undefined}
-                            onSelect={async (date) => {
-                              if (date) {
-                                try {
-                                  await updateMutation.mutateAsync({
-                                    document_number: record.document_number,
-                                    last_action_date: date.toISOString(),
-                                  });
-                                  toast({
-                                    title: 'Last Action Date Updated',
-                                    description: `Last action date set to ${format(date, 'MMM d, yyyy')}`,
-                                  });
-                                  queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
-                                } catch (error) {
-                                  console.error('Error updating last action date:', error);
-                                  toast({
-                                    title: 'Error',
-                                    description: 'Failed to update last action date',
-                                    variant: 'destructive',
-                                  });
-                                }
-                              }
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              "h-auto p-1 text-xs font-normal",
-                              record.next_follow_up_date 
-                                ? new Date(record.next_follow_up_date) <= new Date()
-                                  ? "text-red-500 font-medium"
-                                  : "text-foreground"
-                                : "text-muted-foreground"
-                            )}
-                          >
-                            {record.next_follow_up_date ? (
-                              format(new Date(record.next_follow_up_date), 'MMM d, yyyy')
-                            ) : (
-                              'Click to set'
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={record.next_follow_up_date ? new Date(record.next_follow_up_date) : undefined}
-                            onSelect={async (date) => {
-                              if (date) {
-                                try {
-                                  await updateMutation.mutateAsync({
-                                    document_number: record.document_number,
-                                    next_follow_up_date: date.toISOString(),
-                                  });
-                                  toast({
-                                    title: 'Next Follow-Up Date Updated',
-                                    description: `Next follow-up date set to ${format(date, 'MMM d, yyyy')}`,
-                                  });
-                                  queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
-                                } catch (error) {
-                                  console.error('Error updating next follow-up date:', error);
-                                  toast({
-                                    title: 'Error',
-                                    description: 'Failed to update next follow-up date',
-                                    variant: 'destructive',
-                                  });
-                                }
-                              }
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => {
-                            setViewRecord(record);
-                            setViewOpen(true);
-                          }}
-                          title="View"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => {
-                            if (record.latitude != null && record.longitude != null) {
-                              const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(record.address)},+${encodeURIComponent(record.city)},+TX+${record.zip}/@${record.latitude},${record.longitude},16z`;
-                              window.open(mapsUrl, '_blank');
-                            } else {
+                        <span className="truncate">
+                          {record.last_action_date
+                            ? format(new Date(record.last_action_date), 'MMM d, yyyy')
+                            : 'Click to set'}
+                        </span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={record.last_action_date ? new Date(record.last_action_date) : undefined}
+                        onSelect={async (date) => {
+                          if (date) {
+                            try {
+                              await updateMutation.mutateAsync({
+                                document_number: record.document_number,
+                                last_action_date: date.toISOString(),
+                              });
                               toast({
-                                title: 'Location not available',
-                                description: 'Latitude and longitude are not available for this property',
+                                title: 'Last Action Date Updated',
+                                description: `Last action date set to ${format(date, 'MMM d, yyyy')}`,
+                              });
+                              queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                            } catch (error) {
+                              console.error('Error updating last action date:', error);
+                              toast({
+                                title: 'Error',
+                                description: 'Failed to update last action date',
                                 variant: 'destructive',
                               });
                             }
-                          }}
-                          title="Open in Google Maps"
-                          disabled={record.latitude == null || record.longitude == null}
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => {
-                            window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
-                          }}
-                          title="External Link"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground mb-1">Next Follow-Up</div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "h-auto p-1 text-xs font-normal w-full justify-start min-w-0",
+                          record.next_follow_up_date 
+                            ? new Date(record.next_follow_up_date) <= new Date()
+                              ? "text-red-500 font-medium"
+                              : "text-foreground"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        <span className="truncate">
+                          {record.next_follow_up_date ? (
+                            format(new Date(record.next_follow_up_date), 'MMM d, yyyy')
+                          ) : (
+                            'Click to set'
+                          )}
+                        </span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={record.next_follow_up_date ? new Date(record.next_follow_up_date) : undefined}
+                        onSelect={async (date) => {
+                          if (date) {
+                            try {
+                              await updateMutation.mutateAsync({
+                                document_number: record.document_number,
+                                next_follow_up_date: date.toISOString(),
+                              });
+                              toast({
+                                title: 'Next Follow-Up Date Updated',
+                                description: `Next follow-up date set to ${format(date, 'MMM d, yyyy')}`,
+                              });
+                              queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                            } catch (error) {
+                              console.error('Error updating next follow-up date:', error);
+                              toast({
+                                title: 'Error',
+                                description: 'Failed to update next follow-up date',
+                                variant: 'destructive',
+                              });
+                            }
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 min-w-0"
+                  onClick={() => {
+                    setViewRecord(record);
+                    setViewOpen(true);
+                  }}
+                >
+                  <Eye className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                  <span className="truncate">View</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 min-w-0"
+                  onClick={() => {
+                    if (record.latitude != null && record.longitude != null) {
+                      const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(record.address)},+${encodeURIComponent(record.city)},+TX+${record.zip}/@${record.latitude},${record.longitude},16z`;
+                      window.open(mapsUrl, '_blank');
+                    } else {
+                      toast({
+                        title: 'Location not available',
+                        description: 'Latitude and longitude are not available for this property',
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                  disabled={record.latitude == null || record.longitude == null}
+                >
+                  <Send className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                  <span className="truncate">Maps</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-shrink-0"
+                  onClick={() => {
+                    window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+                  }}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
