@@ -2752,10 +2752,7 @@ export function PreForeclosureView() {
                       <thead className="bg-secondary/50">
                         <tr>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Document #</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">City</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">ZIP</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Actions</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
@@ -2785,19 +2782,19 @@ export function PreForeclosureView() {
                                         <Badge variant="default" className="bg-primary">Depot</Badge>
                                         <Button
                                           size="sm"
-                                          variant="outline"
+                                          variant="default"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
                                           }}
                                           disabled={removingRecordId === routeRecord.id}
-                                          className="h-7 w-7 p-0 text-red-500 border-red-500/50 hover:text-red-600 hover:bg-red-500/20 hover:border-red-500"
+                                          className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white border-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                           title="Remove from route"
                                         >
                                           {removingRecordId === routeRecord.id ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-red-500" />
+                                            <Loader2 className="h-4 w-4 animate-spin" />
                                           ) : (
-                                            <X className="h-3.5 w-3.5" />
+                                            <X className="h-4 w-4" />
                                           )}
                                         </Button>
                                       </>
@@ -2806,28 +2803,28 @@ export function PreForeclosureView() {
                                         <span className="font-medium">{routeRecord.orderIndex}</span>
                                         <Button
                                           size="sm"
-                                          variant="outline"
+                                          variant="default"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
                                           }}
                                           disabled={removingRecordId === routeRecord.id}
-                                          className="h-7 w-7 p-0 text-red-500 border-red-500/50 hover:text-red-600 hover:bg-red-500/20 hover:border-red-500"
+                                          className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white border-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                           title="Remove from route"
                                         >
                                           {removingRecordId === routeRecord.id ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-red-500" />
+                                            <Loader2 className="h-4 w-4 animate-spin" />
                                           ) : (
-                                            <X className="h-3.5 w-3.5" />
+                                            <X className="h-4 w-4" />
                                           )}
                                         </Button>
                                       </>
                                     )}
                                     {/* Reorder buttons */}
-                                    <div className="flex flex-col gap-0.5 ml-1">
+                                    <div className="flex flex-col gap-1 ml-2">
                                       <Button
                                         size="sm"
-                                        variant="outline"
+                                        variant="default"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleReorderRecord(viewRoute.id, routeRecord.id, 'up');
@@ -2836,7 +2833,7 @@ export function PreForeclosureView() {
                                           reorderingRecordId === routeRecord.id ||
                                           index === 0
                                         }
-                                        className="h-7 w-7 p-0 border-border hover:bg-secondary"
+                                        className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Move up"
                                       >
                                         {reorderingRecordId === routeRecord.id ? (
@@ -2847,7 +2844,7 @@ export function PreForeclosureView() {
                                       </Button>
                                       <Button
                                         size="sm"
-                                        variant="outline"
+                                        variant="default"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleReorderRecord(viewRoute.id, routeRecord.id, 'down');
@@ -2856,7 +2853,7 @@ export function PreForeclosureView() {
                                           reorderingRecordId === routeRecord.id ||
                                           index === (viewRoute.records?.length || 0) - 1
                                         }
-                                        className="h-7 w-7 p-0 border-border hover:bg-secondary"
+                                        className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Move down"
                                       >
                                         {reorderingRecordId === routeRecord.id ? (
@@ -2868,10 +2865,7 @@ export function PreForeclosureView() {
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-4 py-2 text-sm font-mono">{documentNumber}</td>
                                 <td className="px-4 py-2 text-sm">{record.address}</td>
-                                <td className="px-4 py-2 text-sm">{record.city}</td>
-                                <td className="px-4 py-2 text-sm">{record.zip}</td>
                                 <td className="px-4 py-2 text-sm">
                                   {record.visited ? (
                                     <Badge variant="outline" className="bg-green-500/20 text-green-600 border-green-500">
