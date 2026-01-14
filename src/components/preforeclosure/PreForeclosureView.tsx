@@ -169,26 +169,33 @@ function SortableRow({
         {documentNumber && record && handleStatusChange && (
           <Select
             value={(record as any).internal_status || (record as any).internalStatus || 'New'}
-            onValueChange={(value) => {
+            onValueChange={async (value) => {
+              console.log('Select onValueChange called with:', value);
               if (handleStatusChange) {
-                // Create a proper PreForeclosureRecord object for handleStatusChange
-                const fullRecord: PreForeclosureRecord = {
-                  document_number: documentNumber,
-                  type: (record as any).type || 'Mortgage',
-                  address: (record as any).address || '',
-                  city: (record as any).city || '',
-                  zip: (record as any).zip || '',
-                  filing_month: (record as any).filing_month || (record as any).filingMonth || '',
-                  county: (record as any).county || 'Bexar',
-                  internal_status: value as PreForeclosureStatus,
-                  inactive: (record as any).inactive || false,
-                  first_seen_month: (record as any).first_seen_month || (record as any).firstSeenMonth || '',
-                  last_seen_month: (record as any).last_seen_month || (record as any).lastSeenMonth || '',
-                  created_at: (record as any).created_at || (record as any).createdAt || new Date().toISOString(),
-                  updated_at: (record as any).updated_at || (record as any).updatedAt || new Date().toISOString(),
-                  ...(record as any),
-                };
-                handleStatusChange(fullRecord, value as PreForeclosureStatus);
+                try {
+                  // Create a proper PreForeclosureRecord object for handleStatusChange
+                  const fullRecord: PreForeclosureRecord = {
+                    document_number: documentNumber,
+                    type: (record as any).type || 'Mortgage',
+                    address: (record as any).address || '',
+                    city: (record as any).city || '',
+                    zip: (record as any).zip || '',
+                    filing_month: (record as any).filing_month || (record as any).filingMonth || '',
+                    county: (record as any).county || 'Bexar',
+                    internal_status: value as PreForeclosureStatus,
+                    inactive: (record as any).inactive || false,
+                    first_seen_month: (record as any).first_seen_month || (record as any).firstSeenMonth || '',
+                    last_seen_month: (record as any).last_seen_month || (record as any).lastSeenMonth || '',
+                    created_at: (record as any).created_at || (record as any).createdAt || new Date().toISOString(),
+                    updated_at: (record as any).updated_at || (record as any).updatedAt || new Date().toISOString(),
+                    ...(record as any),
+                  };
+                  console.log('Calling handleStatusChange with:', fullRecord, value);
+                  await handleStatusChange(fullRecord, value as PreForeclosureStatus);
+                  console.log('handleStatusChange completed');
+                } catch (error) {
+                  console.error('Error in onValueChange:', error);
+                }
               }
             }}
           >
@@ -256,10 +263,15 @@ function SortableRow({
       <td className="px-4 py-2 text-sm">
         {/* Drag Handle - Far Right */}
         <div
+          ref={setActivatorNodeRef}
           {...attributes}
           {...listeners}
           className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded flex items-center justify-center"
           title="Drag to reorder"
+          onPointerDown={(e) => {
+            // Only allow dragging from this handle
+            e.stopPropagation();
+          }}
         >
           <GripVertical className="h-5 w-5 text-muted-foreground" />
         </div>
