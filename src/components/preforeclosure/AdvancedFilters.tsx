@@ -21,6 +21,10 @@ export interface PreForeclosureAdvancedFilters {
   month: string;
   status: PreForeclosureStatus | 'all';
   needsFollowUp: boolean;
+  hasVisited: boolean;
+  hasNotes: boolean;
+  hasPhoneNumbers: boolean;
+  hasTask: boolean;
 }
 
 interface AdvancedFiltersProps {
@@ -173,6 +177,62 @@ export function AdvancedFiltersPanel({
               />
               <Label htmlFor="needsFollowUp" className="cursor-pointer">
                 Needs Follow-Up
+              </Label>
+            </div>
+          </div>
+
+          {/* Has Visited Filter */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="hasVisited"
+                checked={filters.hasVisited}
+                onCheckedChange={(checked) => updateFilter('hasVisited', checked as boolean)}
+              />
+              <Label htmlFor="hasVisited" className="cursor-pointer">
+                Has Been Visited
+              </Label>
+            </div>
+          </div>
+
+          {/* Has Notes Filter */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="hasNotes"
+                checked={filters.hasNotes}
+                onCheckedChange={(checked) => updateFilter('hasNotes', checked as boolean)}
+              />
+              <Label htmlFor="hasNotes" className="cursor-pointer">
+                Has Notes
+              </Label>
+            </div>
+          </div>
+
+          {/* Has Phone Numbers Filter */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="hasPhoneNumbers"
+                checked={filters.hasPhoneNumbers}
+                onCheckedChange={(checked) => updateFilter('hasPhoneNumbers', checked as boolean)}
+              />
+              <Label htmlFor="hasPhoneNumbers" className="cursor-pointer">
+                Has Phone Numbers
+              </Label>
+            </div>
+          </div>
+
+          {/* Has Task Filter */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="hasTask"
+                checked={filters.hasTask}
+                onCheckedChange={(checked) => updateFilter('hasTask', checked as boolean)}
+              />
+              <Label htmlFor="hasTask" className="cursor-pointer">
+                Has Task
               </Label>
             </div>
           </div>

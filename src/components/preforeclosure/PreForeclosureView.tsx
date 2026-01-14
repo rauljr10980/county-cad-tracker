@@ -229,6 +229,10 @@ export function PreForeclosureView() {
     month: 'all',
     status: 'all',
     needsFollowUp: false,
+    hasVisited: false,
+    hasNotes: false,
+    hasPhoneNumbers: false,
+    hasTask: false,
   });
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosureRecord | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -338,6 +342,32 @@ export function PreForeclosureView() {
       );
     }
 
+    // Has visited filter
+    if (advancedFilters.hasVisited) {
+      filtered = filtered.filter(r => r.visited === true);
+    }
+
+    // Has notes filter
+    if (advancedFilters.hasNotes) {
+      filtered = filtered.filter(r => r.notes && r.notes.trim().length > 0);
+    }
+
+    // Has phone numbers filter
+    if (advancedFilters.hasPhoneNumbers) {
+      filtered = filtered.filter(r => {
+        const phones = Array.isArray(r.phoneNumbers) ? r.phoneNumbers : [];
+        return phones.length > 0 && phones.some(phone => phone && phone.trim().length > 0);
+      });
+    }
+
+    // Has task filter
+    if (advancedFilters.hasTask) {
+      filtered = filtered.filter(r => {
+        // A record has a task if it has actionType and dueTime
+        return !!(r.actionType && r.dueTime);
+      });
+    }
+
     return filtered;
   }, [records, searchQuery, advancedFilters]);
 
@@ -350,6 +380,10 @@ export function PreForeclosureView() {
     if (advancedFilters.month !== 'all') count++;
     if (advancedFilters.status !== 'all') count++;
     if (advancedFilters.needsFollowUp) count++;
+    if (advancedFilters.hasVisited) count++;
+    if (advancedFilters.hasNotes) count++;
+    if (advancedFilters.hasPhoneNumbers) count++;
+    if (advancedFilters.hasTask) count++;
     return count;
   }, [advancedFilters]);
 
@@ -367,6 +401,10 @@ export function PreForeclosureView() {
       month: 'all',
       status: 'all',
       needsFollowUp: false,
+      hasVisited: false,
+      hasNotes: false,
+      hasPhoneNumbers: false,
+      hasTask: false,
     });
     setSearchQuery('');
   };
