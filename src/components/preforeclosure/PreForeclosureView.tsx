@@ -717,11 +717,57 @@ export function PreForeclosureView() {
       const result = await reorderRecordInRoute(viewRoute.id, recordId, newIndex);
       
       if (result.route) {
-        setViewRoute(result.route);
+        // Rebuild routeData waypoints based on new order
+        const sortedRecords = [...result.route.records].sort((a, b) => a.orderIndex - b.orderIndex);
+        const recordMap = new Map<string, any>();
+        sortedRecords.forEach(rr => {
+          const docNum = rr.record?.documentNumber || rr.record?.document_number;
+          if (docNum) {
+            recordMap.set(docNum, rr);
+          }
+        });
+        
+        // Rebuild waypoints in the correct order
+        const allWaypoints: any[] = [];
+        sortedRecords.forEach(rr => {
+          const docNum = rr.record?.documentNumber || rr.record?.document_number;
+          if (!docNum) return;
+          
+          // Find matching waypoint in original routeData
+          const originalRouteData = result.route.routeData || viewRoute.routeData;
+          const matchingWaypoint = originalRouteData?.routes?.[0]?.waypoints?.find((wp: any) => {
+            const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
+            return wpId === docNum || (wpId === 'depot' && rr.isDepot);
+          });
+          
+          if (matchingWaypoint) {
+            allWaypoints.push({
+              ...matchingWaypoint,
+              id: rr.isDepot ? 'depot' : docNum,
+              isDepot: rr.isDepot,
+              order: rr.orderIndex
+            });
+          }
+        });
+        
+        // Update routeData with reordered waypoints
+        const updatedRoute = {
+          ...result.route,
+          routeData: {
+            ...result.route.routeData,
+            routes: [{
+              ...result.route.routeData?.routes?.[0],
+              waypoints: allWaypoints,
+              distance: result.route.routeData?.routes?.[0]?.distance || 0
+            }]
+          }
+        };
+        
+        setViewRoute(updatedRoute);
         
         // Update activeRoutes to reflect the change
         setActiveRoutes(prev => prev.map(route => 
-          route.id === viewRoute.id ? result.route : route
+          route.id === viewRoute.id ? updatedRoute : route
         ));
       }
       
@@ -2899,21 +2945,48 @@ export function PreForeclosureView() {
                         return;
                       }
                       
-                      // Filter routeData waypoints to only include records that are still in the route
-                      const currentRecordIds = new Set(routeRecordIds);
+                      // Get current route records sorted by orderIndex
+                      const sortedRecords = [...viewRoute.records].sort((a, b) => a.orderIndex - b.orderIndex);
+                      
+                      // Create a map of document numbers to route records for quick lookup
+                      const recordMap = new Map<string, any>();
+                      sortedRecords.forEach(rr => {
+                        const docNum = rr.record?.documentNumber || rr.record?.document_number;
+                        if (docNum) {
+                          recordMap.set(docNum, rr);
+                        }
+                      });
+                      
+                      // Rebuild waypoints in the correct order based on current orderIndex
+                      const allWaypoints: any[] = [];
+                      sortedRecords.forEach(rr => {
+                        const docNum = rr.record?.documentNumber || rr.record?.document_number;
+                        if (!docNum) return;
+                        
+                        // Find matching waypoint in original routeData
+                        const matchingWaypoint = viewRoute.routeData?.routes?.[0]?.waypoints?.find((wp: any) => {
+                          const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
+                          return wpId === docNum || wpId === 'depot' && rr.isDepot;
+                        });
+                        
+                        if (matchingWaypoint) {
+                          allWaypoints.push({
+                            ...matchingWaypoint,
+                            id: rr.isDepot ? 'depot' : docNum,
+                            isDepot: rr.isDepot,
+                            order: rr.orderIndex
+                          });
+                        }
+                      });
+                      
+                      // Rebuild routeData with reordered waypoints
                       const filteredRouteData = {
                         ...viewRoute.routeData,
-                        routes: viewRoute.routeData.routes?.map((route: any) => ({
-                          ...route,
-                          waypoints: route.waypoints.filter((wp: any) => {
-                            // Keep depot waypoint
-                            if (wp.id === 'depot' || wp.isDepot) return true;
-                            
-                            // Check if this waypoint's ID matches any current record
-                            const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
-                            return currentRecordIds.has(wpId);
-                          })
-                        })).filter((route: any) => route.waypoints.length > 0) || []
+                        routes: [{
+                          ...viewRoute.routeData.routes?.[0],
+                          waypoints: allWaypoints,
+                          distance: viewRoute.routeData.routes?.[0]?.distance || 0
+                        }]
                       };
                       
                       // Recalculate total distance
