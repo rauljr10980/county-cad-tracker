@@ -165,48 +165,45 @@ function SortableRow({
       <td className="px-4 py-2 text-sm">{record.address}</td>
       <td className="px-4 py-2 text-sm hidden">{record.city}</td>
       <td className="px-4 py-2 text-sm hidden">{record.zip}</td>
-      <td className="px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>
+      <td className="px-4 py-2 text-sm">
         {documentNumber && record && handleStatusChange && (
-          <div onClick={(e) => e.stopPropagation()}>
-            <Select
-              value={(record as any).internal_status || (record as any).internalStatus || 'New'}
-              onValueChange={(value) => {
-                if (handleStatusChange) {
-                  // Create a proper PreForeclosureRecord object for handleStatusChange
-                  const fullRecord: PreForeclosureRecord = {
-                    document_number: documentNumber,
-                    type: (record as any).type || 'Mortgage',
-                    address: (record as any).address || '',
-                    city: (record as any).city || '',
-                    zip: (record as any).zip || '',
-                    filing_month: (record as any).filing_month || (record as any).filingMonth || '',
-                    county: (record as any).county || 'Bexar',
-                    internal_status: value as PreForeclosureStatus,
-                    inactive: (record as any).inactive || false,
-                    first_seen_month: (record as any).first_seen_month || (record as any).firstSeenMonth || '',
-                    last_seen_month: (record as any).last_seen_month || (record as any).lastSeenMonth || '',
-                    created_at: (record as any).created_at || (record as any).createdAt || new Date().toISOString(),
-                    updated_at: (record as any).updated_at || (record as any).updatedAt || new Date().toISOString(),
-                    ...(record as any),
-                  };
-                  handleStatusChange(fullRecord, value as PreForeclosureStatus);
-                }
-              }}
+          <Select
+            value={(record as any).internal_status || (record as any).internalStatus || 'New'}
+            onValueChange={(value) => {
+              if (handleStatusChange) {
+                // Create a proper PreForeclosureRecord object for handleStatusChange
+                const fullRecord: PreForeclosureRecord = {
+                  document_number: documentNumber,
+                  type: (record as any).type || 'Mortgage',
+                  address: (record as any).address || '',
+                  city: (record as any).city || '',
+                  zip: (record as any).zip || '',
+                  filing_month: (record as any).filing_month || (record as any).filingMonth || '',
+                  county: (record as any).county || 'Bexar',
+                  internal_status: value as PreForeclosureStatus,
+                  inactive: (record as any).inactive || false,
+                  first_seen_month: (record as any).first_seen_month || (record as any).firstSeenMonth || '',
+                  last_seen_month: (record as any).last_seen_month || (record as any).lastSeenMonth || '',
+                  created_at: (record as any).created_at || (record as any).createdAt || new Date().toISOString(),
+                  updated_at: (record as any).updated_at || (record as any).updatedAt || new Date().toISOString(),
+                  ...(record as any),
+                };
+                handleStatusChange(fullRecord, value as PreForeclosureStatus);
+              }
+            }}
+          >
+            <SelectTrigger 
+              className="h-8 text-xs w-full cursor-pointer hover:bg-secondary/50 border-border"
             >
-              <SelectTrigger 
-                className="h-8 text-xs w-full cursor-pointer hover:bg-secondary/50 border-border"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent onClick={(e) => e.stopPropagation()}>
-                <SelectItem value="New">New</SelectItem>
-                <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-                <SelectItem value="Monitoring">Monitoring</SelectItem>
-                <SelectItem value="Dead">Dead</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="New">New</SelectItem>
+              <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
+              <SelectItem value="Monitoring">Monitoring</SelectItem>
+              <SelectItem value="Dead">Dead</SelectItem>
+            </SelectContent>
+          </Select>
         )}
       </td>
       <td className="px-4 py-2 text-sm">
