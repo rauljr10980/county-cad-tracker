@@ -447,7 +447,8 @@ export function PreForeclosureView() {
           return docNum === record.document_number;
         });
         if (routeRecord && routeRecord.record) {
-          routeRecord.record.internal_status = newStatus;
+          // Update the record's internal_status (handle both camelCase and snake_case)
+          (routeRecord.record as any).internal_status = newStatus;
           // Update viewRoute to trigger re-render
           setViewRoute({ ...viewRoute });
         }
