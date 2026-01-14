@@ -544,11 +544,11 @@ export function AreaSelectorMap({
           ))}
         </div>
 
-        <div className="flex gap-4 flex-1 min-h-0 items-start">
+        <div className="flex gap-4 flex-1 min-h-0">
           {/* Controls Sidebar - Left side */}
-          <div className="w-80 flex flex-col gap-4 h-full">
+          <div className="w-80 flex flex-col gap-4">
             {/* Content area - top */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0">
               {step === 1 && (
                 <div className="space-y-4">
                   <div className="text-sm text-muted-foreground">
@@ -777,7 +777,8 @@ export function AreaSelectorMap({
           </div>
 
           {/* Map - Right side, aligned to start at Back button level */}
-          <div className="flex-1 relative" style={{ marginTop: 'auto', alignSelf: 'flex-start', height: '100%' }}>
+          <div className="flex-1 relative flex items-end" style={{ minHeight: 0 }}>
+            <div className="w-full" style={{ height: 'calc(100% - 0px)', marginTop: 'auto' }}>
             <MapContainer
               center={[initialCenter.lat, initialCenter.lng]}
               zoom={initialZoom}
