@@ -1396,30 +1396,36 @@ export function PreForeclosureView() {
       {headerSection}
 
 
+      {/* Create Route Button - Always Visible */}
+      <div className="flex justify-end mb-4">
+        <Button
+          onClick={() => {
+            // Select all filtered records
+            const allRecordIds = new Set<string>();
+            filteredRecords.forEach(record => {
+              if (record && record.document_number) {
+                allRecordIds.add(record.document_number);
+              }
+            });
+            setSelectedRecordIds(allRecordIds);
+            // Open area selector
+            setAreaSelectorOpen(true);
+          }}
+          className="bg-green-600 hover:bg-green-700 text-white shadow-xl font-bold text-base px-6 py-2.5 border-2 border-green-400"
+          style={{ 
+            minWidth: '180px',
+            boxShadow: '0 8px 20px rgba(34, 197, 94, 0.5)',
+            zIndex: 1000
+          }}
+        >
+          <MapPin className="h-4 w-4 mr-2" />
+          Create Route
+        </Button>
+      </div>
+
       {/* Active Routes Dashboard */}
       <div className="bg-card border border-border rounded-lg p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <h3 className="text-lg font-semibold">Active Routes</h3>
-          <Button
-            onClick={() => {
-              // Select all filtered records
-              const allRecordIds = new Set<string>();
-              filteredRecords.forEach(record => {
-                if (record && record.document_number) {
-                  allRecordIds.add(record.document_number);
-                }
-              });
-              setSelectedRecordIds(allRecordIds);
-              // Open area selector
-              setAreaSelectorOpen(true);
-            }}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg font-semibold text-base px-6 py-2.5 w-full sm:w-auto"
-            size="lg"
-          >
-            <MapPin className="h-5 w-5 mr-2" />
-            Create Route
-          </Button>
-        </div>
+        <h3 className="text-lg font-semibold mb-4">Active Routes</h3>
         {isLoadingActiveRoutes ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
