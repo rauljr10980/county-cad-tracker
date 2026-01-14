@@ -3180,165 +3180,168 @@ export function PreForeclosureView() {
             </DialogDescription>
           </DialogHeader>
 
-          {!viewRoute ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Route Summary */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-secondary/30 rounded-lg">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Driver</div>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${viewRoute.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500'}`} />
-                    <span className="font-semibold">{viewRoute.driver}</span>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={(() => {
+                if (!viewRoute) return [];
+                const validRecords = (viewRoute.records || []).filter(rr => rr && rr.record);
+                return validRecords.sort((a, b) => a.orderIndex - b.orderIndex).map(rr => rr.id);
+              })()}
+              strategy={verticalListSortingStrategy}
+            >
+              {!viewRoute ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Route Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-secondary/30 rounded-lg">
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Driver</div>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${viewRoute.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500'}`} />
+                        <span className="font-semibold">{viewRoute.driver}</span>
       </div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Status</div>
-                  <div className="font-semibold">{viewRoute.status}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Created</div>
-                  <div className="font-semibold">
-                    {viewRoute.createdAt ? new Date(viewRoute.createdAt).toLocaleDateString() : 'N/A'}
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Status</div>
+                      <div className="font-semibold">{viewRoute.status}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Created</div>
+                      <div className="font-semibold">
+                        {viewRoute.createdAt ? new Date(viewRoute.createdAt).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                    {viewRoute.routeData?.totalDistance && (
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Distance</div>
+                        <div className="font-semibold">{viewRoute.routeData.totalDistance.toFixed(2)} km</div>
+                      </div>
+                    )}
                   </div>
-                </div>
-                {viewRoute.routeData?.totalDistance && (
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-1">Distance</div>
-                    <div className="font-semibold">{viewRoute.routeData.totalDistance.toFixed(2)} km</div>
-                  </div>
-                )}
-              </div>
 
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (viewRoute?.routeData) {
-                      // Extract record IDs from the route (current records in the route)
-                      const routeRecordIds = (viewRoute.records || [])
-                        .map((rr: any) => {
-                          const docNumber = rr.record?.documentNumber || rr.record?.document_number || rr.documentNumber || rr.document_number;
-                          return docNumber;
-                        })
-                        .filter(Boolean);
-                      
-                      // Ensure we have record IDs
-                      if (routeRecordIds.length === 0) {
-                        toast({
-                          title: "Error",
-                          description: "No records found in route. Cannot display route map.",
-                          variant: "destructive",
-                        });
-                        return;
-                      }
-                      
-                      // Get current route records sorted by orderIndex
-                      const sortedRecords = [...(viewRoute.records || [])].sort((a, b) => a.orderIndex - b.orderIndex);
-                      
-                      // Create a map of document numbers to route records for quick lookup
-                      const recordMap = new Map<string, any>();
-                      sortedRecords.forEach(rr => {
-                        const docNum = rr.record?.documentNumber || rr.record?.document_number;
-                        if (docNum) {
-                          recordMap.set(docNum, rr);
-                        }
-                      });
-                      
-                      // Rebuild waypoints in the correct order based on current orderIndex
-                      const allWaypoints: any[] = [];
-                      sortedRecords.forEach(rr => {
-                        const docNum = rr.record?.documentNumber || rr.record?.document_number;
-                        if (!docNum) return;
-                        
-                        // Find matching waypoint in original routeData
-                        const matchingWaypoint = viewRoute.routeData?.routes?.[0]?.waypoints?.find((wp: any) => {
-                          const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
-                          return wpId === docNum || wpId === 'depot' && rr.isDepot;
-                        });
-                        
-                        if (matchingWaypoint) {
-                          allWaypoints.push({
-                            ...matchingWaypoint,
-                            id: rr.isDepot ? 'depot' : docNum,
-                            isDepot: rr.isDepot,
-                            order: rr.orderIndex
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (viewRoute?.routeData) {
+                          // Extract record IDs from the route (current records in the route)
+                          const routeRecordIds = (viewRoute.records || [])
+                            .map((rr: any) => {
+                              const docNumber = rr.record?.documentNumber || rr.record?.document_number || rr.documentNumber || rr.document_number;
+                              return docNumber;
+                            })
+                            .filter(Boolean);
+                          
+                          // Ensure we have record IDs
+                          if (routeRecordIds.length === 0) {
+                            toast({
+                              title: "Error",
+                              description: "No records found in route. Cannot display route map.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          
+                          // Get current route records sorted by orderIndex
+                          const sortedRecords = [...(viewRoute.records || [])].sort((a, b) => a.orderIndex - b.orderIndex);
+                          
+                          // Create a map of document numbers to route records for quick lookup
+                          const recordMap = new Map<string, any>();
+                          sortedRecords.forEach(rr => {
+                            const docNum = rr.record?.documentNumber || rr.record?.document_number;
+                            if (docNum) {
+                              recordMap.set(docNum, rr);
+                            }
                           });
+                          
+                          // Rebuild waypoints in the correct order based on current orderIndex
+                          const allWaypoints: any[] = [];
+                          sortedRecords.forEach(rr => {
+                            const docNum = rr.record?.documentNumber || rr.record?.document_number;
+                            if (!docNum) return;
+                            
+                            // Find matching waypoint in original routeData
+                            const matchingWaypoint = viewRoute.routeData?.routes?.[0]?.waypoints?.find((wp: any) => {
+                              const wpId = wp.id || wp.documentNumber || wp.document_number || wp.originalId;
+                              return wpId === docNum || wpId === 'depot' && rr.isDepot;
+                            });
+                            
+                            if (matchingWaypoint) {
+                              allWaypoints.push({
+                                ...matchingWaypoint,
+                                id: rr.isDepot ? 'depot' : docNum,
+                                isDepot: rr.isDepot,
+                                order: rr.orderIndex
+                              });
+                            }
+                          });
+                          
+                          // Rebuild routeData with reordered waypoints
+                          const filteredRouteData = {
+                            ...viewRoute.routeData,
+                            routes: [{
+                              ...viewRoute.routeData.routes?.[0],
+                              waypoints: allWaypoints,
+                              distance: viewRoute.routeData.routes?.[0]?.distance || 0
+                            }]
+                          };
+                          
+                          // Recalculate total distance
+                          filteredRouteData.totalDistance = filteredRouteData.routes.reduce(
+                            (sum: number, route: any) => sum + (route.distance || 0), 
+                            0
+                          );
+                          
+                          // Set optimizedRecordIds BEFORE setting optimizedRoutes to ensure it's available when RouteMap opens
+                          setOptimizedRecordIds(routeRecordIds);
+                          setOptimizedRoutes(filteredRouteData);
+                          setRouteMapOpen(true);
                         }
-                      });
-                      
-                      // Rebuild routeData with reordered waypoints
-                      const filteredRouteData = {
-                        ...viewRoute.routeData,
-                        routes: [{
-                          ...viewRoute.routeData.routes?.[0],
-                          waypoints: allWaypoints,
-                          distance: viewRoute.routeData.routes?.[0]?.distance || 0
-                        }]
-                      };
-                      
-                      // Recalculate total distance
-                      filteredRouteData.totalDistance = filteredRouteData.routes.reduce(
-                        (sum: number, route: any) => sum + (route.distance || 0), 
-                        0
-                      );
-                      
-                      // Set optimizedRecordIds BEFORE setting optimizedRoutes to ensure it's available when RouteMap opens
-                      setOptimizedRecordIds(routeRecordIds);
-                      setOptimizedRoutes(filteredRouteData);
-                      setRouteMapOpen(true);
-                    }
-                  }}
-                >
-                  <RouteIcon className="h-4 w-4 mr-2" />
-                  View Route Map
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleDeleteRoute(viewRoute.id)}
-                  disabled={deletingRoute === viewRoute.id}
-                >
-                  {deletingRoute === viewRoute.id ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Deleting...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Route
-                    </>
-                  )}
-                </Button>
-              </div>
+                      }}
+                    >
+                      <RouteIcon className="h-4 w-4 mr-2" />
+                      View Route Map
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteRoute(viewRoute.id)}
+                      disabled={deletingRoute === viewRoute.id}
+                    >
+                      {deletingRoute === viewRoute.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Route
+                        </>
+                      )}
+                    </Button>
+                  </div>
 
-              {/* Route Records List */}
-              <div>
-                {(() => {
-                  const validRecords = (viewRoute.records || []).filter(rr => rr && rr.record);
-                  const sortedRecords = validRecords.sort((a, b) => a.orderIndex - b.orderIndex);
-                  const sortableItems = sortedRecords.map(rr => rr.id);
-                  
-                  return (
-                    <>
-                      <h3 className="text-lg font-semibold mb-3">Route Stops ({validRecords.length})</h3>
-                      <div className="border border-border rounded-lg overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={handleDragEnd}
-                          >
-                            <SortableContext
-                              items={sortableItems}
-                              strategy={verticalListSortingStrategy}
-                            >
+                  {/* Route Records List */}
+                  <div>
+                    {(() => {
+                      const validRecords = (viewRoute.records || []).filter(rr => rr && rr.record);
+                      const sortedRecords = validRecords.sort((a, b) => a.orderIndex - b.orderIndex);
+                      
+                      return (
+                        <>
+                          <h3 className="text-lg font-semibold mb-3">Route Stops ({validRecords.length})</h3>
+                          <div className="border border-border rounded-lg overflow-hidden">
+                            <div className="overflow-x-auto">
                               <table className="w-full">
                                 <thead className="bg-secondary/50">
                                   <tr>
@@ -3388,16 +3391,16 @@ export function PreForeclosureView() {
                                   )}
                                 </tbody>
                               </table>
-                            </SortableContext>
-                          </DndContext>
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </SortableContext>
+          </DndContext>
         </DialogContent>
       </Dialog>
 
