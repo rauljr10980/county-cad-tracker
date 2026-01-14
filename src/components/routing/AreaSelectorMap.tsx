@@ -801,6 +801,52 @@ export function AreaSelectorMap({
                 {selectedShape && <MapBoundsFitter bounds={selectedShape.bounds} />}
               </MapContainer>
             </div>
+
+            {/* Navigation buttons - below map */}
+            <div className="flex-shrink-0 space-y-2">
+              <div className="flex gap-2">
+                {step > 1 && (
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleBackStep}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Button>
+                )}
+                {step < 4 && (
+                  <Button
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    onClick={handleNextStep}
+                    disabled={
+                      (step === 1 && (!closestProperty || !pinLocation)) ||
+                      (step === 2 && !selectedShape) ||
+                      (step === 3 && selectedProperties.length === 0)
+                    }
+                  >
+                    Next
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                )}
+                {step === 4 && (
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={handleOptimize}
+                  >
+                    <Route className="h-4 w-4 mr-2" />
+                    Optimize Route
+                  </Button>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={onClose}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
