@@ -2257,10 +2257,27 @@ export function PreForeclosureView() {
       <Dialog open={viewOpen} onOpenChange={setViewOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
-              Pre-Foreclosure Details
-            </DialogTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                <DialogTitle>Pre-Foreclosure Details</DialogTitle>
+              </div>
+              <Button
+                onClick={() => {
+                  // Select this record and open area selector
+                  if (viewRecord?.document_number) {
+                    setSelectedRecordIds(new Set([viewRecord.document_number]));
+                    setViewOpen(false); // Close the details modal
+                    setAreaSelectorOpen(true); // Open area selector
+                  }
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white"
+                size="sm"
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                Create Route
+              </Button>
+            </div>
             <DialogDescription>
               Document #{viewRecord?.document_number}
             </DialogDescription>
