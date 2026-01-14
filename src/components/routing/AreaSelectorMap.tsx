@@ -728,11 +728,11 @@ export function AreaSelectorMap({
           </div>
 
           {/* Map - DIRECTLY BELOW Drop Pin button - FULL WIDTH */}
-          <div className="flex-1 relative w-full md:flex-1" style={{ minHeight: '400px', maxHeight: '60vh' }}>
+          <div className="flex-1 relative w-full md:flex-1 overflow-hidden" style={{ minHeight: '400px', maxHeight: '60vh' }}>
               <MapContainer
                 center={[initialCenter.lat, initialCenter.lng]}
                 zoom={initialZoom}
-                style={{ height: '100%', width: '100%' }}
+                style={{ height: '100%', width: '100%', touchAction: 'pan-y pinch-zoom' }}
                 className="rounded-lg z-0"
               >
                 <TileLayer
