@@ -126,8 +126,8 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
                     Login
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {onTabChange && (
+                <DropdownMenuContent align="end" className="z-50">
+                  {onTabChange ? (
                     <>
                       <DropdownMenuItem onClick={() => onTabChange('upload')}>
                         <Upload className="h-4 w-4 mr-2" />
@@ -138,12 +138,17 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
                         Files
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setIsLoginOpen(true)}>
+                        <LogIn className="h-4 w-4 mr-2" />
+                        Login
+                      </DropdownMenuItem>
                     </>
+                  ) : (
+                    <DropdownMenuItem onClick={() => setIsLoginOpen(true)}>
+                      <LogIn className="h-4 w-4 mr-2" />
+                      Login
+                    </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={() => setIsLoginOpen(true)}>
-                    <LogIn className="h-4 w-4 mr-2" />
-                    Login
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
