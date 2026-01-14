@@ -415,17 +415,17 @@ export function TasksView() {
       </div>
 
       {/* Header Controls */}
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
+      <div className="mb-8 flex items-center justify-between flex-wrap gap-6 pb-4 border-b border-border">
         <div>
-          <h2 className="text-xl font-semibold">Action Queue</h2>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h2 className="text-2xl font-bold tracking-tight">Action Queue</h2>
+          <p className="text-sm text-muted-foreground mt-2 font-medium">
             {filteredAndSortedTasks.length} task{filteredAndSortedTasks.length !== 1 ? 's' : ''} ready for action
           </p>
         </div>
         
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           <Select value={filterMode} onValueChange={(v) => setFilterMode(v as FilterMode)}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[160px] h-10 font-medium">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
@@ -441,7 +441,7 @@ export function TasksView() {
           </Select>
 
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[160px] h-10 font-medium">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -453,7 +453,8 @@ export function TasksView() {
 
           <Button
             variant={bulkMode ? "default" : "outline"}
-            size="sm"
+            size="default"
+            className="h-10 font-semibold px-4"
             onClick={() => {
               setBulkMode(!bulkMode);
               setSelectedIds(new Set());
@@ -466,7 +467,7 @@ export function TasksView() {
       </div>
 
       {/* Tasks List */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {filteredAndSortedTasks.map((property) => {
           const { ownerName, address } = parsePropertyAddress(property.propertyAddress);
           const status = getTaskStatus(property);
@@ -480,63 +481,82 @@ export function TasksView() {
             <div
               key={property.id}
               className={cn(
-                "bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-all",
+                "bg-card border border-border rounded-lg p-5 hover:border-primary/50 hover:shadow-md transition-all shadow-sm",
                 bulkMode && "cursor-pointer",
-                selectedIds.has(property.id) && "border-primary bg-primary/5"
+                selectedIds.has(property.id) && "border-primary bg-primary/5 shadow-md"
               )}
               onClick={() => bulkMode && handleBulkToggle(property.id)}
             >
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-6">
                 {/* Checkbox (bulk mode) */}
                 {bulkMode && (
-                  <div>
+                  <div className="flex-shrink-0">
                     <input
                       type="checkbox"
                       checked={selectedIds.has(property.id)}
                       onChange={() => handleBulkToggle(property.id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4"
+                      className="h-5 w-5 rounded border-2 border-border cursor-pointer accent-primary"
                     />
                   </div>
                 )}
 
                 {/* Simplified Content: CALL HIGH LUCIANO MARKETVALUE/AMOUNT DUE */}
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <span className="text-sm font-semibold uppercase">
-                    {actionLabel.replace(/[📞💬✉️🚗]/g, '').trim()}
-                  </span>
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  {/* Action Type */}
+                  <div className="flex items-center gap-2 min-w-[80px]">
+                    <span className="text-base font-bold uppercase tracking-wide text-foreground">
+                      {actionLabel.replace(/[📞💬✉️🚗]/g, '').trim()}
+                    </span>
+                  </div>
+
+                  {/* Priority Badge */}
                   <Badge
                     variant="outline"
                     className={cn(
-                      "text-xs",
+                      "text-xs font-semibold px-3 py-1 rounded-md border-2 min-w-[60px] text-center",
                       PRIORITY_COLORS[priority]
                     )}
                   >
                     {priority.toUpperCase()}
                   </Badge>
+
+                  {/* Assigned To */}
                   {property.assignedTo && (
-                    <span className="text-sm font-medium uppercase">
-                      {property.assignedTo}
-                    </span>
+                    <div className="flex items-center gap-2 min-w-[100px]">
+                      <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        {property.assignedTo}
+                      </span>
+                    </div>
                   )}
-                  <span className="text-sm font-mono font-semibold text-judgment ml-auto">
-                    {formatCurrency(property.totalAmountDue)}
-                  </span>
+
+                  {/* Amount Due - Right aligned */}
+                  <div className="ml-auto flex-shrink-0">
+                    <span className={cn(
+                      "text-lg font-bold font-mono tracking-tight",
+                      property.totalAmountDue > 0 ? "text-green-500" : "text-muted-foreground"
+                    )}>
+                      {formatCurrency(property.totalAmountDue)}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Mark Done Button */}
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedForOutcome(property);
-                    setSelectedOutcome(property.lastOutcome || '');
-                  }}
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Mark Done
-                </Button>
+                <div className="flex-shrink-0">
+                  <Button
+                    variant="default"
+                    size="default"
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 shadow-md hover:shadow-lg transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedForOutcome(property);
+                      setSelectedOutcome(property.lastOutcome || '');
+                    }}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Mark Done
+                  </Button>
+                </div>
               </div>
             </div>
           );
