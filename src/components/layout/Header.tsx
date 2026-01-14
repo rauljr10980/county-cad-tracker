@@ -1,4 +1,4 @@
-import { Building2, RefreshCw, Settings, LogIn, LogOut, User, Menu, X, CheckSquare, Upload } from 'lucide-react';
+import { Building2, RefreshCw, Settings, LogIn, LogOut, User, Menu, X, Upload, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
@@ -23,7 +23,7 @@ import {
 interface HeaderProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
-  onTabChange?: (tab: 'tasks' | 'upload') => void;
+  onTabChange?: (tab: 'upload' | 'files') => void;
 }
 
 export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
@@ -93,13 +93,13 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
                     <DropdownMenuSeparator />
                     {onTabChange && (
                       <>
-                        <DropdownMenuItem onClick={() => onTabChange('tasks')}>
-                          <CheckSquare className="h-4 w-4 mr-2" />
-                          Tasks
-                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onTabChange('upload')}>
                           <Upload className="h-4 w-4 mr-2" />
                           Upload
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onTabChange('files')}>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Files
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                       </>
@@ -171,22 +171,22 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
                             className="justify-start mobile-touch-target"
                             onClick={() => {
                               setIsMobileMenuOpen(false);
-                              onTabChange('tasks');
+                              onTabChange('upload');
                             }}
                           >
-                            <CheckSquare className="h-5 w-5 mr-3" />
-                            Tasks
+                            <Upload className="h-5 w-5 mr-3" />
+                            Upload
                           </Button>
                           <Button
                             variant="ghost"
                             className="justify-start mobile-touch-target"
                             onClick={() => {
                               setIsMobileMenuOpen(false);
-                              onTabChange('upload');
+                              onTabChange('files');
                             }}
                           >
-                            <Upload className="h-5 w-5 mr-3" />
-                            Upload
+                            <FileText className="h-5 w-5 mr-3" />
+                            Files
                           </Button>
                         </>
                       )}

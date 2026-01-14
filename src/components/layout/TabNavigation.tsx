@@ -11,7 +11,7 @@ interface TabNavigationProps {
 const tabs = [
   { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard, shortLabel: 'Dash' },
   { id: 'properties' as TabType, label: 'Properties', icon: List, shortLabel: 'Props' },
-  { id: 'files' as TabType, label: 'Files', icon: FileText, shortLabel: 'Files' },
+  { id: 'tasks' as TabType, label: 'Tasks', icon: CheckSquare, shortLabel: 'Tasks' },
   { id: 'preforeclosure' as TabType, label: 'Pre-Foreclosure', icon: Home, shortLabel: 'Pre-FC' },
 ];
 
