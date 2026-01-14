@@ -1126,110 +1126,122 @@ export function PreForeclosureView() {
 
   // Always show header with upload button, even during loading/error
   const headerSection = (
-    <div className="flex items-center justify-between mb-6">
-      <div>
-        <h2 className="text-xl font-semibold">Pre-Foreclosure Records</h2>
-        {!isLoading && !error && (
-          <p className="text-sm text-muted-foreground mt-1">
-            {filteredRecords.length.toLocaleString()} active record{filteredRecords.length !== 1 ? 's' : ''}
-            {records.length > filteredRecords.length && (
-              <span className="ml-2">
-                ({records.length - filteredRecords.length} inactive)
+    <div className="mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">Pre-Foreclosure Records</h1>
+          {!isLoading && !error && (
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {filteredRecords.length.toLocaleString()} active record{filteredRecords.length !== 1 ? 's' : ''}
               </span>
-            )}
-          </p>
-        )}
-      </div>
-      <div className="flex gap-2 items-center">
-        {selectedRecordIds.size > 0 && (
-          <>
-            <span className="text-sm text-muted-foreground mr-2">
-              {selectedRecordIds.size} selected
-            </span>
-            <Select
-              value={numVehicles.toString()}
-              onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 Vehicle</SelectItem>
-                <SelectItem value="2">2 Vehicles</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={() => setAreaSelectorOpen(true)}
-              variant="outline"
-              size="sm"
-              title="Select area on map to filter records"
-            >
-              Select Area
-            </Button>
-            {customDepot && (
-              <Button
-                onClick={() => {
-                  setCustomDepot(null);
-                  setCustomDepotRecordId(null);
-                  toast({
-                    title: "Starting Point Cleared",
-                    description: "Starting point has been cleared. Route will use default starting point.",
-                  });
-                }}
-                variant="ghost"
-                size="sm"
-                title="Clear custom starting point"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-            <Button
-              onClick={handleCreateRoute}
-              className="bg-primary text-primary-foreground"
-              size="sm"
-              disabled={isOptimizingRoute}
-            >
-              {isOptimizingRoute ? (
+              {records.length > filteredRecords.length && (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Optimizing...
-                </>
-              ) : (
-                <>
-                  <RouteIcon className="h-4 w-4 mr-2" />
-                  Optimize Route
+                  <span className="text-muted-foreground">•</span>
+                  <span>{records.length - filteredRecords.length} inactive</span>
                 </>
               )}
-            </Button>
-            <Button
-              onClick={() => {
-                setSelectedRecordIds(new Set());
-                setRecordsInRoutes(new Set()); // Clear routes tracking so records can be selected/optimized again
-                setOptimizedRoutes(null); // Clear optimized routes
-                setCustomDepot(null); // Clear custom depot
-                setCustomDepotRecordId(null); // Clear custom depot record ID
-              }}
-              variant="outline"
-              size="sm"
-              disabled={isOptimizingRoute}
-            >
-              Clear Selection
-            </Button>
-          </>
-        )}
-        <Button 
-          onClick={() => setDeleteConfirmOpen(true)} 
-          variant="destructive" 
-          size="default"
-          disabled={records.length === 0}
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Delete All Records
-        </Button>
-        <Button onClick={() => setUploadOpen(true)} size="lg">
-          <Upload className="h-4 w-4 mr-2" />
-          Upload Pre-Foreclosure File
-        </Button>
+            </div>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          {selectedRecordIds.size > 0 && (
+            <>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-md text-sm font-medium">
+                <CheckCircle className="h-4 w-4" />
+                {selectedRecordIds.size} selected
+              </div>
+              <Select
+                value={numVehicles.toString()}
+                onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 Vehicle</SelectItem>
+                  <SelectItem value="2">2 Vehicles</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => setAreaSelectorOpen(true)}
+                variant="outline"
+                size="sm"
+                title="Select area on map to filter records"
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                Select Area
+              </Button>
+              {customDepot && (
+                <Button
+                  onClick={() => {
+                    setCustomDepot(null);
+                    setCustomDepotRecordId(null);
+                    toast({
+                      title: "Starting Point Cleared",
+                      description: "Starting point has been cleared. Route will use default starting point.",
+                    });
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  title="Clear custom starting point"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                onClick={handleCreateRoute}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                size="sm"
+                disabled={isOptimizingRoute}
+              >
+                {isOptimizingRoute ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Optimizing...
+                  </>
+                ) : (
+                  <>
+                    <RouteIcon className="h-4 w-4 mr-2" />
+                    Optimize Route
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => {
+                  setSelectedRecordIds(new Set());
+                  setRecordsInRoutes(new Set()); // Clear routes tracking so records can be selected/optimized again
+                  setOptimizedRoutes(null); // Clear optimized routes
+                  setCustomDepot(null); // Clear custom depot
+                  setCustomDepotRecordId(null); // Clear custom depot record ID
+                }}
+                variant="outline"
+                size="sm"
+                disabled={isOptimizingRoute}
+              >
+                Clear Selection
+              </Button>
+            </>
+          )}
+          <Button 
+            onClick={() => setDeleteConfirmOpen(true)} 
+            variant="destructive" 
+            size="default"
+            disabled={records.length === 0}
+            className="shadow-sm"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete All
+          </Button>
+          <Button 
+            onClick={() => setUploadOpen(true)} 
+            size="default"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Upload File
+          </Button>
+        </div>
       </div>
     </div>
   );
