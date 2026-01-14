@@ -845,6 +845,7 @@ export function AreaSelectorMap({
               )}
               {selectedShape && <MapBoundsFitter bounds={selectedShape.bounds} />}
             </MapContainer>
+            </div>
           </div>
         </div>
       </DialogContent>
