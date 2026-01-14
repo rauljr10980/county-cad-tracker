@@ -1398,7 +1398,28 @@ export function PreForeclosureView() {
 
       {/* Active Routes Dashboard */}
       <div className="bg-card border border-border rounded-lg p-4">
-        <h3 className="text-lg font-semibold mb-4">Active Routes</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Active Routes</h3>
+          <Button
+            onClick={() => {
+              // Select all filtered records
+              const allRecordIds = new Set<string>();
+              filteredRecords.forEach(record => {
+                if (record && record.document_number) {
+                  allRecordIds.add(record.document_number);
+                }
+              });
+              setSelectedRecordIds(allRecordIds);
+              // Open area selector
+              setAreaSelectorOpen(true);
+            }}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            size="sm"
+          >
+            <MapPin className="h-4 w-4 mr-2" />
+            Create Route
+          </Button>
+        </div>
         {isLoadingActiveRoutes ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
@@ -1469,29 +1490,8 @@ export function PreForeclosureView() {
             })}
           </div>
         ) : (
-          <div className="text-center py-8">
-            <p className="text-sm text-muted-foreground mb-4">No active routes</p>
-            <Button
-              onClick={() => {
-                // Select all filtered records
-                const allRecordIds = new Set<string>();
-                filteredRecords.forEach(record => {
-                  if (record && record.document_number) {
-                    allRecordIds.add(record.document_number);
-                  }
-                });
-                setSelectedRecordIds(allRecordIds);
-                // Open area selector
-                setAreaSelectorOpen(true);
-              }}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              Create Route
-            </Button>
-            <p className="text-xs text-muted-foreground mt-3">
-              Automatically selects all records and opens area selector
-            </p>
+          <div className="text-center py-8 text-sm text-muted-foreground">
+            No active routes
           </div>
         )}
       </div>
