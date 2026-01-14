@@ -513,7 +513,7 @@ export function AreaSelectorMap({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-full max-h-[90vh] !flex !flex-col overflow-y-auto overscroll-contain" style={{ touchAction: 'pan-y' }}>
+      <DialogContent className="max-w-6xl w-full max-h-[90vh] !flex !flex-col overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle>{getStepTitle()}</DialogTitle>
           <DialogDescription>
