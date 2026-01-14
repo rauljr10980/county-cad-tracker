@@ -3309,31 +3309,31 @@ export function PreForeclosureView() {
                 <h3 className="text-lg font-semibold mb-3">Route Stops ({(viewRoute.records || []).length})</h3>
                 <div className="border border-border rounded-lg overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-secondary/50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Document #</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Internal Status</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
-                        </tr>
-                      </thead>
-                      <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={(viewRoute.records || [])
+                          .sort((a, b) => a.orderIndex - b.orderIndex)
+                          .map(rr => rr.id)}
+                        strategy={verticalListSortingStrategy}
                       >
-                        <SortableContext
-                          items={(viewRoute.records || [])
-                            .sort((a, b) => a.orderIndex - b.orderIndex)
-                            .map(rr => rr.id)}
-                          strategy={verticalListSortingStrategy}
-                        >
+                        <table className="w-full">
+                          <thead className="bg-secondary/50">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Document #</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Internal Status</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
+                            </tr>
+                          </thead>
                           <tbody>
                             {(viewRoute.records || [])
                               .sort((a, b) => {
@@ -3362,10 +3362,10 @@ export function PreForeclosureView() {
                               />
                             );
                           })}
-                      </tbody>
-                        </SortableContext>
-                      </DndContext>
-                    </table>
+                          </tbody>
+                        </table>
+                      </SortableContext>
+                    </DndContext>
                   </div>
                 </div>
               </div>
