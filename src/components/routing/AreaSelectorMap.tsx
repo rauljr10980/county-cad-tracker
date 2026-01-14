@@ -776,8 +776,8 @@ export function AreaSelectorMap({
             </div>
           </div>
 
-          {/* Map - Right side, aligned with navigation buttons */}
-          <div className="flex-1 relative" style={{ height: 'calc(100% - 0px)', alignSelf: 'flex-end' }}>
+          {/* Map - Right side, aligned to start at Back button level */}
+          <div className="flex-1 relative" style={{ marginTop: 'auto', alignSelf: 'flex-start', height: '100%' }}>
             <MapContainer
               center={[initialCenter.lat, initialCenter.lng]}
               zoom={initialZoom}
