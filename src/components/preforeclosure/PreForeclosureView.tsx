@@ -3170,7 +3170,11 @@ export function PreForeclosureView() {
             </DialogDescription>
           </DialogHeader>
 
-          {viewRoute && (
+          {!viewRoute ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : (
             <div className="space-y-4">
               {/* Route Summary */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-secondary/30 rounded-lg">
@@ -3207,12 +3211,12 @@ export function PreForeclosureView() {
                   onClick={() => {
                     if (viewRoute?.routeData) {
                       // Extract record IDs from the route (current records in the route)
-                      const routeRecordIds = viewRoute.records
-                        ?.map((rr: any) => {
+                      const routeRecordIds = (viewRoute.records || [])
+                        .map((rr: any) => {
                           const docNumber = rr.record?.documentNumber || rr.record?.document_number || rr.documentNumber || rr.document_number;
                           return docNumber;
                         })
-                        .filter(Boolean) || [];
+                        .filter(Boolean);
                       
                       // Ensure we have record IDs
                       if (routeRecordIds.length === 0) {
@@ -3225,7 +3229,7 @@ export function PreForeclosureView() {
                       }
                       
                       // Get current route records sorted by orderIndex
-                      const sortedRecords = [...viewRoute.records].sort((a, b) => a.orderIndex - b.orderIndex);
+                      const sortedRecords = [...(viewRoute.records || [])].sort((a, b) => a.orderIndex - b.orderIndex);
                       
                       // Create a map of document numbers to route records for quick lookup
                       const recordMap = new Map<string, any>();
