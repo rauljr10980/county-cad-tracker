@@ -1670,8 +1670,8 @@ export function PreForeclosureView() {
       {headerSection}
       
 
-      {/* Create Route Button - Hidden when route details modal is open */}
-      {!routeDetailsOpen && (
+      {/* Create Route Button - Hidden when route details modal or property details modal is open */}
+      {!routeDetailsOpen && !viewOpen && (
         <div className="flex justify-end mb-4">
           <Button
             onClick={() => {
