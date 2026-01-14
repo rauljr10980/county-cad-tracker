@@ -547,6 +547,8 @@ export function AreaSelectorMap({
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Controls Sidebar - Left side */}
           <div className="w-80 flex flex-col gap-4">
+            {/* Content area - top */}
+            <div className="flex-1 overflow-y-auto">
               {step === 1 && (
                 <div className="space-y-4">
                   <div className="text-sm text-muted-foreground">
@@ -679,11 +681,11 @@ export function AreaSelectorMap({
                     Area drawn successfully!
                   </div>
                 )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {step === 3 && (
-              <div className="space-y-4">
+              {step === 3 && (
+                <div className="space-y-4">
                 <div className="text-sm font-medium">
                   Selected Properties: {selectedProperties.length} / 25
                 </div>
@@ -703,11 +705,11 @@ export function AreaSelectorMap({
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+                </div>
+              )}
 
-            {step === 4 && (
-              <div className="space-y-4">
+              {step === 4 && (
+                <div className="space-y-4">
                 <div className="text-sm font-medium">
                   Ready to Optimize
                 </div>
@@ -723,9 +725,8 @@ export function AreaSelectorMap({
                     <strong>Vehicles:</strong> {numVehicles}
                   </div>
                 </div>
-              </div>
-            )}
-
+                </div>
+              )}
             </div>
 
             {/* Navigation buttons */}
