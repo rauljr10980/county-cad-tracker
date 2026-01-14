@@ -1469,8 +1469,18 @@ export function PreForeclosureView() {
             })}
           </div>
         ) : (
-          <div className="text-center py-4 text-sm text-muted-foreground">
-            No active routes
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground mb-4">No active routes</p>
+            <Button
+              onClick={() => setAreaSelectorOpen(true)}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              Create Route
+            </Button>
+            <p className="text-xs text-muted-foreground mt-3">
+              Select an area on the map to filter records, then optimize your route
+            </p>
           </div>
         )}
       </div>
