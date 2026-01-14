@@ -1,4 +1,4 @@
-import { Building2, RefreshCw, Settings, LogIn, LogOut, User, Menu, X } from 'lucide-react';
+import { Building2, RefreshCw, Settings, LogIn, LogOut, User, Menu, X, CheckSquare, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
@@ -23,9 +23,10 @@ import {
 interface HeaderProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  onTabChange?: (tab: 'tasks' | 'upload') => void;
 }
 
-export function Header({ onRefresh, isRefreshing }: HeaderProps) {
+export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isSignupOpen, setIsSignupOpen] = useState(false);
@@ -90,6 +91,19 @@ export function Header({ onRefresh, isRefreshing }: HeaderProps) {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    {onTabChange && (
+                      <>
+                        <DropdownMenuItem onClick={() => onTabChange('tasks')}>
+                          <CheckSquare className="h-4 w-4 mr-2" />
+                          Tasks
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onTabChange('upload')}>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <DropdownMenuItem onClick={handleLogout}>
                       <LogOut className="h-4 w-4 mr-2" />
                       Logout
@@ -150,6 +164,32 @@ export function Header({ onRefresh, isRefreshing }: HeaderProps) {
                           )}
                         </div>
                       </div>
+                      {onTabChange && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            className="justify-start mobile-touch-target"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              onTabChange('tasks');
+                            }}
+                          >
+                            <CheckSquare className="h-5 w-5 mr-3" />
+                            Tasks
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="justify-start mobile-touch-target"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              onTabChange('upload');
+                            }}
+                          >
+                            <Upload className="h-5 w-5 mr-3" />
+                            Upload
+                          </Button>
+                        </>
+                      )}
                       <Button
                         variant="ghost"
                         className="justify-start mobile-touch-target"
