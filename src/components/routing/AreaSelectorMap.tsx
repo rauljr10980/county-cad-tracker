@@ -513,7 +513,7 @@ export function AreaSelectorMap({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-full h-[90vh] !flex !flex-col overflow-y-auto">
+      <DialogContent className="max-w-6xl w-full max-h-[90vh] !flex !flex-col overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{getStepTitle()}</DialogTitle>
           <DialogDescription>
@@ -544,7 +544,7 @@ export function AreaSelectorMap({
           ))}
         </div>
 
-        <div className="!flex !flex-col gap-4 flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
+        <div className="!flex !flex-col gap-4 flex-1 min-h-0">
           {/* Controls Section - Top (Drop Pin button) */}
           <div className="flex-shrink-0 w-full">
               {step === 1 && (
@@ -728,7 +728,7 @@ export function AreaSelectorMap({
           </div>
 
           {/* Map - DIRECTLY BELOW Drop Pin button - FULL WIDTH */}
-          <div className="flex-1 relative w-full md:flex-1" style={{ minHeight: '300px', maxHeight: '50vh' }}>
+          <div className="relative w-full flex-shrink-0" style={{ minHeight: '300px', height: '40vh', maxHeight: '400px' }}>
               <MapContainer
                 center={[initialCenter.lat, initialCenter.lng]}
                 zoom={initialZoom}
