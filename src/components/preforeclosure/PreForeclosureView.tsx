@@ -1864,10 +1864,18 @@ export function PreForeclosureView() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('Route card clicked:', route.id);
-                      setViewRoute(route);
+                      console.log('Route card clicked:', route.id, 'Route data:', route);
+                      // Ensure route has records array and all required fields
+                      const routeWithRecords = {
+                        ...route,
+                        records: (route.records || []).filter(rr => rr && rr.record), // Filter out null records
+                        routeData: route.routeData || null,
+                        createdAt: route.createdAt || new Date().toISOString(),
+                        updatedAt: route.updatedAt || new Date().toISOString(),
+                      };
+                      console.log('Setting viewRoute with:', routeWithRecords);
+                      setViewRoute(routeWithRecords);
                       setRouteDetailsOpen(true);
-                      console.log('Modal should open, routeDetailsOpen:', true);
                     }}
                     className="cursor-pointer"
                   >
@@ -3161,11 +3169,13 @@ export function PreForeclosureView() {
               Route Details
             </DialogTitle>
             <DialogDescription>
-              {viewRoute && (
+              {viewRoute ? (
                 <>
-                  Driver: {viewRoute.driver} • {viewRoute.records?.length || 0} stops • 
+                  Driver: {viewRoute.driver} • {(viewRoute.records || []).filter(rr => rr && rr.record).length} stops • 
                   {viewRoute.routeData?.totalDistance ? ` ${viewRoute.routeData.totalDistance.toFixed(2)} km` : ''}
                 </>
+              ) : (
+                'Loading route details...'
               )}
             </DialogDescription>
           </DialogHeader>
