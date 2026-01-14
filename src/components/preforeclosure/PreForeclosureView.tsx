@@ -3306,7 +3306,7 @@ export function PreForeclosureView() {
 
               {/* Route Records List */}
               <div>
-                <h3 className="text-lg font-semibold mb-3">Route Stops ({viewRoute.records?.length || 0})</h3>
+                <h3 className="text-lg font-semibold mb-3">Route Stops ({(viewRoute.records || []).length})</h3>
                 <div className="border border-border rounded-lg overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full">
