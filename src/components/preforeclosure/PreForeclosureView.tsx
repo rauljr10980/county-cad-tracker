@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw, GripVertical } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw, GripVertical, Phone, Star } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
