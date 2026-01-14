@@ -59,8 +59,8 @@ export function PreForeclosureTable({
 
   return (
     <>
-      {/* Mobile/Tablet Card View */}
-      <div className="xl:hidden space-y-3">
+      {/* Card View - All Screen Sizes */}
+      <div className="space-y-3">
         {preforeclosures.map((pf) => (
           <PreForeclosureCard
             key={pf.document_number}
@@ -70,8 +70,8 @@ export function PreForeclosureTable({
         ))}
       </div>
 
-      {/* Desktop Table View (1280px+ only) */}
-      <div className="hidden xl:block border border-border rounded-lg overflow-hidden">
+      {/* Desktop Table View - DISABLED to prevent horizontal scroll */}
+      <div className="hidden border border-border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">
