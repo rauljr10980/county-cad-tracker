@@ -923,6 +923,31 @@ export async function createRoute(
 }
 
 /**
+ * Reorder a record in a route
+ */
+export async function reorderRecordInRoute(
+  routeId: string,
+  recordId: string,
+  newOrderIndex: number
+): Promise<{ success: boolean; route: Route }> {
+  const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}/records/${recordId}/reorder`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ newOrderIndex }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to reorder record in route');
+  }
+  
+  return response.json();
+}
+
+/**
  * Finish a route (mark as finished)
  */
 export async function finishRoute(routeId: string): Promise<Route> {

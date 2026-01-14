@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,7 +16,7 @@ import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute } from '@/lib/api';
+import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute, reorderRecordInRoute } from '@/lib/api';
 
 // Local type alias to avoid runtime reference issues
 type RouteType = {
@@ -97,6 +97,7 @@ export function PreForeclosureView() {
   const [markingVisited, setMarkingVisited] = useState<string | null>(null);
   const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
   const [removingRecordId, setRemovingRecordId] = useState<string | null>(null);
+  const [reorderingRecordId, setReorderingRecordId] = useState<string | null>(null);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -488,6 +489,48 @@ export function PreForeclosureView() {
         description: `Could not find record with document number ${documentNumber}`,
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleReorderRecord = async (routeId: string, recordId: string, direction: 'up' | 'down') => {
+    if (!viewRoute) return;
+    
+    const sortedRecords = [...viewRoute.records].sort((a, b) => {
+      return a.orderIndex - b.orderIndex;
+    });
+    
+    const currentIndex = sortedRecords.findIndex(rr => rr.id === recordId);
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= sortedRecords.length) return;
+    
+    setReorderingRecordId(recordId);
+    try {
+      const result = await reorderRecordInRoute(routeId, recordId, newIndex);
+      
+      if (result.route) {
+        setViewRoute(result.route);
+        
+        // Update activeRoutes to reflect the change
+        setActiveRoutes(prev => prev.map(route => 
+          route.id === routeId ? result.route : route
+        ));
+      }
+      
+      toast({
+        title: 'Route updated',
+        description: `Record moved ${direction === 'up' ? 'up' : 'down'} in route.`,
+      });
+    } catch (error: any) {
+      console.error('[PreForeclosure] Error reordering record:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reorder record in route',
+        variant: 'destructive',
+      });
+    } finally {
+      setReorderingRecordId(null);
     }
   };
 
@@ -2716,10 +2759,7 @@ export function PreForeclosureView() {
                       <tbody>
                         {viewRoute.records
                           ?.sort((a, b) => {
-                            // Always put depot first
-                            if (a.isDepot && !b.isDepot) return -1;
-                            if (!a.isDepot && b.isDepot) return 1;
-                            // Then sort by orderIndex for non-depot records
+                            // Sort by orderIndex (depot can be anywhere now)
                             return a.orderIndex - b.orderIndex;
                           })
                           .map((routeRecord, index) => {
@@ -2736,7 +2776,26 @@ export function PreForeclosureView() {
                                 <td className="px-4 py-2 text-sm">
                                   <div className="flex items-center gap-2">
                                     {routeRecord.isDepot ? (
-                                      <Badge variant="default" className="bg-primary">Depot</Badge>
+                                      <>
+                                        <Badge variant="default" className="bg-primary">Depot</Badge>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
+                                          }}
+                                          disabled={removingRecordId === routeRecord.id}
+                                          className="h-7 w-7 p-0 text-red-500 border-red-500/50 hover:text-red-600 hover:bg-red-500/20 hover:border-red-500"
+                                          title="Remove from route"
+                                        >
+                                          {removingRecordId === routeRecord.id ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-red-500" />
+                                          ) : (
+                                            <X className="h-3.5 w-3.5" />
+                                          )}
+                                        </Button>
+                                      </>
                                     ) : (
                                       <>
                                         <span className="font-medium">{routeRecord.orderIndex}</span>
@@ -2759,6 +2818,49 @@ export function PreForeclosureView() {
                                         </Button>
                                       </>
                                     )}
+                                    {/* Reorder buttons */}
+                                    <div className="flex flex-col gap-0.5 ml-1">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReorderRecord(viewRoute.id, routeRecord.id, 'up');
+                                        }}
+                                        disabled={
+                                          reorderingRecordId === routeRecord.id ||
+                                          index === 0
+                                        }
+                                        className="h-5 w-5 p-0"
+                                        title="Move up"
+                                      >
+                                        {reorderingRecordId === routeRecord.id ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <ChevronUp className="h-3 w-3" />
+                                        )}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReorderRecord(viewRoute.id, routeRecord.id, 'down');
+                                        }}
+                                        disabled={
+                                          reorderingRecordId === routeRecord.id ||
+                                          index === (viewRoute.records?.length || 0) - 1
+                                        }
+                                        className="h-5 w-5 p-0"
+                                        title="Move down"
+                                      >
+                                        {reorderingRecordId === routeRecord.id ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <ChevronDown className="h-3 w-3" />
+                                        )}
+                                      </Button>
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="px-4 py-2 text-sm font-mono">{documentNumber}</td>
