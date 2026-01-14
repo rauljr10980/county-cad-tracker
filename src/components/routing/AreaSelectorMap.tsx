@@ -544,22 +544,93 @@ export function AreaSelectorMap({
           ))}
         </div>
 
-        <div className="flex gap-4 flex-1 min-h-0">
-          {/* Controls Sidebar */}
-          <div className="w-80 flex flex-col gap-4">
-            {step === 1 && (
-              <div className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Click on the map to drop a pin. The route will start from the closest property to your pin location.
-                </div>
-                <Button
-                  variant={drawingMode === 'pin' ? 'default' : 'outline'}
-                  className="w-full justify-start"
-                  onClick={() => setDrawingMode('pin')}
+        <div className="flex flex-col gap-4 flex-1 min-h-0">
+          {/* Map - Now on top */}
+          <div className="flex-1 relative min-h-0" style={{ minHeight: '500px' }}>
+            <MapContainer
+              center={[initialCenter.lat, initialCenter.lng]}
+              zoom={initialZoom}
+              style={{ height: '100%', width: '100%' }}
+              className="rounded-lg z-0"
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <ShapeDrawer
+                drawingMode={step === 1 ? (drawingMode === 'pin' ? 'pin' : null) : (step === 2 ? drawingMode : null)}
+                onRectangleComplete={handleRectangleComplete}
+                onCircleComplete={handleCircleComplete}
+                onPolygonComplete={handlePolygonComplete}
+                onPolygonPointAdd={handlePolygonPointAdd}
+                onPinDrop={step === 1 ? handlePinDrop : undefined}
+              />
+              {drawnRectangle && (
+                <Rectangle bounds={drawnRectangle} pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.2, weight: 2 }} />
+              )}
+              {drawnCircle && (
+                <Circle center={drawnCircle.center} radius={drawnCircle.radius} pathOptions={{ color: '#EA4335', fillColor: '#EA4335', fillOpacity: 0.2, weight: 2 }} />
+              )}
+              {drawnPolygon && drawnPolygon.length >= 3 && (
+                <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
+              )}
+              {pinLocation && (
+                <Marker
+                  position={[pinLocation.lat, pinLocation.lng]}
+                  icon={L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                  })}
                 >
-                  <MapPin className="h-4 w-4 mr-2" />
-                  Drop Pin
-                </Button>
+                  <Popup>
+                    <div style={{ padding: '4px' }}>
+                      <strong>Starting Point</strong><br/>
+                      {closestProperty ? `Closest: ${closestProperty.propertyAddress || closestProperty.address || 'N/A'}` : 'Finding closest property...'}
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+              {closestProperty && pinLocation && (
+                <Marker
+                  position={[closestProperty.latitude, closestProperty.longitude]}
+                  icon={L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                  })}
+                >
+                  <Popup>
+                    <div style={{ padding: '4px' }}>
+                      <strong>Starting Property</strong><br/>
+                      {closestProperty.propertyAddress || closestProperty.address || 'N/A'}<br/>
+                      {closestProperty.accountNumber && <small>{closestProperty.accountNumber}</small>}
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+              {selectedShape && <MapBoundsFitter bounds={selectedShape.bounds} />}
+            </MapContainer>
+          </div>
+
+          {/* Controls Sidebar - Now below map */}
+          <div className="flex gap-4">
+            <div className="flex-1 flex flex-col gap-4">
+              {step === 1 && (
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    Click on the map to drop a pin. The route will start from the closest property to your pin location.
+                  </div>
+                  <Button
+                    variant={drawingMode === 'pin' ? 'default' : 'outline'}
+                    className="w-full justify-start"
+                    onClick={() => setDrawingMode('pin')}
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Drop Pin
+                  </Button>
                 {pinLocation && (
                   <>
                     <div className="text-xs space-y-1 p-2 bg-muted rounded">
@@ -726,121 +797,49 @@ export function AreaSelectorMap({
               </div>
             )}
 
+            </div>
+
             {/* Navigation buttons */}
-            <div className="mt-auto space-y-2">
-              <div className="flex gap-2">
-                {step > 1 && (
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={handleBackStep}
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back
-                  </Button>
-                )}
-                {step < 4 && (
-                  <Button
-                    className="flex-1"
-                    onClick={handleNextStep}
-                    disabled={
-                      (step === 1 && (!closestProperty || !pinLocation)) ||
-                      (step === 2 && !selectedShape) ||
-                      (step === 3 && selectedProperties.length === 0)
-                    }
-                  >
-                    Next
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                )}
-                {step === 4 && (
-                  <Button
-                    className="w-full"
-                    onClick={handleOptimize}
-                  >
-                    <Route className="h-4 w-4 mr-2" />
-                    Optimize Route
-                  </Button>
-                )}
-              </div>
+            <div className="flex gap-2 items-end">
+              {step > 1 && (
+                <Button
+                  variant="outline"
+                  onClick={handleBackStep}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+              )}
+              {step < 4 && (
+                <Button
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={handleNextStep}
+                  disabled={
+                    (step === 1 && (!closestProperty || !pinLocation)) ||
+                    (step === 2 && !selectedShape) ||
+                    (step === 3 && selectedProperties.length === 0)
+                  }
+                >
+                  Next
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              )}
+              {step === 4 && (
+                <Button
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={handleOptimize}
+                >
+                  <Route className="h-4 w-4 mr-2" />
+                  Optimize Route
+                </Button>
+              )}
               <Button
                 variant="outline"
-                className="w-full"
                 onClick={onClose}
               >
                 Cancel
               </Button>
             </div>
-          </div>
-
-          {/* Map */}
-          <div className="flex-1 relative min-h-0">
-            <MapContainer
-              center={[initialCenter.lat, initialCenter.lng]}
-              zoom={initialZoom}
-              style={{ height: '100%', width: '100%' }}
-              className="rounded-lg z-0"
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <ShapeDrawer
-                drawingMode={step === 1 ? (drawingMode === 'pin' ? 'pin' : null) : (step === 2 ? drawingMode : null)}
-                onRectangleComplete={handleRectangleComplete}
-                onCircleComplete={handleCircleComplete}
-                onPolygonComplete={handlePolygonComplete}
-                onPolygonPointAdd={handlePolygonPointAdd}
-                onPinDrop={step === 1 ? handlePinDrop : undefined}
-              />
-              {drawnRectangle && (
-                <Rectangle bounds={drawnRectangle} pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.2, weight: 2 }} />
-              )}
-              {drawnCircle && (
-                <Circle center={drawnCircle.center} radius={drawnCircle.radius} pathOptions={{ color: '#EA4335', fillColor: '#EA4335', fillOpacity: 0.2, weight: 2 }} />
-              )}
-              {drawnPolygon && drawnPolygon.length >= 3 && (
-                <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
-              )}
-              {pinLocation && (
-                <Marker
-                  position={[pinLocation.lat, pinLocation.lng]}
-                  icon={L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                  })}
-                >
-                  <Popup>
-                    <div style={{ padding: '4px' }}>
-                      <strong>Starting Point</strong><br/>
-                      {closestProperty ? `Closest: ${closestProperty.propertyAddress || closestProperty.address || 'N/A'}` : 'Finding closest property...'}
-                    </div>
-                  </Popup>
-                </Marker>
-              )}
-              {closestProperty && pinLocation && (
-                <Marker
-                  position={[closestProperty.latitude, closestProperty.longitude]}
-                  icon={L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
-                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                  })}
-                >
-                  <Popup>
-                    <div style={{ padding: '4px' }}>
-                      <strong>Starting Property</strong><br/>
-                      {closestProperty.propertyAddress || closestProperty.address || 'N/A'}<br/>
-                      {closestProperty.accountNumber && <small>{closestProperty.accountNumber}</small>}
-                    </div>
-                  </Popup>
-                </Marker>
-              )}
-              {selectedShape && <MapBoundsFitter bounds={selectedShape.bounds} />}
-            </MapContainer>
           </div>
         </div>
       </DialogContent>
