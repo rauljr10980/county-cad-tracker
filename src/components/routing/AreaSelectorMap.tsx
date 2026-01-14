@@ -725,7 +725,6 @@ export function AreaSelectorMap({
                 </div>
                 </div>
               )}
-            </div>
           </div>
 
           {/* Map - DIRECTLY BELOW Drop Pin button - FULL WIDTH */}
@@ -842,7 +841,6 @@ export function AreaSelectorMap({
               >
                 Cancel
               </Button>
-            </div>
           </div>
         </div>
       </DialogContent>
