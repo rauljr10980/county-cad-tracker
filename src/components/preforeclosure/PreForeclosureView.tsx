@@ -1398,7 +1398,7 @@ export function PreForeclosureView() {
 
       {/* Active Routes Dashboard */}
       <div className="bg-card border border-border rounded-lg p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h3 className="text-lg font-semibold">Active Routes</h3>
           <Button
             onClick={() => {
@@ -1413,10 +1413,10 @@ export function PreForeclosureView() {
               // Open area selector
               setAreaSelectorOpen(true);
             }}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-            size="sm"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg font-semibold text-base px-6 py-2.5 w-full sm:w-auto"
+            size="lg"
           >
-            <MapPin className="h-4 w-4 mr-2" />
+            <MapPin className="h-5 w-5 mr-2" />
             Create Route
           </Button>
         </div>
