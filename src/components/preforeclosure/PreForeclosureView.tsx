@@ -2384,8 +2384,8 @@ export function PreForeclosureView() {
                 </div>
               </div>
 
-              {/* Phone Numbers Section */}
-              <div className="bg-secondary/30 rounded-lg p-4">
+              {/* Phone Numbers Section - Always Visible */}
+              <div className="bg-secondary/30 rounded-lg p-4" style={{ display: 'block' }}>
                 <div className="flex items-center gap-2 mb-3">
                   <Phone className="h-4 w-4 text-primary" />
                   <span className="text-sm font-medium">Phone Numbers</span>
