@@ -2752,7 +2752,10 @@ export function PreForeclosureView() {
                       <thead className="bg-secondary/50">
                         <tr>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Document #</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Actions</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
@@ -2788,13 +2791,13 @@ export function PreForeclosureView() {
                                             handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
                                           }}
                                           disabled={removingRecordId === routeRecord.id}
-                                          className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white border-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                          className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                           title="Remove from route"
                                         >
                                           {removingRecordId === routeRecord.id ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <Loader2 className="h-5 w-5 animate-spin" />
                                           ) : (
-                                            <X className="h-4 w-4" />
+                                            <X className="h-5 w-5" />
                                           )}
                                         </Button>
                                       </>
@@ -2809,18 +2812,18 @@ export function PreForeclosureView() {
                                             handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
                                           }}
                                           disabled={removingRecordId === routeRecord.id}
-                                          className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white border-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                          className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                           title="Remove from route"
                                         >
                                           {removingRecordId === routeRecord.id ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <Loader2 className="h-5 w-5 animate-spin" />
                                           ) : (
-                                            <X className="h-4 w-4" />
+                                            <X className="h-5 w-5" />
                                           )}
                                         </Button>
                                       </>
                                     )}
-                                    {/* Reorder buttons */}
+                                    {/* Reorder buttons - Always visible for all stops including depot */}
                                     <div className="flex flex-col gap-1 ml-2">
                                       <Button
                                         size="sm"
@@ -2833,13 +2836,13 @@ export function PreForeclosureView() {
                                           reorderingRecordId === routeRecord.id ||
                                           index === 0
                                         }
-                                        className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="h-9 w-9 p-0 bg-blue-600 hover:bg-blue-700 text-white border-2 border-blue-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Move up"
                                       >
                                         {reorderingRecordId === routeRecord.id ? (
-                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                          <Loader2 className="h-5 w-5 animate-spin" />
                                         ) : (
-                                          <ChevronUp className="h-4 w-4" />
+                                          <ChevronUp className="h-5 w-5" />
                                         )}
                                       </Button>
                                       <Button
@@ -2853,19 +2856,22 @@ export function PreForeclosureView() {
                                           reorderingRecordId === routeRecord.id ||
                                           index === (viewRoute.records?.length || 0) - 1
                                         }
-                                        className="h-8 w-8 p-0 bg-blue-600 hover:bg-blue-700 text-white border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="h-9 w-9 p-0 bg-blue-600 hover:bg-blue-700 text-white border-2 border-blue-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Move down"
                                       >
                                         {reorderingRecordId === routeRecord.id ? (
-                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                          <Loader2 className="h-5 w-5 animate-spin" />
                                         ) : (
-                                          <ChevronDown className="h-4 w-4" />
+                                          <ChevronDown className="h-5 w-5" />
                                         )}
                                       </Button>
                                     </div>
                                   </div>
                                 </td>
+                                <td className="px-4 py-2 text-sm font-mono hidden">{documentNumber}</td>
                                 <td className="px-4 py-2 text-sm">{record.address}</td>
+                                <td className="px-4 py-2 text-sm hidden">{record.city}</td>
+                                <td className="px-4 py-2 text-sm hidden">{record.zip}</td>
                                 <td className="px-4 py-2 text-sm">
                                   {record.visited ? (
                                     <Badge variant="outline" className="bg-green-500/20 text-green-600 border-green-500">
