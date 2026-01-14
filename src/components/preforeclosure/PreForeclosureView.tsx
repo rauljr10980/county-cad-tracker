@@ -3310,42 +3310,50 @@ export function PreForeclosureView() {
 
               {/* Route Records List */}
               <div>
-                <h3 className="text-lg font-semibold mb-3">Route Stops ({(viewRoute.records || []).length})</h3>
-                <div className="border border-border rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <SortableContext
-                        items={(viewRoute.records || [])
-                          .sort((a, b) => a.orderIndex - b.orderIndex)
-                          .map(rr => rr.id)}
-                        strategy={verticalListSortingStrategy}
+                <h3 className="text-lg font-semibold mb-3">Route Stops ({(viewRoute.records || []).filter(rr => rr.record).length})</h3>
+                {(viewRoute.records || []).length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No records in this route.
+                  </div>
+                ) : (
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
                       >
-                        <table className="w-full">
-                          <thead className="bg-secondary/50">
-                            <tr>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Document #</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Internal Status</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
-                              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(viewRoute.records || [])
-                              .sort((a, b) => {
-                                // Sort by orderIndex (depot can be anywhere now)
-                                return a.orderIndex - b.orderIndex;
-                              })
-                              .map((routeRecord, index) => {
+                        <SortableContext
+                          items={(viewRoute.records || [])
+                            .filter(rr => rr.record) // Filter out null records
+                            .sort((a, b) => a.orderIndex - b.orderIndex)
+                            .map(rr => rr.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <table className="w-full">
+                            <thead className="bg-secondary/50">
+                              <tr>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Document #</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Internal Status</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(viewRoute.records || [])
+                                .filter(rr => rr.record) // Filter out null records
+                                .sort((a, b) => {
+                                  // Sort by orderIndex (depot can be anywhere now)
+                                  return a.orderIndex - b.orderIndex;
+                                })
+                                .map((routeRecord, index) => {
                             const record = routeRecord.record;
+                            if (!record) return null; // Safety check
                             // Handle both camelCase (from backend) and snake_case (from interface)
                             const documentNumber = record.document_number || record.documentNumber || '';
                             return (
@@ -3372,6 +3380,7 @@ export function PreForeclosureView() {
                     </DndContext>
                   </div>
                 </div>
+                )}
               </div>
             </div>
           )}
