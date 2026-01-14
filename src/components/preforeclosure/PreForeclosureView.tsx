@@ -159,6 +159,26 @@ function SortableRow({
       <td className="px-4 py-2 text-sm hidden">{record.city}</td>
       <td className="px-4 py-2 text-sm hidden">{record.zip}</td>
       <td className="px-4 py-2 text-sm">
+        {documentNumber && record && (
+          <Select
+            value={record.internal_status || 'New'}
+            onValueChange={(value) => {
+              handleStatusChange(record, value as PreForeclosureStatus);
+            }}
+          >
+            <SelectTrigger className="h-7 text-xs w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="New">New</SelectItem>
+              <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
+              <SelectItem value="Monitoring">Monitoring</SelectItem>
+              <SelectItem value="Dead">Dead</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+      </td>
+      <td className="px-4 py-2 text-sm">
         {documentNumber && (
           <Button
             size="sm"
@@ -3198,6 +3218,7 @@ export function PreForeclosureView() {
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Internal Status</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
@@ -3238,6 +3259,7 @@ export function PreForeclosureView() {
                                 handleMarkVisited={handleMarkVisited}
                                 handleViewRecordDetails={handleViewRecordDetails}
                                 markingVisited={markingVisited}
+                                handleStatusChange={handleStatusChange}
                               />
                             );
                           })}
