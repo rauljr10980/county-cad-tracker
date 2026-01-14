@@ -732,7 +732,7 @@ export function AreaSelectorMap({
               <MapContainer
                 center={[initialCenter.lat, initialCenter.lng]}
                 zoom={initialZoom}
-                style={{ height: '100%', width: '100%' }}
+                style={{ height: '100%', width: '100%', touchAction: 'manipulation' }}
                 className="rounded-lg z-0"
               >
                 <TileLayer
