@@ -2856,9 +2856,9 @@ export function PreForeclosureView() {
                       size="sm"
                       onClick={handleClearTask}
                       disabled={savingAction}
-                      className="h-7 text-xs"
+                      className="h-8 text-xs bg-red-500/10 hover:bg-red-500/20 text-red-500 border-red-500/30"
                     >
-                      <Trash2 className="h-3 w-3 mr-1" />
+                      <Trash2 className="h-4 w-4 mr-1.5" />
                       Clear Task
                     </Button>
                   </div>
