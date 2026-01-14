@@ -92,7 +92,12 @@ function SortableRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: routeRecord.id });
+    setActivatorNodeRef,
+  } = useSortable({ 
+    id: routeRecord.id,
+    // Only allow dragging from the drag handle, not the entire row
+    strategy: undefined,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -107,6 +112,7 @@ function SortableRow({
       className={`border-t border-border hover:bg-secondary/30 ${
         routeRecord.isDepot ? 'bg-primary/10' : ''
       } ${isDragging ? 'bg-secondary/50' : ''}`}
+      // Don't attach drag listeners to the entire row - only to the drag handle
     >
       <td className="px-4 py-2 text-sm">
         <div className="flex items-center gap-2 flex-wrap">
