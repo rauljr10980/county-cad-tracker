@@ -160,14 +160,22 @@ function SortableRow({
       <td className="px-4 py-2 text-sm hidden">{record.city}</td>
       <td className="px-4 py-2 text-sm hidden">{record.zip}</td>
       <td className="px-4 py-2 text-sm">
-        {documentNumber && record && (
+        {documentNumber && record && handleStatusChange && (
           <Select
-            value={record.internal_status || 'New'}
+            value={(record as any).internal_status || 'New'}
             onValueChange={(value) => {
-              handleStatusChange(record, value as PreForeclosureStatus);
+              if (handleStatusChange) {
+                // Create a proper PreForeclosureRecord object for handleStatusChange
+                const fullRecord: PreForeclosureRecord = {
+                  ...(record as any),
+                  document_number: documentNumber,
+                  internal_status: value as PreForeclosureStatus,
+                };
+                handleStatusChange(fullRecord, value as PreForeclosureStatus);
+              }
             }}
           >
-            <SelectTrigger className="h-7 text-xs w-full">
+            <SelectTrigger className="h-8 text-xs w-full cursor-pointer hover:bg-secondary/50 border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
