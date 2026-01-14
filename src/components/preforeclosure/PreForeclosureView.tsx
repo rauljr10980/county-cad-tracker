@@ -2374,60 +2374,104 @@ export function PreForeclosureView() {
               </div>
 
               {/* Phone Numbers Section */}
-              <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
-                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                  Phone Numbers
-                </h3>
+              <div className="bg-secondary/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Phone className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Phone Numbers</span>
+                </div>
                 <div className="space-y-2">
-                  {[0, 1, 2, 3, 4, 5].map((index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Input
-                        type="tel"
-                        value={viewRecord.phoneNumbers?.[index] || ''}
-                        onChange={(e) => {
-                          const newPhoneNumbers = [...(viewRecord.phoneNumbers || [])];
-                          if (e.target.value) {
+                  {[0, 1, 2, 3, 4, 5].map((index) => {
+                    const phoneValue = viewRecord.phoneNumbers?.[index] || '';
+                    const isOwnerPhone = viewRecord.ownerPhoneIndex === index;
+                    return (
+                      <div key={index} className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground w-16 shrink-0">
+                          Phone {index + 1}:
+                        </span>
+                        <Input
+                          type="tel"
+                          value={phoneValue}
+                          onChange={(e) => {
+                            const newPhoneNumbers = [...(viewRecord.phoneNumbers || [])];
                             newPhoneNumbers[index] = e.target.value;
-                          } else {
-                            newPhoneNumbers.splice(index, 1);
-                          }
-                          // Ensure array has max 6 elements
-                          const trimmed = newPhoneNumbers.slice(0, 6);
-                          setViewRecord({
-                            ...viewRecord,
-                            phoneNumbers: trimmed,
-                          });
-                        }}
-                        placeholder={`Phone ${index + 1}${index === 0 ? ' (Owner)' : ''}`}
-                        className="flex-1"
-                        onBlur={async () => {
-                          // Auto-save on blur
-                          try {
-                            await updateMutation.mutateAsync({
+                            // Ensure array has max 6 elements
+                            const trimmed = newPhoneNumbers.slice(0, 6);
+                            setViewRecord({
+                              ...viewRecord,
+                              phoneNumbers: trimmed,
+                            });
+                          }}
+                          placeholder="Enter phone number"
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "h-8 w-8 shrink-0",
+                            isOwnerPhone && "text-yellow-500"
+                          )}
+                          onClick={() => {
+                            const newOwnerPhoneIndex = isOwnerPhone ? undefined : index;
+                            setViewRecord({
+                              ...viewRecord,
+                              ownerPhoneIndex: newOwnerPhoneIndex,
+                            });
+                            // Auto-save on click
+                            updateMutation.mutateAsync({
                               document_number: viewRecord.document_number,
                               phoneNumbers: viewRecord.phoneNumbers || [],
+                              ownerPhoneIndex: newOwnerPhoneIndex,
+                            }).catch((error) => {
+                              console.error('Error saving owner phone index:', error);
                             });
-                            queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
-                          } catch (error) {
-                            console.error('Error saving phone numbers:', error);
-                            toast({
-                              title: 'Error',
-                              description: 'Failed to save phone numbers. Please try again.',
-                              variant: 'destructive',
-                            });
-                          }
-                        }}
-                      />
-                      {index === 0 && (
-                        <Badge variant="outline" className="text-xs">
-                          Owner
-                        </Badge>
+                          }}
+                          title={isOwnerPhone ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                        >
+                          <Star className={cn(
+                            "h-4 w-4",
+                            isOwnerPhone ? "fill-yellow-500" : "fill-none"
+                          )} />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await updateMutation.mutateAsync({
+                            document_number: viewRecord.document_number,
+                            phoneNumbers: viewRecord.phoneNumbers || [],
+                            ownerPhoneIndex: viewRecord.ownerPhoneIndex,
+                          });
+                          toast({
+                            title: 'Phone Numbers Saved',
+                            description: 'Phone numbers have been saved successfully.',
+                          });
+                          queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                        } catch (error) {
+                          console.error('Error saving phone numbers:', error);
+                          toast({
+                            title: 'Error',
+                            description: 'Failed to save phone numbers. Please try again.',
+                            variant: 'destructive',
+                          });
+                        }
+                      }}
+                      disabled={updateMutation.isPending}
+                    >
+                      {updateMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Phone Numbers'
                       )}
-                    </div>
-                  ))}
-                  <p className="text-xs text-muted-foreground">
-                    Phone numbers are automatically saved when you click away from the input field.
-                  </p>
+                    </Button>
+                  </div>
                 </div>
               </div>
 
