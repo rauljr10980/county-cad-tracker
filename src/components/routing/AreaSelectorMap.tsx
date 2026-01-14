@@ -728,60 +728,12 @@ export function AreaSelectorMap({
                 </div>
               )}
             </div>
-
-            {/* Navigation buttons */}
-            <div className="mt-auto space-y-2">
-              <div className="flex gap-2">
-                {step > 1 && (
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={handleBackStep}
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back
-                  </Button>
-                )}
-                {step < 4 && (
-                  <Button
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                    onClick={handleNextStep}
-                    disabled={
-                      (step === 1 && (!closestProperty || !pinLocation)) ||
-                      (step === 2 && !selectedShape) ||
-                      (step === 3 && selectedProperties.length === 0)
-                    }
-                  >
-                    Next
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                )}
-                {step === 4 && (
-                  <Button
-                    className="w-full bg-green-600 hover:bg-green-700"
-                    onClick={handleOptimize}
-                  >
-                    <Route className="h-4 w-4 mr-2" />
-                    Optimize Route
-                  </Button>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={onClose}
-              >
-                Cancel
-              </Button>
-            </div>
           </div>
 
-          {/* Map - Right side, aligned to start at Back button level */}
+          {/* Map - Right side */}
           <div className="flex-1 flex flex-col gap-4" style={{ minHeight: 0 }}>
-            {/* Spacer to match left sidebar content area height - pushes map down */}
-            <div className="flex-1" style={{ minHeight: 0 }}></div>
-            {/* Map container aligned with navigation buttons */}
-            <div className="relative flex-shrink-0" style={{ height: 'calc(100vh - 400px)', minHeight: '400px' }}>
+            {/* Map container */}
+            <div className="flex-1 relative" style={{ minHeight: 0 }}>
               <MapContainer
                 center={[initialCenter.lat, initialCenter.lng]}
                 zoom={initialZoom}
