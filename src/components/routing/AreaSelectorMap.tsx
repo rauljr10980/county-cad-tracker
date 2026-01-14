@@ -547,7 +547,7 @@ export function AreaSelectorMap({
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Controls Sidebar - Left side */}
           <div className="w-80 flex flex-col gap-4">
-            {/* Content area - top */}
+            {/* Content area - top - takes up space to push buttons down */}
             <div className="flex-1 overflow-y-auto min-h-0">
               {step === 1 && (
                 <div className="space-y-4">
