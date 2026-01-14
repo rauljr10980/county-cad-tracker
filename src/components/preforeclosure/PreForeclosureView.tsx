@@ -109,16 +109,6 @@ function SortableRow({
     >
       <td className="px-4 py-2 text-sm">
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Drag Handle */}
-          <div
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded"
-            title="Drag to reorder"
-          >
-            <GripVertical className="h-5 w-5 text-muted-foreground" />
-          </div>
-          
           {routeRecord.isDepot ? (
             <>
               <Badge variant="default" className="bg-primary">Depot</Badge>
@@ -169,62 +159,34 @@ function SortableRow({
       <td className="px-4 py-2 text-sm hidden">{record.city}</td>
       <td className="px-4 py-2 text-sm hidden">{record.zip}</td>
       <td className="px-4 py-2 text-sm">
-        {record.visited ? (
-          <Badge variant="outline" className="bg-green-500/20 text-green-600 border-green-500">
-            Visited
-          </Badge>
-        ) : (
-          <Badge variant="outline">Pending</Badge>
-        )}
-      </td>
-      <td className="px-4 py-2 text-sm">
         {documentNumber && (
-          <>
-            {!record.visited ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleMarkVisited(documentNumber, viewRoute.driver, true);
-                }}
-                disabled={markingVisited === documentNumber}
-                className="h-7 text-xs"
-              >
-                {markingVisited === documentNumber ? (
-                  <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Marking...
-                  </>
-                ) : (
-                  'Mark Visited'
-                )}
-              </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (record.visited) {
+                handleMarkVisited(documentNumber, viewRoute.driver, false);
+              } else {
+                handleMarkVisited(documentNumber, viewRoute.driver, true);
+              }
+            }}
+            disabled={markingVisited === documentNumber}
+            className={`h-7 text-xs w-full ${
+              record.visited 
+                ? 'bg-green-500/20 text-green-600 border-green-500 hover:bg-green-500/30' 
+                : ''
+            }`}
+          >
+            {markingVisited === documentNumber ? (
+              <>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                {record.visited ? 'Updating...' : 'Marking...'}
+              </>
             ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleMarkVisited(documentNumber, viewRoute.driver, false);
-                }}
-                disabled={markingVisited === documentNumber}
-                className="h-7 text-xs text-muted-foreground"
-              >
-                {markingVisited === documentNumber ? (
-                  <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw className="h-3 w-3 mr-1" />
-                    Set Pending
-                  </>
-                )}
-              </Button>
+              record.visited ? 'Visited' : 'Pending'
             )}
-          </>
+          </Button>
         )}
       </td>
       <td className="px-4 py-2 text-sm">
@@ -242,6 +204,17 @@ function SortableRow({
             Details
           </Button>
         )}
+      </td>
+      <td className="px-4 py-2 text-sm">
+        {/* Drag Handle - Far Right */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded flex items-center justify-center"
+          title="Drag to reorder"
+        >
+          <GripVertical className="h-5 w-5 text-muted-foreground" />
+        </div>
       </td>
     </tr>
   );
@@ -3038,9 +3011,9 @@ export function PreForeclosureView() {
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Actions</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
                         </tr>
                       </thead>
                       <DndContext
