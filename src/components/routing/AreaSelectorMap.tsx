@@ -513,7 +513,7 @@ export function AreaSelectorMap({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-full max-h-[90vh] !flex !flex-col overflow-y-auto">
+      <DialogContent className="max-w-6xl w-full max-h-[90vh] !flex !flex-col overflow-y-auto overscroll-contain" style={{ touchAction: 'pan-y' }}>
         <DialogHeader>
           <DialogTitle>{getStepTitle()}</DialogTitle>
           <DialogDescription>
@@ -798,7 +798,7 @@ export function AreaSelectorMap({
           </div>
 
           {/* Navigation buttons - below map */}
-          <div className="flex-shrink-0 space-y-2">
+          <div className="flex-shrink-0 space-y-2 pb-4">
               <div className="flex gap-2">
                 {step > 1 && (
                   <Button
