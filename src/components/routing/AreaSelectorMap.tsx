@@ -513,47 +513,40 @@ export function AreaSelectorMap({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col p-0">
-        <div className="p-6 pb-4">
-          <DialogHeader>
-            <DialogTitle>{getStepTitle()}</DialogTitle>
-            <DialogDescription>
-              {step === 1 && 'Drop a pin on the map to set the starting point for your route.'}
-              {step === 2 && 'Draw a polygon, rectangle, or circle around the area. The starting point must be inside this area.'}
-              {step === 3 && 'Review the selected properties before optimizing the route.'}
-              {step === 4 && 'Confirm and optimize your route.'}
-            </DialogDescription>
-          </DialogHeader>
+      <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{getStepTitle()}</DialogTitle>
+          <DialogDescription>
+            {step === 1 && 'Drop a pin on the map to set the starting point for your route.'}
+            {step === 2 && 'Draw a polygon, rectangle, or circle around the area. The starting point must be inside this area.'}
+            {step === 3 && 'Review the selected properties before optimizing the route.'}
+            {step === 4 && 'Confirm and optimize your route.'}
+          </DialogDescription>
+        </DialogHeader>
 
-          {/* Step indicator */}
-          <div className="flex items-center justify-between mt-4">
-            {[1, 2, 3, 4].map((s) => (
-              <div key={s} className="flex items-center flex-1">
-                <div className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-full border-2",
-                  step >= s ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-muted"
-                )}>
-                  {s}
-                </div>
-                {s < 4 && (
-                  <div className={cn(
-                    "flex-1 h-1 mx-2",
-                    step > s ? "bg-primary" : "bg-muted"
-                  )} />
-                )}
+        {/* Step indicator */}
+        <div className="flex items-center justify-between mb-4">
+          {[1, 2, 3, 4].map((s) => (
+            <div key={s} className="flex items-center flex-1">
+              <div className={cn(
+                "flex items-center justify-center w-8 h-8 rounded-full border-2",
+                step >= s ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-muted"
+              )}>
+                {s}
               </div>
-            ))}
-          </div>
+              {s < 4 && (
+                <div className={cn(
+                  "flex-1 h-1 mx-2",
+                  step > s ? "bg-primary" : "bg-muted"
+                )} />
+              )}
+            </div>
+          ))}
         </div>
 
-        {/* Map - Now on top, taking most of the space */}
-        <div className="flex-1 relative min-h-0 px-6" style={{ minHeight: '500px' }}>
-            <MapContainer
-              center={[initialCenter.lat, initialCenter.lng]}
-              zoom={initialZoom}
-              style={{ height: '100%', width: '100%' }}
-              className="rounded-lg z-0"
-            >
+        <div className="flex gap-4 flex-1 min-h-0">
+          {/* Controls Sidebar - Left side */}
+          <div className="w-80 flex flex-col gap-4">
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
