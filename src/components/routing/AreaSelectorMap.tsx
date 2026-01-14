@@ -777,74 +777,77 @@ export function AreaSelectorMap({
           </div>
 
           {/* Map - Right side, aligned to start at Back button level */}
-          <div className="flex-1 relative flex items-end" style={{ minHeight: 0 }}>
-            <div className="w-full" style={{ height: 'calc(100% - 0px)', marginTop: 'auto' }}>
-            <MapContainer
-              center={[initialCenter.lat, initialCenter.lng]}
-              zoom={initialZoom}
-              style={{ height: '100%', width: '100%' }}
-              className="rounded-lg z-0"
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <ShapeDrawer
-                drawingMode={step === 1 ? (drawingMode === 'pin' ? 'pin' : null) : (step === 2 ? drawingMode : null)}
-                onRectangleComplete={handleRectangleComplete}
-                onCircleComplete={handleCircleComplete}
-                onPolygonComplete={handlePolygonComplete}
-                onPolygonPointAdd={handlePolygonPointAdd}
-                onPinDrop={step === 1 ? handlePinDrop : undefined}
-              />
-              {drawnRectangle && (
-                <Rectangle bounds={drawnRectangle} pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.2, weight: 2 }} />
-              )}
-              {drawnCircle && (
-                <Circle center={drawnCircle.center} radius={drawnCircle.radius} pathOptions={{ color: '#EA4335', fillColor: '#EA4335', fillOpacity: 0.2, weight: 2 }} />
-              )}
-              {drawnPolygon && drawnPolygon.length >= 3 && (
-                <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
-              )}
-              {pinLocation && (
-                <Marker
-                  position={[pinLocation.lat, pinLocation.lng]}
-                  icon={L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                  })}
-                >
-                  <Popup>
-                    <div style={{ padding: '4px' }}>
-                      <strong>Starting Point</strong><br/>
-                      {closestProperty ? `Closest: ${closestProperty.propertyAddress || closestProperty.address || 'N/A'}` : 'Finding closest property...'}
-                    </div>
-                  </Popup>
-                </Marker>
-              )}
-              {closestProperty && pinLocation && (
-                <Marker
-                  position={[closestProperty.latitude, closestProperty.longitude]}
-                  icon={L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
-                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                  })}
-                >
-                  <Popup>
-                    <div style={{ padding: '4px' }}>
-                      <strong>Starting Property</strong><br/>
-                      {closestProperty.propertyAddress || closestProperty.address || 'N/A'}<br/>
-                      {closestProperty.accountNumber && <small>{closestProperty.accountNumber}</small>}
-                    </div>
-                  </Popup>
-                </Marker>
-              )}
-              {selectedShape && <MapBoundsFitter bounds={selectedShape.bounds} />}
-            </MapContainer>
+          <div className="flex-1 flex flex-col gap-4" style={{ minHeight: 0 }}>
+            {/* Spacer to match left sidebar content area height - pushes map down */}
+            <div className="flex-1" style={{ minHeight: 0 }}></div>
+            {/* Map container aligned with navigation buttons */}
+            <div className="relative flex-shrink-0" style={{ height: 'calc(100vh - 400px)', minHeight: '400px' }}>
+              <MapContainer
+                center={[initialCenter.lat, initialCenter.lng]}
+                zoom={initialZoom}
+                style={{ height: '100%', width: '100%' }}
+                className="rounded-lg z-0"
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <ShapeDrawer
+                  drawingMode={step === 1 ? (drawingMode === 'pin' ? 'pin' : null) : (step === 2 ? drawingMode : null)}
+                  onRectangleComplete={handleRectangleComplete}
+                  onCircleComplete={handleCircleComplete}
+                  onPolygonComplete={handlePolygonComplete}
+                  onPolygonPointAdd={handlePolygonPointAdd}
+                  onPinDrop={step === 1 ? handlePinDrop : undefined}
+                />
+                {drawnRectangle && (
+                  <Rectangle bounds={drawnRectangle} pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.2, weight: 2 }} />
+                )}
+                {drawnCircle && (
+                  <Circle center={drawnCircle.center} radius={drawnCircle.radius} pathOptions={{ color: '#EA4335', fillColor: '#EA4335', fillOpacity: 0.2, weight: 2 }} />
+                )}
+                {drawnPolygon && drawnPolygon.length >= 3 && (
+                  <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
+                )}
+                {pinLocation && (
+                  <Marker
+                    position={[pinLocation.lat, pinLocation.lng]}
+                    icon={L.icon({
+                      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                      iconSize: [25, 41],
+                      iconAnchor: [12, 41],
+                    })}
+                  >
+                    <Popup>
+                      <div style={{ padding: '4px' }}>
+                        <strong>Starting Point</strong><br/>
+                        {closestProperty ? `Closest: ${closestProperty.propertyAddress || closestProperty.address || 'N/A'}` : 'Finding closest property...'}
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
+                {closestProperty && pinLocation && (
+                  <Marker
+                    position={[closestProperty.latitude, closestProperty.longitude]}
+                    icon={L.icon({
+                      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+                      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                      iconSize: [25, 41],
+                      iconAnchor: [12, 41],
+                    })}
+                  >
+                    <Popup>
+                      <div style={{ padding: '4px' }}>
+                        <strong>Starting Property</strong><br/>
+                        {closestProperty.propertyAddress || closestProperty.address || 'N/A'}<br/>
+                        {closestProperty.accountNumber && <small>{closestProperty.accountNumber}</small>}
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
+                {selectedShape && <MapBoundsFitter bounds={selectedShape.bounds} />}
+              </MapContainer>
             </div>
           </div>
         </div>
