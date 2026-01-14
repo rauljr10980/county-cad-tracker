@@ -1651,32 +1651,34 @@ export function PreForeclosureView() {
       {headerSection}
       
 
-      {/* Create Route Button - Always Visible */}
-      <div className="flex justify-end mb-4">
-        <Button
-          onClick={() => {
-            // Select all filtered records
-            const allRecordIds = new Set<string>();
-            filteredRecords.forEach(record => {
-              if (record && record.document_number) {
-                allRecordIds.add(record.document_number);
-              }
-            });
-            setSelectedRecordIds(allRecordIds);
-            // Open area selector
-            setAreaSelectorOpen(true);
-          }}
-          className="bg-green-600 hover:bg-green-700 text-white shadow-xl font-bold text-base px-6 py-2.5 border-2 border-green-400"
-          style={{ 
-            minWidth: '180px',
-            boxShadow: '0 8px 20px rgba(34, 197, 94, 0.5)',
-            zIndex: 1000
-          }}
-        >
-          <MapPin className="h-4 w-4 mr-2" />
-          Create Route
-        </Button>
-      </div>
+      {/* Create Route Button - Hidden when route details modal is open */}
+      {!routeDetailsOpen && (
+        <div className="flex justify-end mb-4">
+          <Button
+            onClick={() => {
+              // Select all filtered records
+              const allRecordIds = new Set<string>();
+              filteredRecords.forEach(record => {
+                if (record && record.document_number) {
+                  allRecordIds.add(record.document_number);
+                }
+              });
+              setSelectedRecordIds(allRecordIds);
+              // Open area selector
+              setAreaSelectorOpen(true);
+            }}
+            className="bg-green-600 hover:bg-green-700 text-white shadow-xl font-bold text-base px-6 py-2.5 border-2 border-green-400"
+            style={{ 
+              minWidth: '180px',
+              boxShadow: '0 8px 20px rgba(34, 197, 94, 0.5)',
+              zIndex: 1000
+            }}
+          >
+            <MapPin className="h-4 w-4 mr-2" />
+            Create Route
+          </Button>
+        </div>
+      )}
 
       {/* Active Routes Dashboard */}
       <div className="bg-card border border-border rounded-lg p-4">
