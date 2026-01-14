@@ -1577,8 +1577,8 @@ export function PreForeclosureView() {
                 />
               </div>
 
-              {/* Eye Icon */}
-              <div className="absolute top-4 right-4 z-10">
+              {/* Eye Icon - Hidden */}
+              {/* <div className="absolute top-4 right-4 z-10">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1591,7 +1591,7 @@ export function PreForeclosureView() {
                 >
                   <Eye className="h-4 w-4" />
                 </Button>
-              </div>
+              </div> */}
 
               {/* Type Badge */}
               <div className="flex items-center gap-2 mb-2 pr-8 pl-8">
@@ -1801,7 +1801,8 @@ export function PreForeclosureView() {
                   <Send className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                   <span className="truncate">Maps</span>
                 </Button>
-                <Button
+                {/* External Link Button - Hidden */}
+                {/* <Button
                   variant="outline"
                   size="sm"
                   className="flex-shrink-0"
@@ -1810,7 +1811,7 @@ export function PreForeclosureView() {
                   }}
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                </Button>
+                </Button> */}
               </div>
             </div>
           ))}
