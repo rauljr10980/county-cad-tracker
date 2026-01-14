@@ -513,7 +513,7 @@ export function AreaSelectorMap({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col">
+      <DialogContent className="max-w-6xl w-full h-[90vh] !flex !flex-col">
         <DialogHeader>
           <DialogTitle>{getStepTitle()}</DialogTitle>
           <DialogDescription>
