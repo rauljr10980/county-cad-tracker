@@ -189,7 +189,7 @@ export function PreForeclosuresView() {
   const hasActiveFilters = typeFilter !== 'all' || statusFilter !== 'all' || cityFilter !== 'all' || zipFilter !== 'all' || showNeedsFollowUp || searchQuery;
 
   return (
-    <div className="p-3 md:p-6">
+    <div className="p-3 md:p-6 overflow-x-hidden">
       {/* Header - Mobile First */}
       <div className="mb-4 md:mb-6">
         <div className="flex flex-col gap-3 mb-4">
