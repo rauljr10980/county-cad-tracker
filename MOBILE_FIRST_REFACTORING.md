@@ -233,6 +233,23 @@ All defined in `src/index.css`:
 
 ---
 
+## 🐛 Critical Fix: Breakpoint Correction
+
+**Issue Discovered**: Initial implementation used `lg` breakpoint (1024px) for mobile/desktop view switching, which was too large. This meant:
+- Devices below 1024px (including tablets) showed mobile cards
+- Only large desktop screens showed tables
+- Tables were appearing on medium-sized screens causing horizontal scroll
+
+**Fix Applied**: Changed from `lg` (1024px) to `md` (768px) breakpoint for view switching:
+- Below 768px: Mobile card layout
+- Above 768px: Desktop table layout
+- Tablets (768px+) now properly show tables
+- All mobile devices show optimized card views
+
+**Files Updated**:
+- [PreForeclosureTable.tsx](src/components/preforeclosures/PreForeclosureTable.tsx) - Lines 63, 74
+- [PropertyTable.tsx](src/components/properties/PropertyTable.tsx) - Lines 196, 217
+
 ## 📊 Before vs After Comparison
 
 ### Desktop (No Changes)

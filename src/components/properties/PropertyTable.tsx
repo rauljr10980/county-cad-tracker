@@ -193,7 +193,7 @@ export function PropertyTable({
   return (
     <>
       {/* Mobile Card View */}
-      <div className="lg:hidden space-y-3">
+      <div className="md:hidden space-y-3">
         {displayProperties.map((property) => {
           const followUpDate = localFollowUps[property.id] || property.lastFollowUp;
 
@@ -214,7 +214,7 @@ export function PropertyTable({
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden lg:block bg-card border border-border rounded-lg overflow-hidden">
+      <div className="hidden md:block bg-card border border-border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="data-table">
           <thead>
