@@ -115,15 +115,37 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
                 </Button>
               </>
             ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsLoginOpen(true)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <LogIn className="h-4 w-4 mr-2" />
-                Login
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Login
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {onTabChange && (
+                    <>
+                      <DropdownMenuItem onClick={() => onTabChange('upload')}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onTabChange('files')}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Files
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem onClick={() => setIsLoginOpen(true)}>
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Login
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
 
@@ -208,17 +230,45 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
                       </Button>
                     </>
                   ) : (
-                    <Button
-                      variant="ghost"
-                      className="justify-start mobile-touch-target"
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        setIsLoginOpen(true);
-                      }}
-                    >
-                      <LogIn className="h-5 w-5 mr-3" />
-                      Login
-                    </Button>
+                    <>
+                      {onTabChange && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            className="justify-start mobile-touch-target"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              onTabChange('upload');
+                            }}
+                          >
+                            <Upload className="h-5 w-5 mr-3" />
+                            Upload
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="justify-start mobile-touch-target"
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              onTabChange('files');
+                            }}
+                          >
+                            <FileText className="h-5 w-5 mr-3" />
+                            Files
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        variant="ghost"
+                        className="justify-start mobile-touch-target"
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          setIsLoginOpen(true);
+                        }}
+                      >
+                        <LogIn className="h-5 w-5 mr-3" />
+                        Login
+                      </Button>
+                    </>
                   )}
                 </div>
               </SheetContent>
