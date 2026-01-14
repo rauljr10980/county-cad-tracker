@@ -720,6 +720,8 @@ export async function updatePreForeclosure(updates: {
   document_number: string;
   internal_status?: string;
   notes?: string;
+  phoneNumbers?: string[];
+  ownerPhoneIndex?: number;
   last_action_date?: string;
   next_follow_up_date?: string;
   actionType?: 'call' | 'text' | 'mail' | 'driveby';

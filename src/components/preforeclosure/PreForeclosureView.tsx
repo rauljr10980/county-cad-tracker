@@ -2375,6 +2375,64 @@ export function PreForeclosureView() {
 
               {/* Tasks Section */}
               <div className="space-y-4">
+                  {/* Phone Numbers Section */}
+                  <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                    <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                      Phone Numbers
+                    </h3>
+                    <div className="space-y-2">
+                      {[0, 1, 2, 3, 4, 5].map((index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Input
+                            type="tel"
+                            value={viewRecord.phoneNumbers?.[index] || ''}
+                            onChange={(e) => {
+                              const newPhoneNumbers = [...(viewRecord.phoneNumbers || [])];
+                              if (e.target.value) {
+                                newPhoneNumbers[index] = e.target.value;
+                              } else {
+                                newPhoneNumbers.splice(index, 1);
+                              }
+                              // Ensure array has max 6 elements
+                              const trimmed = newPhoneNumbers.slice(0, 6);
+                              setViewRecord({
+                                ...viewRecord,
+                                phoneNumbers: trimmed,
+                              });
+                            }}
+                            placeholder={`Phone ${index + 1}${index === 0 ? ' (Owner)' : ''}`}
+                            className="flex-1"
+                            onBlur={async () => {
+                              // Auto-save on blur
+                              try {
+                                await updateMutation.mutateAsync({
+                                  document_number: viewRecord.document_number,
+                                  phoneNumbers: viewRecord.phoneNumbers || [],
+                                });
+                                queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                              } catch (error) {
+                                console.error('Error saving phone numbers:', error);
+                                toast({
+                                  title: 'Error',
+                                  description: 'Failed to save phone numbers. Please try again.',
+                                  variant: 'destructive',
+                                });
+                              }
+                            }}
+                          />
+                          {index === 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              Owner
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                      <p className="text-xs text-muted-foreground">
+                        Phone numbers are automatically saved when you click away from the input field.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Notes Section */}
                   <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
                     <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">

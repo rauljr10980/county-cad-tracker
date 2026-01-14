@@ -182,6 +182,8 @@ export interface PreForeclosureRecord {
   // Operator-Entered (manual only)
   internal_status: PreForeclosureStatus;
   notes?: string;
+  phoneNumbers?: string[]; // Array of up to 6 phone numbers
+  ownerPhoneIndex?: number; // Index of which phone number is the owner's (0-5)
   last_action_date?: string; // ISO date string
   next_follow_up_date?: string; // ISO date string
   
