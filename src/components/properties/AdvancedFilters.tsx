@@ -139,7 +139,7 @@ export function AdvancedFiltersPanel({
                   <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuContent align="start" className="w-56 z-[100]">
                 <DropdownMenuLabel>Select Status</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuCheckboxItem
@@ -222,14 +222,17 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="amountDueMin" className="text-xs text-muted-foreground">
                   Min ($)
                 </Label>
-                <Input className="mobile-input"
+                <Input 
+                  className="mobile-input w-full"
                   id="amountDueMin"
                   type="number"
                   placeholder="0"
+                  min="0"
+                  step="0.01"
                   value={filters.amountDueMin || ''}
                   onChange={(e) => {
                     const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('amountDueMin', value);
+                    updateFilter('amountDueMin', isNaN(value as number) ? undefined : value);
                   }}
                 />
               </div>
@@ -237,14 +240,17 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="amountDueMax" className="text-xs text-muted-foreground">
                   Max ($)
                 </Label>
-                <Input className="mobile-input"
+                <Input 
+                  className="mobile-input w-full"
                   id="amountDueMax"
                   type="number"
                   placeholder="No limit"
+                  min="0"
+                  step="0.01"
                   value={filters.amountDueMax || ''}
                   onChange={(e) => {
                     const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('amountDueMax', value);
+                    updateFilter('amountDueMax', isNaN(value as number) ? undefined : value);
                   }}
                 />
               </div>
@@ -259,14 +265,17 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="marketValueMin" className="text-xs text-muted-foreground">
                   Min ($)
                 </Label>
-                <Input className="mobile-input"
+                <Input 
+                  className="mobile-input w-full"
                   id="marketValueMin"
                   type="number"
                   placeholder="0"
+                  min="0"
+                  step="0.01"
                   value={filters.marketValueMin || ''}
                   onChange={(e) => {
                     const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('marketValueMin', value);
+                    updateFilter('marketValueMin', isNaN(value as number) ? undefined : value);
                   }}
                 />
               </div>
@@ -274,14 +283,17 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="marketValueMax" className="text-xs text-muted-foreground">
                   Max ($)
                 </Label>
-                <Input className="mobile-input"
+                <Input 
+                  className="mobile-input w-full"
                   id="marketValueMax"
                   type="number"
                   placeholder="No limit"
+                  min="0"
+                  step="0.01"
                   value={filters.marketValueMax || ''}
                   onChange={(e) => {
                     const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('marketValueMax', value);
+                    updateFilter('marketValueMax', isNaN(value as number) ? undefined : value);
                   }}
                 />
               </div>
@@ -296,15 +308,18 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="ratioMin" className="text-xs text-muted-foreground">
                   Min (%)
                 </Label>
-                <Input className="mobile-input"
+                <Input 
+                  className="mobile-input w-full"
                   id="ratioMin"
                   type="number"
                   placeholder="0"
+                  min="0"
+                  max="100"
                   step="0.1"
                   value={filters.ratioMin || ''}
                   onChange={(e) => {
                     const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('ratioMin', value);
+                    updateFilter('ratioMin', isNaN(value as number) ? undefined : value);
                   }}
                 />
               </div>
@@ -312,15 +327,17 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="ratioMax" className="text-xs text-muted-foreground">
                   Max (%)
                 </Label>
-                <Input className="mobile-input"
+                <Input 
+                  className="mobile-input w-full"
                   id="ratioMax"
                   type="number"
                   placeholder="No limit"
+                  min="0"
                   step="0.1"
                   value={filters.ratioMax || ''}
                   onChange={(e) => {
                     const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('ratioMax', value);
+                    updateFilter('ratioMax', isNaN(value as number) ? undefined : value);
                   }}
                 />
               </div>
@@ -330,7 +347,8 @@ export function AdvancedFiltersPanel({
           {/* Tax Year */}
           <div className="space-y-3">
             <Label htmlFor="taxYear">Tax Year</Label>
-            <Input className="mobile-input"
+            <Input 
+              className="mobile-input w-full"
               id="taxYear"
               type="text"
               placeholder="e.g., 2024"
@@ -347,7 +365,7 @@ export function AdvancedFiltersPanel({
                 variant={filters.hasNotes === 'any' || !filters.hasNotes ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => updateFilter('hasNotes', 'any')}
-                className="flex-1"
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 Any
               </Button>
@@ -355,7 +373,7 @@ export function AdvancedFiltersPanel({
                 variant={filters.hasNotes === 'yes' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => updateFilter('hasNotes', 'yes')}
-                className="flex-1"
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 Yes
               </Button>
@@ -363,7 +381,7 @@ export function AdvancedFiltersPanel({
                 variant={filters.hasNotes === 'no' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => updateFilter('hasNotes', 'no')}
-                className="flex-1"
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 No
               </Button>
@@ -378,7 +396,7 @@ export function AdvancedFiltersPanel({
                 variant={filters.hasLink === 'any' || !filters.hasLink ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => updateFilter('hasLink', 'any')}
-                className="flex-1"
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 Any
               </Button>
@@ -386,7 +404,7 @@ export function AdvancedFiltersPanel({
                 variant={filters.hasLink === 'yes' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => updateFilter('hasLink', 'yes')}
-                className="flex-1"
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 Yes
               </Button>
@@ -394,7 +412,7 @@ export function AdvancedFiltersPanel({
                 variant={filters.hasLink === 'no' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => updateFilter('hasLink', 'no')}
-                className="flex-1"
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 No
               </Button>
@@ -409,7 +427,7 @@ export function AdvancedFiltersPanel({
                 variant={filters.hasExemptions === 'any' || !filters.hasExemptions ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => updateFilter('hasExemptions', 'any')}
-                className="flex-1"
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 Any
               </Button>
@@ -417,7 +435,7 @@ export function AdvancedFiltersPanel({
                 variant={filters.hasExemptions === 'yes' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => updateFilter('hasExemptions', 'yes')}
-                className="flex-1"
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 Yes
               </Button>
@@ -425,7 +443,7 @@ export function AdvancedFiltersPanel({
                 variant={filters.hasExemptions === 'no' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => updateFilter('hasExemptions', 'no')}
-                className="flex-1"
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 No
               </Button>
@@ -440,7 +458,8 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="followUpDateFrom" className="text-xs text-muted-foreground">
                   From
                 </Label>
-                <Input className="mobile-input"
+                <Input 
+                  className="mobile-input w-full"
                   id="followUpDateFrom"
                   type="date"
                   value={filters.followUpDateFrom || ''}
@@ -451,7 +470,8 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="followUpDateTo" className="text-xs text-muted-foreground">
                   To
                 </Label>
-                <Input className="mobile-input"
+                <Input 
+                  className="mobile-input w-full"
                   id="followUpDateTo"
                   type="date"
                   value={filters.followUpDateTo || ''}
@@ -469,7 +489,8 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="lastPaymentDateFrom" className="text-xs text-muted-foreground">
                   From
                 </Label>
-                <Input className="mobile-input"
+                <Input 
+                  className="mobile-input w-full"
                   id="lastPaymentDateFrom"
                   type="date"
                   value={filters.lastPaymentDateFrom || ''}
@@ -480,7 +501,8 @@ export function AdvancedFiltersPanel({
                 <Label htmlFor="lastPaymentDateTo" className="text-xs text-muted-foreground">
                   To
                 </Label>
-                <Input className="mobile-input"
+                <Input 
+                  className="mobile-input w-full"
                   id="lastPaymentDateTo"
                   type="date"
                   value={filters.lastPaymentDateTo || ''}
@@ -495,7 +517,7 @@ export function AdvancedFiltersPanel({
             <Button
               variant="default"
               onClick={handleSearch}
-              className="w-full"
+              className="w-full mobile-touch-target"
             >
               <Search className="h-4 w-4 mr-2" />
               Search
@@ -504,7 +526,7 @@ export function AdvancedFiltersPanel({
               <Button
                 variant="outline"
                 onClick={onClear}
-                className="w-full"
+                className="w-full mobile-touch-target"
               >
                 <X className="h-4 w-4 mr-2" />
                 Clear All Filters
