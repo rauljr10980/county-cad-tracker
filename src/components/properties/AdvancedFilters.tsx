@@ -229,10 +229,17 @@ export function AdvancedFiltersPanel({
                   placeholder="0"
                   min="0"
                   step="0.01"
-                  value={filters.amountDueMin || ''}
+                  value={filters.amountDueMin !== undefined ? filters.amountDueMin.toString() : ''}
                   onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('amountDueMin', isNaN(value as number) ? undefined : value);
+                    const inputValue = e.target.value.trim();
+                    if (inputValue === '') {
+                      updateFilter('amountDueMin', undefined);
+                      return;
+                    }
+                    const value = parseFloat(inputValue);
+                    if (!isNaN(value) && value >= 0) {
+                      updateFilter('amountDueMin', value);
+                    }
                   }}
                 />
               </div>
@@ -247,10 +254,17 @@ export function AdvancedFiltersPanel({
                   placeholder="No limit"
                   min="0"
                   step="0.01"
-                  value={filters.amountDueMax || ''}
+                  value={filters.amountDueMax !== undefined ? filters.amountDueMax.toString() : ''}
                   onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('amountDueMax', isNaN(value as number) ? undefined : value);
+                    const inputValue = e.target.value.trim();
+                    if (inputValue === '') {
+                      updateFilter('amountDueMax', undefined);
+                      return;
+                    }
+                    const value = parseFloat(inputValue);
+                    if (!isNaN(value) && value >= 0) {
+                      updateFilter('amountDueMax', value);
+                    }
                   }}
                 />
               </div>
@@ -272,10 +286,17 @@ export function AdvancedFiltersPanel({
                   placeholder="0"
                   min="0"
                   step="0.01"
-                  value={filters.marketValueMin || ''}
+                  value={filters.marketValueMin !== undefined ? filters.marketValueMin.toString() : ''}
                   onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('marketValueMin', isNaN(value as number) ? undefined : value);
+                    const inputValue = e.target.value.trim();
+                    if (inputValue === '') {
+                      updateFilter('marketValueMin', undefined);
+                      return;
+                    }
+                    const value = parseFloat(inputValue);
+                    if (!isNaN(value) && value >= 0) {
+                      updateFilter('marketValueMin', value);
+                    }
                   }}
                 />
               </div>
@@ -290,10 +311,17 @@ export function AdvancedFiltersPanel({
                   placeholder="No limit"
                   min="0"
                   step="0.01"
-                  value={filters.marketValueMax || ''}
+                  value={filters.marketValueMax !== undefined ? filters.marketValueMax.toString() : ''}
                   onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('marketValueMax', isNaN(value as number) ? undefined : value);
+                    const inputValue = e.target.value.trim();
+                    if (inputValue === '') {
+                      updateFilter('marketValueMax', undefined);
+                      return;
+                    }
+                    const value = parseFloat(inputValue);
+                    if (!isNaN(value) && value >= 0) {
+                      updateFilter('marketValueMax', value);
+                    }
                   }}
                 />
               </div>
@@ -316,10 +344,17 @@ export function AdvancedFiltersPanel({
                   min="0"
                   max="100"
                   step="0.1"
-                  value={filters.ratioMin || ''}
+                  value={filters.ratioMin !== undefined ? filters.ratioMin.toString() : ''}
                   onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('ratioMin', isNaN(value as number) ? undefined : value);
+                    const inputValue = e.target.value.trim();
+                    if (inputValue === '') {
+                      updateFilter('ratioMin', undefined);
+                      return;
+                    }
+                    const value = parseFloat(inputValue);
+                    if (!isNaN(value) && value >= 0 && value <= 100) {
+                      updateFilter('ratioMin', value);
+                    }
                   }}
                 />
               </div>
@@ -334,10 +369,17 @@ export function AdvancedFiltersPanel({
                   placeholder="No limit"
                   min="0"
                   step="0.1"
-                  value={filters.ratioMax || ''}
+                  value={filters.ratioMax !== undefined ? filters.ratioMax.toString() : ''}
                   onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    updateFilter('ratioMax', isNaN(value as number) ? undefined : value);
+                    const inputValue = e.target.value.trim();
+                    if (inputValue === '') {
+                      updateFilter('ratioMax', undefined);
+                      return;
+                    }
+                    const value = parseFloat(inputValue);
+                    if (!isNaN(value) && value >= 0) {
+                      updateFilter('ratioMax', value);
+                    }
                   }}
                 />
               </div>

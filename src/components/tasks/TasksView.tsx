@@ -541,8 +541,23 @@ export function TasksView() {
                   </div>
                 </div>
 
-                {/* Mark Done Button */}
-                <div className="flex-shrink-0">
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* View Details Button */}
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="border-border hover:border-primary hover:bg-primary/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedProperty(property);
+                    }}
+                    title="View and edit property details"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+
+                  {/* Mark Done Button */}
                   <Button
                     variant="default"
                     size="default"
