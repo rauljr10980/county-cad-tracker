@@ -116,7 +116,7 @@ export function AdvancedFiltersPanel({
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto overscroll-contain">
         <SheetHeader>
           <SheetTitle>Advanced Filters</SheetTitle>
           <SheetDescription>
