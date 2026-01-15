@@ -271,7 +271,17 @@ export function PropertiesView() {
         needsFrontendStatusFilter,
         searchStatus,
         hasActiveFilters,
-        sampleStatuses: rawProperties.slice(0, 5).map(p => ({ accountNumber: p.accountNumber, status: p.status }))
+        amountDueMin: advancedFilters.amountDueMin,
+        amountDueMax: advancedFilters.amountDueMax,
+        marketValueMin: advancedFilters.marketValueMin,
+        marketValueMax: advancedFilters.marketValueMax,
+        ratioMin: advancedFilters.ratioMin,
+        ratioMax: advancedFilters.ratioMax,
+        taxYear: advancedFilters.taxYear,
+        hasNotes: advancedFilters.hasNotes,
+        hasLink: advancedFilters.hasLink,
+        hasExemptions: advancedFilters.hasExemptions,
+        sampleStatuses: rawProperties.slice(0, 5).map(p => ({ accountNumber: p.accountNumber, status: p.status, totalAmountDue: p.totalAmountDue }))
       });
     }
     
@@ -324,14 +334,36 @@ export function PropertiesView() {
       // Amount Due range
       if (advancedFilters.amountDueMin !== undefined && advancedFilters.amountDueMin !== null) {
         const minValue = typeof advancedFilters.amountDueMin === 'number' ? advancedFilters.amountDueMin : parseFloat(String(advancedFilters.amountDueMin));
-        if (!isNaN(minValue) && p.totalAmountDue < minValue) {
-          return false;
+        if (!isNaN(minValue)) {
+          if (p.totalAmountDue < minValue) {
+            return false;
+          }
+          // Debug logging for first few properties
+          if (rawProperties.indexOf(p) < 5) {
+            console.log('[FILTER DEBUG] Amount Due Min check:', {
+              accountNumber: p.accountNumber,
+              totalAmountDue: p.totalAmountDue,
+              minValue,
+              passes: p.totalAmountDue >= minValue
+            });
+          }
         }
       }
       if (advancedFilters.amountDueMax !== undefined && advancedFilters.amountDueMax !== null) {
         const maxValue = typeof advancedFilters.amountDueMax === 'number' ? advancedFilters.amountDueMax : parseFloat(String(advancedFilters.amountDueMax));
-        if (!isNaN(maxValue) && p.totalAmountDue > maxValue) {
-          return false;
+        if (!isNaN(maxValue)) {
+          if (p.totalAmountDue > maxValue) {
+            return false;
+          }
+          // Debug logging for first few properties
+          if (rawProperties.indexOf(p) < 5) {
+            console.log('[FILTER DEBUG] Amount Due Max check:', {
+              accountNumber: p.accountNumber,
+              totalAmountDue: p.totalAmountDue,
+              maxValue,
+              passes: p.totalAmountDue <= maxValue
+            });
+          }
         }
       }
       
