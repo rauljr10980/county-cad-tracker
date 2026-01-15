@@ -635,8 +635,10 @@ export function PropertiesView() {
       let finalTotalPages = 1;
     
     // All properties are now fetched and paginated on frontend
-    // Use sorted properties if sorting is active, otherwise use raw properties
-    const propertiesToPaginate = isSortingActive ? sortedProperties : rawProperties;
+    // Use sorted properties if filters or sorting are active, otherwise use raw properties
+    // sortedProperties already contains filtered properties when filters are active
+    const hasAnyFilterOrSort = selectedStatuses.length > 0 || hasActiveAdvancedFilters || isSortingActive;
+    const propertiesToPaginate = hasAnyFilterOrSort ? sortedProperties : rawProperties;
     finalTotal = propertiesToPaginate.length || totalUnfiltered;
     finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
     
