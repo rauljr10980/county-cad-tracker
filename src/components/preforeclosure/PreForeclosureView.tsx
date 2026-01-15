@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute, reorderRecordInRoute } from '@/lib/api';
+import { batchGeocodeAddresses } from '@/lib/geocoding';
 
 // Local type alias to avoid runtime reference issues
 type RouteType = {
@@ -331,7 +332,11 @@ export function PreForeclosureView() {
   const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
   const [removingRecordId, setRemovingRecordId] = useState<string | null>(null);
   const [reorderingRecordId, setReorderingRecordId] = useState<string | null>(null);
-  
+  const [geocodeOpen, setGeocodeOpen] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodeProgress, setGeocodeProgress] = useState({ current: 0, total: 0, address: '' });
+  const [geocodeResults, setGeocodeResults] = useState<Map<string, { latitude: number; longitude: number; displayName: string }>>(new Map());
+
   // Drag and drop sensors
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -1569,6 +1574,78 @@ export function PreForeclosureView() {
     }
   };
 
+  const handleGeocodeAddresses = async () => {
+    // Get records that don't have coordinates
+    const recordsNeedingGeocode = filteredRecords.filter(
+      (r: any) => !r.latitude || !r.longitude
+    );
+
+    if (recordsNeedingGeocode.length === 0) {
+      toast({
+        title: 'No records to geocode',
+        description: 'All visible records already have coordinates',
+      });
+      return;
+    }
+
+    setIsGeocoding(true);
+    setGeocodeOpen(true);
+    setGeocodeResults(new Map());
+
+    try {
+      const addressesToGeocode = recordsNeedingGeocode.map((r: any) => ({
+        id: r.document_number,
+        address: r.address,
+        city: r.city,
+        state: 'TX',
+        zip: r.zip,
+      }));
+
+      const results = await batchGeocodeAddresses(
+        addressesToGeocode,
+        (completed, total, current) => {
+          setGeocodeProgress({ current: completed, total, address: current });
+        }
+      );
+
+      setGeocodeResults(results);
+
+      // Update records with coordinates
+      let successCount = 0;
+      for (const [documentNumber, result] of results.entries()) {
+        const record = recordsNeedingGeocode.find((r: any) => r.document_number === documentNumber);
+        if (record) {
+          try {
+            await updateMutation.mutateAsync({
+              document_number: documentNumber,
+              updates: {
+                latitude: result.latitude,
+                longitude: result.longitude,
+              },
+            });
+            successCount++;
+          } catch (error) {
+            console.error(`Failed to update ${documentNumber}:`, error);
+          }
+        }
+      }
+
+      toast({
+        title: 'Geocoding complete',
+        description: `Successfully geocoded ${successCount} of ${recordsNeedingGeocode.length} addresses`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Geocoding failed',
+        description: error instanceof Error ? error.message : 'Failed to geocode addresses',
+        variant: 'destructive',
+      });
+      console.error('Geocoding error:', error);
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
   // Always show header with upload button, even during loading/error
   const headerSection = (
     <div className="mb-8">
@@ -1668,9 +1745,9 @@ export function PreForeclosureView() {
             </Button>
           </>
         )}
-        <Button 
-          onClick={() => setDeleteConfirmOpen(true)} 
-          variant="destructive" 
+        <Button
+          onClick={() => setDeleteConfirmOpen(true)}
+          variant="destructive"
           size="default"
           disabled={records.length === 0}
             className="shadow-sm"
@@ -1678,8 +1755,27 @@ export function PreForeclosureView() {
           <Trash2 className="h-4 w-4 mr-2" />
             Delete All
         </Button>
-          <Button 
-            onClick={() => setUploadOpen(true)} 
+          <Button
+            onClick={handleGeocodeAddresses}
+            size="default"
+            variant="outline"
+            disabled={isGeocoding || records.length === 0}
+            className="shadow-sm"
+          >
+            {isGeocoding ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Geocoding...
+              </>
+            ) : (
+              <>
+                <MapPin className="h-4 w-4 mr-2" />
+                Geocode Addresses
+              </>
+            )}
+        </Button>
+          <Button
+            onClick={() => setUploadOpen(true)}
             size="default"
             className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
           >
@@ -1806,6 +1902,73 @@ export function PreForeclosureView() {
         </Dialog>
   );
 
+  // Geocoding Progress Modal
+  const geocodeModal = (
+    <Dialog open={geocodeOpen} onOpenChange={(open) => !isGeocoding && setGeocodeOpen(open)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Geocoding Addresses</DialogTitle>
+          <DialogDescription>
+            Converting addresses to GPS coordinates for mapping and routing
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {isGeocoding ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Progress:</span>
+                <span className="text-sm text-muted-foreground">
+                  {geocodeProgress.current} / {geocodeProgress.total}
+                </span>
+              </div>
+              <div className="w-full bg-secondary rounded-full h-2.5">
+                <div
+                  className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${geocodeProgress.total > 0 ? (geocodeProgress.current / geocodeProgress.total) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <div className="text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Currently geocoding: {geocodeProgress.address}</span>
+                </div>
+              </div>
+              <div className="bg-secondary/30 rounded-lg p-4 text-sm space-y-2">
+                <p className="font-medium">Please wait...</p>
+                <p className="text-muted-foreground">
+                  This process takes about 1 second per address due to rate limiting.
+                  Don't close this window.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-green-500/10 rounded-lg p-4 text-sm border border-green-500/20">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-green-700">Geocoding Complete!</p>
+                    <p className="text-muted-foreground mt-1">
+                      Successfully processed {geocodeResults.size} addresses.
+                      Coordinates have been saved to the database.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={() => setGeocodeOpen(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
 
   if (isLoading) {
     return (
@@ -1818,6 +1981,7 @@ export function PreForeclosureView() {
           </div>
         </div>
         {uploadModal}
+        {geocodeModal}
       </div>
     );
   }
@@ -1831,6 +1995,7 @@ export function PreForeclosureView() {
           <p className="text-destructive">Failed to load pre-foreclosure records</p>
         </div>
         {uploadModal}
+        {geocodeModal}
       </div>
     );
   }
@@ -2280,6 +2445,9 @@ export function PreForeclosureView() {
 
       {/* Upload Modal */}
       {uploadModal}
+
+      {/* Geocode Modal */}
+      {geocodeModal}
 
       {/* Notes Modal */}
       <Dialog open={notesOpen} onOpenChange={setNotesOpen}>
