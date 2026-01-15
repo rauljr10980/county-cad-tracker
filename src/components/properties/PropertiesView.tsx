@@ -500,6 +500,23 @@ export function PropertiesView() {
       return true;
     });
     
+    // Debug: Log filtering results
+    if (hasActiveFilters || needsFrontendStatusFilter) {
+      console.log('[FILTER] Filtering complete:', {
+        inputCount: rawProperties.length,
+        outputCount: filtered.length,
+        amountDueMin: advancedFilters.amountDueMin,
+        amountDueMax: advancedFilters.amountDueMax,
+        marketValueMin: advancedFilters.marketValueMin,
+        marketValueMax: advancedFilters.marketValueMax,
+        sampleFiltered: filtered.slice(0, 5).map(p => ({ 
+          accountNumber: p.accountNumber, 
+          totalAmountDue: p.totalAmountDue,
+          marketValue: p.marketValue 
+        }))
+      });
+    }
+    
     // Debug logging when status filter is active
     if (needsFrontendStatusFilter && advancedFilters.statuses.length > 0) {
       // Count how many properties match each status after normalization
