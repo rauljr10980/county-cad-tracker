@@ -322,11 +322,17 @@ export function PropertiesView() {
       }
       
       // Amount Due range
-      if (advancedFilters.amountDueMin !== undefined && p.totalAmountDue < advancedFilters.amountDueMin) {
-        return false;
+      if (advancedFilters.amountDueMin !== undefined && advancedFilters.amountDueMin !== null) {
+        const minValue = typeof advancedFilters.amountDueMin === 'number' ? advancedFilters.amountDueMin : parseFloat(String(advancedFilters.amountDueMin));
+        if (!isNaN(minValue) && p.totalAmountDue < minValue) {
+          return false;
+        }
       }
-      if (advancedFilters.amountDueMax !== undefined && p.totalAmountDue > advancedFilters.amountDueMax) {
-        return false;
+      if (advancedFilters.amountDueMax !== undefined && advancedFilters.amountDueMax !== null) {
+        const maxValue = typeof advancedFilters.amountDueMax === 'number' ? advancedFilters.amountDueMax : parseFloat(String(advancedFilters.amountDueMax));
+        if (!isNaN(maxValue) && p.totalAmountDue > maxValue) {
+          return false;
+        }
       }
       
       // Market Value range
