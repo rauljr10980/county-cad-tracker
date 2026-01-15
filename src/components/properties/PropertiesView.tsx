@@ -330,11 +330,17 @@ export function PropertiesView() {
       }
       
       // Market Value range
-      if (advancedFilters.marketValueMin !== undefined && (p.marketValue === undefined || p.marketValue < advancedFilters.marketValueMin)) {
-        return false;
+      if (advancedFilters.marketValueMin !== undefined && advancedFilters.marketValueMin !== null) {
+        const minValue = typeof advancedFilters.marketValueMin === 'number' ? advancedFilters.marketValueMin : parseFloat(String(advancedFilters.marketValueMin));
+        if (!isNaN(minValue) && (p.marketValue === undefined || p.marketValue < minValue)) {
+          return false;
+        }
       }
-      if (advancedFilters.marketValueMax !== undefined && (p.marketValue === undefined || p.marketValue > advancedFilters.marketValueMax)) {
-        return false;
+      if (advancedFilters.marketValueMax !== undefined && advancedFilters.marketValueMax !== null) {
+        const maxValue = typeof advancedFilters.marketValueMax === 'number' ? advancedFilters.marketValueMax : parseFloat(String(advancedFilters.marketValueMax));
+        if (!isNaN(maxValue) && (p.marketValue === undefined || p.marketValue > maxValue)) {
+          return false;
+        }
       }
       
       // Ratio range (calculated as: amountDue / marketValue * 100)
@@ -345,18 +351,24 @@ export function PropertiesView() {
           : null;
         
         // If ratio is null (no market value) and min is set, exclude it
-        if (ratio === null && advancedFilters.ratioMin !== undefined) {
+        if (ratio === null && advancedFilters.ratioMin !== undefined && advancedFilters.ratioMin !== null) {
           return false;
         }
         
         // Check min ratio
-        if (ratio !== null && advancedFilters.ratioMin !== undefined && ratio < advancedFilters.ratioMin) {
-          return false;
+        if (ratio !== null && advancedFilters.ratioMin !== undefined && advancedFilters.ratioMin !== null) {
+          const minValue = typeof advancedFilters.ratioMin === 'number' ? advancedFilters.ratioMin : parseFloat(String(advancedFilters.ratioMin));
+          if (!isNaN(minValue) && ratio < minValue) {
+            return false;
+          }
         }
         
         // Check max ratio
-        if (ratio !== null && advancedFilters.ratioMax !== undefined && ratio > advancedFilters.ratioMax) {
-          return false;
+        if (ratio !== null && advancedFilters.ratioMax !== undefined && advancedFilters.ratioMax !== null) {
+          const maxValue = typeof advancedFilters.ratioMax === 'number' ? advancedFilters.ratioMax : parseFloat(String(advancedFilters.ratioMax));
+          if (!isNaN(maxValue) && ratio > maxValue) {
+            return false;
+          }
         }
       }
       
@@ -698,9 +710,15 @@ export function PropertiesView() {
 
   // Handle advanced filters change
   const handleFiltersChange = (filters: AdvancedFilters) => {
+    console.log('[FILTERS] Filters changed:', filters);
     setAdvancedFilters(filters);
-    setPage(1);
+    setPage(1); // Reset to first page when filters change
   };
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [advancedFilters]);
 
   const clearAllFilters = () => {
     setAdvancedFilters({
