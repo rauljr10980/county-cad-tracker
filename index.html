@@ -2,10 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+
+    <!-- Mobile Web App Capable -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CAD Tracker" />
+
+    <!-- Theme Colors -->
+    <meta name="theme-color" content="#1a202e" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f7fafc" media="(prefers-color-scheme: light)" />
+
     <title>Real Estate Acquisitions | Bexar County Tax Delinquent Manager</title>
     <meta name="description" content="Manage and analyze tax-delinquent property data with automated data extraction from Bexar County and change tracking across monthly uploads." />
     <meta name="author" content="Real Estate Acquisitions" />
@@ -18,8 +29,10 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@Lovable" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-    <script type="module" crossorigin src="/county-cad-tracker/assets/index-4yd31AHp-1767910686840.js"></script>
-    <link rel="stylesheet" crossorigin href="/county-cad-tracker/assets/index-Dhmy4JQb.css">
+    
+    <!-- Using Leaflet + OpenStreetMap (FREE, no API key required) -->
+    <script type="module" crossorigin src="/county-cad-tracker/assets/index-FIXED-1768594006142.js"></script>
+    <link rel="stylesheet" crossorigin href="/county-cad-tracker/assets/index-7tHx9zDv.css">
   </head>
 
   <body>
@@ -40,6 +53,6 @@
           });
         });
       }
-    </script>
+    </script>
   </body>
 </html>
