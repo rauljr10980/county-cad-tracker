@@ -71,6 +71,7 @@ import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { AdvancedFiltersPanel, PreForeclosureAdvancedFilters } from './AdvancedFilters';
 import { UploadStatsCard } from './UploadStatsCard';
+import { OverallStatsCard } from './OverallStatsCard';
 
 // Sortable Row Component
 function SortableRow({ 
@@ -2026,8 +2027,11 @@ export function PreForeclosureView() {
       {/* Header */}
       {headerSection}
 
-      {/* Upload Stats Dashboard */}
-      <UploadStatsCard />
+      {/* Stats Dashboard Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <UploadStatsCard />
+        <OverallStatsCard />
+      </div>
 
       {/* Active Routes Dashboard */}
       <div className="bg-card border border-border rounded-lg p-4">
