@@ -817,6 +817,7 @@ export async function getLatestPreForeclosureUploadStats(): Promise<{
   inactiveRecords?: number;
   totalRecords?: number;
   activeRecords?: number;
+  newDocumentNumbers?: string[];
   message?: string;
 }> {
   const response = await fetch(`${API_BASE_URL}/api/preforeclosure/upload-stats/latest`, {

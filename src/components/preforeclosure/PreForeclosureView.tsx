@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useDeletePreForeclosures } from '@/hooks/usePreForeclosure';
+import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats } from '@/hooks/usePreForeclosure';
 import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -307,6 +307,7 @@ export function PreForeclosureView() {
 
   const queryClient = useQueryClient();
   const { data: records = [], isLoading, error } = usePreForeclosures();
+  const { data: uploadStats } = useLatestPreForeclosureUploadStats();
   const updateMutation = useUpdatePreForeclosure();
   const uploadMutation = useUploadPreForeclosureFile();
   const deleteMutation = useDeletePreForeclosures();
@@ -439,22 +440,22 @@ export function PreForeclosureView() {
 
     // Show new only filter - show records added in the most recent upload
     if (advancedFilters.showNewOnly) {
-      // Get the most recent month from all records
-      const allMonths = records.map(r => r.first_seen_month).filter(Boolean);
-      const latestMonth = allMonths.length > 0 ? allMonths.sort().reverse()[0] : null;
+      // Use the new document numbers from the latest upload stats
+      const newDocNumbers = uploadStats?.newDocumentNumbers || [];
 
-      console.log('[FILTER DEBUG] Latest upload month:', latestMonth);
+      console.log('[FILTER DEBUG] New document numbers from latest upload:', newDocNumbers.length);
       console.log('[FILTER DEBUG] Records before filter:', filtered.length);
 
-      if (latestMonth) {
-        filtered = filtered.filter(r => r.first_seen_month === latestMonth);
+      if (newDocNumbers.length > 0) {
+        const newDocSet = new Set(newDocNumbers);
+        filtered = filtered.filter(r => newDocSet.has(r.document_number));
       }
 
       console.log('[FILTER DEBUG] Records after filter:', filtered.length);
     }
 
     return filtered;
-  }, [records, searchQuery, advancedFilters]);
+  }, [records, searchQuery, advancedFilters, uploadStats]);
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {

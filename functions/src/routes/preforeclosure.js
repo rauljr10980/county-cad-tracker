@@ -652,7 +652,8 @@ router.get('/upload-stats/latest', optionalAuth, async (req, res) => {
       updatedRecords: latestUpload.updatedRecords,
       inactiveRecords: latestUpload.inactiveRecords,
       totalRecords: latestUpload.totalRecords,
-      activeRecords: latestUpload.activeRecords
+      activeRecords: latestUpload.activeRecords,
+      newDocumentNumbers: latestUpload.newDocumentNumbers || []
     });
   } catch (error) {
     console.error('[PRE-FORECLOSURE] Latest upload stats error:', error);
