@@ -112,6 +112,7 @@ model Property {
   noteRecords    Note[]           @relation("PropertyNotes") // Detailed notes with authors
   tasks          Task[]
   paymentHistory PaymentHistory[]
+  routeRecords   RouteRecord[]    // Routes this property is in
 
   // Indexes for performance (50k+ properties)
   @@index([accountNumber])
@@ -443,6 +444,7 @@ model Route {
   // Route Details
   driver String // "Luciano" or "Raul"
   status RouteStatus @default(ACTIVE)
+  routeType RouteType @default(PREFORECLOSURE) // Type of records in this route
 
   // Route Data (stored as JSON)
   routeData Json // Full route optimization result
@@ -459,6 +461,7 @@ model Route {
   @@index([driver])
   @@index([createdAt])
   @@index([status, driver])
+  @@index([routeType])
   @@map("routes")
 }
 
@@ -468,6 +471,11 @@ enum RouteStatus {
   CANCELLED
 }
 
+enum RouteType {
+  PROPERTY
+  PREFORECLOSURE
+}
+
 model RouteRecord {
   id String @id @default(cuid())
 
@@ -475,8 +483,12 @@ model RouteRecord {
   routeId String
   route   Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
 
-  preForeclosureId String
-  preForeclosure   PreForeclosure @relation(fields: [preForeclosureId], references: [id], onDelete: Cascade)
+  // Optional relations - one of these will be set based on route type
+  preForeclosureId String?
+  preForeclosure   PreForeclosure? @relation(fields: [preForeclosureId], references: [id], onDelete: Cascade)
+
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   // Position in route (for ordering)
   orderIndex Int @default(0)
@@ -486,9 +498,9 @@ model RouteRecord {
 
   createdAt DateTime @default(now())
 
-  @@unique([routeId, preForeclosureId])
   @@index([routeId])
   @@index([preForeclosureId])
+  @@index([propertyId])
   @@index([routeId, orderIndex])
   @@map("route_records")
 }

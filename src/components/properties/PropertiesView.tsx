@@ -1,5 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
-import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown, Route, MapPin } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown, Route, MapPin, Trash2, GripVertical, Eye, CheckCircle, RotateCcw } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { AdvancedFiltersPanel, AdvancedFilters } from './AdvancedFilters';
@@ -8,9 +25,11 @@ import { useProperties } from '@/hooks/useFiles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP } from '@/lib/api';
+import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute } from '@/lib/api';
+import { batchGeocodeAddresses } from '@/lib/geocoding';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { FileDropZone } from '@/components/upload/FileDropZone';
@@ -25,6 +44,166 @@ import {
 
 const ITEMS_PER_PAGE = 100;
 
+// Local type alias for routes
+type RouteType = {
+  id: string;
+  driver: 'Luciano' | 'Raul';
+  status: 'ACTIVE' | 'FINISHED' | 'CANCELLED';
+  routeData: any;
+  routeType?: string;
+  createdAt: string;
+  finishedAt?: string;
+  updatedAt: string;
+  recordCount: number;
+  records: Array<{
+    id: string;
+    orderIndex: number;
+    isDepot: boolean;
+    record: {
+      id: string;
+      accountNumber?: string;
+      propertyAddress?: string;
+      ownerName?: string;
+      latitude?: number;
+      longitude?: number;
+      visited?: boolean;
+      visited_at?: string;
+      visited_by?: string;
+      visitedAt?: string;
+      visitedBy?: string;
+    };
+  }>;
+};
+
+// Sortable Row Component for Route Details
+function SortableRouteRow({
+  routeRecord,
+  index,
+  viewRoute,
+  propertyId,
+  record,
+  removingRecordId,
+  reorderingRecordId,
+  handleRemoveRecordFromRoute,
+  handleViewRecordDetails,
+}: any) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    setActivatorNodeRef,
+  } = useSortable({
+    id: routeRecord.id,
+    disabled: removingRecordId !== null || reorderingRecordId !== null,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const isDepot = routeRecord.isDepot === true;
+  const isRemoving = removingRecordId === propertyId;
+  const isReordering = reorderingRecordId === propertyId;
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'border-b border-border hover:bg-secondary/50',
+        isDragging && 'opacity-50 bg-secondary',
+        isDepot && 'bg-blue-50 dark:bg-blue-950/20'
+      )}
+    >
+      <td className="px-4 py-2 text-sm font-mono">
+        {isDepot ? (
+          <span className="text-blue-600 dark:text-blue-400 font-bold">START</span>
+        ) : (
+          <span>{index + 1}</span>
+        )}
+      </td>
+      <td className="px-4 py-2 text-sm font-mono">{record?.accountNumber || 'N/A'}</td>
+      <td className="px-4 py-2 text-sm">{record?.propertyAddress || 'N/A'}</td>
+      <td className="px-4 py-2 text-sm">{record?.ownerName || 'N/A'}</td>
+      <td className="px-4 py-2">
+        {record?.visited ? (
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded">
+            <CheckCircle className="h-3 w-3" />
+            Visited
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded">
+            Not Visited
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-2 text-sm">
+        {!isDepot && propertyId && (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRemoveRecordFromRoute(viewRoute.id, propertyId);
+            }}
+            disabled={isRemoving || isReordering}
+            className="h-7 text-xs"
+          >
+            {isRemoving ? (
+              <>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Removing...
+              </>
+            ) : (
+              <>
+                <Trash2 className="h-3 w-3 mr-1" />
+                Remove
+              </>
+            )}
+          </Button>
+        )}
+      </td>
+      <td className="px-4 py-2 text-sm">
+        {propertyId && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewRecordDetails(propertyId);
+            }}
+            className="h-7 text-xs"
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            Details
+          </Button>
+        )}
+      </td>
+      <td className="px-4 py-2 text-sm">
+        {!isDepot && (
+          <div
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded flex items-center justify-center"
+            title="Drag to reorder"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <GripVertical className="h-5 w-5 text-muted-foreground" />
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 export function PropertiesView() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<Set<string>>(new Set());
@@ -36,6 +215,30 @@ export function PropertiesView() {
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotPropertyId, setCustomDepotPropertyId] = useState<string | null>(null);
   const [propertiesInRoutes, setPropertiesInRoutes] = useState<Set<string>>(new Set());
+
+  // Geocoding state
+  const [geocodeOpen, setGeocodeOpen] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodeProgress, setGeocodeProgress] = useState({ current: 0, total: 0, address: '' });
+  const [geocodeResults, setGeocodeResults] = useState<Map<string, { latitude: number; longitude: number; displayName: string }>>(new Map());
+
+  // Active routes state
+  const [activeRoutes, setActiveRoutes] = useState<RouteType[]>([]);
+  const [isLoadingActiveRoutes, setIsLoadingActiveRoutes] = useState(false);
+  const [viewRoute, setViewRoute] = useState<RouteType | null>(null);
+  const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
+  const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
+  const [removingRecordId, setRemovingRecordId] = useState<string | null>(null);
+  const [reorderingRecordId, setReorderingRecordId] = useState<string | null>(null);
+
+  // Drag and drop sensors for route reordering
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({
     statuses: [],
     amountDueMin: undefined,
@@ -1249,10 +1452,11 @@ export function PropertiesView() {
         depotLat,
         depotLon,
         depotPropertyId,
+        routeType: 'PROPERTY',
         expectedResult: `${propertiesWithoutDepot.length} visitable stops (depot excluded)`
       });
-      
-      const solution = await solveVRP(propertiesForVRP, numVehicles, depotLat, depotLon, depotPropertyId);
+
+      const solution = await solveVRP(propertiesForVRP, numVehicles, depotLat, depotLon, depotPropertyId, 'PROPERTY');
 
       if (!solution.success || !solution.routes || solution.routes.length === 0) {
         throw new Error('No routes generated');
@@ -1308,6 +1512,224 @@ export function PropertiesView() {
     }
     // If no custom depot is set, just proceed with optimization
     await handleCreateRouteWithDepot();
+  };
+
+  // Load active routes on mount
+  const loadActiveRoutes = async () => {
+    setIsLoadingActiveRoutes(true);
+    try {
+      console.log('[Properties] Loading active routes...');
+      const routes = await getActiveRoutes();
+      console.log('[Properties] Loaded routes:', routes.length, routes);
+
+      // Filter for PROPERTY routes only
+      const propertyRoutes = routes.filter((r: RouteType) => r.routeType === 'PROPERTY');
+      console.log('[Properties] Filtered property routes:', propertyRoutes.length);
+      setActiveRoutes(propertyRoutes);
+
+      // Update propertiesInRoutes based on active routes
+      const activePropertyIds = new Set<string>();
+      propertyRoutes.forEach((route: RouteType) => {
+        route.records?.forEach((rr: any) => {
+          const propId = rr.record?.id;
+          if (propId) {
+            activePropertyIds.add(propId);
+          }
+        });
+      });
+      setPropertiesInRoutes(activePropertyIds);
+    } catch (error) {
+      console.error('[Properties] Error loading active routes:', error);
+    } finally {
+      setIsLoadingActiveRoutes(false);
+    }
+  };
+
+  useEffect(() => {
+    loadActiveRoutes();
+  }, []);
+
+  // Geocode addresses function
+  const handleGeocodeAddresses = async () => {
+    // Get properties that don't have coordinates
+    const propertiesNeedingGeocode = filteredProperties.filter(
+      (p: Property) => !p.latitude || !p.longitude
+    );
+
+    if (propertiesNeedingGeocode.length === 0) {
+      toast({
+        title: 'No properties to geocode',
+        description: 'All visible properties already have coordinates',
+      });
+      return;
+    }
+
+    setIsGeocoding(true);
+    setGeocodeOpen(true);
+    setGeocodeResults(new Map());
+
+    try {
+      const addressesToGeocode = propertiesNeedingGeocode.map((p: Property) => ({
+        id: p.id,
+        address: p.propertyAddress || '',
+        city: '',
+        state: 'TX',
+        zip: '',
+      }));
+
+      const results = await batchGeocodeAddresses(
+        addressesToGeocode,
+        (completed, total, current) => {
+          setGeocodeProgress({ current: completed, total, address: current });
+        }
+      );
+
+      setGeocodeResults(results);
+
+      // Update properties with geocoded coordinates
+      let successCount = 0;
+      for (const [id, coords] of results.entries()) {
+        try {
+          // Call API to update property coordinates
+          const response = await fetch(`/api/properties/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+            }),
+          });
+
+          if (response.ok) {
+            successCount++;
+          }
+        } catch (err) {
+          console.error(`Failed to update property ${id}:`, err);
+        }
+      }
+
+      toast({
+        title: 'Geocoding Complete',
+        description: `Successfully geocoded ${successCount} of ${propertiesNeedingGeocode.length} properties`,
+      });
+
+      // Reload data to reflect changes
+      window.location.reload();
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      toast({
+        title: 'Geocoding Failed',
+        description: error instanceof Error ? error.message : 'Failed to geocode addresses',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  // Route management functions
+  const handleViewRoute = (route: RouteType) => {
+    console.log('[Properties] Viewing route:', route);
+    setViewRoute(route);
+    setRouteDetailsOpen(true);
+  };
+
+  const handleDeleteRoute = async (routeId: string) => {
+    setDeletingRoute(routeId);
+    try {
+      await deleteRoute(routeId);
+      toast({
+        title: 'Route Deleted',
+        description: 'Route has been successfully deleted',
+      });
+      // Reload active routes
+      await loadActiveRoutes();
+    } catch (error) {
+      console.error('Error deleting route:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to delete route',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingRoute(null);
+    }
+  };
+
+  const handleRemoveRecordFromRoute = async (routeId: string, propertyId: string) => {
+    setRemovingRecordId(propertyId);
+    try {
+      await removeRecordFromRoute(routeId, propertyId);
+      toast({
+        title: 'Property Removed',
+        description: 'Property has been removed from the route',
+      });
+
+      // Update viewRoute
+      if (viewRoute && viewRoute.id === routeId) {
+        const updatedRecords = viewRoute.records.filter(r => r.record.id !== propertyId);
+        setViewRoute({ ...viewRoute, records: updatedRecords, recordCount: updatedRecords.length });
+      }
+
+      // Reload active routes
+      await loadActiveRoutes();
+    } catch (error) {
+      console.error('Error removing property from route:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to remove property',
+        variant: 'destructive',
+      });
+    } finally {
+      setRemovingRecordId(null);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || !viewRoute) return;
+
+    if (active.id !== over.id) {
+      const oldIndex = viewRoute.records.findIndex((r) => r.id === active.id);
+      const newIndex = viewRoute.records.findIndex((r) => r.id === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const newRecords = arrayMove(viewRoute.records, oldIndex, newIndex);
+      setViewRoute({ ...viewRoute, records: newRecords });
+
+      // Update order in backend
+      const propertyId = viewRoute.records[oldIndex].record.id;
+      setReorderingRecordId(propertyId);
+
+      try {
+        await reorderRecordInRoute(viewRoute.id, propertyId, newIndex);
+        toast({
+          title: 'Route Updated',
+          description: 'Stop order has been updated',
+        });
+        await loadActiveRoutes();
+      } catch (error) {
+        console.error('Error reordering route:', error);
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to reorder stops',
+          variant: 'destructive',
+        });
+        // Revert on error
+        setViewRoute(viewRoute);
+      } finally {
+        setReorderingRecordId(null);
+      }
+    }
+  };
+
+  const handleViewRecordDetails = (propertyId: string) => {
+    const property = rawProperties.find(p => p.id === propertyId);
+    if (property) {
+      setSelectedProperty(property);
+    }
   };
 
   return (
@@ -1452,7 +1874,29 @@ export function PropertiesView() {
             </p>
           )}
         </div>
-        
+
+        {/* Geocode Button */}
+        <div className="mb-4">
+          <Button
+            onClick={handleGeocodeAddresses}
+            variant="outline"
+            size="sm"
+            disabled={isGeocoding}
+          >
+            {isGeocoding ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Geocoding...
+              </>
+            ) : (
+              <>
+                <MapPin className="h-4 w-4 mr-2" />
+                Geocode Addresses
+              </>
+            )}
+          </Button>
+        </div>
+
         {/* Advanced Filters - Mobile Optimized */}
         <div className="mt-4">
           <AdvancedFiltersPanel
@@ -1644,6 +2088,67 @@ export function PropertiesView() {
         </>
       )}
 
+      {/* Active Routes Dashboard */}
+      <div className="mt-6 bg-card border border-border rounded-lg p-4">
+        <h3 className="text-lg font-semibold mb-4">Active Routes</h3>
+        {isLoadingActiveRoutes ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+            <span className="text-sm text-muted-foreground">Loading routes...</span>
+          </div>
+        ) : Array.isArray(activeRoutes) && activeRoutes.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {activeRoutes.map((route: RouteType) => {
+              const stopCount = route.records?.length || 0;
+              const driverColor = route.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500';
+              return (
+                <div
+                  key={route.id}
+                  className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors relative group cursor-pointer"
+                  onClick={() => handleViewRoute(route)}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className={cn('w-3 h-3 rounded-full', driverColor)} />
+                        <h4 className="font-semibold text-sm">{route.driver}</h4>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {stopCount} {stopCount === 1 ? 'stop' : 'stops'}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteRoute(route.id);
+                      }}
+                      disabled={deletingRoute === route.id}
+                    >
+                      {deletingRoute === route.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Created {new Date(route.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <p>No active routes</p>
+            <p className="text-xs mt-1">Create a route to get started</p>
+          </div>
+        )}
+      </div>
+
       <PropertyDetailsModal
         property={selectedProperty}
         isOpen={!!selectedProperty}
@@ -1663,8 +2168,8 @@ export function PropertiesView() {
               }}
               recordIds={Array.from(selectedPropertyIds)}
               onRouteSaved={() => {
-                // Reload active routes or update state after route is saved
-                // Routes are now tracked in the database
+                // Reload active routes after route is saved
+                loadActiveRoutes();
               }}
             />
           )}
@@ -1848,6 +2353,127 @@ export function PropertiesView() {
         }))}
         numVehicles={numVehicles}
       />
+
+      {/* Route Details Modal */}
+      {viewRoute && (
+        <Dialog open={routeDetailsOpen} onOpenChange={setRouteDetailsOpen}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Route Details - {viewRoute.driver}</DialogTitle>
+              <DialogDescription>
+                {viewRoute.records?.length || 0} stops • Created {new Date(viewRoute.createdAt).toLocaleDateString()}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Route Map */}
+              {viewRoute.routeData && (
+                <div className="rounded-lg overflow-hidden border border-border">
+                  <RouteMap
+                    routes={[viewRoute.routeData]}
+                    numVehicles={1}
+                    totalDistance={viewRoute.routeData.totalDistance || 0}
+                    isOpen={true}
+                    onClose={() => {}}
+                    recordIds={[]}
+                    compact={true}
+                  />
+                </div>
+              )}
+
+              {/* Route Records Table */}
+              <div className="border border-border rounded-lg overflow-hidden">
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={viewRoute.records?.map(r => r.id) || []}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <table className="w-full">
+                      <thead className="bg-secondary/50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-sm font-semibold">#</th>
+                          <th className="px-4 py-2 text-left text-sm font-semibold">Account #</th>
+                          <th className="px-4 py-2 text-left text-sm font-semibold">Address</th>
+                          <th className="px-4 py-2 text-left text-sm font-semibold">Owner</th>
+                          <th className="px-4 py-2 text-left text-sm font-semibold">Status</th>
+                          <th className="px-4 py-2 text-left text-sm font-semibold">Actions</th>
+                          <th className="px-4 py-2 text-left text-sm font-semibold">Details</th>
+                          <th className="px-4 py-2 text-left text-sm font-semibold">Reorder</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {viewRoute.records?.map((routeRecord, index) => {
+                          const record = routeRecord.record;
+                          const propertyId = record?.id;
+                          return (
+                            <SortableRouteRow
+                              key={routeRecord.id}
+                              routeRecord={routeRecord}
+                              index={index}
+                              viewRoute={viewRoute}
+                              propertyId={propertyId}
+                              record={record}
+                              removingRecordId={removingRecordId}
+                              reorderingRecordId={reorderingRecordId}
+                              handleRemoveRecordFromRoute={handleRemoveRecordFromRoute}
+                              handleViewRecordDetails={handleViewRecordDetails}
+                            />
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </SortableContext>
+                </DndContext>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Geocoding Progress Modal */}
+      <Dialog open={geocodeOpen} onOpenChange={setGeocodeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Geocoding Addresses</DialogTitle>
+            <DialogDescription>
+              Converting addresses to coordinates...
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span className="text-sm">
+                Progress: {geocodeProgress.current} / {geocodeProgress.total}
+              </span>
+            </div>
+            {geocodeProgress.address && (
+              <div className="text-xs text-muted-foreground">
+                Current: {geocodeProgress.address}
+              </div>
+            )}
+            <div className="w-full bg-secondary rounded-full h-2">
+              <div
+                className="bg-primary h-2 rounded-full transition-all"
+                style={{
+                  width: `${geocodeProgress.total > 0 ? (geocodeProgress.current / geocodeProgress.total) * 100 : 0}%`,
+                }}
+              />
+            </div>
+            {!isGeocoding && geocodeResults.size > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold text-sm mb-2">Results:</h4>
+                <p className="text-sm text-muted-foreground">
+                  Successfully geocoded {geocodeResults.size} properties
+                </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

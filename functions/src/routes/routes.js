@@ -3,6 +3,40 @@ const router = express.Router();
 const { optionalAuth } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 
+// Helper function to format route record based on type
+function formatRouteRecord(routeRecord) {
+  if (routeRecord.preForeclosure) {
+    return {
+      id: routeRecord.preForeclosure.id,
+      document_number: routeRecord.preForeclosure.documentNumber,
+      documentNumber: routeRecord.preForeclosure.documentNumber,
+      address: routeRecord.preForeclosure.address,
+      city: routeRecord.preForeclosure.city,
+      zip: routeRecord.preForeclosure.zip,
+      latitude: routeRecord.preForeclosure.latitude,
+      longitude: routeRecord.preForeclosure.longitude,
+      visited: routeRecord.preForeclosure.visited || false,
+      visited_at: routeRecord.preForeclosure.visitedAt ? routeRecord.preForeclosure.visitedAt.toISOString() : null,
+      visited_by: routeRecord.preForeclosure.visitedBy || null,
+      visitedAt: routeRecord.preForeclosure.visitedAt ? routeRecord.preForeclosure.visitedAt.toISOString() : null,
+      visitedBy: routeRecord.preForeclosure.visitedBy || null
+    };
+  } else if (routeRecord.property) {
+    return {
+      id: routeRecord.property.id,
+      accountNumber: routeRecord.property.accountNumber,
+      ownerName: routeRecord.property.ownerName,
+      propertyAddress: routeRecord.property.propertyAddress,
+      address: routeRecord.property.propertyAddress, // Alias for compatibility
+      latitude: routeRecord.property.latitude,
+      longitude: routeRecord.property.longitude,
+      totalDue: routeRecord.property.totalDue,
+      status: routeRecord.property.status
+    };
+  }
+  return null;
+}
+
 // GET /api/routes - Get all routes (active by default, or all if status query param)
 router.get('/', optionalAuth, async (req, res) => {
   try {
@@ -27,6 +61,18 @@ router.get('/', optionalAuth, async (req, res) => {
                 visitedAt: true,
                 visitedBy: true,
               }
+            },
+            property: {
+              select: {
+                id: true,
+                accountNumber: true,
+                ownerName: true,
+                propertyAddress: true,
+                latitude: true,
+                longitude: true,
+                totalDue: true,
+                status: true,
+              }
             }
           },
           orderBy: {
@@ -44,6 +90,7 @@ router.get('/', optionalAuth, async (req, res) => {
       id: route.id,
       driver: route.driver,
       status: route.status,
+      routeType: route.routeType,
       routeData: route.routeData,
       createdAt: route.createdAt,
       finishedAt: route.finishedAt,
@@ -53,21 +100,7 @@ router.get('/', optionalAuth, async (req, res) => {
         id: rr.id,
         orderIndex: rr.orderIndex,
         isDepot: rr.isDepot,
-        record: rr.preForeclosure ? {
-          id: rr.preForeclosure.id,
-          document_number: rr.preForeclosure.documentNumber,
-          documentNumber: rr.preForeclosure.documentNumber, // Also include camelCase for compatibility
-          address: rr.preForeclosure.address,
-          city: rr.preForeclosure.city,
-          zip: rr.preForeclosure.zip,
-          latitude: rr.preForeclosure.latitude,
-          longitude: rr.preForeclosure.longitude,
-          visited: rr.preForeclosure.visited || false,
-          visited_at: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null,
-          visited_by: rr.preForeclosure.visitedBy || null,
-          visitedAt: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null, // Also include camelCase
-          visitedBy: rr.preForeclosure.visitedBy || null // Also include camelCase
-        } : null
+        record: formatRouteRecord(rr)
       }))
     }));
 
@@ -101,6 +134,18 @@ router.get('/active', optionalAuth, async (req, res) => {
                 visitedAt: true,
                 visitedBy: true,
               }
+            },
+            property: {
+              select: {
+                id: true,
+                accountNumber: true,
+                ownerName: true,
+                propertyAddress: true,
+                latitude: true,
+                longitude: true,
+                totalDue: true,
+                status: true,
+              }
             }
           },
           orderBy: {
@@ -118,6 +163,7 @@ router.get('/active', optionalAuth, async (req, res) => {
       id: route.id,
       driver: route.driver,
       status: route.status,
+      routeType: route.routeType,
       routeData: route.routeData,
       createdAt: route.createdAt,
       recordCount: route.records.length,
@@ -125,21 +171,7 @@ router.get('/active', optionalAuth, async (req, res) => {
         id: rr.id,
         orderIndex: rr.orderIndex,
         isDepot: rr.isDepot,
-        record: rr.preForeclosure ? {
-          id: rr.preForeclosure.id,
-          document_number: rr.preForeclosure.documentNumber,
-          documentNumber: rr.preForeclosure.documentNumber, // Also include camelCase for compatibility
-          address: rr.preForeclosure.address,
-          city: rr.preForeclosure.city,
-          zip: rr.preForeclosure.zip,
-          latitude: rr.preForeclosure.latitude,
-          longitude: rr.preForeclosure.longitude,
-          visited: rr.preForeclosure.visited || false,
-          visited_at: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null,
-          visited_by: rr.preForeclosure.visitedBy || null,
-          visitedAt: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null, // Also include camelCase
-          visitedBy: rr.preForeclosure.visitedBy || null // Also include camelCase
-        } : null
+        record: formatRouteRecord(rr)
       }))
     }));
 
@@ -153,7 +185,7 @@ router.get('/active', optionalAuth, async (req, res) => {
 // POST /api/routes - Create a new route
 router.post('/', optionalAuth, async (req, res) => {
   try {
-    const { driver, routeData, recordIds } = req.body;
+    const { driver, routeData, recordIds, routeType = 'PREFORECLOSURE' } = req.body;
 
     if (!driver || !routeData || !recordIds || !Array.isArray(recordIds)) {
       return res.status(400).json({ error: 'driver, routeData, and recordIds array are required' });
@@ -164,15 +196,68 @@ router.post('/', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'driver must be "Luciano" or "Raul"' });
     }
 
-    // Verify all records exist
-    const records = await prisma.preForeclosure.findMany({
-      where: {
-        documentNumber: { in: recordIds }
-      }
-    });
+    // Validate routeType
+    if (routeType !== 'PROPERTY' && routeType !== 'PREFORECLOSURE') {
+      return res.status(400).json({ error: 'routeType must be "PROPERTY" or "PREFORECLOSURE"' });
+    }
 
-    if (records.length !== recordIds.length) {
-      return res.status(400).json({ error: 'Some records not found' });
+    let records;
+    let routeRecordsData;
+
+    if (routeType === 'PROPERTY') {
+      // For properties, recordIds are property IDs
+      records = await prisma.property.findMany({
+        where: {
+          id: { in: recordIds }
+        }
+      });
+
+      if (records.length !== recordIds.length) {
+        return res.status(400).json({ error: 'Some property records not found' });
+      }
+
+      routeRecordsData = recordIds.map((propertyId, index) => {
+        const record = records.find(r => r.id === propertyId);
+        if (!record) {
+          throw new Error(`Property ${propertyId} not found`);
+        }
+        // Find if this is the depot in routeData
+        const isDepot = routeData.routes?.[0]?.waypoints?.[0]?.id === propertyId ||
+                       routeData.routes?.[0]?.waypoints?.[0]?.originalId === propertyId;
+
+        return {
+          propertyId: record.id,
+          orderIndex: index,
+          isDepot: isDepot || false
+        };
+      });
+    } else {
+      // For pre-foreclosures, recordIds are document numbers
+      records = await prisma.preForeclosure.findMany({
+        where: {
+          documentNumber: { in: recordIds }
+        }
+      });
+
+      if (records.length !== recordIds.length) {
+        return res.status(400).json({ error: 'Some pre-foreclosure records not found' });
+      }
+
+      routeRecordsData = recordIds.map((documentNumber, index) => {
+        const record = records.find(r => r.documentNumber === documentNumber);
+        if (!record) {
+          throw new Error(`Record ${documentNumber} not found`);
+        }
+        // Find if this is the depot in routeData
+        const isDepot = routeData.routes?.[0]?.waypoints?.[0]?.id === documentNumber ||
+                       routeData.routes?.[0]?.waypoints?.[0]?.originalId === documentNumber;
+
+        return {
+          preForeclosureId: record.id,
+          orderIndex: index,
+          isDepot: isDepot || false
+        };
+      });
     }
 
     // Create route with records
@@ -180,23 +265,10 @@ router.post('/', optionalAuth, async (req, res) => {
       data: {
         driver,
         status: 'ACTIVE',
+        routeType,
         routeData,
         records: {
-          create: recordIds.map((documentNumber, index) => {
-            const record = records.find(r => r.documentNumber === documentNumber);
-            if (!record) {
-              throw new Error(`Record ${documentNumber} not found`);
-            }
-            // Find if this is the depot in routeData
-            const isDepot = routeData.routes?.[0]?.waypoints?.[0]?.id === documentNumber ||
-                           routeData.routes?.[0]?.waypoints?.[0]?.originalId === documentNumber;
-            
-            return {
-              preForeclosureId: record.id,
-              orderIndex: index,
-              isDepot: isDepot || false
-            };
-          })
+          create: routeRecordsData
         }
       },
       include: {
@@ -212,6 +284,18 @@ router.post('/', optionalAuth, async (req, res) => {
                 latitude: true,
                 longitude: true,
               }
+            },
+            property: {
+              select: {
+                id: true,
+                accountNumber: true,
+                ownerName: true,
+                propertyAddress: true,
+                latitude: true,
+                longitude: true,
+                totalDue: true,
+                status: true,
+              }
             }
           }
         }
@@ -222,6 +306,7 @@ router.post('/', optionalAuth, async (req, res) => {
       id: route.id,
       driver: route.driver,
       status: route.status,
+      routeType: route.routeType,
       createdAt: route.createdAt,
       recordCount: route.records.length
     });
@@ -349,6 +434,18 @@ router.delete('/:routeId/records/:recordId', optionalAuth, async (req, res) => {
                 visitedAt: true,
                 visitedBy: true,
               }
+            },
+            property: {
+              select: {
+                id: true,
+                accountNumber: true,
+                ownerName: true,
+                propertyAddress: true,
+                latitude: true,
+                longitude: true,
+                totalDue: true,
+                status: true,
+              }
             }
           },
           orderBy: {
@@ -375,6 +472,7 @@ router.delete('/:routeId/records/:recordId', optionalAuth, async (req, res) => {
       id: updatedRoute.id,
       driver: updatedRoute.driver,
       status: updatedRoute.status,
+      routeType: updatedRoute.routeType,
       routeData: updatedRoute.routeData,
       createdAt: updatedRoute.createdAt,
       finishedAt: updatedRoute.finishedAt,
@@ -384,21 +482,7 @@ router.delete('/:routeId/records/:recordId', optionalAuth, async (req, res) => {
         id: rr.id,
         orderIndex: rr.orderIndex,
         isDepot: rr.isDepot,
-        record: rr.preForeclosure ? {
-          id: rr.preForeclosure.id,
-          document_number: rr.preForeclosure.documentNumber,
-          documentNumber: rr.preForeclosure.documentNumber,
-          address: rr.preForeclosure.address,
-          city: rr.preForeclosure.city,
-          zip: rr.preForeclosure.zip,
-          latitude: rr.preForeclosure.latitude,
-          longitude: rr.preForeclosure.longitude,
-          visited: rr.preForeclosure.visited || false,
-          visited_at: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null,
-          visited_by: rr.preForeclosure.visitedBy || null,
-          visitedAt: rr.preForeclosure.visitedAt ? rr.preForeclosure.visitedAt.toISOString() : null,
-          visitedBy: rr.preForeclosure.visitedBy || null
-        } : null
+        record: formatRouteRecord(rr)
       }))
     };
 
@@ -470,6 +554,18 @@ router.put('/:routeId/records/:recordId/reorder', optionalAuth, async (req, res)
                   visitedAt: true,
                   visitedBy: true,
                 }
+              },
+              property: {
+                select: {
+                  id: true,
+                  accountNumber: true,
+                  ownerName: true,
+                  propertyAddress: true,
+                  latitude: true,
+                  longitude: true,
+                  totalDue: true,
+                  status: true,
+                }
               }
             },
             orderBy: {
@@ -483,6 +579,7 @@ router.put('/:routeId/records/:recordId/reorder', optionalAuth, async (req, res)
         id: updatedRoute.id,
         driver: updatedRoute.driver,
         status: updatedRoute.status,
+        routeType: updatedRoute.routeType,
         routeData: updatedRoute.routeData,
         createdAt: updatedRoute.createdAt,
         finishedAt: updatedRoute.finishedAt,
@@ -492,21 +589,7 @@ router.put('/:routeId/records/:recordId/reorder', optionalAuth, async (req, res)
           id: rr.id,
           orderIndex: rr.orderIndex,
           isDepot: rr.isDepot,
-          record: rr.preForeclosure ? {
-            id: rr.preForeclosure.id,
-            document_number: rr.preForeclosure.documentNumber,
-            documentNumber: rr.preForeclosure.documentNumber,
-            address: rr.preForeclosure.address,
-            city: rr.preForeclosure.city,
-            zip: rr.preForeclosure.zip,
-            latitude: rr.preForeclosure.latitude,
-            longitude: rr.preForeclosure.longitude,
-            visited: rr.preForeclosure.visited,
-            visited_at: rr.preForeclosure.visitedAt,
-            visited_by: rr.preForeclosure.visitedBy,
-            visitedAt: rr.preForeclosure.visitedAt,
-            visitedBy: rr.preForeclosure.visitedBy,
-          } : null
+          record: formatRouteRecord(rr)
         }))
       };
 
@@ -560,6 +643,18 @@ router.put('/:routeId/records/:recordId/reorder', optionalAuth, async (req, res)
                 visitedAt: true,
                 visitedBy: true,
               }
+            },
+            property: {
+              select: {
+                id: true,
+                accountNumber: true,
+                ownerName: true,
+                propertyAddress: true,
+                latitude: true,
+                longitude: true,
+                totalDue: true,
+                status: true,
+              }
             }
           },
           orderBy: {
@@ -573,6 +668,7 @@ router.put('/:routeId/records/:recordId/reorder', optionalAuth, async (req, res)
       id: updatedRoute.id,
       driver: updatedRoute.driver,
       status: updatedRoute.status,
+      routeType: updatedRoute.routeType,
       routeData: updatedRoute.routeData,
       createdAt: updatedRoute.createdAt,
       finishedAt: updatedRoute.finishedAt,
@@ -582,21 +678,7 @@ router.put('/:routeId/records/:recordId/reorder', optionalAuth, async (req, res)
         id: rr.id,
         orderIndex: rr.orderIndex,
         isDepot: rr.isDepot,
-        record: rr.preForeclosure ? {
-          id: rr.preForeclosure.id,
-          document_number: rr.preForeclosure.documentNumber,
-          documentNumber: rr.preForeclosure.documentNumber,
-          address: rr.preForeclosure.address,
-          city: rr.preForeclosure.city,
-          zip: rr.preForeclosure.zip,
-          latitude: rr.preForeclosure.latitude,
-          longitude: rr.preForeclosure.longitude,
-          visited: rr.preForeclosure.visited,
-          visited_at: rr.preForeclosure.visitedAt,
-          visited_by: rr.preForeclosure.visitedBy,
-          visitedAt: rr.preForeclosure.visitedAt,
-          visitedBy: rr.preForeclosure.visitedBy,
-        } : null
+        record: formatRouteRecord(rr)
       }))
     };
 
