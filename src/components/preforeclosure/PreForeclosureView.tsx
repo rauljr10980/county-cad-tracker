@@ -297,6 +297,7 @@ export function PreForeclosureView() {
     hasNotes: false,
     hasPhoneNumbers: false,
     hasTask: false,
+    showNewOnly: false,
   });
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosureRecord | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -436,6 +437,11 @@ export function PreForeclosureView() {
       });
     }
 
+    // Show new only filter
+    if (advancedFilters.showNewOnly) {
+      filtered = filtered.filter(r => r.internal_status === 'New');
+    }
+
     return filtered;
   }, [records, searchQuery, advancedFilters]);
 
@@ -452,6 +458,7 @@ export function PreForeclosureView() {
     if (advancedFilters.hasNotes) count++;
     if (advancedFilters.hasPhoneNumbers) count++;
     if (advancedFilters.hasTask) count++;
+    if (advancedFilters.showNewOnly) count++;
     return count;
   }, [advancedFilters]);
 
@@ -473,6 +480,7 @@ export function PreForeclosureView() {
       hasNotes: false,
       hasPhoneNumbers: false,
       hasTask: false,
+      showNewOnly: false,
     });
     setSearchQuery('');
   };

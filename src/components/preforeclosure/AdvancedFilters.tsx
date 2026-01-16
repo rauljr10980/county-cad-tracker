@@ -25,6 +25,7 @@ export interface PreForeclosureAdvancedFilters {
   hasNotes: boolean;
   hasPhoneNumbers: boolean;
   hasTask: boolean;
+  showNewOnly: boolean;
 }
 
 interface AdvancedFiltersProps {
@@ -233,6 +234,20 @@ export function AdvancedFiltersPanel({
               />
               <Label htmlFor="hasTask" className="cursor-pointer">
                 Has Task
+              </Label>
+            </div>
+          </div>
+
+          {/* Show New Only Filter */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="showNewOnly"
+                checked={filters.showNewOnly}
+                onCheckedChange={(checked) => updateFilter('showNewOnly', checked as boolean)}
+              />
+              <Label htmlFor="showNewOnly" className="cursor-pointer">
+                New Records Only
               </Label>
             </div>
           </div>
