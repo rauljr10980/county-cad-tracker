@@ -437,18 +437,19 @@ export function PreForeclosureView() {
       });
     }
 
-    // Show new only filter
+    // Show new only filter - show records added in the most recent upload
     if (advancedFilters.showNewOnly) {
-      console.log('[FILTER DEBUG] Filtering for New records only');
-      console.log('[FILTER DEBUG] Sample record internal_status:', filtered[0]?.internal_status);
+      // Get the most recent month from all records
+      const allMonths = records.map(r => r.first_seen_month).filter(Boolean);
+      const latestMonth = allMonths.length > 0 ? allMonths.sort().reverse()[0] : null;
+
+      console.log('[FILTER DEBUG] Latest upload month:', latestMonth);
       console.log('[FILTER DEBUG] Records before filter:', filtered.length);
-      filtered = filtered.filter(r => {
-        const isNew = r.internal_status === 'New';
-        if (!isNew) {
-          console.log('[FILTER DEBUG] Filtering out record with status:', r.internal_status, 'Document:', r.document_number);
-        }
-        return isNew;
-      });
+
+      if (latestMonth) {
+        filtered = filtered.filter(r => r.first_seen_month === latestMonth);
+      }
+
       console.log('[FILTER DEBUG] Records after filter:', filtered.length);
     }
 
