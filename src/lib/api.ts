@@ -789,6 +789,49 @@ export async function uploadPreForeclosureFile(file: File): Promise<{
 }
 
 /**
+ * Get pre-foreclosure upload history
+ */
+export async function getPreForeclosureUploadHistory(limit: number = 10): Promise<any[]> {
+  const response = await fetch(`${API_BASE_URL}/api/preforeclosure/upload-history?limit=${limit}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch upload history');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get latest pre-foreclosure upload stats (for dashboard)
+ */
+export async function getLatestPreForeclosureUploadStats(): Promise<{
+  hasData: boolean;
+  filename?: string;
+  uploadedAt?: string;
+  uploadedBy?: string;
+  newRecords?: number;
+  updatedRecords?: number;
+  inactiveRecords?: number;
+  totalRecords?: number;
+  activeRecords?: number;
+  message?: string;
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/preforeclosure/upload-stats/latest`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch latest upload stats');
+  }
+
+  return response.json();
+}
+
+/**
  * Delete all pre-foreclosure records
  */
 export async function deletePreForeclosures(): Promise<{ success: boolean; message: string }> {
@@ -796,12 +839,12 @@ export async function deletePreForeclosures(): Promise<{ success: boolean; messa
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error || 'Failed to delete pre-foreclosure records');
   }
-  
+
   return response.json();
 }
 

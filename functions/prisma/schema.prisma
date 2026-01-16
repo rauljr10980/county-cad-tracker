@@ -398,6 +398,42 @@ model PreForeclosure {
 }
 
 // ============================================================================
+// UPLOAD HISTORY & COMPARISON TRACKING
+// ============================================================================
+
+model PreForeclosureUploadHistory {
+  id String @id @default(cuid())
+
+  // Upload Metadata
+  filename String
+  uploadedBy String? // Username or "System"
+  uploadedAt DateTime @default(now())
+
+  // Comparison Stats
+  recordsProcessed Int // Total records in the uploaded file
+  newRecords Int // Records created (didn't exist before)
+  updatedRecords Int // Records that already existed and were updated
+  inactiveRecords Int // Records marked as inactive (missing from new upload)
+
+  // Summary Counts (after upload)
+  totalRecords Int // Total records in database after upload
+  activeRecords Int // Active records after upload
+
+  // Upload Result
+  success Boolean @default(true)
+  errorMessage String? @db.Text
+
+  // Detailed Changes (JSON array of document numbers)
+  newDocumentNumbers Json? // Array of new document numbers added
+  updatedDocumentNumbers Json? // Array of document numbers updated
+  inactiveDocumentNumbers Json? // Array of document numbers marked inactive
+
+  @@index([uploadedAt])
+  @@index([success])
+  @@map("preforeclosure_upload_history")
+}
+
+// ============================================================================
 // ROUTE TRACKING
 // ============================================================================
 

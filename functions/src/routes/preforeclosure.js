@@ -287,6 +287,8 @@ router.post('/upload', optionalAuth, async (req, res) => {
     let created = 0;
     let updated = 0;
     const dbErrors = [];
+    const newDocNumbers = [];
+    const updatedDocNumbers = [];
 
     for (const record of processedRecords) {
       try {
@@ -314,6 +316,7 @@ router.post('/upload', optionalAuth, async (req, res) => {
           }
         });
           updated++;
+          updatedDocNumbers.push(record.documentNumber);
         } else {
         // Create new record
         await prisma.preForeclosure.create({
@@ -335,6 +338,7 @@ router.post('/upload', optionalAuth, async (req, res) => {
           }
         });
           created++;
+          newDocNumbers.push(record.documentNumber);
         }
       } catch (dbError) {
         console.error(`[PRE-FORECLOSURE] Database error for record ${record.documentNumber}:`, dbError);
@@ -353,6 +357,29 @@ router.post('/upload', optionalAuth, async (req, res) => {
     const totalRecords = await prisma.preForeclosure.count();
     const activeRecords = await prisma.preForeclosure.count({ where: { inactive: false } });
     const inactiveRecords = await prisma.preForeclosure.count({ where: { inactive: true } });
+
+    // Save upload history for comparison reports
+    try {
+      await prisma.preForeclosureUploadHistory.create({
+        data: {
+          filename,
+          uploadedBy: req.user?.username || 'System',
+          recordsProcessed: processedRecords.length,
+          newRecords: created,
+          updatedRecords: updated,
+          inactiveRecords: missingDocNumbers.length,
+          totalRecords,
+          activeRecords,
+          success: true,
+          newDocumentNumbers: newDocNumbers,
+          updatedDocumentNumbers: updatedDocNumbers,
+          inactiveDocumentNumbers: missingDocNumbers
+        }
+      });
+    } catch (historyError) {
+      console.error('[PRE-FORECLOSURE] Failed to save upload history:', historyError);
+      // Don't fail the upload if history save fails
+    }
 
     console.log(`[PRE-FORECLOSURE] Upload complete: ${created} created, ${updated} updated, ${processedRecords.length} processed`);
 
@@ -568,6 +595,61 @@ router.put('/:documentNumber/visit', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Pre-foreclosure record not found' });
     }
     res.status(500).json({ error: 'Failed to mark record as visited' });
+  }
+});
+
+// ============================================================================
+// GET UPLOAD HISTORY
+// ============================================================================
+
+router.get('/upload-history', optionalAuth, async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+
+    const history = await prisma.preForeclosureUploadHistory.findMany({
+      orderBy: { uploadedAt: 'desc' },
+      take: parseInt(limit, 10)
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Upload history fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch upload history' });
+  }
+});
+
+// ============================================================================
+// GET LATEST UPLOAD STATS (for dashboard)
+// ============================================================================
+
+router.get('/upload-stats/latest', optionalAuth, async (req, res) => {
+  try {
+    const latestUpload = await prisma.preForeclosureUploadHistory.findFirst({
+      where: { success: true },
+      orderBy: { uploadedAt: 'desc' }
+    });
+
+    if (!latestUpload) {
+      return res.json({
+        hasData: false,
+        message: 'No uploads yet'
+      });
+    }
+
+    res.json({
+      hasData: true,
+      filename: latestUpload.filename,
+      uploadedAt: latestUpload.uploadedAt.toISOString(),
+      uploadedBy: latestUpload.uploadedBy,
+      newRecords: latestUpload.newRecords,
+      updatedRecords: latestUpload.updatedRecords,
+      inactiveRecords: latestUpload.inactiveRecords,
+      totalRecords: latestUpload.totalRecords,
+      activeRecords: latestUpload.activeRecords
+    });
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Latest upload stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch latest upload stats' });
   }
 });
 

@@ -70,6 +70,7 @@ type RouteType = {
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { AdvancedFiltersPanel, PreForeclosureAdvancedFilters } from './AdvancedFilters';
+import { UploadStatsCard } from './UploadStatsCard';
 
 // Sortable Row Component
 function SortableRow({ 
@@ -2004,8 +2005,9 @@ export function PreForeclosureView() {
     <div className="p-6 space-y-6">
       {/* Header */}
       {headerSection}
-      
 
+      {/* Upload Stats Dashboard */}
+      <UploadStatsCard />
 
       {/* Active Routes Dashboard */}
       <div className="bg-card border border-border rounded-lg p-4">
