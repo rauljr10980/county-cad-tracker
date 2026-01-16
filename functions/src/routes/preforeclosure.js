@@ -606,15 +606,19 @@ router.get('/upload-history', optionalAuth, async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
+    // Check if table exists before querying
     const history = await prisma.preForeclosureUploadHistory.findMany({
       orderBy: { uploadedAt: 'desc' },
       take: parseInt(limit, 10)
+    }).catch(err => {
+      console.error('[PRE-FORECLOSURE] Upload history table may not exist:', err.message);
+      return [];
     });
 
     res.json(history);
   } catch (error) {
     console.error('[PRE-FORECLOSURE] Upload history fetch error:', error);
-    res.status(500).json({ error: 'Failed to fetch upload history' });
+    res.status(500).json({ error: 'Failed to fetch upload history', details: error.message });
   }
 });
 
@@ -627,6 +631,9 @@ router.get('/upload-stats/latest', optionalAuth, async (req, res) => {
     const latestUpload = await prisma.preForeclosureUploadHistory.findFirst({
       where: { success: true },
       orderBy: { uploadedAt: 'desc' }
+    }).catch(err => {
+      console.error('[PRE-FORECLOSURE] Upload history table may not exist:', err.message);
+      return null;
     });
 
     if (!latestUpload) {
@@ -649,7 +656,7 @@ router.get('/upload-stats/latest', optionalAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('[PRE-FORECLOSURE] Latest upload stats error:', error);
-    res.status(500).json({ error: 'Failed to fetch latest upload stats' });
+    res.status(500).json({ error: 'Failed to fetch latest upload stats', details: error.message });
   }
 });
 
