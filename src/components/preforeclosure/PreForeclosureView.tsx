@@ -439,7 +439,17 @@ export function PreForeclosureView() {
 
     // Show new only filter
     if (advancedFilters.showNewOnly) {
-      filtered = filtered.filter(r => r.internal_status === 'New');
+      console.log('[FILTER DEBUG] Filtering for New records only');
+      console.log('[FILTER DEBUG] Sample record internal_status:', filtered[0]?.internal_status);
+      console.log('[FILTER DEBUG] Records before filter:', filtered.length);
+      filtered = filtered.filter(r => {
+        const isNew = r.internal_status === 'New';
+        if (!isNew) {
+          console.log('[FILTER DEBUG] Filtering out record with status:', r.internal_status, 'Document:', r.document_number);
+        }
+        return isNew;
+      });
+      console.log('[FILTER DEBUG] Records after filter:', filtered.length);
     }
 
     return filtered;
