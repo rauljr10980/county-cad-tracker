@@ -2289,7 +2289,7 @@ export function PreForeclosureView() {
                       </Badge>
                     ) : recordsInRoutes && recordsInRoutes.has(record.document_number) ? (
                       <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs whitespace-nowrap">
-                        In Progress
+                        In Route
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="bg-muted text-muted-foreground text-xs whitespace-nowrap">
@@ -2925,7 +2925,7 @@ export function PreForeclosureView() {
                             </Badge>
                           ) : recordsInRoutes && recordsInRoutes.has(viewRecord.document_number) ? (
                             <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                              In Progress
+                              In Route
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="bg-muted text-muted-foreground">
