@@ -3239,7 +3239,11 @@ export function PreForeclosureView() {
       <AreaSelectorMap
         isOpen={areaSelectorOpen}
         onClose={() => setAreaSelectorOpen(false)}
-        unavailablePropertyIds={new Set([...depotRecordIds, ...recordsInRoutes])}
+        unavailablePropertyIds={new Set([
+          ...depotRecordIds,
+          ...recordsInRoutes,
+          ...records.filter(r => r.visited === true).map(r => r.document_number)
+        ])}
         onOptimize={async ({ startingPoint, area, selectedProperties }) => {
           // Find the record that matches the starting point property
           const depotRecord = filteredRecords.find(r => r.document_number === startingPoint.property.id) ||

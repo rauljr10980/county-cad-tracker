@@ -383,9 +383,13 @@ export function AreaSelectorMap({
         return;
       }
 
-      // Filter properties within the area
+      // Filter properties within the area AND exclude visited/in-route properties
       const propsInArea = properties.filter(p => {
         if (!p.latitude || !p.longitude) return false;
+
+        // Exclude unavailable properties (visited or in active routes)
+        if (p.id && unavailablePropertyIds.has(p.id)) return false;
+
         const point = { lat: p.latitude, lng: p.longitude };
 
         if (selectedShape.type === 'polygon' && selectedShape.polygon) {
