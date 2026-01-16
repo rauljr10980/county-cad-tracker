@@ -268,8 +268,8 @@ router.post('/upload', optionalAuth, async (req, res) => {
     const existingDocNumbers = new Set(existingRecords.map(r => r.documentNumber));
 
     // Mark missing records as inactive
-    const newDocNumbers = new Set(processedRecords.map(r => r.documentNumber));
-    const missingDocNumbers = Array.from(existingDocNumbers).filter(doc => !newDocNumbers.has(doc));
+    const uploadedDocNumbers = new Set(processedRecords.map(r => r.documentNumber));
+    const missingDocNumbers = Array.from(existingDocNumbers).filter(doc => !uploadedDocNumbers.has(doc));
 
     if (missingDocNumbers.length > 0) {
       await prisma.preForeclosure.updateMany({
