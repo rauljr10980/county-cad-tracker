@@ -20,7 +20,7 @@ const getApiBaseUrl = () => {
   return 'http://localhost:8080';
 };
 
-const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 
 // Debug: Log API URL
 console.log('[API] Using API URL:', API_BASE_URL);

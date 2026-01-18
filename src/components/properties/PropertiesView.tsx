@@ -28,7 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute } from '@/lib/api';
+import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL } from '@/lib/api';
 import { batchGeocodeAddresses } from '@/lib/geocoding';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
@@ -1591,7 +1591,7 @@ export function PropertiesView() {
       for (const [id, coords] of results.entries()) {
         try {
           // Call API to update property coordinates
-          const response = await fetch(`/api/properties/${id}`, {
+          const response = await fetch(`${API_BASE_URL}/api/properties/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1602,6 +1602,8 @@ export function PropertiesView() {
 
           if (response.ok) {
             successCount++;
+          } else {
+            console.error(`Failed to update property ${id}: ${response.status} ${response.statusText}`);
           }
         } catch (err) {
           console.error(`Failed to update property ${id}:`, err);
