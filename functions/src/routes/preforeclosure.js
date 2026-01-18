@@ -437,7 +437,16 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
     if (updates.next_follow_up_date !== undefined) {
       dbUpdates.nextFollowUpDate = updates.next_follow_up_date ? new Date(updates.next_follow_up_date) : null;
     }
-    
+
+    // Geocoding fields - handle updates.updates nested object for geocoding
+    if (updates.updates) {
+      if (updates.updates.latitude !== undefined) dbUpdates.latitude = updates.updates.latitude;
+      if (updates.updates.longitude !== undefined) dbUpdates.longitude = updates.updates.longitude;
+    }
+    // Also handle direct latitude/longitude fields
+    if (updates.latitude !== undefined) dbUpdates.latitude = updates.latitude;
+    if (updates.longitude !== undefined) dbUpdates.longitude = updates.longitude;
+
     // Action/Task fields
     if (updates.actionType !== undefined) {
       if (updates.actionType) {
