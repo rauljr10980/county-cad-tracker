@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar, CalendarPlus, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar, CalendarPlus, ArrowUp, ArrowDown, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -232,6 +232,9 @@ export function PropertyTable({
                   />
                 )}
               </th>
+              <th className="w-12" title="Geocoded">
+                <MapPin className="h-4 w-4 mx-auto text-muted-foreground" />
+              </th>
               <th className="w-24">Status</th>
               <th>Owner</th>
               <th>Property Address</th>
@@ -313,6 +316,13 @@ export function PropertyTable({
                         }}
                         title="Select property"
                       />
+                    )}
+                  </td>
+                  <td className="text-center">
+                    {property.latitude && property.longitude ? (
+                      <MapPin className="h-4 w-4 mx-auto text-green-500" title={`Geocoded: ${property.latitude.toFixed(4)}, ${property.longitude.toFixed(4)}`} />
+                    ) : (
+                      <div className="h-4 w-4 mx-auto" title="Not geocoded" />
                     )}
                   </td>
                   <td>
