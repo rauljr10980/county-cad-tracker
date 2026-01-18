@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown, Route, MapPin, Trash2, GripVertical, Eye, CheckCircle, RotateCcw } from 'lucide-react';
 import {
   DndContext,
@@ -205,6 +206,7 @@ function SortableRouteRow({
 }
 
 export function PropertiesView() {
+  const queryClient = useQueryClient();
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<Set<string>>(new Set());
   const [numVehicles, setNumVehicles] = useState<1 | 2>(1);
@@ -1668,9 +1670,9 @@ export function PropertiesView() {
         });
       }
 
-      // Reload data to reflect changes (only if some were geocoded)
+      // Refresh data to reflect changes (only if some were geocoded)
       if (successCount > 0) {
-        window.location.reload();
+        await queryClient.invalidateQueries({ queryKey: ['properties'] });
       }
     } catch (error) {
       console.error('Geocoding error:', error);
