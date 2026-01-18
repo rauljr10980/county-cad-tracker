@@ -219,6 +219,7 @@ export function PropertiesView() {
   // Geocoding state
   const [geocodeOpen, setGeocodeOpen] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodeCancelled, setGeocodeCancelled] = useState(false);
   const [geocodeProgress, setGeocodeProgress] = useState({ current: 0, total: 0, address: '' });
   const [geocodeResults, setGeocodeResults] = useState<Map<string, { latitude: number; longitude: number; displayName: string }>>(new Map());
 
@@ -1579,6 +1580,7 @@ export function PropertiesView() {
     setIsGeocoding(true);
     setGeocodeOpen(true);
     setGeocodeResults(new Map());
+    setGeocodeCancelled(false);
 
     try {
       const addressesToGeocode = propertiesNeedingGeocode.map((p: Property) => {
@@ -1607,7 +1609,8 @@ export function PropertiesView() {
         addressesToGeocode,
         (completed, total, current) => {
           setGeocodeProgress({ current: completed, total, address: current });
-        }
+        },
+        () => geocodeCancelled
       );
 
       setGeocodeResults(results);
@@ -1636,13 +1639,23 @@ export function PropertiesView() {
         }
       }
 
-      toast({
-        title: 'Geocoding Complete',
-        description: `Successfully geocoded ${successCount} of ${propertiesNeedingGeocode.length} properties`,
-      });
+      if (geocodeCancelled) {
+        toast({
+          title: 'Geocoding Cancelled',
+          description: `Stopped after geocoding ${successCount} properties`,
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'Geocoding Complete',
+          description: `Successfully geocoded ${successCount} of ${propertiesNeedingGeocode.length} properties`,
+        });
+      }
 
-      // Reload data to reflect changes
-      window.location.reload();
+      // Reload data to reflect changes (only if some were geocoded)
+      if (successCount > 0) {
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Geocoding error:', error);
       toast({
@@ -2483,12 +2496,18 @@ export function PropertiesView() {
       )}
 
       {/* Geocoding Progress Modal */}
-      <Dialog open={geocodeOpen} onOpenChange={setGeocodeOpen}>
+      <Dialog open={geocodeOpen} onOpenChange={(open) => {
+        if (!open && isGeocoding) {
+          // User clicked X or pressed Escape while geocoding
+          setGeocodeCancelled(true);
+        }
+        setGeocodeOpen(open);
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Geocoding Addresses</DialogTitle>
             <DialogDescription>
-              Converting addresses to coordinates...
+              {geocodeCancelled ? 'Cancelling...' : 'Converting addresses to coordinates...'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -2511,6 +2530,16 @@ export function PropertiesView() {
                 }}
               />
             </div>
+            {isGeocoding && (
+              <Button
+                onClick={() => setGeocodeCancelled(true)}
+                variant="destructive"
+                size="sm"
+                disabled={geocodeCancelled}
+              >
+                {geocodeCancelled ? 'Stopping...' : 'Stop Geocoding'}
+              </Button>
+            )}
             {!isGeocoding && geocodeResults.size > 0 && (
               <div className="mt-4">
                 <h4 className="font-semibold text-sm mb-2">Results:</h4>

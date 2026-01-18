@@ -91,7 +91,8 @@ export async function batchGeocodeAddresses(
     state?: string;
     zip?: string;
   }>,
-  onProgress?: (completed: number, total: number, current: string) => void
+  onProgress?: (completed: number, total: number, current: string) => void,
+  shouldCancel?: () => boolean
 ): Promise<Map<string, GeocodeResult>> {
   const results = new Map<string, GeocodeResult>();
   const BATCH_SIZE = 5; // Process 5 addresses at a time
@@ -101,6 +102,11 @@ export async function batchGeocodeAddresses(
 
   // Process addresses in batches
   for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+    // Check if cancelled before processing next batch
+    if (shouldCancel && shouldCancel()) {
+      break;
+    }
+
     const batch = addresses.slice(i, i + BATCH_SIZE);
 
     // Process batch in parallel
