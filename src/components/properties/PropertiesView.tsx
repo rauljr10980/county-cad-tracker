@@ -1551,15 +1551,28 @@ export function PropertiesView() {
 
   // Geocode addresses function
   const handleGeocodeAddresses = async () => {
-    // Get properties that don't have coordinates
+    // Get properties that don't have coordinates AND have valid addresses (starting with a number)
     const propertiesNeedingGeocode = filteredProperties.filter(
-      (p: Property) => !p.latitude || !p.longitude
+      (p: Property) => {
+        // Must not have coordinates
+        if (p.latitude && p.longitude) return false;
+
+        // Must have a propertyAddress
+        if (!p.propertyAddress) return false;
+
+        // Address must start with a number (e.g., "123 Main St")
+        // Skip addresses that start with text (e.g., "ABSTRACT", "LOT", etc.)
+        const trimmedAddress = p.propertyAddress.trim();
+        const startsWithNumber = /^\d/.test(trimmedAddress);
+
+        return startsWithNumber;
+      }
     );
 
     if (propertiesNeedingGeocode.length === 0) {
       toast({
         title: 'No properties to geocode',
-        description: 'All visible properties already have coordinates',
+        description: 'All visible properties already have coordinates or have invalid addresses',
       });
       return;
     }
