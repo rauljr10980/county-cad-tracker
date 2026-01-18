@@ -80,8 +80,8 @@ export async function geocodeAddress(
 }
 
 /**
- * Batch geocode multiple addresses with rate limiting
- * Nominatim requires 1 second between requests
+ * Batch geocode multiple addresses with parallel processing and rate limiting
+ * Uses batches of 5 concurrent requests with 250ms delays for better performance
  */
 export async function batchGeocodeAddresses(
   addresses: Array<{
@@ -94,28 +94,42 @@ export async function batchGeocodeAddresses(
   onProgress?: (completed: number, total: number, current: string) => void
 ): Promise<Map<string, GeocodeResult>> {
   const results = new Map<string, GeocodeResult>();
+  const BATCH_SIZE = 5; // Process 5 addresses at a time
+  const DELAY_MS = 250; // 250ms between batches (allows ~4 batches/second = ~20 addresses/second)
 
-  for (let i = 0; i < addresses.length; i++) {
-    const item = addresses[i];
+  let completed = 0;
 
-    if (onProgress) {
-      onProgress(i, addresses.length, item.address);
-    }
+  // Process addresses in batches
+  for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+    const batch = addresses.slice(i, i + BATCH_SIZE);
 
-    const result = await geocodeAddress(
-      item.address,
-      item.city,
-      item.state || 'TX', // Default to Texas
-      item.zip
-    );
+    // Process batch in parallel
+    const batchPromises = batch.map(async (item) => {
+      const result = await geocodeAddress(
+        item.address,
+        item.city,
+        item.state || 'TX',
+        item.zip
+      );
 
-    if ('latitude' in result) {
-      results.set(item.id, result);
-    }
+      if ('latitude' in result) {
+        results.set(item.id, result);
+      }
 
-    // Rate limiting: wait 1 second between requests (Nominatim requirement)
-    if (i < addresses.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      completed++;
+      if (onProgress) {
+        onProgress(completed, addresses.length, item.address);
+      }
+
+      return result;
+    });
+
+    // Wait for all geocoding in this batch to complete
+    await Promise.all(batchPromises);
+
+    // Rate limiting: wait between batches (except for last batch)
+    if (i + BATCH_SIZE < addresses.length) {
+      await new Promise(resolve => setTimeout(resolve, DELAY_MS));
     }
   }
 
