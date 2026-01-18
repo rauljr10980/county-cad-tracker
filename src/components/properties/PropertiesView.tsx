@@ -1551,7 +1551,7 @@ export function PropertiesView() {
 
   // Geocode addresses function
   const handleGeocodeAddresses = async () => {
-    // Get properties that don't have coordinates AND have valid addresses (starting with a number)
+    // Get properties that don't have coordinates AND have valid addresses
     const propertiesNeedingGeocode = filteredProperties.filter(
       (p: Property) => {
         // Must not have coordinates
@@ -1560,12 +1560,11 @@ export function PropertiesView() {
         // Must have a propertyAddress
         if (!p.propertyAddress) return false;
 
-        // Address must start with a number (e.g., "123 Main St")
-        // Skip addresses that start with text (e.g., "ABSTRACT", "LOT", etc.)
-        const trimmedAddress = p.propertyAddress.trim();
-        const startsWithNumber = /^\d/.test(trimmedAddress);
+        // Address must contain a number somewhere (for geocoding to work)
+        // Format is "OWNER NAME + ADDRESS" so we look for any number
+        const hasNumber = /\d/.test(p.propertyAddress);
 
-        return startsWithNumber;
+        return hasNumber;
       }
     );
 
@@ -1582,13 +1581,27 @@ export function PropertiesView() {
     setGeocodeResults(new Map());
 
     try {
-      const addressesToGeocode = propertiesNeedingGeocode.map((p: Property) => ({
-        id: p.id,
-        address: p.propertyAddress || '',
-        city: '',
-        state: 'TX',
-        zip: '',
-      }));
+      const addressesToGeocode = propertiesNeedingGeocode.map((p: Property) => {
+        // Extract actual address from "OWNER NAME + ADDRESS" format
+        // Example: "GOODWIN BOBBY J 190 SWEET BAY LANE SANTEE, SC 29142"
+        // We want: "190 SWEET BAY LANE SANTEE, SC 29142"
+        let cleanAddress = p.propertyAddress || '';
+
+        // Find first number in the string (start of actual address)
+        const match = cleanAddress.match(/\d+/);
+        if (match && match.index !== undefined) {
+          // Extract from first number onwards
+          cleanAddress = cleanAddress.substring(match.index);
+        }
+
+        return {
+          id: p.id,
+          address: cleanAddress,
+          city: '',
+          state: 'TX',
+          zip: '',
+        };
+      });
 
       const results = await batchGeocodeAddresses(
         addressesToGeocode,
@@ -1809,7 +1822,7 @@ export function PropertiesView() {
                     const propertiesNeedingGeocode = rawProperties.filter(p => {
                       if (p.latitude && p.longitude) return false;
                       if (!p.propertyAddress) return false;
-                      return /^\d/.test(p.propertyAddress.trim());
+                      return /\d/.test(p.propertyAddress);
                     });
 
                     // If no properties have coordinates, prompt user to geocode first
