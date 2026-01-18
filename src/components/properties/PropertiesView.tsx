@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown, Route, MapPin, Trash2, GripVertical, Eye, CheckCircle, RotateCcw } from 'lucide-react';
 import {
   DndContext,
@@ -220,6 +220,7 @@ export function PropertiesView() {
   const [geocodeOpen, setGeocodeOpen] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [geocodeCancelled, setGeocodeCancelled] = useState(false);
+  const geocodeCancelledRef = useRef(false);
   const [geocodeProgress, setGeocodeProgress] = useState({ current: 0, total: 0, address: '' });
   const [geocodeResults, setGeocodeResults] = useState<Map<string, { latitude: number; longitude: number; displayName: string }>>(new Map());
 
@@ -1552,8 +1553,13 @@ export function PropertiesView() {
 
   // Geocode addresses function
   const handleGeocodeAddresses = async () => {
+    // If properties are selected, only geocode those. Otherwise geocode all filtered properties.
+    const targetProperties = selectedPropertyIds.size > 0
+      ? properties.filter(p => selectedPropertyIds.has(p.id))
+      : filteredProperties;
+
     // Get properties that don't have coordinates AND have valid addresses
-    const propertiesNeedingGeocode = filteredProperties.filter(
+    const propertiesNeedingGeocode = targetProperties.filter(
       (p: Property) => {
         // Must not have coordinates
         if (p.latitude && p.longitude) return false;
@@ -1572,7 +1578,9 @@ export function PropertiesView() {
     if (propertiesNeedingGeocode.length === 0) {
       toast({
         title: 'No properties to geocode',
-        description: 'All visible properties already have coordinates or have invalid addresses',
+        description: selectedPropertyIds.size > 0
+          ? 'Selected properties already have coordinates or have invalid addresses'
+          : 'All visible properties already have coordinates or have invalid addresses',
       });
       return;
     }
@@ -1581,6 +1589,9 @@ export function PropertiesView() {
     setGeocodeOpen(true);
     setGeocodeResults(new Map());
     setGeocodeCancelled(false);
+
+    // Use a ref-like object to track cancellation
+    geocodeCancelledRef.current = false;
 
     try {
       const addressesToGeocode = propertiesNeedingGeocode.map((p: Property) => {
@@ -1609,8 +1620,13 @@ export function PropertiesView() {
         addressesToGeocode,
         (completed, total, current) => {
           setGeocodeProgress({ current: completed, total, address: current });
+          // Update cancel ref when state changes
+          setGeocodeCancelled(prev => {
+            geocodeCancelledRef.current = prev;
+            return prev;
+          });
         },
-        () => geocodeCancelled
+        () => geocodeCancelledRef.current
       );
 
       setGeocodeResults(results);
