@@ -1803,7 +1803,27 @@ export function PropertiesView() {
 
                 {/* Area Selector Button */}
                 <Button
-                  onClick={() => setAreaSelectorOpen(true)}
+                  onClick={async () => {
+                    // Check if we have any properties with coordinates
+                    const propertiesWithCoords = rawProperties.filter(p => p.latitude && p.longitude);
+                    const propertiesNeedingGeocode = rawProperties.filter(p => {
+                      if (p.latitude && p.longitude) return false;
+                      if (!p.propertyAddress) return false;
+                      return /^\d/.test(p.propertyAddress.trim());
+                    });
+
+                    // If no properties have coordinates, prompt user to geocode first
+                    if (propertiesWithCoords.length === 0 && propertiesNeedingGeocode.length > 0) {
+                      toast({
+                        title: 'Geocoding Required',
+                        description: `Please click "Geocode Addresses" first to convert ${propertiesNeedingGeocode.length} property addresses to coordinates.`,
+                        variant: 'default',
+                      });
+                      return;
+                    }
+
+                    setAreaSelectorOpen(true);
+                  }}
                   variant="outline"
                   size="sm"
                   className="w-full sm:w-auto mobile-touch-target"
