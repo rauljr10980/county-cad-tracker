@@ -335,13 +335,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     // Map frontend field names to database field names
     const updateData = { ...updates };
-    
+
     // Map totalAmountDue (frontend) to totalDue (database)
     if (updateData.totalAmountDue !== undefined && updateData.totalDue === undefined) {
       updateData.totalDue = updateData.totalAmountDue;
       delete updateData.totalAmountDue;
     }
-    
+
     // Map totalPercentage (frontend) to percentageDue (database)
     if (updateData.totalPercentage !== undefined && updateData.percentageDue === undefined) {
       updateData.percentageDue = updateData.totalPercentage;
@@ -371,6 +371,54 @@ router.put('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Property not found' });
     }
     console.error('[PROPERTIES] Update error:', error);
+    res.status(500).json({ error: 'Failed to update property' });
+  }
+});
+
+// PATCH endpoint for partial updates (like geocoding)
+router.patch('/:id', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Map frontend field names to database field names
+    const updateData = { ...updates };
+
+    // Map totalAmountDue (frontend) to totalDue (database)
+    if (updateData.totalAmountDue !== undefined && updateData.totalDue === undefined) {
+      updateData.totalDue = updateData.totalAmountDue;
+      delete updateData.totalAmountDue;
+    }
+
+    // Map totalPercentage (frontend) to percentageDue (database)
+    if (updateData.totalPercentage !== undefined && updateData.percentageDue === undefined) {
+      updateData.percentageDue = updateData.totalPercentage;
+      delete updateData.totalPercentage;
+    }
+
+    // Convert date fields if present
+    if (updateData.expectedCloseDate) {
+      updateData.expectedCloseDate = new Date(updateData.expectedCloseDate);
+    }
+
+    const property = await prisma.property.update({
+      where: { id },
+      data: updateData
+    });
+
+    // Map response back to frontend format
+    const mappedProperty = {
+      ...property,
+      totalAmountDue: property.totalDue || 0,
+      totalPercentage: property.percentageDue || 0
+    };
+
+    res.json(mappedProperty);
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+    console.error('[PROPERTIES] Patch error:', error);
     res.status(500).json({ error: 'Failed to update property' });
   }
 });
