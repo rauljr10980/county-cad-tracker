@@ -2246,6 +2246,7 @@ export function PropertiesView() {
                 setOptimizedRoutes(null);
               }}
               recordIds={Array.from(selectedPropertyIds)}
+              routeType="PROPERTY"
               onRouteSaved={() => {
                 // Reload active routes after route is saved
                 loadActiveRoutes();

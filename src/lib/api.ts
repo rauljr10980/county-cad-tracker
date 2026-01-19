@@ -949,7 +949,8 @@ export async function getActiveRoutes(): Promise<Route[]> {
 export async function createRoute(
   driver: 'Luciano' | 'Raul',
   routeData: any,
-  recordIds: string[]
+  recordIds: string[],
+  routeType: 'PROPERTY' | 'PREFORECLOSURE' = 'PREFORECLOSURE'
 ): Promise<{ id: string; driver: string; status: string; createdAt: string; recordCount: number }> {
   const response = await fetch(`${API_BASE_URL}/api/routes`, {
     method: 'POST',
@@ -957,14 +958,14 @@ export async function createRoute(
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
-    body: JSON.stringify({ driver, routeData, recordIds }),
+    body: JSON.stringify({ driver, routeData, recordIds, routeType }),
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error || 'Failed to create route');
   }
-  
+
   return response.json();
 }
 
