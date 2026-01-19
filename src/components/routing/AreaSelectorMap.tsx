@@ -3,9 +3,9 @@
  * Step-by-step wizard: 1. Starting Point -> 2. Draw Area -> 3. Preview -> 4. Optimize
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, useMap, Rectangle, Circle, Polygon, useMapEvents } from 'react-leaflet';
-import { LatLngBounds, LatLng } from 'leaflet';
+import { LatLngBounds, LatLng, DivIcon } from 'leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Loader2, Square, Circle as CircleIcon, Check, X, PenTool, MapPin, ArrowRight, ArrowLeft, List, Route, Save, FolderOpen } from 'lucide-react';
@@ -231,6 +231,41 @@ function MapBoundsFitter({ bounds }: { bounds: LatLngBounds | null }) {
   return null;
 }
 
+// Component to display property count within the drawn zone
+function PropertyCountOverlay({
+  count,
+  center
+}: {
+  count: number;
+  center: { lat: number; lng: number }
+}) {
+  const countIcon = useMemo(() => {
+    return new DivIcon({
+      html: `<div style="
+        background: rgba(16, 185, 129, 0.95);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        white-space: nowrap;
+        border: 2px solid white;
+      ">${count} ${count === 1 ? 'property' : 'properties'}</div>`,
+      className: '',
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
+  }, [count]);
+
+  return (
+    <Marker
+      position={[center.lat, center.lng]}
+      icon={countIcon}
+    />
+  );
+}
+
 export function AreaSelectorMap({ 
   isOpen, 
   onClose, 
@@ -253,6 +288,7 @@ export function AreaSelectorMap({
   const [polygonPointsBeingDrawn, setPolygonPointsBeingDrawn] = useState<LatLng[]>([]);
   const [selectedProperties, setSelectedProperties] = useState<PropertyLike[]>([]);
   const [startingPointValidation, setStartingPointValidation] = useState<{ valid: boolean; message: string } | null>(null);
+  const [totalPropertiesInZone, setTotalPropertiesInZone] = useState<number>(0);
 
   // Zone management state
   const [showZoneManager, setShowZoneManager] = useState(false);
@@ -278,11 +314,34 @@ export function AreaSelectorMap({
     }
   }, [isOpen]);
 
+  const calculatePropertiesInBounds = (shape: { type: 'rectangle' | 'circle' | 'polygon'; bounds: LatLngBounds; center?: LatLng; radius?: number; polygon?: LatLng[] }) => {
+    const count = properties.filter(p => {
+      if (!p.latitude || !p.longitude) return false;
+      const point = { lat: p.latitude, lng: p.longitude };
+
+      if (shape.type === 'polygon' && shape.polygon) {
+        return isPointInPolygon(point, shape.polygon.map(p => ({ lat: p.lat, lng: p.lng })));
+      } else if (shape.type === 'circle' && shape.center && shape.radius) {
+        const radiusKm = shape.radius / 1000;
+        return isPointInCircle(point, { lat: shape.center.lat, lng: shape.center.lng }, radiusKm);
+      } else if (shape.type === 'rectangle') {
+        const ne = shape.bounds.getNorthEast();
+        const sw = shape.bounds.getSouthWest();
+        return isPointInBounds(point, { north: ne.lat, south: sw.lat, east: ne.lng, west: sw.lng });
+      }
+      return false;
+    }).length;
+
+    setTotalPropertiesInZone(count);
+  };
+
   const handleRectangleComplete = (bounds: LatLngBounds) => {
     setDrawnRectangle(bounds);
     setDrawnCircle(null);
     setDrawnPolygon(null);
-    setSelectedShape({ type: 'rectangle', bounds });
+    const shape = { type: 'rectangle' as const, bounds };
+    setSelectedShape(shape);
+    calculatePropertiesInBounds(shape);
     setDrawingMode(null);
   };
 
@@ -295,7 +354,9 @@ export function AreaSelectorMap({
       [center.lat - radiusDegrees, center.lng - radiusDegrees / Math.cos(center.lat * Math.PI / 180)],
       [center.lat + radiusDegrees, center.lng + radiusDegrees / Math.cos(center.lat * Math.PI / 180)]
     );
-    setSelectedShape({ type: 'circle', bounds, center, radius });
+    const shape = { type: 'circle' as const, bounds, center, radius };
+    setSelectedShape(shape);
+    calculatePropertiesInBounds(shape);
     setDrawingMode(null);
   };
 
@@ -306,7 +367,9 @@ export function AreaSelectorMap({
     setDrawnPolygon(uniquePoints);
     setDrawnRectangle(null);
     setDrawnCircle(null);
-    setSelectedShape({ type: 'polygon', bounds, polygon: uniquePoints });
+    const shape = { type: 'polygon' as const, bounds, polygon: uniquePoints };
+    setSelectedShape(shape);
+    calculatePropertiesInBounds(shape);
     setDrawingMode(null);
   };
 
@@ -395,13 +458,9 @@ export function AreaSelectorMap({
         return;
       }
 
-      // Filter properties within the area AND exclude visited/in-route properties
-      const propsInArea = properties.filter(p => {
+      // Calculate TOTAL properties in zone (for display on map)
+      const allPropsInZone = properties.filter(p => {
         if (!p.latitude || !p.longitude) return false;
-
-        // Exclude unavailable properties (visited or in active routes)
-        if (p.id && unavailablePropertyIds.has(p.id)) return false;
-
         const point = { lat: p.latitude, lng: p.longitude };
 
         if (selectedShape.type === 'polygon' && selectedShape.polygon) {
@@ -415,6 +474,16 @@ export function AreaSelectorMap({
           return isPointInBounds(point, { north: ne.lat, south: sw.lat, east: ne.lng, west: sw.lng });
         }
         return false;
+      });
+
+      // Store total count for display
+      setTotalPropertiesInZone(allPropsInZone.length);
+
+      // Filter properties within the area AND exclude visited/in-route properties (for route optimization)
+      const propsInArea = allPropsInZone.filter(p => {
+        // Exclude unavailable properties (visited or in active routes)
+        if (p.id && unavailablePropertyIds.has(p.id)) return false;
+        return true;
       });
 
       // Ensure starting point property is included
@@ -472,24 +541,34 @@ export function AreaSelectorMap({
       [zone.bounds.north, zone.bounds.east]
     );
 
+    let shape: { type: 'rectangle' | 'circle' | 'polygon'; bounds: LatLngBounds; center?: LatLng; radius?: number; polygon?: LatLng[] };
+
     if (zone.type === 'rectangle') {
       setDrawnRectangle(bounds);
       setDrawnCircle(null);
       setDrawnPolygon(null);
-      setSelectedShape({ type: 'rectangle', bounds });
+      shape = { type: 'rectangle', bounds };
+      setSelectedShape(shape);
     } else if (zone.type === 'circle' && zone.center && zone.radius) {
       const center = new LatLng(zone.center.lat, zone.center.lng);
       setDrawnCircle({ center, radius: zone.radius });
       setDrawnRectangle(null);
       setDrawnPolygon(null);
-      setSelectedShape({ type: 'circle', bounds, center, radius: zone.radius });
+      shape = { type: 'circle', bounds, center, radius: zone.radius };
+      setSelectedShape(shape);
     } else if (zone.type === 'polygon' && zone.polygon) {
       const polygon = zone.polygon.map(p => new LatLng(p.lat, p.lng));
       setDrawnPolygon(polygon);
       setDrawnRectangle(null);
       setDrawnCircle(null);
-      setSelectedShape({ type: 'polygon', bounds, polygon });
+      shape = { type: 'polygon', bounds, polygon };
+      setSelectedShape(shape);
+    } else {
+      return;
     }
+
+    // Calculate property count for the loaded zone
+    calculatePropertiesInBounds(shape);
 
     toast({
       title: 'Zone Loaded',
@@ -898,6 +977,16 @@ export function AreaSelectorMap({
                 {drawnPolygon && drawnPolygon.length >= 3 && (
                   <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
                 )}
+                {/* Property count overlay */}
+                {selectedShape && totalPropertiesInZone > 0 && (() => {
+                  const center = selectedShape.center
+                    ? { lat: selectedShape.center.lat, lng: selectedShape.center.lng }
+                    : {
+                        lat: (selectedShape.bounds.getNorthEast().lat + selectedShape.bounds.getSouthWest().lat) / 2,
+                        lng: (selectedShape.bounds.getNorthEast().lng + selectedShape.bounds.getSouthWest().lng) / 2
+                      };
+                  return <PropertyCountOverlay count={totalPropertiesInZone} center={center} />;
+                })()}
                 {pinLocation && (
                   <Marker
                     position={[pinLocation.lat, pinLocation.lng]}
