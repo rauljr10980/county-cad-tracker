@@ -8,11 +8,16 @@ import { MapContainer, TileLayer, useMap, Rectangle, Circle, Polygon, useMapEven
 import { LatLngBounds, LatLng } from 'leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Loader2, Square, Circle as CircleIcon, Check, X, PenTool, MapPin, ArrowRight, ArrowLeft, List, Route } from 'lucide-react';
+import { Loader2, Square, Circle as CircleIcon, Check, X, PenTool, MapPin, ArrowRight, ArrowLeft, List, Route, Save, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Marker, Popup } from 'react-leaflet';
 import { cn } from '@/lib/utils';
+import { ZoneManager } from './ZoneManager';
+import { SavedZone, saveZone, getNextColor, loadZones } from '@/lib/zones';
+import { toast } from '@/hooks/use-toast';
 
 // Fix for default marker icons in Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -249,6 +254,13 @@ export function AreaSelectorMap({
   const [selectedProperties, setSelectedProperties] = useState<PropertyLike[]>([]);
   const [startingPointValidation, setStartingPointValidation] = useState<{ valid: boolean; message: string } | null>(null);
 
+  // Zone management state
+  const [showZoneManager, setShowZoneManager] = useState(false);
+  const [showSaveZoneDialog, setShowSaveZoneDialog] = useState(false);
+  const [zoneName, setZoneName] = useState('');
+  const [zoneDescription, setZoneDescription] = useState('');
+  const [loadedZone, setLoadedZone] = useState<SavedZone | null>(null);
+
   // Reset when modal opens/closes
   useEffect(() => {
     if (isOpen) {
@@ -451,6 +463,97 @@ export function AreaSelectorMap({
     }
   };
 
+  const handleLoadZone = (zone: SavedZone) => {
+    setLoadedZone(zone);
+
+    // Convert zone geometry to map shapes
+    const bounds = new LatLngBounds(
+      [zone.bounds.south, zone.bounds.west],
+      [zone.bounds.north, zone.bounds.east]
+    );
+
+    if (zone.type === 'rectangle') {
+      setDrawnRectangle(bounds);
+      setDrawnCircle(null);
+      setDrawnPolygon(null);
+      setSelectedShape({ type: 'rectangle', bounds });
+    } else if (zone.type === 'circle' && zone.center && zone.radius) {
+      const center = new LatLng(zone.center.lat, zone.center.lng);
+      setDrawnCircle({ center, radius: zone.radius });
+      setDrawnRectangle(null);
+      setDrawnPolygon(null);
+      setSelectedShape({ type: 'circle', bounds, center, radius: zone.radius });
+    } else if (zone.type === 'polygon' && zone.polygon) {
+      const polygon = zone.polygon.map(p => new LatLng(p.lat, p.lng));
+      setDrawnPolygon(polygon);
+      setDrawnRectangle(null);
+      setDrawnCircle(null);
+      setSelectedShape({ type: 'polygon', bounds, polygon });
+    }
+
+    toast({
+      title: 'Zone Loaded',
+      description: `Loaded "${zone.name}" zone`,
+    });
+  };
+
+  const handleSaveCurrentZone = () => {
+    if (!selectedShape) {
+      toast({
+        title: 'No Area Drawn',
+        description: 'Please draw an area before saving',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setShowSaveZoneDialog(true);
+  };
+
+  const handleConfirmSaveZone = () => {
+    if (!selectedShape || !zoneName.trim()) {
+      toast({
+        title: 'Invalid Zone',
+        description: 'Please provide a zone name',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const existingZones = loadZones();
+    const color = getNextColor(existingZones);
+
+    const bounds = selectedShape.bounds;
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+
+    const newZone = saveZone({
+      name: zoneName.trim(),
+      description: zoneDescription.trim() || undefined,
+      type: selectedShape.type,
+      color,
+      bounds: {
+        north: ne.lat,
+        south: sw.lat,
+        east: ne.lng,
+        west: sw.lng,
+      },
+      center: selectedShape.center ? { lat: selectedShape.center.lat, lng: selectedShape.center.lng } : undefined,
+      radius: selectedShape.radius,
+      polygon: selectedShape.polygon ? selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })) : undefined,
+    });
+
+    toast({
+      title: 'Zone Saved',
+      description: `Saved "${newZone.name}" for future use`,
+    });
+
+    setShowSaveZoneDialog(false);
+    setZoneName('');
+    setZoneDescription('');
+    setLoadedZone(newZone);
+  };
+
   const handleOptimize = () => {
     if (!closestProperty || !pinLocation || !selectedShape) return;
 
@@ -609,6 +712,14 @@ export function AreaSelectorMap({
                 <div className="text-sm text-muted-foreground">
                   Draw a shape around the area. The starting point must be inside the drawn area.
                 </div>
+                {loadedZone && (
+                  <div className="text-xs p-2 bg-primary/10 rounded border border-primary/20">
+                    <div className="font-medium text-primary">Using saved zone: {loadedZone.name}</div>
+                    {loadedZone.description && (
+                      <div className="text-muted-foreground mt-1">{loadedZone.description}</div>
+                    )}
+                  </div>
+                )}
                 {startingPointValidation && !startingPointValidation.valid && (
                   <div className="text-xs text-destructive p-2 bg-destructive/10 rounded">
                     {startingPointValidation.message}
@@ -619,6 +730,33 @@ export function AreaSelectorMap({
                     {startingPointValidation.message}
                   </div>
                 )}
+
+                {/* Zone management buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 justify-start"
+                    onClick={() => setShowZoneManager(true)}
+                  >
+                    <FolderOpen className="h-4 w-4 mr-2" />
+                    Load Saved Zone
+                  </Button>
+                  {selectedShape && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start"
+                      onClick={handleSaveCurrentZone}
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Zone
+                    </Button>
+                  )}
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="text-xs text-muted-foreground mb-2">Or draw a custom area:</div>
+                </div>
+
                 <Button
                   variant={drawingMode === 'rectangle' ? 'default' : 'outline'}
                   className="w-full justify-start"
@@ -848,6 +986,56 @@ export function AreaSelectorMap({
           </div>
         </div>
       </DialogContent>
+
+      {/* Zone Manager Dialog */}
+      <ZoneManager
+        isOpen={showZoneManager}
+        onClose={() => setShowZoneManager(false)}
+        onSelectZone={handleLoadZone}
+      />
+
+      {/* Save Zone Dialog */}
+      <Dialog open={showSaveZoneDialog} onOpenChange={setShowSaveZoneDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Service Zone</DialogTitle>
+            <DialogDescription>
+              Save this area as a reusable zone for future route optimization.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="zoneName">Zone Name *</Label>
+              <Input
+                id="zoneName"
+                placeholder="e.g., North Zone, Downtown Area"
+                value={zoneName}
+                onChange={(e) => setZoneName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="zoneDescription">Description (Optional)</Label>
+              <Input
+                id="zoneDescription"
+                placeholder="e.g., Covers residential areas in north sector"
+                value={zoneDescription}
+                onChange={(e) => setZoneDescription(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowSaveZoneDialog(false)}>
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={handleConfirmSaveZone} disabled={!zoneName.trim()}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Zone
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
