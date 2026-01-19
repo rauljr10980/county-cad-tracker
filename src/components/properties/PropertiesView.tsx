@@ -2448,7 +2448,7 @@ export function PropertiesView() {
             <div className="space-y-4">
               {/* Route Map */}
               {viewRoute.routeData && (
-                <div className="rounded-lg overflow-hidden border border-border">
+                <div className="rounded-lg overflow-hidden border border-border" style={{ height: '400px' }}>
                   <RouteMap
                     routes={viewRoute.routeData.routes || []}
                     numVehicles={viewRoute.routeData.numVehicles || 1}
