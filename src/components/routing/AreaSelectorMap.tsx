@@ -251,10 +251,13 @@ function PropertyCountOverlay({
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         white-space: nowrap;
         border: 2px solid white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       ">${count}</div>`,
       className: '',
-      iconSize: [0, 0],
-      iconAnchor: [0, 0],
+      iconSize: [60, 40],
+      iconAnchor: [30, 20],
     });
   }, [count]);
 
