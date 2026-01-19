@@ -192,19 +192,21 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose, 
 
   if (!isOpen) return null;
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col">
+  // If compact mode, render without Dialog wrapper
+  const mapContent = (
+    <>
+      {!compact && (
         <DialogHeader>
           <DialogTitle>Optimized Route</DialogTitle>
           <DialogDescription>
-            {routes.length === 1 ? 'Single vehicle route' : `${routes.length} vehicle routes`} • 
-            Total distance: {totalDistance.toFixed(2)} km • 
+            {routes.length === 1 ? 'Single vehicle route' : `${routes.length} vehicle routes`} •
+            Total distance: {totalDistance.toFixed(2)} km •
             {routes.reduce((sum, r) => sum + r.waypoints.filter(wp => wp.id !== 'depot').length, 0)} stops
           </DialogDescription>
         </DialogHeader>
+      )}
 
-        <div className="flex-1 relative min-h-0">
+      <div className={cn("relative min-h-0", compact ? "h-full" : "flex-1")}>
           {error ? (
             <div className="absolute inset-0 flex items-center justify-center bg-secondary/30 rounded-lg">
               <div className="text-center p-6">
@@ -310,8 +312,9 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose, 
               </MapContainer>
             </>
           )}
-        </div>
+      </div>
 
+      {!compact && (
         <div className="flex items-center justify-between pt-4 border-t">
           <div className="flex gap-2">
             {routes.map((route, index) => (
@@ -356,7 +359,7 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose, 
                   variant="outline"
                   size="sm"
                   onClick={() => handleOpenInMaps(index)}
-                  title={stopCount > 25 ? 
+                  title={stopCount > 25 ?
                     `Open route in Google Maps with first ${limitedCount} stops (out of ${stopCount} total. Google Maps limit is 25 waypoints)` :
                     `Open route in Google Maps with ${stopCount} stops`}
                 >
@@ -367,6 +370,19 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose, 
             <Button onClick={onClose}>Close</Button>
           </div>
         </div>
+      )}
+    </>
+  );
+
+  // Render with or without Dialog wrapper based on compact mode
+  if (compact) {
+    return <div className="h-full flex flex-col">{mapContent}</div>;
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col">
+        {mapContent}
       </DialogContent>
     </Dialog>
   );
