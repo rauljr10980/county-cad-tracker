@@ -2450,12 +2450,13 @@ export function PropertiesView() {
               {viewRoute.routeData && (
                 <div className="rounded-lg overflow-hidden border border-border">
                   <RouteMap
-                    routes={[viewRoute.routeData]}
-                    numVehicles={1}
+                    routes={viewRoute.routeData.routes || []}
+                    numVehicles={viewRoute.routeData.numVehicles || 1}
                     totalDistance={viewRoute.routeData.totalDistance || 0}
                     isOpen={true}
                     onClose={() => {}}
                     recordIds={[]}
+                    routeType="PROPERTY"
                     compact={true}
                   />
                 </div>
