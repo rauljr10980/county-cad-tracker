@@ -247,11 +247,11 @@ function PropertyCountOverlay({
         padding: 8px 16px;
         border-radius: 20px;
         font-weight: bold;
-        font-size: 14px;
+        font-size: 16px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         white-space: nowrap;
         border: 2px solid white;
-      ">${count} ${count === 1 ? 'property' : 'properties'}</div>`,
+      ">${count}</div>`,
       className: '',
       iconSize: [0, 0],
       iconAnchor: [0, 0],
