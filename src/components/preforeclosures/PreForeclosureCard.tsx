@@ -60,9 +60,6 @@ export function PreForeclosureCard({ preforeclosure: pf, onViewDetails }: PreFor
               </Badge>
             )}
           </div>
-          <p className="font-mono text-xs text-muted-foreground truncate">
-            {pf.document_number}
-          </p>
         </div>
       </div>
 
@@ -80,12 +77,12 @@ export function PreForeclosureCard({ preforeclosure: pf, onViewDetails }: PreFor
       {/* Info Grid */}
       <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
         <div>
-          <p className="text-muted-foreground mb-1">Filing Month</p>
-          <p className="font-semibold">{pf.filing_month}</p>
+          <p className="text-muted-foreground mb-1">Rental or Primary Home</p>
+          <p className="font-semibold">Click to set</p>
         </div>
         <div>
-          <p className="text-muted-foreground mb-1">Last Action</p>
-          <p className="font-semibold">{formatDate(pf.last_action_date) || '—'}</p>
+          <p className="text-muted-foreground mb-1">Next Follow-Up</p>
+          <p className="font-semibold">Click to set</p>
         </div>
         {pf.next_follow_up_date && (
           <>
