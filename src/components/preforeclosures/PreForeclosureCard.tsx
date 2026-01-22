@@ -84,22 +84,6 @@ export function PreForeclosureCard({ preforeclosure: pf, onViewDetails }: PreFor
           <p className="text-muted-foreground mb-1">Next Follow-Up</p>
           <p className="font-semibold">Click to set</p>
         </div>
-        {pf.next_follow_up_date && (
-          <>
-            <div className="col-span-2">
-              <p className="text-muted-foreground mb-1">Next Follow-Up</p>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-3 w-3 text-muted-foreground" />
-                <p className={cn(
-                  "font-semibold",
-                  isFollowUpDue && "text-yellow-400"
-                )}>
-                  {formatDate(pf.next_follow_up_date)}
-                </p>
-              </div>
-            </div>
-          </>
-        )}
       </div>
 
       {/* Follow-up Alert */}
