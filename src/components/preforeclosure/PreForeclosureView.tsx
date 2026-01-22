@@ -2080,11 +2080,6 @@ export function PreForeclosureView() {
                     <div className="text-sm text-muted-foreground">
                       {stopCount} {stopCount === 1 ? 'stop' : 'stops'}
                     </div>
-                    {route.routeData?.totalDistance && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {route.routeData.totalDistance.toFixed(2)} km
-                      </div>
-                    )}
                   </div>
                   {/* Delete button - appears on hover */}
                   <Button
