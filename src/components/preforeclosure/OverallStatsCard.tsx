@@ -28,7 +28,6 @@ export function OverallStatsCard() {
               <Badge variant="outline" className="bg-green-500/20 text-green-600 border-green-500/30">
                 Visited
               </Badge>
-              <span className="text-sm text-muted-foreground">Properties</span>
             </div>
             <span className="text-sm font-medium text-muted-foreground">{visitedPercentage}%</span>
           </div>
