@@ -83,27 +83,6 @@ export function UploadStatsCard() {
             </div>
           </div>
 
-          {/* Inactive Records */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-orange-500 text-orange-600">
-                Inactive
-              </Badge>
-            </div>
-            <div className="text-2xl font-bold text-orange-600">
-              {stats.inactiveRecords?.toLocaleString() || 0}
-            </div>
-          </div>
-
-          {/* Total Active */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Badge>Total Active</Badge>
-            </div>
-            <div className="text-2xl font-bold">
-              {stats.activeRecords?.toLocaleString() || 0}
-            </div>
-          </div>
         </div>
 
       </CardContent>
