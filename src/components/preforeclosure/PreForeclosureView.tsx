@@ -2244,11 +2244,7 @@ export function PreForeclosureView() {
                       </Badge>
               </div>
 
-              {/* Document Number - Hidden on mobile */}
-              <div className="mb-3 pr-8 pl-8 hidden sm:block">
-                <div className="font-semibold text-base break-words">{record.document_number}</div>
-                <div className="text-xs text-muted-foreground font-mono break-words">{record.filing_month}</div>
-              </div>
+              {/* Document Number and Date - Hidden */}
 
               {/* Address */}
               <div className="mb-4 pr-8 pl-8">
@@ -2303,54 +2299,52 @@ export function PreForeclosureView() {
               {/* Dates */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div className="min-w-0">
-                  <div className="text-xs text-muted-foreground mb-1">Last Action</div>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-auto p-1 text-xs font-normal w-full justify-start min-w-0",
-                          record.last_action_date ? "text-foreground" : "text-muted-foreground"
-                        )}
-                      >
-                        <span className="truncate">
-                      {record.last_action_date
-                        ? format(new Date(record.last_action_date), 'MMM d, yyyy')
-                            : 'Click to set'}
-                        </span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="single"
-                        selected={record.last_action_date ? new Date(record.last_action_date) : undefined}
-                        onSelect={async (date) => {
-                          if (date) {
-                            try {
-                              await updateMutation.mutateAsync({
-                                document_number: record.document_number,
-                                last_action_date: date.toISOString(),
-                              });
-                              toast({
-                                title: 'Last Action Date Updated',
-                                description: `Last action date set to ${format(date, 'MMM d, yyyy')}`,
-                              });
-                              queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
-                            } catch (error) {
-                              console.error('Error updating last action date:', error);
-                              toast({
-                                title: 'Error',
-                                description: 'Failed to update last action date',
-                                variant: 'destructive',
-                              });
-                            }
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <div className="text-xs text-muted-foreground mb-1">Rental or Primary Home</div>
+                  <Select
+                    value={record.notes?.includes('Rental') ? 'Rental' : record.notes?.includes('Primary Home') ? 'Primary Home' : ''}
+                    onValueChange={async (value) => {
+                      try {
+                        // Store in notes for now - can be moved to a dedicated field later
+                        const currentNotes = record.notes || '';
+                        let newNotes = currentNotes;
+                        
+                        // Remove existing rental/primary home markers
+                        newNotes = newNotes.replace(/\[Rental\]/g, '').replace(/\[Primary Home\]/g, '').trim();
+                        
+                        // Add new marker
+                        if (value === 'Rental') {
+                          newNotes = newNotes ? `${newNotes} [Rental]` : '[Rental]';
+                        } else if (value === 'Primary Home') {
+                          newNotes = newNotes ? `${newNotes} [Primary Home]` : '[Primary Home]';
+                        }
+                        
+                        await updateMutation.mutateAsync({
+                          document_number: record.document_number,
+                          notes: newNotes,
+                        });
+                        toast({
+                          title: 'Updated',
+                          description: `Property type set to ${value}`,
+                        });
+                        queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                      } catch (error) {
+                        console.error('Error updating property type:', error);
+                        toast({
+                          title: 'Error',
+                          description: 'Failed to update property type',
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full h-8 text-xs min-w-0">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Rental">Rental</SelectItem>
+                      <SelectItem value="Primary Home">Primary Home</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs text-muted-foreground mb-1">Next Follow-Up</div>
