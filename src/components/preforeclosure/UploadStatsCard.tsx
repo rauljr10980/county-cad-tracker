@@ -110,12 +110,6 @@ export function UploadStatsCard() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="pt-4 border-t">
-          <div className="text-xs text-muted-foreground">
-            Uploaded by <span className="font-medium text-foreground">{stats.uploadedBy || 'Unknown'}</span>
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
