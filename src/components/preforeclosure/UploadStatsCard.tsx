@@ -52,12 +52,6 @@ export function UploadStatsCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* File Info */}
-        <div className="text-sm">
-          <div className="font-medium text-muted-foreground">File:</div>
-          <div className="text-foreground">{stats.filename}</div>
-        </div>
-
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4">
           {/* New Records */}
