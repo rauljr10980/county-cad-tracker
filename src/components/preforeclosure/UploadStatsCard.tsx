@@ -71,7 +71,6 @@ export function UploadStatsCard() {
             <div className="text-2xl font-bold text-green-600">
               {stats.newRecords?.toLocaleString() || 0}
             </div>
-            <div className="text-xs text-muted-foreground">New properties added</div>
           </div>
 
           {/* Updated Records */}
@@ -82,7 +81,6 @@ export function UploadStatsCard() {
             <div className="text-2xl font-bold">
               {stats.updatedRecords?.toLocaleString() || 0}
             </div>
-            <div className="text-xs text-muted-foreground">Records updated</div>
           </div>
 
           {/* Inactive Records */}
@@ -95,7 +93,6 @@ export function UploadStatsCard() {
             <div className="text-2xl font-bold text-orange-600">
               {stats.inactiveRecords?.toLocaleString() || 0}
             </div>
-            <div className="text-xs text-muted-foreground">Missing from upload</div>
           </div>
 
           {/* Total Active */}
@@ -106,7 +103,6 @@ export function UploadStatsCard() {
             <div className="text-2xl font-bold">
               {stats.activeRecords?.toLocaleString() || 0}
             </div>
-            <div className="text-xs text-muted-foreground">Active records</div>
           </div>
         </div>
 
