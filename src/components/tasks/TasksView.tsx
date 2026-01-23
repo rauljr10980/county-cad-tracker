@@ -572,12 +572,27 @@ export function TasksView() {
 
                   {/* Amount Due - Right aligned */}
                   <div className="ml-auto flex-shrink-0">
-                    <span className={cn(
-                      "text-lg font-bold font-mono tracking-tight",
-                      property.totalAmountDue > 0 ? "text-green-500" : "text-muted-foreground"
-                    )}>
-                      {formatCurrency(property.totalAmountDue)}
-                    </span>
+                    {property.totalAmountDue > 0 ? (
+                      <span className="text-lg font-bold font-mono tracking-tight text-green-500">
+                        {formatCurrency(property.totalAmountDue)}
+                      </span>
+                    ) : isPreForeclosureTask(property) && (property as any).type ? (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-sm font-semibold px-3 py-1 rounded-md border-2",
+                          (property as any).type === 'Mortgage'
+                            ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                            : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                        )}
+                      >
+                        {(property as any).type}
+                      </Badge>
+                    ) : (
+                      <span className="text-lg font-bold font-mono tracking-tight text-muted-foreground">
+                        {formatCurrency(property.totalAmountDue)}
+                      </span>
+                    )}
                   </div>
                 </div>
 
