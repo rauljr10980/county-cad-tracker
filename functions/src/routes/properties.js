@@ -1288,4 +1288,218 @@ router.put('/:id/deal-stage', optionalAuth, async (req, res) => {
   }
 });
 
+// ============================================================================
+// BATCH GEOCODE PROPERTIES
+// ============================================================================
+
+router.post('/geocode/batch', optionalAuth, async (req, res) => {
+  try {
+    const { limit: limitParam, offset: offsetParam } = req.body;
+    const limit = limitParam ? parseInt(limitParam) : 100; // Default batch size
+    const offset = offsetParam ? parseInt(offsetParam) : 0;
+
+    // Fetch properties without coordinates but with addresses
+    const properties = await prisma.property.findMany({
+      where: {
+        AND: [
+          {
+            OR: [
+              { latitude: null },
+              { longitude: null }
+            ]
+          },
+          {
+            propertyAddress: { not: '' },
+            propertyAddress: { not: null }
+          }
+        ]
+      },
+      select: {
+        id: true,
+        propertyAddress: true,
+        accountNumber: true,
+        latitude: true,
+        longitude: true
+      },
+      take: limit,
+      skip: offset,
+      orderBy: { createdAt: 'asc' }
+    });
+
+    if (properties.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No properties need geocoding',
+        processed: 0,
+        total: 0,
+        results: []
+      });
+    }
+
+    // Geocode addresses using Nominatim
+    const results = [];
+    const BATCH_SIZE = 5; // Process 5 at a time
+    const DELAY_MS = 1200; // 1.2 seconds between batches (to respect Nominatim's 1 req/sec limit)
+
+    for (let i = 0; i < properties.length; i += BATCH_SIZE) {
+      const batch = properties.slice(i, i + BATCH_SIZE);
+      
+      const batchPromises = batch.map(async (property) => {
+        try {
+          // Skip if already has coordinates
+          if (property.latitude && property.longitude) {
+            return {
+              id: property.id,
+              accountNumber: property.accountNumber,
+              success: true,
+              skipped: true,
+              message: 'Already has coordinates'
+            };
+          }
+
+          if (!property.propertyAddress || property.propertyAddress.trim() === '') {
+            return {
+              id: property.id,
+              accountNumber: property.accountNumber,
+              success: false,
+              error: 'No address provided'
+            };
+          }
+
+          // Build search query
+          const searchQuery = `${property.propertyAddress}, San Antonio, TX`;
+
+          // Geocode using Nominatim
+          const url = `https://nominatim.openstreetmap.org/search?` + new URLSearchParams({
+            q: searchQuery,
+            format: 'json',
+            limit: '1',
+            addressdetails: '1',
+          });
+
+          const response = await fetch(url, {
+            headers: {
+              'User-Agent': 'County-CAD-Tracker/1.0',
+            },
+          });
+
+          if (!response.ok) {
+            return {
+              id: property.id,
+              accountNumber: property.accountNumber,
+              success: false,
+              error: `API returned ${response.status}`
+            };
+          }
+
+          const data = await response.json();
+
+          if (!data || data.length === 0) {
+            return {
+              id: property.id,
+              accountNumber: property.accountNumber,
+              success: false,
+              error: 'Address not found'
+            };
+          }
+
+          const result = data[0];
+          const latitude = parseFloat(result.lat);
+          const longitude = parseFloat(result.lon);
+
+          // Update property with coordinates
+          await prisma.property.update({
+            where: { id: property.id },
+            data: {
+              latitude,
+              longitude
+            }
+          });
+
+          return {
+            id: property.id,
+            accountNumber: property.accountNumber,
+            success: true,
+            latitude,
+            longitude,
+            displayName: result.display_name
+          };
+        } catch (error) {
+          console.error(`[GEOCODE] Error geocoding property ${property.id}:`, error);
+          return {
+            id: property.id,
+            accountNumber: property.accountNumber,
+            success: false,
+            error: error.message || 'Unknown error'
+          };
+        }
+      });
+
+      // Wait for batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+
+      // Rate limiting: wait between batches (except for last batch)
+      if (i + BATCH_SIZE < properties.length) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+      }
+    }
+
+    const successCount = results.filter(r => r.success && !r.skipped).length;
+    const errorCount = results.filter(r => !r.success).length;
+    const skippedCount = results.filter(r => r.skipped).length;
+
+    res.json({
+      success: true,
+      processed: results.length,
+      successful: successCount,
+      errors: errorCount,
+      skipped: skippedCount,
+      results: results
+    });
+  } catch (error) {
+    console.error('[PROPERTIES] Batch geocode error:', error);
+    res.status(500).json({ error: 'Failed to geocode properties', message: error.message });
+  }
+});
+
+// ============================================================================
+// GET GEOCODE STATUS (count properties without coordinates)
+// ============================================================================
+
+router.get('/geocode/status', optionalAuth, async (req, res) => {
+  try {
+    const [totalProperties, propertiesWithoutCoords, propertiesWithCoords] = await Promise.all([
+      prisma.property.count(),
+      prisma.property.count({
+        where: {
+          OR: [
+            { latitude: null },
+            { longitude: null }
+          ],
+          propertyAddress: { not: '' }
+        }
+      }),
+      prisma.property.count({
+        where: {
+          latitude: { not: null },
+          longitude: { not: null }
+        }
+      })
+    ]);
+
+    res.json({
+      total: totalProperties,
+      withoutCoordinates: propertiesWithoutCoords,
+      withCoordinates: propertiesWithCoords,
+      percentageComplete: totalProperties > 0 
+        ? ((propertiesWithCoords / totalProperties) * 100).toFixed(2)
+        : 0
+    });
+  } catch (error) {
+    console.error('[PROPERTIES] Geocode status error:', error);
+    res.status(500).json({ error: 'Failed to get geocode status', message: error.message });
+  }
+});
+
 module.exports = router;

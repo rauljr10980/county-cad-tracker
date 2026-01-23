@@ -1035,6 +1035,63 @@ export async function cancelRoute(routeId: string): Promise<Route> {
 }
 
 /**
+ * Get geocoding status (count of properties with/without coordinates)
+ */
+export async function getGeocodeStatus(): Promise<{
+  total: number;
+  withoutCoordinates: number;
+  withCoordinates: number;
+  percentageComplete: string;
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/properties/geocode/status`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to get geocode status');
+  }
+  
+  return response.json();
+}
+
+/**
+ * Batch geocode properties
+ */
+export async function batchGeocodeProperties(limit: number = 100, offset: number = 0): Promise<{
+  success: boolean;
+  processed: number;
+  successful: number;
+  errors: number;
+  skipped: number;
+  results: Array<{
+    id: string;
+    accountNumber: string;
+    success: boolean;
+    latitude?: number;
+    longitude?: number;
+    error?: string;
+    skipped?: boolean;
+  }>;
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/properties/geocode/batch`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ limit, offset }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to geocode properties');
+  }
+  
+  return response.json();
+}
+
+/**
  * Delete a route (preserves pre-foreclosure records and their visited status)
  */
 export async function deleteRoute(routeId: string): Promise<{ success: boolean; message: string }> {

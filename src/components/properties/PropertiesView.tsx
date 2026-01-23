@@ -29,7 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL } from '@/lib/api';
+import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus } from '@/lib/api';
 import { batchGeocodeAddresses } from '@/lib/geocoding';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
@@ -225,6 +225,12 @@ export function PropertiesView() {
   const geocodeCancelledRef = useRef(false);
   const [geocodeProgress, setGeocodeProgress] = useState({ current: 0, total: 0, address: '' });
   const [geocodeResults, setGeocodeResults] = useState<Map<string, { latitude: number; longitude: number; displayName: string }>>(new Map());
+  
+  // Batch geocoding state
+  const [batchGeocodeOpen, setBatchGeocodeOpen] = useState(false);
+  const [isBatchGeocoding, setIsBatchGeocoding] = useState(false);
+  const [batchGeocodeProgress, setBatchGeocodeProgress] = useState({ processed: 0, successful: 0, errors: 0, skipped: 0, total: 0 });
+  const [geocodeStatus, setGeocodeStatus] = useState<{ total: number; withoutCoordinates: number; withCoordinates: number; percentageComplete: string } | null>(null);
 
   // Active routes state
   const [activeRoutes, setActiveRoutes] = useState<RouteType[]>([]);
@@ -1686,6 +1692,96 @@ export function PropertiesView() {
     }
   };
 
+  // Batch geocode all properties
+  const handleBatchGeocodeAll = async () => {
+    try {
+      setIsBatchGeocoding(true);
+      setBatchGeocodeOpen(true);
+      setBatchGeocodeProgress({ processed: 0, successful: 0, errors: 0, skipped: 0, total: 0 });
+
+      // First, get status to know how many need geocoding
+      const status = await getGeocodeStatus();
+      setGeocodeStatus(status);
+      setBatchGeocodeProgress(prev => ({ ...prev, total: status.withoutCoordinates }));
+
+      if (status.withoutCoordinates === 0) {
+        toast({
+          title: 'All Properties Geocoded',
+          description: 'All properties already have coordinates.',
+        });
+        setBatchGeocodeOpen(false);
+        setIsBatchGeocoding(false);
+        return;
+      }
+
+      // Process in batches of 100
+      const BATCH_SIZE = 100;
+      let offset = 0;
+      let totalProcessed = 0;
+      let totalSuccessful = 0;
+      let totalErrors = 0;
+      let totalSkipped = 0;
+
+      while (offset < status.withoutCoordinates) {
+        const result = await batchGeocodeProperties(BATCH_SIZE, offset);
+        
+        totalProcessed += result.processed;
+        totalSuccessful += result.successful;
+        totalErrors += result.errors;
+        totalSkipped += result.skipped;
+
+        setBatchGeocodeProgress({
+          processed: totalProcessed,
+          successful: totalSuccessful,
+          errors: totalErrors,
+          skipped: totalSkipped,
+          total: status.withoutCoordinates
+        });
+
+        // Update status
+        const updatedStatus = await getGeocodeStatus();
+        setGeocodeStatus(updatedStatus);
+
+        // If we've processed all or no more need geocoding, break
+        if (result.processed === 0 || updatedStatus.withoutCoordinates === 0) {
+          break;
+        }
+
+        offset += BATCH_SIZE;
+      }
+
+      toast({
+        title: 'Batch Geocoding Complete',
+        description: `Processed ${totalProcessed} properties: ${totalSuccessful} successful, ${totalErrors} errors, ${totalSkipped} skipped`,
+      });
+
+      // Refresh properties data
+      await queryClient.invalidateQueries({ queryKey: ['properties'] });
+    } catch (error) {
+      console.error('Batch geocoding error:', error);
+      toast({
+        title: 'Batch Geocoding Failed',
+        description: error instanceof Error ? error.message : 'Failed to geocode properties',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBatchGeocoding(false);
+    }
+  };
+
+  // Load geocode status on mount
+  useEffect(() => {
+    const loadStatus = async () => {
+      try {
+        const status = await getGeocodeStatus();
+        setGeocodeStatus(status);
+      } catch (error) {
+        console.error('Failed to load geocode status:', error);
+      }
+    };
+    loadStatus();
+  }, []);
+
   // Route management functions
   const handleViewRoute = (route: RouteType) => {
     console.log('[Properties] Viewing route:', route);
@@ -1954,13 +2050,13 @@ export function PropertiesView() {
           )}
         </div>
 
-        {/* Geocode Button */}
-        <div className="mb-4">
+        {/* Geocode Buttons */}
+        <div className="mb-4 flex flex-col sm:flex-row gap-2">
           <Button
             onClick={handleGeocodeAddresses}
             variant="outline"
             size="sm"
-            disabled={isGeocoding}
+            disabled={isGeocoding || isBatchGeocoding}
           >
             {isGeocoding ? (
               <>
@@ -1970,10 +2066,34 @@ export function PropertiesView() {
             ) : (
               <>
                 <MapPin className="h-4 w-4 mr-2" />
-                Geocode Addresses
+                Geocode Selected/Visible
               </>
             )}
           </Button>
+          <Button
+            onClick={handleBatchGeocodeAll}
+            variant="default"
+            size="sm"
+            disabled={isGeocoding || isBatchGeocoding}
+          >
+            {isBatchGeocoding ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Geocoding All...
+              </>
+            ) : (
+              <>
+                <MapPin className="h-4 w-4 mr-2" />
+                Geocode All Properties
+              </>
+            )}
+          </Button>
+          {geocodeStatus && (
+            <div className="text-xs text-muted-foreground flex items-center gap-2">
+              <span>{geocodeStatus.withCoordinates.toLocaleString()} / {geocodeStatus.total.toLocaleString()} geocoded</span>
+              <span>({geocodeStatus.percentageComplete}%)</span>
+            </div>
+          )}
         </div>
 
         {/* Advanced Filters - Mobile Optimized */}
@@ -2566,6 +2686,102 @@ export function PropertiesView() {
                 <p className="text-sm text-muted-foreground">
                   Successfully geocoded {geocodeResults.size} properties
                 </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Geocoding Dialog */}
+      <Dialog open={batchGeocodeOpen} onOpenChange={(open) => {
+        if (!open && isBatchGeocoding) {
+          // Don't allow closing while geocoding
+          return;
+        }
+        setBatchGeocodeOpen(open);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Batch Geocoding All Properties</DialogTitle>
+            <DialogDescription>
+              {isBatchGeocoding ? 'Geocoding all properties in batches...' : 'Batch geocoding complete'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {geocodeStatus && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Total Properties:</span>
+                  <span className="font-semibold">{geocodeStatus.total.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span>With Coordinates:</span>
+                  <span className="font-semibold text-green-500">{geocodeStatus.withCoordinates.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span>Without Coordinates:</span>
+                  <span className="font-semibold text-yellow-500">{geocodeStatus.withoutCoordinates.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span>Completion:</span>
+                  <span className="font-semibold">{geocodeStatus.percentageComplete}%</span>
+                </div>
+              </div>
+            )}
+            
+            {isBatchGeocoding && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <span className="text-sm">
+                    Processing batch: {batchGeocodeProgress.processed.toLocaleString()} / {batchGeocodeProgress.total.toLocaleString()}
+                  </span>
+                </div>
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{
+                      width: `${batchGeocodeProgress.total > 0 ? (batchGeocodeProgress.processed / batchGeocodeProgress.total) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <div className="text-muted-foreground">Successful</div>
+                    <div className="font-semibold text-green-500">{batchGeocodeProgress.successful.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Errors</div>
+                    <div className="font-semibold text-red-500">{batchGeocodeProgress.errors.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Skipped</div>
+                    <div className="font-semibold text-yellow-500">{batchGeocodeProgress.skipped.toLocaleString()}</div>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  This process may take several hours for 33k+ properties. You can close this dialog and it will continue in the background.
+                </p>
+              </>
+            )}
+            
+            {!isBatchGeocoding && batchGeocodeProgress.processed > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">Batch Complete!</div>
+                <div className="grid grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <div className="text-muted-foreground">Successful</div>
+                    <div className="font-semibold text-green-500">{batchGeocodeProgress.successful.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Errors</div>
+                    <div className="font-semibold text-red-500">{batchGeocodeProgress.errors.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Skipped</div>
+                    <div className="font-semibold text-yellow-500">{batchGeocodeProgress.skipped.toLocaleString()}</div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
