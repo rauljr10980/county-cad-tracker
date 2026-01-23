@@ -530,6 +530,15 @@ export function TasksView() {
                     </div>
                   )}
 
+                  {/* Notes */}
+                  {property.notes && property.notes.trim() && (
+                    <div className="flex items-center gap-2 flex-1 min-w-0 max-w-[300px]">
+                      <span className="text-sm text-muted-foreground truncate" title={property.notes}>
+                        {property.notes}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Amount Due - Right aligned */}
                   <div className="ml-auto flex-shrink-0">
                     <span className={cn(
