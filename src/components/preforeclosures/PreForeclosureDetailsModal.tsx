@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Save, FileText, MapPin, Calendar, AlertCircle, Eye, Send, ExternalLink } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Save, FileText, MapPin, Calendar, AlertCircle, Eye, Send, ExternalLink, Phone, Star } from 'lucide-react';
 import { PreForeclosure, PreForeclosureInternalStatus } from '@/types/property';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { updatePreForeclosure } from '@/lib/api';
 
 interface PreForeclosureDetailsModalProps {
   preforeclosure: PreForeclosure | null;
@@ -38,17 +39,30 @@ export function PreForeclosureDetailsModal({
     preforeclosure?.internal_status || 'New'
   );
   const [nextFollowUp, setNextFollowUp] = useState(preforeclosure?.next_follow_up_date || '');
+  const [phoneNumbers, setPhoneNumbers] = useState<string[]>(['', '', '', '', '', '']);
+  const [ownerPhoneIndex, setOwnerPhoneIndex] = useState<number | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
+  const [savingPhones, setSavingPhones] = useState(false);
   const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
 
   // Reset form when modal opens with new data
-  useState(() => {
+  useEffect(() => {
     if (preforeclosure) {
       setNotes(preforeclosure.notes || '');
-      setInternalStatus(preforeclosure.internal_status);
+      setInternalStatus(preforeclosure.internal_status || 'New');
       setNextFollowUp(preforeclosure.next_follow_up_date || '');
+      const phones = preforeclosure.phoneNumbers || [];
+      setPhoneNumbers([
+        phones[0] || '',
+        phones[1] || '',
+        phones[2] || '',
+        phones[3] || '',
+        phones[4] || '',
+        phones[5] || '',
+      ]);
+      setOwnerPhoneIndex(preforeclosure.ownerPhoneIndex);
     }
-  });
+  }, [preforeclosure]);
 
   const handleSave = async () => {
     if (!preforeclosure) return;
@@ -69,6 +83,29 @@ export function PreForeclosureDetailsModal({
       toast.error('Failed to update record');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSavePhoneNumbers = async () => {
+    if (!preforeclosure) return;
+    
+    setSavingPhones(true);
+    try {
+      const filteredPhones = phoneNumbers.filter(p => p.trim() !== '');
+      await updatePreForeclosure({
+        document_number: preforeclosure.document_number,
+        phoneNumbers: filteredPhones,
+        ownerPhoneIndex: ownerPhoneIndex,
+      });
+      toast.success('Phone numbers saved successfully');
+      onUpdate(preforeclosure.document_number, {
+        phoneNumbers: filteredPhones,
+        ownerPhoneIndex: ownerPhoneIndex,
+      });
+    } catch (error) {
+      toast.error('Failed to save phone numbers');
+    } finally {
+      setSavingPhones(false);
     }
   };
 
@@ -187,6 +224,88 @@ export function PreForeclosureDetailsModal({
                 This record is inactive (not in latest file)
               </div>
             )}
+          </div>
+
+          {/* Property Information Section */}
+          <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+              Property Information
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              {preforeclosure.latitude != null && (
+                <div>
+                  <Label className="text-muted-foreground text-xs">Latitude</Label>
+                  <p className="font-mono text-sm">{preforeclosure.latitude.toFixed(6)}</p>
+                </div>
+              )}
+              {preforeclosure.longitude != null && (
+                <div>
+                  <Label className="text-muted-foreground text-xs">Longitude</Label>
+                  <p className="font-mono text-sm">{preforeclosure.longitude.toFixed(6)}</p>
+                </div>
+              )}
+              {preforeclosure.school_district && (
+                <div className="col-span-2">
+                  <Label className="text-muted-foreground text-xs">School District</Label>
+                  <p className="text-sm">{preforeclosure.school_district}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Phone Numbers Section */}
+          <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-2 mb-3">
+              <Phone className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Phone Numbers</span>
+            </div>
+            <div className="space-y-2">
+              {phoneNumbers.map((phone, index) => {
+                const isOwnerPhone = ownerPhoneIndex === index;
+                return (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      type="tel"
+                      placeholder="Enter phone number"
+                      value={phone}
+                      onChange={(e) => {
+                        const newPhones = [...phoneNumbers];
+                        newPhones[index] = e.target.value;
+                        setPhoneNumbers(newPhones);
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "h-10 w-10",
+                        isOwnerPhone && "text-yellow-500"
+                      )}
+                      onClick={() => {
+                        const newOwnerPhoneIndex = isOwnerPhone ? undefined : index;
+                        setOwnerPhoneIndex(newOwnerPhoneIndex);
+                      }}
+                      title={isOwnerPhone ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                    >
+                      <Star className={cn(
+                        "h-4 w-4",
+                        isOwnerPhone ? "fill-yellow-500" : "fill-none"
+                      )} />
+                    </Button>
+                  </div>
+                );
+              })}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  size="sm"
+                  onClick={handleSavePhoneNumbers}
+                  disabled={savingPhones}
+                >
+                  {savingPhones ? 'Saving...' : 'Save Phone Numbers'}
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Operator-Editable Section */}
