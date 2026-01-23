@@ -1352,39 +1352,47 @@ router.post('/geocode/batch', optionalAuth, async (req, res) => {
     }
 
     // Geocode addresses using Nominatim
+    // IMPORTANT: Nominatim has strict rate limiting (1 request per second)
+    // Process sequentially with proper delays to avoid rate limit errors
     const results = [];
-    const BATCH_SIZE = 5; // Process 5 at a time
-    const DELAY_MS = 1200; // 1.2 seconds between batches (to respect Nominatim's 1 req/sec limit)
+    const DELAY_MS = 1100; // 1.1 seconds between requests (slightly more than 1 req/sec)
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 5000; // 5 seconds delay on rate limit errors
 
-    for (let i = 0; i < properties.length; i += BATCH_SIZE) {
-      const batch = properties.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < properties.length; i++) {
+      const property = properties[i];
       
-      const batchPromises = batch.map(async (property) => {
+      // Skip if already has coordinates
+      if (property.latitude && property.longitude) {
+        results.push({
+          id: property.id,
+          accountNumber: property.accountNumber,
+          success: true,
+          skipped: true,
+          message: 'Already has coordinates'
+        });
+        continue;
+      }
+
+      if (!property.propertyAddress || property.propertyAddress.trim() === '') {
+        results.push({
+          id: property.id,
+          accountNumber: property.accountNumber,
+          success: false,
+          error: 'No address provided'
+        });
+        continue;
+      }
+
+      // Build search query
+      const searchQuery = `${property.propertyAddress}, San Antonio, TX`;
+
+      // Geocode using Nominatim with retry logic
+      let retries = 0;
+      let success = false;
+      
+      while (retries < MAX_RETRIES && !success) {
         try {
-          // Skip if already has coordinates
-          if (property.latitude && property.longitude) {
-            return {
-              id: property.id,
-              accountNumber: property.accountNumber,
-              success: true,
-              skipped: true,
-              message: 'Already has coordinates'
-            };
-          }
-
-          if (!property.propertyAddress || property.propertyAddress.trim() === '') {
-            return {
-              id: property.id,
-              accountNumber: property.accountNumber,
-              success: false,
-              error: 'No address provided'
-            };
-          }
-
-          // Build search query
-          const searchQuery = `${property.propertyAddress}, San Antonio, TX`;
-
-          // Geocode using Nominatim
           const params = new URLSearchParams({
             q: searchQuery,
             format: 'json',
@@ -1399,29 +1407,59 @@ router.post('/geocode/batch', optionalAuth, async (req, res) => {
             },
           });
 
+          // Handle rate limiting (HTTP 429)
+          if (response.status === 429) {
+            retries++;
+            if (retries < MAX_RETRIES) {
+              console.warn(`[GEOCODE] Rate limited for property ${property.id}, retrying in ${RETRY_DELAY_MS}ms (attempt ${retries + 1}/${MAX_RETRIES})`);
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+              continue;
+            } else {
+              results.push({
+                id: property.id,
+                accountNumber: property.accountNumber,
+                success: false,
+                error: 'Rate limit exceeded after retries'
+              });
+              break;
+            }
+          }
+
           if (!response.ok) {
-            return {
+            results.push({
               id: property.id,
               accountNumber: property.accountNumber,
               success: false,
-              error: `API returned ${response.status}`
-            };
+              error: `API returned ${response.status}: ${response.statusText}`
+            });
+            break;
           }
 
           const data = await response.json();
 
           if (!data || data.length === 0) {
-            return {
+            results.push({
               id: property.id,
               accountNumber: property.accountNumber,
               success: false,
               error: 'Address not found'
-            };
+            });
+            break;
           }
 
           const result = data[0];
           const latitude = parseFloat(result.lat);
           const longitude = parseFloat(result.lon);
+
+          if (isNaN(latitude) || isNaN(longitude)) {
+            results.push({
+              id: property.id,
+              accountNumber: property.accountNumber,
+              success: false,
+              error: 'Invalid coordinates returned'
+            });
+            break;
+          }
 
           // Update property with coordinates
           await prisma.property.update({
@@ -1432,31 +1470,36 @@ router.post('/geocode/batch', optionalAuth, async (req, res) => {
             }
           });
 
-          return {
+          results.push({
             id: property.id,
             accountNumber: property.accountNumber,
             success: true,
             latitude,
             longitude,
             displayName: result.display_name
-          };
+          });
+          
+          success = true;
         } catch (error) {
-          console.error(`[GEOCODE] Error geocoding property ${property.id}:`, error);
-          return {
-            id: property.id,
-            accountNumber: property.accountNumber,
-            success: false,
-            error: error.message || 'Unknown error'
-          };
+          retries++;
+          if (retries < MAX_RETRIES) {
+            console.warn(`[GEOCODE] Error geocoding property ${property.id}, retrying (attempt ${retries + 1}/${MAX_RETRIES}):`, error.message);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+          } else {
+            console.error(`[GEOCODE] Error geocoding property ${property.id} after ${MAX_RETRIES} retries:`, error);
+            results.push({
+              id: property.id,
+              accountNumber: property.accountNumber,
+              success: false,
+              error: error.message || 'Unknown error'
+            });
+            break;
+          }
         }
-      });
+      }
 
-      // Wait for batch to complete
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
-
-      // Rate limiting: wait between batches (except for last batch)
-      if (i + BATCH_SIZE < properties.length) {
+      // Rate limiting: wait between requests (except for last one)
+      if (i < properties.length - 1) {
         await new Promise(resolve => setTimeout(resolve, DELAY_MS));
       }
     }
