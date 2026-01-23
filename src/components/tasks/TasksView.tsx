@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
 import { Phone, MessageSquare, Mail, Car, CheckSquare, Loader2, AlertCircle, Eye, Clock, Flag, Filter, CheckCircle2, X } from 'lucide-react';
-import { Property } from '@/types/property';
+import { Property, PreForeclosure } from '@/types/property';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getTasks, updatePropertyAction, markTaskDone, updatePropertyPriority } from '@/lib/api';
+import { getTasks, updatePropertyAction, markTaskDone, updatePropertyPriority, updatePreForeclosure } from '@/lib/api';
 import { format, isToday, isPast, parseISO, startOfDay, isBefore, isAfter } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
+import { PreForeclosureDetailsModal } from '@/components/preforeclosures/PreForeclosureDetailsModal';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +54,7 @@ const OUTCOME_OPTIONS: { value: Outcome; label: string; nextAction?: ActionType 
 export function TasksView() {
   const queryClient = useQueryClient();
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [selectedPreForeclosure, setSelectedPreForeclosure] = useState<PreForeclosure | null>(null);
   const [selectedForOutcome, setSelectedForOutcome] = useState<Property | null>(null);
   const [selectedOutcome, setSelectedOutcome] = useState<Outcome | ''>('');
   const [bulkMode, setBulkMode] = useState(false);
@@ -61,6 +63,37 @@ export function TasksView() {
   const [sortBy, setSortBy] = useState<'urgency' | 'action' | 'overdue'>('urgency');
   const [updatingPriority, setUpdatingPriority] = useState<Set<string>>(new Set());
   const [priorityPopoverOpen, setPriorityPopoverOpen] = useState<{ [key: string]: boolean }>({});
+
+  // Helper to check if a task is from a pre-foreclosure (has documentNumber)
+  const isPreForeclosureTask = (task: Property): boolean => {
+    return !!(task as any).documentNumber;
+  };
+
+  // Convert Property to PreForeclosure format
+  const propertyToPreForeclosure = (property: Property): PreForeclosure => {
+    return {
+      document_number: (property as any).documentNumber || property.accountNumber,
+      type: 'Mortgage' as const, // Default, could be enhanced
+      address: property.propertyAddress || '',
+      city: (property as any).city || '',
+      zip: (property as any).zip || '',
+      filing_month: '',
+      county: 'Bexar',
+      internal_status: (property.status === 'UNKNOWN' ? 'New' : property.status) as any,
+      notes: property.notes || undefined,
+      phoneNumbers: property.phoneNumbers,
+      ownerPhoneIndex: property.ownerPhoneIndex,
+      actionType: property.actionType,
+      priority: property.priority,
+      dueTime: property.dueTime,
+      assignedTo: property.assignedTo,
+      first_seen_month: '',
+      last_seen_month: '',
+      inactive: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  };
 
   const { data, isLoading, error, refetch } = useQuery<Property[]>({
     queryKey: ['tasks'],
@@ -318,6 +351,30 @@ export function TasksView() {
     }
   };
 
+  // Handle pre-foreclosure updates
+  const handlePreForeclosureUpdate = async (documentNumber: string, updates: Partial<PreForeclosure>) => {
+    try {
+      await updatePreForeclosure({
+        document_number: documentNumber,
+        ...updates,
+      });
+      
+      // Refetch tasks to get updated data
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      
+      toast({
+        title: "Record Updated",
+        description: "Pre-foreclosure record updated successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update pre-foreclosure record",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
@@ -559,9 +616,15 @@ export function TasksView() {
                     className="border-border hover:border-primary hover:bg-primary/10"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedProperty(property);
+                      if (isPreForeclosureTask(property)) {
+                        setSelectedPreForeclosure(propertyToPreForeclosure(property));
+                        setSelectedProperty(null);
+                      } else {
+                        setSelectedProperty(property);
+                        setSelectedPreForeclosure(null);
+                      }
                     }}
-                    title="View and edit property details"
+                    title="View and edit details"
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -631,6 +694,13 @@ export function TasksView() {
         property={selectedProperty}
         isOpen={!!selectedProperty}
         onClose={() => setSelectedProperty(null)}
+      />
+
+      <PreForeclosureDetailsModal
+        preforeclosure={selectedPreForeclosure}
+        isOpen={!!selectedPreForeclosure}
+        onClose={() => setSelectedPreForeclosure(null)}
+        onUpdate={handlePreForeclosureUpdate}
       />
     </div>
   );
