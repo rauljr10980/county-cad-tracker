@@ -71,22 +71,31 @@ export function TasksView() {
 
   // Convert Property to PreForeclosure format
   const propertyToPreForeclosure = (property: Property): PreForeclosure => {
+    const pf = property as any; // Type assertion for pre-foreclosure specific fields
     return {
-      document_number: (property as any).documentNumber || property.accountNumber,
-      type: 'Mortgage' as const, // Default, could be enhanced
+      document_number: pf.documentNumber || property.accountNumber,
+      type: (pf.type || 'Mortgage') as 'Mortgage' | 'Tax',
       address: property.propertyAddress || '',
-      city: (property as any).city || '',
-      zip: (property as any).zip || '',
-      filing_month: '',
-      county: 'Bexar',
-      internal_status: (property.status === 'UNKNOWN' ? 'New' : property.status) as any,
+      city: pf.city || '',
+      zip: pf.zip || '',
+      filing_month: pf.filingMonth || '',
+      county: pf.county || 'Bexar',
+      latitude: pf.latitude || property.latitude,
+      longitude: pf.longitude || property.longitude,
+      school_district: pf.schoolDistrict,
+      internal_status: (pf.internalStatus || (property.status === 'UNKNOWN' ? 'New' : property.status)) as any,
       notes: property.notes || undefined,
       phoneNumbers: property.phoneNumbers,
       ownerPhoneIndex: property.ownerPhoneIndex,
+      last_action_date: pf.lastActionDate || undefined,
+      next_follow_up_date: pf.nextFollowUpDate || undefined,
       actionType: property.actionType,
       priority: property.priority,
       dueTime: property.dueTime,
       assignedTo: property.assignedTo,
+      visited: pf.visited,
+      visited_at: pf.visitedAt || undefined,
+      visited_by: pf.visitedBy,
       first_seen_month: '',
       last_seen_month: '',
       inactive: false,
