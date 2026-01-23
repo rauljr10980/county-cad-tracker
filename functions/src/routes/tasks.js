@@ -180,6 +180,9 @@ router.get('/',
           visited: true,
           visitedAt: true,
           visitedBy: true,
+          firstSeenMonth: true,
+          lastSeenMonth: true,
+          inactive: true,
         },
         orderBy: { dueTime: 'asc' }
       });
@@ -209,7 +212,8 @@ router.get('/',
 
       // Transform pre-foreclosure tasks to Property format expected by frontend
       const preForeclosurePropertiesWithTasks = preForeclosureTasks.map(pf => {
-        // Map pre-foreclosure to Property-like format
+        // Map pre-foreclosure to Property-like format (for task list)
+        // Also include snake_case fields for PreForeclosureDetailsModal compatibility
         return {
           id: pf.id,
           accountNumber: pf.documentNumber, // Use documentNumber as accountNumber
@@ -239,7 +243,8 @@ router.get('/',
           attempts: 0,
           lastOutcome: null,
           lastOutcomeDate: null,
-          // Add pre-foreclosure specific fields
+          // Add pre-foreclosure specific fields in BOTH formats for compatibility
+          // camelCase for Property interface
           documentNumber: pf.documentNumber,
           type: pf.type,
           city: pf.city,
@@ -247,11 +252,24 @@ router.get('/',
           filingMonth: pf.filingMonth,
           county: pf.county,
           schoolDistrict: pf.schoolDistrict,
+          internalStatus: pf.internalStatus,
           lastActionDate: pf.lastActionDate ? pf.lastActionDate.toISOString() : null,
           nextFollowUpDate: pf.nextFollowUpDate ? pf.nextFollowUpDate.toISOString() : null,
           visited: pf.visited,
           visitedAt: pf.visitedAt ? pf.visitedAt.toISOString() : null,
           visitedBy: pf.visitedBy,
+          // snake_case for PreForeclosure interface (matching preforeclosure route format)
+          document_number: pf.documentNumber,
+          filing_month: pf.filingMonth || '',
+          school_district: pf.schoolDistrict || null,
+          internal_status: pf.internalStatus || 'New',
+          last_action_date: pf.lastActionDate ? pf.lastActionDate.toISOString() : null,
+          next_follow_up_date: pf.nextFollowUpDate ? pf.nextFollowUpDate.toISOString() : null,
+          visited_at: pf.visitedAt ? pf.visitedAt.toISOString() : null,
+          visited_by: pf.visitedBy || null,
+          first_seen_month: pf.firstSeenMonth || '',
+          last_seen_month: pf.lastSeenMonth || '',
+          inactive: pf.inactive || false,
         };
       });
 

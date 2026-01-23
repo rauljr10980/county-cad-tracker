@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Phone, MessageSquare, Mail, Car, CheckSquare, Loader2, AlertCircle, Eye, Clock, Flag, Filter, CheckCircle2, X } from 'lucide-react';
 import { Property, PreForeclosure } from '@/types/property';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getTasks, updatePropertyAction, markTaskDone, updatePropertyPriority, updatePreForeclosure } from '@/lib/api';
+import { getTasks, updatePropertyAction, markTaskDone, updatePropertyPriority, updatePreForeclosure, getPreForeclosures } from '@/lib/api';
 import { format, isToday, isPast, parseISO, startOfDay, isBefore, isAfter } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -67,41 +67,6 @@ export function TasksView() {
   // Helper to check if a task is from a pre-foreclosure (has documentNumber)
   const isPreForeclosureTask = (task: Property): boolean => {
     return !!(task as any).documentNumber;
-  };
-
-  // Convert Property to PreForeclosure format
-  const propertyToPreForeclosure = (property: Property): PreForeclosure => {
-    const pf = property as any; // Type assertion for pre-foreclosure specific fields
-    return {
-      document_number: pf.documentNumber || property.accountNumber,
-      type: (pf.type || 'Mortgage') as 'Mortgage' | 'Tax',
-      address: property.propertyAddress || '',
-      city: pf.city || '',
-      zip: pf.zip || '',
-      filing_month: pf.filingMonth || '',
-      county: pf.county || 'Bexar',
-      latitude: pf.latitude || property.latitude,
-      longitude: pf.longitude || property.longitude,
-      school_district: pf.schoolDistrict,
-      internal_status: (pf.internalStatus || (property.status === 'UNKNOWN' ? 'New' : property.status)) as any,
-      notes: property.notes || undefined,
-      phoneNumbers: property.phoneNumbers,
-      ownerPhoneIndex: property.ownerPhoneIndex,
-      last_action_date: pf.lastActionDate || undefined,
-      next_follow_up_date: pf.nextFollowUpDate || undefined,
-      actionType: property.actionType,
-      priority: property.priority,
-      dueTime: property.dueTime,
-      assignedTo: property.assignedTo,
-      visited: pf.visited,
-      visited_at: pf.visitedAt || undefined,
-      visited_by: pf.visitedBy,
-      first_seen_month: '',
-      last_seen_month: '',
-      inactive: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
   };
 
   const { data, isLoading, error, refetch } = useQuery<Property[]>({
@@ -623,10 +588,31 @@ export function TasksView() {
                     variant="outline"
                     size="default"
                     className="border-border hover:border-primary hover:bg-primary/10"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
                       if (isPreForeclosureTask(property)) {
-                        setSelectedPreForeclosure(propertyToPreForeclosure(property));
+                        const docNumber = (property as any).documentNumber || property.accountNumber;
+                        // Fetch full pre-foreclosure record from backend
+                        try {
+                          const allRecords = await getPreForeclosures();
+                          const fullRecord = allRecords.find(r => r.document_number === docNumber);
+                          if (fullRecord) {
+                            setSelectedPreForeclosure(fullRecord);
+                          } else {
+                            toast({
+                              title: "Record Not Found",
+                              description: "Could not find full pre-foreclosure record",
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error) {
+                          console.error('Failed to fetch pre-foreclosure:', error);
+                          toast({
+                            title: "Error",
+                            description: "Failed to load pre-foreclosure details",
+                            variant: "destructive",
+                          });
+                        }
                         setSelectedProperty(null);
                       } else {
                         setSelectedProperty(property);
