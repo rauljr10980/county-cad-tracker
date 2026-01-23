@@ -1759,11 +1759,15 @@ export function PropertiesView() {
       await queryClient.invalidateQueries({ queryKey: ['properties'] });
     } catch (error) {
       console.error('Batch geocoding error:', error);
+      const errorMessage = error instanceof Error 
+        ? `${error.message}${error.cause ? ` (${error.cause})` : ''}`
+        : 'Failed to geocode properties';
       toast({
         title: 'Batch Geocoding Failed',
-        description: error instanceof Error ? error.message : 'Failed to geocode properties',
+        description: errorMessage,
         variant: 'destructive',
       });
+      // Keep dialog open to show error
     } finally {
       setIsBatchGeocoding(false);
     }

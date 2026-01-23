@@ -1074,21 +1074,34 @@ export async function batchGeocodeProperties(limit: number = 100, offset: number
     skipped?: boolean;
   }>;
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/properties/geocode/batch`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify({ limit, offset }),
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to geocode properties');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/properties/geocode/batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ limit, offset }),
+    });
+    
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+      }
+      const errorMessage = errorData.error || errorData.message || 'Failed to geocode properties';
+      throw new Error(errorMessage, { cause: errorData.details });
+    }
+    
+    return response.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error: Failed to connect to geocoding service');
   }
-  
-  return response.json();
 }
 
 /**

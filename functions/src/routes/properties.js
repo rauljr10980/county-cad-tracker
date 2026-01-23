@@ -8,6 +8,22 @@ const { body, query, validationResult } = require('express-validator');
 const { optionalAuth, authenticateToken } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 
+// Fetch should be available in Node.js 18+, but provide fallback
+const useFetch = () => {
+  if (typeof globalThis.fetch !== 'undefined') {
+    return globalThis.fetch;
+  }
+  if (typeof fetch !== 'undefined') {
+    return fetch;
+  }
+  try {
+    return require('node-fetch');
+  } catch (e) {
+    throw new Error('Fetch is not available. Node.js 18+ is required or install node-fetch');
+  }
+};
+const fetch = useFetch();
+
 const router = express.Router();
 
 // ============================================================================
@@ -1370,12 +1386,13 @@ router.post('/geocode/batch', optionalAuth, async (req, res) => {
           const searchQuery = `${property.propertyAddress}, San Antonio, TX`;
 
           // Geocode using Nominatim
-          const url = `https://nominatim.openstreetmap.org/search?` + new URLSearchParams({
+          const params = new URLSearchParams({
             q: searchQuery,
             format: 'json',
             limit: '1',
             addressdetails: '1',
           });
+          const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
 
           const response = await fetch(url, {
             headers: {
@@ -1459,7 +1476,12 @@ router.post('/geocode/batch', optionalAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('[PROPERTIES] Batch geocode error:', error);
-    res.status(500).json({ error: 'Failed to geocode properties', message: error.message });
+    console.error('[PROPERTIES] Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to geocode properties', 
+      message: error.message || 'Unknown error',
+      details: error.stack
+    });
   }
 });
 
