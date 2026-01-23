@@ -1315,7 +1315,9 @@ router.post('/geocode/batch', optionalAuth, async (req, res) => {
     const offset = offsetParam ? parseInt(offsetParam) : 0;
 
     // Fetch properties without coordinates but with addresses
-    const properties = await prisma.property.findMany({
+    // Note: We filter out empty strings in JavaScript since Prisma doesn't allow
+    // the same field to appear twice in an AND array
+    const allProperties = await prisma.property.findMany({
       where: {
         AND: [
           {
@@ -1326,9 +1328,6 @@ router.post('/geocode/batch', optionalAuth, async (req, res) => {
           },
           {
             propertyAddress: { not: null }
-          },
-          {
-            propertyAddress: { not: '' }
           }
         ]
       },
@@ -1339,10 +1338,15 @@ router.post('/geocode/batch', optionalAuth, async (req, res) => {
         latitude: true,
         longitude: true
       },
-      take: limit,
+      take: limit * 2, // Fetch more to account for filtering
       skip: offset,
       orderBy: { createdAt: 'asc' }
     });
+    
+    // Filter out empty strings in JavaScript
+    const properties = allProperties.filter(p => 
+      p.propertyAddress && p.propertyAddress.trim() !== ''
+    ).slice(0, limit); // Take only the requested limit
 
     if (properties.length === 0) {
       return res.json({
