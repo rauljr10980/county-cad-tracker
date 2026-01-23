@@ -1325,8 +1325,10 @@ router.post('/geocode/batch', optionalAuth, async (req, res) => {
             ]
           },
           {
-            propertyAddress: { not: '' },
             propertyAddress: { not: null }
+          },
+          {
+            propertyAddress: { not: '' }
           }
         ]
       },
