@@ -1326,10 +1326,18 @@ export function PropertiesView() {
       p.id !== depotPropertyId // Don't count depot property as duplicate if it's already in routes
     ).length;
 
+    console.log('[handleCreateRouteWithDepot] Properties in routes check:', {
+      totalPropertiesToCheck: propertiesToCheck.length,
+      propertiesInRoutesCount: propertiesInRoutes.size,
+      duplicateCount,
+      availablePropertiesCount: availableProperties.length,
+      propertiesExcludingDepot: availableProperties.filter(p => p.id !== depotPropertyId).length
+    });
+
     if (duplicateCount > 0) {
       toast({
         title: "Properties Already in Routes",
-        description: `${duplicateCount} selected properties are already in existing routes. They will be excluded from this route.`,
+        description: `${duplicateCount} selected properties are already in existing routes. They will be excluded from this route. Click "Refresh" to reload from saved routes only.`,
         variant: "default",
       });
     }
@@ -1340,13 +1348,15 @@ export function PropertiesView() {
                          availableProperties[0].id === depotPropertyId;
 
     if (availableProperties.length === 0 || hasOnlyDepot) {
+      const reason = hasOnlyDepot || duplicateCount > 0
+        ? `All ${propertiesToCheck.length} selected properties are already marked as in routes. Click "Refresh" to reload from saved routes only, or select different properties.`
+        : "Please select properties with latitude and longitude coordinates, or use the area selector.";
       toast({
         title: "No valid locations",
-        description: hasOnlyDepot || duplicateCount > 0
-          ? "All selected properties are already in existing routes. The starting point cannot be the only property. Please select additional properties that are not already in routes."
-          : "Please select properties with latitude and longitude coordinates, or use the area selector.",
+        description: reason,
         variant: "destructive",
       });
+      setIsOptimizingRoute(false);
       return;
     }
 
@@ -1524,6 +1534,8 @@ export function PropertiesView() {
       }
 
       // Extract all property IDs from the generated routes to track them
+      // NOTE: We do NOT mark properties as "in route" here - only after the route is saved
+      // This prevents properties from being stuck as "in route" if the user closes without saving
       const routePropertyIds = new Set<string>();
       solution.routes.forEach((route: any) => {
         route.waypoints.forEach((wp: any) => {
@@ -1533,14 +1545,13 @@ export function PropertiesView() {
         });
       });
 
-      // Update the set of properties in routes
-      // Include the depot property ID if it was used (it should be tracked too)
+      // Include the depot property ID if it was used
       if (depotPropertyId) {
         routePropertyIds.add(depotPropertyId);
       }
-      setPropertiesInRoutes(prev => new Set([...prev, ...routePropertyIds]));
 
       // Store routes and show map visualization
+      // Properties will only be marked as "in route" after the route is saved (in onRouteSaved callback)
       setOptimizedRoutes(solution);
       setRouteMapOpen(true);
       
@@ -1967,17 +1978,43 @@ export function PropertiesView() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-primary">
                   {selectedPropertyIds.size} selected
+                  {propertiesInRoutes.size > 0 && (
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({propertiesInRoutes.size} in saved routes)
+                    </span>
+                  )}
                 </span>
-                <Button
-                  onClick={() => setSelectedPropertyIds(new Set())}
-                  variant="ghost"
-                  size="sm"
-                  disabled={isOptimizingRoute}
-                  className="h-8"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Clear
-                </Button>
+                <div className="flex gap-2">
+                  {propertiesInRoutes.size > 0 && (
+                    <Button
+                      onClick={async () => {
+                        // Refresh properties in routes from actual saved routes only
+                        await loadActiveRoutes();
+                        toast({
+                          title: "Routes Refreshed",
+                          description: "Properties in routes have been refreshed from saved routes only.",
+                        });
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      title="Refresh properties in routes (only shows properties from actually saved routes)"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Refresh
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => setSelectedPropertyIds(new Set())}
+                    variant="ghost"
+                    size="sm"
+                    disabled={isOptimizingRoute}
+                    className="h-8"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                </div>
               </div>
 
               {/* Route Controls - Stacked on Mobile */}
@@ -2424,6 +2461,7 @@ export function PropertiesView() {
               routeType="PROPERTY"
               onRouteSaved={() => {
                 // Reload active routes after route is saved
+                // This will update propertiesInRoutes based on actual saved routes
                 loadActiveRoutes();
               }}
             />
