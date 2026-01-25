@@ -331,6 +331,7 @@ export function PropertiesView() {
     hasNotes: 'any',
     hasLink: 'any',
     hasExemptions: 'any',
+    hasVisited: 'any',
     followUpDateFrom: undefined,
     followUpDateTo: undefined,
     lastPaymentDateFrom: undefined,
@@ -372,6 +373,7 @@ export function PropertiesView() {
       (advancedFilters.hasNotes !== 'any') ||
       (advancedFilters.hasLink !== 'any') ||
       (advancedFilters.hasExemptions !== 'any') ||
+      (advancedFilters.hasVisited !== 'any') ||
       (advancedFilters.followUpDateFrom !== undefined) ||
       (advancedFilters.followUpDateTo !== undefined) ||
       (advancedFilters.lastPaymentDateFrom !== undefined) ||
@@ -730,6 +732,13 @@ export function PropertiesView() {
           });
           if (validExemptions.length > 0) return false;
         }
+      }
+      
+      // Has Visited (check if property is in routes and marked as visited)
+      if (advancedFilters.hasVisited === 'yes') {
+        if (!propertiesInRoutes.has(p.id)) return false;
+      } else if (advancedFilters.hasVisited === 'no') {
+        if (propertiesInRoutes.has(p.id)) return false;
       }
       
       // Follow-up Date range

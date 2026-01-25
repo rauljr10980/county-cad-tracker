@@ -34,6 +34,7 @@ export interface AdvancedFilters {
   hasNotes?: 'yes' | 'no' | 'any';
   hasLink?: 'yes' | 'no' | 'any';
   hasExemptions?: 'yes' | 'no' | 'any';
+  hasVisited?: 'yes' | 'no' | 'any';
   followUpDateFrom?: string;
   followUpDateTo?: string;
   lastPaymentDateFrom?: string;
@@ -485,6 +486,37 @@ export function AdvancedFiltersPanel({
                 variant={filters.hasExemptions === 'no' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => updateFilter('hasExemptions', 'no')}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                No
+              </Button>
+            </div>
+          </div>
+
+          {/* Has Visited */}
+          <div className="space-y-3">
+            <Label>Visited</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={filters.hasVisited === 'any' || !filters.hasVisited ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('hasVisited', 'any')}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                Any
+              </Button>
+              <Button
+                variant={filters.hasVisited === 'yes' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('hasVisited', 'yes')}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                Yes
+              </Button>
+              <Button
+                variant={filters.hasVisited === 'no' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('hasVisited', 'no')}
                 className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 No
