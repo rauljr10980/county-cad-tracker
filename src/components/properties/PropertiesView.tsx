@@ -834,7 +834,7 @@ export function PropertiesView() {
     }
     
     return filtered;
-  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery]);
+  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery, propertiesInRoutes]);
   
   // Apply sorting to all properties before pagination (only for filtered cases)
   const sortedProperties = useMemo(() => {
