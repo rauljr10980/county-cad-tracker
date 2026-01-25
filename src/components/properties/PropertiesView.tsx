@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown, Route, MapPin, Trash2, GripVertical, Eye, CheckCircle, RotateCcw } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Search, X, ChevronDown, Route, MapPin, Trash2, GripVertical, Eye, CheckCircle, RotateCcw, Route as RouteIcon } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -29,7 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus } from '@/lib/api';
+import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus, markPropertyVisitedInRoute } from '@/lib/api';
 import { batchGeocodeAddresses } from '@/lib/geocoding';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
@@ -76,7 +76,7 @@ type RouteType = {
   }>;
 };
 
-// Sortable Row Component for Route Details
+// Sortable Row Component for Route Details (matching pre-foreclosure design)
 function SortableRouteRow({
   routeRecord,
   index,
@@ -86,7 +86,9 @@ function SortableRouteRow({
   removingRecordId,
   reorderingRecordId,
   handleRemoveRecordFromRoute,
+  handleMarkVisited,
   handleViewRecordDetails,
+  markingVisited,
 }: any) {
   const {
     attributes,
@@ -98,7 +100,8 @@ function SortableRouteRow({
     setActivatorNodeRef,
   } = useSortable({
     id: routeRecord.id,
-    disabled: removingRecordId !== null || reorderingRecordId !== null,
+    // Only allow dragging from the drag handle, not the entire row
+    strategy: undefined,
   });
 
   const style = {
@@ -108,63 +111,99 @@ function SortableRouteRow({
   };
 
   const isDepot = routeRecord.isDepot === true;
-  const isRemoving = removingRecordId === propertyId;
-  const isReordering = reorderingRecordId === propertyId;
+  // Get visited status from routeRecord (for properties, stored on RouteRecord)
+  const visited = routeRecord.visited === true || record?.visited === true;
 
   return (
     <tr
       ref={setNodeRef}
       style={style}
-      className={cn(
-        'border-b border-border hover:bg-secondary/50',
-        isDragging && 'opacity-50 bg-secondary',
-        isDepot && 'bg-blue-50 dark:bg-blue-950/20'
-      )}
+      className={`border-t border-border hover:bg-secondary/30 ${
+        routeRecord.isDepot ? 'bg-primary/10' : ''
+      } ${isDragging ? 'bg-secondary/50' : ''}`}
     >
-      <td className="px-4 py-2 text-sm font-mono">
-        {isDepot ? (
-          <span className="text-blue-600 dark:text-blue-400 font-bold">START</span>
-        ) : (
-          <span>{index + 1}</span>
-        )}
+      <td className="px-4 py-2 text-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          {routeRecord.isDepot ? (
+            <>
+              <Badge variant="default" className="bg-primary">Depot</Badge>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveRecordFromRoute(viewRoute.id, propertyId);
+                }}
+                disabled={removingRecordId === routeRecord.id}
+                className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Remove from route"
+              >
+                {removingRecordId === routeRecord.id ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <X className="h-5 w-5" />
+                )}
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="font-medium">{routeRecord.orderIndex}</span>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveRecordFromRoute(viewRoute.id, propertyId);
+                }}
+                disabled={removingRecordId === routeRecord.id}
+                className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Remove from route"
+              >
+                {removingRecordId === routeRecord.id ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <X className="h-5 w-5" />
+                )}
+              </Button>
+            </>
+          )}
+        </div>
       </td>
-      <td className="px-4 py-2 text-sm font-mono">{record?.accountNumber || 'N/A'}</td>
-      <td className="px-4 py-2 text-sm">{record?.propertyAddress || 'N/A'}</td>
-      <td className="px-4 py-2 text-sm">{record?.ownerName || 'N/A'}</td>
-      <td className="px-4 py-2">
-        {record?.visited ? (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded">
-            <CheckCircle className="h-3 w-3" />
-            Visited
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded">
-            Not Visited
-          </span>
-        )}
+      <td className="px-4 py-2 text-sm font-mono hidden">{record?.accountNumber || 'N/A'}</td>
+      <td className="px-4 py-2 text-sm">{record?.propertyAddress || record?.address || 'N/A'}</td>
+      <td className="px-4 py-2 text-sm hidden">{record?.ownerName || 'N/A'}</td>
+      <td className="px-4 py-2 text-sm hidden">{record?.city || 'N/A'}</td>
+      <td className="px-4 py-2 text-sm" style={{ position: 'relative', zIndex: 1 }}>
+        {/* Internal Status - Not applicable for properties, but keeping structure similar */}
+        <span className="text-xs text-muted-foreground">-</span>
       </td>
       <td className="px-4 py-2 text-sm">
-        {!isDepot && propertyId && (
+        {propertyId && (
           <Button
             size="sm"
-            variant="destructive"
+            variant="outline"
             onClick={(e) => {
               e.stopPropagation();
-              handleRemoveRecordFromRoute(viewRoute.id, propertyId);
+              if (visited) {
+                handleMarkVisited(propertyId, viewRoute.driver, false);
+              } else {
+                handleMarkVisited(propertyId, viewRoute.driver, true);
+              }
             }}
-            disabled={isRemoving || isReordering}
-            className="h-7 text-xs"
+            disabled={markingVisited === propertyId}
+            className={`h-7 text-xs w-full ${
+              visited 
+                ? 'bg-green-500/20 text-green-600 border-green-500 hover:bg-green-500/30' 
+                : ''
+            }`}
           >
-            {isRemoving ? (
+            {markingVisited === propertyId ? (
               <>
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                Removing...
+                {visited ? 'Updating...' : 'Marking...'}
               </>
             ) : (
-              <>
-                <Trash2 className="h-3 w-3 mr-1" />
-                Remove
-              </>
+              visited ? 'Visited' : 'Pending'
             )}
           </Button>
         )}
@@ -186,20 +225,20 @@ function SortableRouteRow({
         )}
       </td>
       <td className="px-4 py-2 text-sm">
-        {!isDepot && (
-          <div
-            ref={setActivatorNodeRef}
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded flex items-center justify-center"
-            title="Drag to reorder"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            <GripVertical className="h-5 w-5 text-muted-foreground" />
-          </div>
-        )}
+        {/* Drag Handle - Far Right */}
+        <div
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded flex items-center justify-center"
+          title="Drag to reorder"
+          onPointerDown={(e) => {
+            // Only allow dragging from this handle
+            e.stopPropagation();
+          }}
+        >
+          <GripVertical className="h-5 w-5 text-muted-foreground" />
+        </div>
       </td>
     </tr>
   );
@@ -240,6 +279,7 @@ export function PropertiesView() {
   const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
   const [removingRecordId, setRemovingRecordId] = useState<string | null>(null);
   const [reorderingRecordId, setReorderingRecordId] = useState<string | null>(null);
+  const [markingVisited, setMarkingVisited] = useState<string | null>(null);
 
   // Drag and drop sensors for route reordering
   const sensors = useSensors(
@@ -1960,6 +2000,49 @@ export function PropertiesView() {
     }
   };
 
+  const handleMarkVisited = async (propertyId: string, driver: 'Luciano' | 'Raul', visited: boolean = true) => {
+    if (!viewRoute) return;
+    
+    setMarkingVisited(propertyId);
+    try {
+      // Find the route record ID for this property
+      const routeRecord = viewRoute.records.find(rr => rr.record.id === propertyId);
+      if (!routeRecord) {
+        throw new Error('Property not found in route');
+      }
+
+      await markPropertyVisitedInRoute(viewRoute.id, routeRecord.id, driver, visited);
+      
+      // Update viewRoute to trigger re-render
+      if (viewRoute) {
+        const updatedRecords = viewRoute.records.map(rr => {
+          if (rr.record.id === propertyId) {
+            return {
+              ...rr,
+              visited: visited,
+              visitedAt: visited ? new Date().toISOString() : null,
+              visitedBy: visited ? driver : null,
+            };
+          }
+          return rr;
+        });
+        setViewRoute({ ...viewRoute, records: updatedRecords });
+      }
+
+      // Reload active routes to update propertiesInRoutes
+      await loadActiveRoutes();
+    } catch (error) {
+      console.error('Error updating visited status:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update visited status',
+        variant: 'destructive',
+      });
+    } finally {
+      setMarkingVisited(null);
+    }
+  };
+
   return (
     <div className="p-3 md:p-6">
       <div className="mb-4 md:mb-6">
@@ -2675,86 +2758,248 @@ export function PropertiesView() {
         numVehicles={numVehicles}
       />
 
-      {/* Route Details Modal */}
-      {viewRoute && (
-        <Dialog open={routeDetailsOpen} onOpenChange={setRouteDetailsOpen}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Route Details - {viewRoute.driver}</DialogTitle>
-              <DialogDescription>
-                {viewRoute.records?.length || 0} stops • Created {new Date(viewRoute.createdAt).toLocaleDateString()}
-              </DialogDescription>
-            </DialogHeader>
+      {/* Route Details Modal - Matching pre-foreclosure design */}
+      <Dialog open={routeDetailsOpen} onOpenChange={setRouteDetailsOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RouteIcon className="h-5 w-5" />
+              Route Details
+            </DialogTitle>
+            <DialogDescription>
+              {viewRoute ? (
+                <>
+                  Driver: {viewRoute.driver} • {(viewRoute.records || []).filter(rr => rr && rr.record).length} stops • 
+                  {viewRoute.routeData?.totalDistance ? ` ${viewRoute.routeData.totalDistance.toFixed(2)} km` : ''}
+                </>
+              ) : (
+                'Loading route details...'
+              )}
+            </DialogDescription>
+          </DialogHeader>
 
-            <div className="space-y-4">
-              {/* Route Map */}
-              {viewRoute.routeData && (
-                <div className="rounded-lg overflow-hidden border border-border" style={{ height: '400px' }}>
-                  <RouteMap
-                    routes={viewRoute.routeData.routes || []}
-                    numVehicles={viewRoute.routeData.numVehicles || 1}
-                    totalDistance={viewRoute.routeData.totalDistance || 0}
-                    isOpen={true}
-                    onClose={() => {}}
-                    recordIds={[]}
-                    routeType="PROPERTY"
-                    compact={true}
-                  />
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={(() => {
+                if (!viewRoute) return [];
+                const validRecords = (viewRoute.records || []).filter(rr => rr && rr.record);
+                return validRecords.sort((a, b) => a.orderIndex - b.orderIndex).map(rr => rr.id);
+              })()}
+              strategy={verticalListSortingStrategy}
+            >
+              {!viewRoute ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Route Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-secondary/30 rounded-lg">
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Driver</div>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${viewRoute.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500'}`} />
+                        <span className="font-semibold">{viewRoute.driver}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Status</div>
+                      <div className="font-semibold">{viewRoute.status}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Created</div>
+                      <div className="font-semibold">
+                        {viewRoute.createdAt ? new Date(viewRoute.createdAt).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                    {viewRoute.routeData?.totalDistance && (
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Distance</div>
+                        <div className="font-semibold">{viewRoute.routeData.totalDistance.toFixed(2)} km</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (viewRoute?.routeData) {
+                          // Extract property IDs from the route (current records in the route)
+                          const routePropertyIds = (viewRoute.records || [])
+                            .map((rr: any) => {
+                              const propId = rr.record?.id;
+                              return propId;
+                            })
+                            .filter(Boolean);
+                          
+                          // Ensure we have property IDs
+                          if (routePropertyIds.length === 0) {
+                            toast({
+                              title: "Error",
+                              description: "No properties found in route. Cannot display route map.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          
+                          // Get current route records sorted by orderIndex
+                          const sortedRecords = [...(viewRoute.records || [])].sort((a, b) => a.orderIndex - b.orderIndex);
+                          
+                          // Create a map of property IDs to route records for quick lookup
+                          const recordMap = new Map<string, any>();
+                          sortedRecords.forEach(rr => {
+                            const propId = rr.record?.id;
+                            if (propId) {
+                              recordMap.set(propId, rr);
+                            }
+                          });
+                          
+                          // Rebuild waypoints in the correct order based on current orderIndex
+                          const allWaypoints: any[] = [];
+                          sortedRecords.forEach(rr => {
+                            const propId = rr.record?.id;
+                            if (!propId) return;
+                            
+                            // Find matching waypoint in original routeData
+                            const matchingWaypoint = viewRoute.routeData?.routes?.[0]?.waypoints?.find((wp: any) => {
+                              const wpId = wp.id || wp.propertyId || wp.originalId;
+                              return wpId === propId || (wpId === 'depot' && rr.isDepot);
+                            });
+                            
+                            if (matchingWaypoint) {
+                              allWaypoints.push({
+                                ...matchingWaypoint,
+                                id: rr.isDepot ? 'depot' : propId,
+                                isDepot: rr.isDepot,
+                                order: rr.orderIndex
+                              });
+                            }
+                          });
+                          
+                          // Rebuild routeData with reordered waypoints
+                          const filteredRouteData = {
+                            ...viewRoute.routeData,
+                            routes: [{
+                              ...viewRoute.routeData.routes?.[0],
+                              waypoints: allWaypoints,
+                              distance: viewRoute.routeData.routes?.[0]?.distance || 0
+                            }]
+                          };
+                          
+                          // Recalculate total distance
+                          filteredRouteData.totalDistance = filteredRouteData.routes.reduce(
+                            (sum: number, route: any) => sum + (route.distance || 0), 
+                            0
+                          );
+                          
+                          // Set optimizedPropertyIds BEFORE setting optimizedRoutes to ensure it's available when RouteMap opens
+                          setSelectedPropertyIds(new Set(routePropertyIds));
+                          setOptimizedRoutes(filteredRouteData);
+                          setRouteMapOpen(true);
+                        }
+                      }}
+                    >
+                      <RouteIcon className="h-4 w-4 mr-2" />
+                      View Route Map
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteRoute(viewRoute.id)}
+                      disabled={deletingRoute === viewRoute.id}
+                    >
+                      {deletingRoute === viewRoute.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Route
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Route Records List */}
+                  <div>
+                    {(() => {
+                      const validRecords = (viewRoute.records || []).filter(rr => rr && rr.record);
+                      const sortedRecords = validRecords.sort((a, b) => a.orderIndex - b.orderIndex);
+                      
+                      return (
+                        <>
+                          <h3 className="text-lg font-semibold mb-3">Route Stops ({validRecords.length})</h3>
+                          <div className="border border-border rounded-lg overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead className="bg-secondary/50">
+                                  <tr>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Account #</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Owner</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Internal Status</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {sortedRecords.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                                        No properties in this route.
+                                      </td>
+                                    </tr>
+                                  ) : (
+                                    sortedRecords.map((routeRecord, index) => {
+                                      const record = routeRecord.record;
+                                      if (!record) return null; // Safety check
+                                      const propertyId = record.id;
+                                      if (!propertyId) return null; // Skip if no property ID
+                                      return (
+                                        <SortableRouteRow
+                                          key={routeRecord.id}
+                                          routeRecord={routeRecord}
+                                          index={index}
+                                          viewRoute={viewRoute}
+                                          propertyId={propertyId}
+                                          record={record}
+                                          removingRecordId={removingRecordId}
+                                          reorderingRecordId={reorderingRecordId}
+                                          handleRemoveRecordFromRoute={handleRemoveRecordFromRoute}
+                                          handleMarkVisited={handleMarkVisited}
+                                          handleViewRecordDetails={handleViewRecordDetails}
+                                          markingVisited={markingVisited}
+                                        />
+                                      );
+                                    })
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
-
-              {/* Route Records Table */}
-              <div className="border border-border rounded-lg overflow-hidden">
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={viewRoute.records?.map(r => r.id) || []}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <table className="w-full">
-                      <thead className="bg-secondary/50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-sm font-semibold">#</th>
-                          <th className="px-4 py-2 text-left text-sm font-semibold">Account #</th>
-                          <th className="px-4 py-2 text-left text-sm font-semibold">Address</th>
-                          <th className="px-4 py-2 text-left text-sm font-semibold">Owner</th>
-                          <th className="px-4 py-2 text-left text-sm font-semibold">Status</th>
-                          <th className="px-4 py-2 text-left text-sm font-semibold">Actions</th>
-                          <th className="px-4 py-2 text-left text-sm font-semibold">Details</th>
-                          <th className="px-4 py-2 text-left text-sm font-semibold">Reorder</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {viewRoute.records?.map((routeRecord, index) => {
-                          const record = routeRecord.record;
-                          const propertyId = record?.id;
-                          return (
-                            <SortableRouteRow
-                              key={routeRecord.id}
-                              routeRecord={routeRecord}
-                              index={index}
-                              viewRoute={viewRoute}
-                              propertyId={propertyId}
-                              record={record}
-                              removingRecordId={removingRecordId}
-                              reorderingRecordId={reorderingRecordId}
-                              handleRemoveRecordFromRoute={handleRemoveRecordFromRoute}
-                              handleViewRecordDetails={handleViewRecordDetails}
-                            />
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </SortableContext>
-                </DndContext>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+            </SortableContext>
+          </DndContext>
+        </DialogContent>
+      </Dialog>
 
       {/* Geocoding Progress Modal */}
       <Dialog open={geocodeOpen} onOpenChange={(open) => {

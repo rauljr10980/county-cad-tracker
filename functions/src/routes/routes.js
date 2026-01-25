@@ -31,7 +31,13 @@ function formatRouteRecord(routeRecord) {
       latitude: routeRecord.property.latitude,
       longitude: routeRecord.property.longitude,
       totalDue: routeRecord.property.totalDue,
-      status: routeRecord.property.status
+      status: routeRecord.property.status,
+      // Include visited status from RouteRecord (for properties, stored on RouteRecord)
+      visited: routeRecord.visited || false,
+      visited_at: routeRecord.visitedAt ? routeRecord.visitedAt.toISOString() : null,
+      visited_by: routeRecord.visitedBy || null,
+      visitedAt: routeRecord.visitedAt ? routeRecord.visitedAt.toISOString() : null,
+      visitedBy: routeRecord.visitedBy || null
     };
   }
   return null;
@@ -100,6 +106,9 @@ router.get('/', optionalAuth, async (req, res) => {
         id: rr.id,
         orderIndex: rr.orderIndex,
         isDepot: rr.isDepot,
+        visited: rr.visited || false, // Include visited status from RouteRecord (for properties)
+        visitedAt: rr.visitedAt ? rr.visitedAt.toISOString() : null,
+        visitedBy: rr.visitedBy || null,
         record: formatRouteRecord(rr)
       }))
     }));
@@ -171,6 +180,9 @@ router.get('/active', optionalAuth, async (req, res) => {
         id: rr.id,
         orderIndex: rr.orderIndex,
         isDepot: rr.isDepot,
+        visited: rr.visited || false, // Include visited status from RouteRecord (for properties)
+        visitedAt: rr.visitedAt ? rr.visitedAt.toISOString() : null,
+        visitedBy: rr.visitedBy || null,
         record: formatRouteRecord(rr)
       }))
     }));
@@ -589,6 +601,9 @@ router.put('/:routeId/records/:recordId/reorder', optionalAuth, async (req, res)
           id: rr.id,
           orderIndex: rr.orderIndex,
           isDepot: rr.isDepot,
+          visited: rr.visited || false,
+          visitedAt: rr.visitedAt ? rr.visitedAt.toISOString() : null,
+          visitedBy: rr.visitedBy || null,
           record: formatRouteRecord(rr)
         }))
       };

@@ -874,6 +874,36 @@ export async function markPreForeclosureVisited(documentNumber: string, driver?:
   return response.json();
 }
 
+/**
+ * Mark or unmark property as visited in route (separate from pre-foreclosure)
+ */
+export async function markPropertyVisitedInRoute(
+  routeId: string,
+  recordId: string,
+  driver?: 'Luciano' | 'Raul',
+  visited: boolean = true
+) {
+  const url = `${API_BASE_URL}/api/routes/${routeId}/records/${recordId}/visit`;
+  console.log('[API] Updating property visited status in route:', { url, routeId, recordId, driver, visited });
+  
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ driver, visited }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    console.error('[API] Error updating property visited status:', error);
+    throw new Error(error.error || 'Failed to update visited status');
+  }
+  
+  return response.json();
+}
+
 // ============================================================================
 // ROUTE MANAGEMENT
 // ============================================================================

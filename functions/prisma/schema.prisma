@@ -496,6 +496,11 @@ model RouteRecord {
   // Whether this is the starting point/depot
   isDepot Boolean @default(false)
 
+  // Visited status (for properties - stored separately from pre-foreclosure)
+  visited Boolean @default(false)
+  visitedAt DateTime?
+  visitedBy String?
+
   createdAt DateTime @default(now())
 
   @@index([routeId])
