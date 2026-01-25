@@ -317,7 +317,12 @@ export function AreaSelectorMap({
     }
   }, [isOpen]);
 
+  // Calculate properties within the drawn area
+  // IMPORTANT: This uses the 'properties' prop, which should be filteredProperties from the parent
+  // This ensures we only count properties that match the current filters (e.g., 435 filtered properties)
   const calculatePropertiesInBounds = (shape: { type: 'rectangle' | 'circle' | 'polygon'; bounds: LatLngBounds; center?: LatLng; radius?: number; polygon?: LatLng[] }) => {
+    // Filter properties that are within the drawn area
+    // Only considers properties passed to this component (should be filteredProperties)
     const count = properties.filter(p => {
       if (!p.latitude || !p.longitude) return false;
       const point = { lat: p.latitude, lng: p.longitude };
@@ -462,11 +467,14 @@ export function AreaSelectorMap({
       }
 
       // Calculate TOTAL properties in zone (for display on map)
+      // IMPORTANT: 'properties' prop should be filteredProperties from parent, so we only count filtered properties
+      // This ensures when you have 435 filtered properties, the map only considers those 435, not all properties
       // OPTIMIZATION: Use a more efficient approach - count first, then filter only what we need
       let totalCount = 0;
       const propsInZoneForDisplay: PropertyLike[] = [];
       
-      // First pass: Count and collect properties (limit collection to avoid memory issues)
+      // First pass: Count and collect properties from the filtered set (limit collection to avoid memory issues)
+      // This only considers properties that match current filters (e.g., 435 filtered properties)
       for (const p of properties) {
         if (!p.latitude || !p.longitude) continue;
         const point = { lat: p.latitude, lng: p.longitude };

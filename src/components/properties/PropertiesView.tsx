@@ -1071,7 +1071,8 @@ export function PropertiesView() {
     polygon?: { lat: number; lng: number }[];
   }) => {
     // Filter properties within the selected area
-    const propertiesInArea = rawProperties.filter(p => {
+    // Use filteredProperties to match what's shown in the table
+    const propertiesInArea = filteredProperties.filter(p => {
       if (!p.latitude || !p.longitude) return false;
       
       // If polygon is provided, use point-in-polygon check
@@ -1125,7 +1126,7 @@ export function PropertiesView() {
     
     // Automatically create route with custom starting point if it was set
     if (customDepotPropertyId) {
-      const depotProperty = rawProperties.find(p => p.id === customDepotPropertyId);
+      const depotProperty = filteredProperties.find(p => p.id === customDepotPropertyId);
       if (depotProperty && customDepot) {
         await handleCreateRouteWithDepot(depotProperty, customDepot);
         return;
@@ -2439,8 +2440,8 @@ export function PropertiesView() {
             areaType: area.polygon ? 'polygon' : area.radius !== undefined ? 'circle' : 'rectangle'
           });
 
-          // Find the property that matches the starting point
-          const depotProperty = rawProperties.find(p => p.id === startingPoint.property.id);
+          // Find the property that matches the starting point (use filteredProperties to match what's shown on map)
+          const depotProperty = filteredProperties.find(p => p.id === startingPoint.property.id);
           
           if (!depotProperty) {
             toast({
@@ -2496,10 +2497,11 @@ export function PropertiesView() {
             firstFew: selectedProperties.slice(0, 3).map(p => ({ id: p.id, lat: p.latitude, lng: p.longitude }))
           });
 
-          // Convert selectedProperties (PropertyLike) to full Property objects from rawProperties
+          // Convert selectedProperties (PropertyLike) to full Property objects from filteredProperties
           // IMPORTANT: selectedProperties from AreaSelectorMap is ALREADY limited to 26 (1 depot + 25 properties)
           // and has already been validated against the area. We should trust this limit.
-          const propertyMap = new Map(rawProperties.map(p => [p.id, p]));
+          // Use filteredProperties to match what's shown on the map
+          const propertyMap = new Map(filteredProperties.map(p => [p.id, p]));
           const propertiesToOptimize: Property[] = [];
           
           console.log('[onOptimize] Converting selectedProperties from AreaSelectorMap:', {
@@ -2596,7 +2598,7 @@ export function PropertiesView() {
           // The backend will exclude the depot from visitable stops, so it won't appear as a stop
           await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation, propertiesToOptimize);
         }}
-        properties={rawProperties.filter(p => p.latitude != null && p.longitude != null).map(p => ({
+        properties={filteredProperties.filter(p => p.latitude != null && p.longitude != null).map(p => ({
           id: p.id,
           latitude: p.latitude!,
           longitude: p.longitude!,
