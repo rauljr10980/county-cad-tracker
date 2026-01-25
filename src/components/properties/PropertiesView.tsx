@@ -1198,14 +1198,15 @@ export function PropertiesView() {
           console.warn('[handleCreateRouteWithDepot] Property missing coordinates:', p.id);
           return false;
         }
-        // Allow depot property even if it's in routes (it's the starting point)
+        // Allow depot property even if it's visited (it's the starting point)
         if (depotPropertyId && p.id === depotPropertyId) return true;
-        // Filter out properties already in routes
-        const inRoutes = propertiesInRoutes.has(p.id);
-        if (inRoutes) {
-          console.log('[handleCreateRouteWithDepot] Property already in routes, filtering out:', p.id);
+        // Filter out properties that are explicitly marked as visited (not just in routes)
+        // This matches pre-foreclosure behavior - only exclude if visited
+        const isVisited = propertiesInRoutes.has(p.id);
+        if (isVisited) {
+          console.log('[handleCreateRouteWithDepot] Property is marked as visited, filtering out:', p.id);
         }
-        return !inRoutes;
+        return !isVisited;
       });
       console.log('[handleCreateRouteWithDepot] After filtering providedProperties:', availableProperties.length);
     } else {
@@ -1224,14 +1225,15 @@ export function PropertiesView() {
           console.warn('[handleCreateRouteWithDepot] Selected property missing coordinates, excluding:', p.id);
           return false;
         }
-        // Allow depot property even if it's in routes (it's the starting point)
+        // Allow depot property even if it's visited (it's the starting point)
         if (depotPropertyId && p.id === depotPropertyId) return true;
-        // Filter out properties already in routes
-        const inRoutes = propertiesInRoutes.has(p.id);
-        if (inRoutes) {
-          console.log('[handleCreateRouteWithDepot] Selected property already in routes, excluding:', p.id);
+        // Filter out properties that are explicitly marked as visited (not just in routes)
+        // This matches pre-foreclosure behavior - only exclude if visited
+        const isVisited = propertiesInRoutes.has(p.id);
+        if (isVisited) {
+          console.log('[handleCreateRouteWithDepot] Selected property is marked as visited, excluding:', p.id);
         }
-        return !inRoutes;
+        return !isVisited;
       });
       
       console.log('[handleCreateRouteWithDepot] Filtered from selectedPropertyIds:', {
@@ -1317,13 +1319,14 @@ export function PropertiesView() {
       }
     }
 
-    // Check if any selected properties are already in routes
+    // Check if any selected properties are already marked as visited
+    // Note: propertiesInRoutes now only contains properties that are explicitly marked as visited
     const propertiesToCheck = providedProperties || availableProperties;
     const duplicateCount = propertiesToCheck.filter(p => 
       propertiesInRoutes.has(p.id) && 
       p.latitude != null &&
       p.longitude != null &&
-      p.id !== depotPropertyId // Don't count depot property as duplicate if it's already in routes
+      p.id !== depotPropertyId // Don't count depot property as duplicate if it's visited
     ).length;
 
     console.log('[handleCreateRouteWithDepot] Properties in routes check:', {
@@ -1336,8 +1339,8 @@ export function PropertiesView() {
 
     if (duplicateCount > 0) {
       toast({
-        title: "Properties Already in Routes",
-        description: `${duplicateCount} selected properties are already in existing routes. They will be excluded from this route. Click "Refresh" to reload from saved routes only.`,
+        title: "Properties Already Visited",
+        description: `${duplicateCount} selected properties are already marked as visited. They will be excluded from this route. Only visited properties are excluded - properties in routes but not visited can still be selected.`,
         variant: "default",
       });
     }
@@ -1349,7 +1352,7 @@ export function PropertiesView() {
 
     if (availableProperties.length === 0 || hasOnlyDepot) {
       const reason = hasOnlyDepot || duplicateCount > 0
-        ? `All ${propertiesToCheck.length} selected properties are already marked as in routes. Click "Refresh" to reload from saved routes only, or select different properties.`
+        ? `All ${propertiesToCheck.length} selected properties are already marked as visited. Only visited properties are excluded - properties in routes but not visited can still be selected.`
         : "Please select properties with latitude and longitude coordinates, or use the area selector.";
       toast({
         title: "No valid locations",
@@ -1600,11 +1603,15 @@ export function PropertiesView() {
       setActiveRoutes(propertyRoutes);
 
       // Update propertiesInRoutes based on active routes
+      // IMPORTANT: Only mark properties as "in route" if they are explicitly marked as VISITED
+      // This matches the pre-foreclosure behavior where properties are only excluded when marked as visited
       const activePropertyIds = new Set<string>();
       propertyRoutes.forEach((route: RouteType) => {
         route.records?.forEach((rr: any) => {
           const propId = rr.record?.id;
-          if (propId) {
+          // Only add to propertiesInRoutes if the property is explicitly marked as visited
+          // Properties in routes but not visited can still be selected for new routes
+          if (propId && (rr.visited === true || rr.record?.visited === true)) {
             activePropertyIds.add(propId);
           }
         });
@@ -1980,29 +1987,49 @@ export function PropertiesView() {
                   {selectedPropertyIds.size} selected
                   {propertiesInRoutes.size > 0 && (
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({propertiesInRoutes.size} in saved routes)
+                      ({propertiesInRoutes.size} marked as visited)
                     </span>
                   )}
                 </span>
                 <div className="flex gap-2">
                   {propertiesInRoutes.size > 0 && (
-                    <Button
-                      onClick={async () => {
-                        // Refresh properties in routes from actual saved routes only
-                        await loadActiveRoutes();
-                        toast({
-                          title: "Routes Refreshed",
-                          description: "Properties in routes have been refreshed from saved routes only.",
-                        });
-                      }}
-                      variant="outline"
-                      size="sm"
-                      className="h-8"
-                      title="Refresh properties in routes (only shows properties from actually saved routes)"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      Refresh
-                    </Button>
+                    <>
+                      <Button
+                        onClick={async () => {
+                          // Clear all properties from routes tracking - reset to empty
+                          // This makes all properties available again, even if they were incorrectly marked
+                          setPropertiesInRoutes(new Set());
+                          toast({
+                            title: "Selection Cleared",
+                            description: "All properties are now available for route optimization. Only explicitly visited properties will be excluded.",
+                          });
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        title="Clear all properties from routes - makes them all available again"
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Clear Selection
+                      </Button>
+                      <Button
+                        onClick={async () => {
+                          // Refresh properties in routes from actual saved routes only
+                          await loadActiveRoutes();
+                          toast({
+                            title: "Routes Refreshed",
+                            description: "Properties in routes have been refreshed from saved routes (only visited properties are excluded).",
+                          });
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        title="Refresh properties in routes (only shows visited properties from actually saved routes)"
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Refresh
+                      </Button>
+                    </>
                   )}
                   <Button
                     onClick={() => setSelectedPropertyIds(new Set())}
