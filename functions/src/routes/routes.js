@@ -707,5 +707,76 @@ router.put('/:routeId/records/:recordId/reorder', optionalAuth, async (req, res)
   }
 });
 
+// PUT /api/routes/:routeId/records/:recordId/visit - Mark property as visited in route
+router.put('/:routeId/records/:recordId/visit', optionalAuth, async (req, res) => {
+  try {
+    const { routeId, recordId } = req.params;
+    const { driver, visited } = req.body; // visited: true/false (optional, defaults to true)
+
+    // Get the route to check route type
+    const route = await prisma.route.findUnique({
+      where: { id: routeId },
+      include: {
+        records: {
+          where: { id: recordId }
+        }
+      }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    const routeRecord = route.records[0];
+    if (!routeRecord) {
+      return res.status(404).json({ error: 'Record not found in route' });
+    }
+
+    // Only allow marking visited for PROPERTY routes (pre-foreclosure uses different endpoint)
+    if (route.routeType !== 'PROPERTY') {
+      return res.status(400).json({ error: 'This endpoint is only for PROPERTY routes. Use pre-foreclosure endpoint for pre-foreclosure routes.' });
+    }
+
+    // Update visited status on RouteRecord (stored separately for properties)
+    const visitedStatus = visited !== undefined ? visited : true;
+    const updateData = {
+      visited: visitedStatus,
+      visitedAt: visitedStatus ? new Date() : null,
+      visitedBy: visitedStatus ? (driver || route.driver || null) : null
+    };
+
+    const updated = await prisma.routeRecord.update({
+      where: { id: recordId },
+      data: updateData,
+      include: {
+        property: {
+          select: {
+            id: true,
+            accountNumber: true,
+            propertyAddress: true
+          }
+        }
+      }
+    });
+
+    // Map to frontend format
+    res.json({
+      id: updated.id,
+      propertyId: updated.propertyId,
+      visited: updated.visited,
+      visited_at: updated.visitedAt?.toISOString(),
+      visited_by: updated.visitedBy,
+      visitedAt: updated.visitedAt?.toISOString(),
+      visitedBy: updated.visitedBy
+    });
+  } catch (error) {
+    console.error('[ROUTES] Visit update error:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Route record not found' });
+    }
+    res.status(500).json({ error: 'Failed to mark property as visited' });
+  }
+});
+
 module.exports = router;
 
