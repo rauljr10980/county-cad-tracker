@@ -1187,6 +1187,7 @@ export function PropertiesView() {
     // Filter out properties that are already in existing routes
     // IMPORTANT: If providedProperties is passed, ONLY use those - do NOT fall back to selectedPropertyIds
     // This ensures the area selector's 25-property limit is respected
+    // CRITICAL: When no providedProperties, ONLY use properties that are in selectedPropertyIds
     let availableProperties: Property[];
     
     if (validatedProvidedProperties && validatedProvidedProperties.length > 0) {
@@ -1207,17 +1208,36 @@ export function PropertiesView() {
       });
       console.log('[handleCreateRouteWithDepot] After filtering providedProperties:', availableProperties.length);
     } else {
-      console.log('[handleCreateRouteWithDepot] No providedProperties, using selectedPropertyIds (legacy behavior)');
-      console.warn('[handleCreateRouteWithDepot] WARNING: This should not happen when using area selector!');
+      console.log('[handleCreateRouteWithDepot] No providedProperties, using ONLY selectedPropertyIds');
+      console.log('[handleCreateRouteWithDepot] Selected property IDs:', Array.from(selectedPropertyIds));
+      
+      // CRITICAL: Only use properties that are explicitly selected
+      // Filter rawProperties to ONLY include those in selectedPropertyIds
       availableProperties = rawProperties.filter(p => {
-        if (!selectedPropertyIds.has(p.id)) return false;
-        if (p.latitude == null || p.longitude == null) return false;
+        // FIRST CHECK: Must be in selectedPropertyIds - this is the most important filter
+        if (!selectedPropertyIds.has(p.id)) {
+          return false; // Not selected, exclude immediately
+        }
+        // Must have valid coordinates
+        if (p.latitude == null || p.longitude == null) {
+          console.warn('[handleCreateRouteWithDepot] Selected property missing coordinates, excluding:', p.id);
+          return false;
+        }
         // Allow depot property even if it's in routes (it's the starting point)
         if (depotPropertyId && p.id === depotPropertyId) return true;
         // Filter out properties already in routes
-        return !propertiesInRoutes.has(p.id);
+        const inRoutes = propertiesInRoutes.has(p.id);
+        if (inRoutes) {
+          console.log('[handleCreateRouteWithDepot] Selected property already in routes, excluding:', p.id);
+        }
+        return !inRoutes;
       });
-      console.log('[handleCreateRouteWithDepot] Filtered from selectedPropertyIds:', availableProperties.length);
+      
+      console.log('[handleCreateRouteWithDepot] Filtered from selectedPropertyIds:', {
+        selectedCount: selectedPropertyIds.size,
+        availableCount: availableProperties.length,
+        availableIds: availableProperties.map(p => p.id)
+      });
       
       // Safety limit: If using legacy path (no area selector), warn if too many properties
       if (availableProperties.length > 25) {
@@ -1229,6 +1249,15 @@ export function PropertiesView() {
         });
         setIsOptimizingRoute(false);
         return;
+      }
+      
+      // Final validation: Ensure we're only using selected properties
+      const unselectedProperties = availableProperties.filter(p => !selectedPropertyIds.has(p.id));
+      if (unselectedProperties.length > 0) {
+        console.error('[handleCreateRouteWithDepot] CRITICAL ERROR: Found properties not in selectedPropertyIds!', unselectedProperties.map(p => p.id));
+        // Remove any unselected properties
+        availableProperties = availableProperties.filter(p => selectedPropertyIds.has(p.id));
+        console.log('[handleCreateRouteWithDepot] Removed unselected properties, new count:', availableProperties.length);
       }
     }
 
@@ -1363,7 +1392,28 @@ export function PropertiesView() {
 
     console.log('[handleCreateRouteWithDepot] Final availableProperties count:', availableProperties.length);
     
-    const selectedProperties = availableProperties;
+    // CRITICAL: Final validation - ensure ONLY selected properties are used
+    // If no providedProperties was passed, double-check that all properties are in selectedPropertyIds
+    let selectedProperties: Property[];
+    if (!validatedProvidedProperties || validatedProvidedProperties.length === 0) {
+      // When using manual selection, ensure every property is in selectedPropertyIds
+      selectedProperties = availableProperties.filter(p => {
+        const isSelected = selectedPropertyIds.has(p.id);
+        if (!isSelected) {
+          console.error('[handleCreateRouteWithDepot] CRITICAL: Property not in selectedPropertyIds:', p.id);
+        }
+        return isSelected;
+      });
+      console.log('[handleCreateRouteWithDepot] Final validation - only selected properties:', {
+        before: availableProperties.length,
+        after: selectedProperties.length,
+        selectedIds: Array.from(selectedPropertyIds),
+        propertiesInRoute: selectedProperties.map(p => p.id)
+      });
+    } else {
+      // When using providedProperties (area selector), use those directly
+      selectedProperties = availableProperties;
+    }
 
     setIsOptimizingRoute(true);
 

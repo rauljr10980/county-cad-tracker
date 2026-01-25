@@ -10,8 +10,9 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const BATCH_SIZE = 100; // Process 100 properties per batch
-const GEOCODE_BATCH_SIZE = 5; // Geocode 5 addresses at a time
-const DELAY_MS = 1200; // 1.2 seconds between geocode batches (respects 1 req/sec limit)
+const DELAY_MS = 1100; // 1.1 seconds between requests (respects Nominatim's 1 req/sec limit)
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 5000; // 5 seconds delay on rate limit errors
 
 /**
  * Geocode a single address using Nominatim
@@ -19,12 +20,13 @@ const DELAY_MS = 1200; // 1.2 seconds between geocode batches (respects 1 req/se
 async function geocodeAddress(address) {
   try {
     const searchQuery = `${address}, San Antonio, TX`;
-    const url = `https://nominatim.openstreetmap.org/search?` + new URLSearchParams({
+    const params = new URLSearchParams({
       q: searchQuery,
       format: 'json',
       limit: '1',
       addressdetails: '1',
     });
+    const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
 
     const response = await fetch(url, {
       headers: {
@@ -33,7 +35,7 @@ async function geocodeAddress(address) {
     });
 
     if (!response.ok) {
-      return { error: `API returned ${response.status}` };
+      return { error: `API returned ${response.status}: ${response.statusText}` };
     }
 
     const data = await response.json();
@@ -43,9 +45,16 @@ async function geocodeAddress(address) {
     }
 
     const result = data[0];
+    const latitude = parseFloat(result.lat);
+    const longitude = parseFloat(result.lon);
+    
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return { error: 'Invalid coordinates returned' };
+    }
+    
     return {
-      latitude: parseFloat(result.lat),
-      longitude: parseFloat(result.lon),
+      latitude,
+      longitude,
       displayName: result.display_name,
     };
   } catch (error) {
@@ -65,81 +74,70 @@ async function processBatch(properties, batchNumber, totalBatches) {
     skipped: 0,
   };
 
-  // Process in smaller geocode batches
-  for (let i = 0; i < properties.length; i += GEOCODE_BATCH_SIZE) {
-    const geocodeBatch = properties.slice(i, i + GEOCODE_BATCH_SIZE);
+  // Process sequentially to respect Nominatim's 1 req/sec limit
+  for (let i = 0; i < properties.length; i++) {
+    const property = properties[i];
     
-    const geocodePromises = geocodeBatch.map(async (property) => {
-      // Skip if already has coordinates
-      if (property.latitude && property.longitude) {
-        results.skipped++;
-        return {
-          id: property.id,
-          accountNumber: property.accountNumber,
-          success: true,
-          skipped: true,
-        };
-      }
+    // Skip if already has coordinates
+    if (property.latitude && property.longitude) {
+      results.skipped++;
+      continue;
+    }
 
-      if (!property.propertyAddress || property.propertyAddress.trim() === '') {
-        results.errors++;
-        return {
-          id: property.id,
-          accountNumber: property.accountNumber,
-          success: false,
-          error: 'No address provided',
-        };
-      }
+    if (!property.propertyAddress || property.propertyAddress.trim() === '') {
+      results.errors++;
+      continue;
+    }
 
+    // Geocode with retry logic
+    let retries = 0;
+    let success = false;
+    
+    while (retries < MAX_RETRIES && !success) {
       const geocodeResult = await geocodeAddress(property.propertyAddress);
 
       if (geocodeResult.error) {
-        results.errors++;
-        console.log(`  ❌ ${property.accountNumber}: ${geocodeResult.error}`);
-        return {
-          id: property.id,
-          accountNumber: property.accountNumber,
-          success: false,
-          error: geocodeResult.error,
-        };
+        // Check if it's a rate limit error
+        if (geocodeResult.error.includes('429') || geocodeResult.error.includes('Rate limit')) {
+          retries++;
+          if (retries < MAX_RETRIES) {
+            console.log(`  ⚠️  ${property.accountNumber}: Rate limited, retrying in ${RETRY_DELAY_MS}ms (attempt ${retries + 1}/${MAX_RETRIES})`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+            continue;
+          } else {
+            results.errors++;
+            console.log(`  ❌ ${property.accountNumber}: Rate limit exceeded after retries`);
+            break;
+          }
+        } else {
+          results.errors++;
+          console.log(`  ❌ ${property.accountNumber}: ${geocodeResult.error}`);
+          break;
+        }
+      } else {
+        // Update property with coordinates
+        try {
+          await prisma.property.update({
+            where: { id: property.id },
+            data: {
+              latitude: geocodeResult.latitude,
+              longitude: geocodeResult.longitude,
+            },
+          });
+
+          results.successful++;
+          console.log(`  ✅ ${property.accountNumber}: ${geocodeResult.latitude.toFixed(6)}, ${geocodeResult.longitude.toFixed(6)}`);
+          success = true;
+        } catch (updateError) {
+          results.errors++;
+          console.log(`  ❌ ${property.accountNumber}: Failed to update - ${updateError.message}`);
+          break;
+        }
       }
+    }
 
-      // Update property with coordinates
-      try {
-        await prisma.property.update({
-          where: { id: property.id },
-          data: {
-            latitude: geocodeResult.latitude,
-            longitude: geocodeResult.longitude,
-          },
-        });
-
-        results.successful++;
-        console.log(`  ✅ ${property.accountNumber}: ${geocodeResult.latitude.toFixed(6)}, ${geocodeResult.longitude.toFixed(6)}`);
-        return {
-          id: property.id,
-          accountNumber: property.accountNumber,
-          success: true,
-          latitude: geocodeResult.latitude,
-          longitude: geocodeResult.longitude,
-        };
-      } catch (updateError) {
-        results.errors++;
-        console.log(`  ❌ ${property.accountNumber}: Failed to update - ${updateError.message}`);
-        return {
-          id: property.id,
-          accountNumber: property.accountNumber,
-          success: false,
-          error: `Update failed: ${updateError.message}`,
-        };
-      }
-    });
-
-    // Wait for geocode batch to complete
-    await Promise.all(geocodePromises);
-
-    // Rate limiting: wait between geocode batches (except for last batch)
-    if (i + GEOCODE_BATCH_SIZE < properties.length) {
+    // Rate limiting: wait between requests (except for last one)
+    if (i < properties.length - 1) {
       await new Promise(resolve => setTimeout(resolve, DELAY_MS));
     }
   }
@@ -155,25 +153,33 @@ async function main() {
     console.log('🚀 Starting batch geocoding of all properties...\n');
 
     // Get total count
-    const [totalProperties, propertiesWithoutCoords] = await Promise.all([
+    // Note: propertyAddress is non-nullable (String @default("")), so we filter empty strings in JS
+    const [totalProperties, propertiesWithoutCoordsCount] = await Promise.all([
       prisma.property.count(),
       prisma.property.count({
         where: {
-          AND: [
-            {
-              OR: [
-                { latitude: null },
-                { longitude: null }
-              ]
-            },
-            {
-              propertyAddress: { not: '' },
-              propertyAddress: { not: null }
-            }
+          OR: [
+            { latitude: null },
+            { longitude: null }
           ]
         }
       })
     ]);
+    
+    // Get actual count by filtering empty strings
+    const allWithoutCoords = await prisma.property.findMany({
+      where: {
+        OR: [
+          { latitude: null },
+          { longitude: null }
+        ]
+      },
+      select: { propertyAddress: true },
+      take: 100000 // Get all to count
+    });
+    const propertiesWithoutCoords = allWithoutCoords.filter(p => 
+      p.propertyAddress && p.propertyAddress.trim() !== ''
+    ).length;
 
     console.log(`📊 Statistics:`);
     console.log(`   Total properties: ${totalProperties.toLocaleString()}`);
@@ -188,7 +194,7 @@ async function main() {
 
     const totalBatches = Math.ceil(propertiesWithoutCoords / BATCH_SIZE);
     console.log(`📦 Will process in ${totalBatches} batches of ${BATCH_SIZE} properties each\n`);
-    console.log(`⏱️  Estimated time: ~${Math.ceil(propertiesWithoutCoords / GEOCODE_BATCH_SIZE * DELAY_MS / 1000 / 60)} minutes\n`);
+    console.log(`⏱️  Estimated time: ~${Math.ceil(propertiesWithoutCoords * DELAY_MS / 1000 / 60)} minutes\n`);
 
     let offset = 0;
     let totalSuccessful = 0;
@@ -197,20 +203,12 @@ async function main() {
     const startTime = Date.now();
 
     while (offset < propertiesWithoutCoords) {
-      // Fetch batch
-      const properties = await prisma.property.findMany({
+      // Fetch batch (propertyAddress is non-nullable, filter empty strings in JS)
+      const allProperties = await prisma.property.findMany({
         where: {
-          AND: [
-            {
-              OR: [
-                { latitude: null },
-                { longitude: null }
-              ]
-            },
-            {
-              propertyAddress: { not: '' },
-              propertyAddress: { not: null }
-            }
+          OR: [
+            { latitude: null },
+            { longitude: null }
           ]
         },
         select: {
@@ -220,10 +218,15 @@ async function main() {
           latitude: true,
           longitude: true,
         },
-        take: BATCH_SIZE,
+        take: BATCH_SIZE * 2, // Fetch more to account for filtering
         skip: offset,
         orderBy: { createdAt: 'asc' }
       });
+      
+      // Filter out empty strings
+      const properties = allProperties.filter(p => 
+        p.propertyAddress && p.propertyAddress.trim() !== ''
+      ).slice(0, BATCH_SIZE);
 
       if (properties.length === 0) {
         console.log('No more properties to geocode.');
