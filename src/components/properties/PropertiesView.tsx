@@ -30,7 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus, markPropertyVisitedInRoute } from '@/lib/api';
+import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus, markPropertyVisitedInRoute, updatePropertyDealStage } from '@/lib/api';
 import { batchGeocodeAddresses } from '@/lib/geocoding';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
@@ -90,6 +90,7 @@ function SortableRouteRow({
   handleMarkVisited,
   handleViewRecordDetails,
   markingVisited,
+  handleDealStageChange,
 }: any) {
   const {
     attributes,
@@ -175,8 +176,36 @@ function SortableRouteRow({
       <td className="px-4 py-2 text-sm hidden">{record?.ownerName || 'N/A'}</td>
       <td className="px-4 py-2 text-sm hidden">{record?.city || 'N/A'}</td>
       <td className="px-4 py-2 text-sm" style={{ position: 'relative', zIndex: 1 }}>
-        {/* Internal Status - Not applicable for properties, but keeping structure similar */}
-        <span className="text-xs text-muted-foreground">-</span>
+        {propertyId && record && handleDealStageChange && (
+          <Select
+            value={(record as any).dealStage || 'new_lead'}
+            onValueChange={async (value) => {
+              if (handleDealStageChange) {
+                try {
+                  await handleDealStageChange(propertyId, value as any);
+                } catch (error) {
+                  console.error('Error updating deal stage:', error);
+                }
+              }
+            }}
+          >
+            <SelectTrigger 
+              className="h-8 text-xs w-full cursor-pointer hover:bg-secondary/50 border-border"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="z-[100]">
+              <SelectItem value="new_lead">New Lead</SelectItem>
+              <SelectItem value="contacted">Contacted</SelectItem>
+              <SelectItem value="interested">Interested</SelectItem>
+              <SelectItem value="offer_sent">Offer Sent</SelectItem>
+              <SelectItem value="negotiating">Negotiating</SelectItem>
+              <SelectItem value="under_contract">Under Contract</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
+              <SelectItem value="dead">Dead</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
       </td>
       <td className="px-4 py-2 text-sm">
         {propertyId && (
@@ -2044,6 +2073,44 @@ export function PropertiesView() {
     }
   };
 
+  const handleDealStageChange = async (propertyId: string, dealStage: 'new_lead' | 'contacted' | 'interested' | 'offer_sent' | 'negotiating' | 'under_contract' | 'closed' | 'dead') => {
+    try {
+      await updatePropertyDealStage(propertyId, dealStage);
+      
+      // Update viewRoute to trigger re-render
+      if (viewRoute) {
+        const updatedRecords = viewRoute.records.map(rr => {
+          if (rr.record.id === propertyId) {
+            return {
+              ...rr,
+              record: {
+                ...rr.record,
+                dealStage: dealStage
+              }
+            };
+          }
+          return rr;
+        });
+        setViewRoute({ ...viewRoute, records: updatedRecords });
+      }
+
+      // Refresh properties data
+      await queryClient.invalidateQueries({ queryKey: ['properties'] });
+      
+      toast({
+        title: 'Deal Stage Updated',
+        description: 'Property deal stage has been updated',
+      });
+    } catch (error) {
+      console.error('Error updating deal stage:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update deal stage',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="p-3 md:p-6">
       <div className="mb-4 md:mb-6">
@@ -2950,7 +3017,7 @@ export function PropertiesView() {
                                     <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Owner</th>
                                     <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
                                     <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Internal Status</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Deal Stage</th>
                                     <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
                                     <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
                                     <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
@@ -2983,6 +3050,7 @@ export function PropertiesView() {
                                           handleMarkVisited={handleMarkVisited}
                                           handleViewRecordDetails={handleViewRecordDetails}
                                           markingVisited={markingVisited}
+                                          handleDealStageChange={handleDealStageChange}
                                         />
                                       );
                                     })
