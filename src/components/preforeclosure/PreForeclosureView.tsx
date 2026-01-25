@@ -733,13 +733,17 @@ export function PreForeclosureView() {
       console.log('[PreForeclosure] Loading active routes...');
       const routes = await getActiveRoutes();
       console.log('[PreForeclosure] Loaded active routes:', routes.length, routes);
-      setActiveRoutes(routes);
+
+      // Filter for PREFORECLOSURE routes only
+      const preForeclosureRoutes = routes.filter((r: RouteType) => r.routeType === 'PREFORECLOSURE');
+      console.log('[PreForeclosure] Filtered pre-foreclosure routes:', preForeclosureRoutes.length);
+      setActiveRoutes(preForeclosureRoutes);
       
       // Update recordsInRoutes based on active routes
       // Also track which properties are depots (starting points)
       const activeRecordIds = new Set<string>();
       const depotIds = new Set<string>();
-      routes.forEach(route => {
+      preForeclosureRoutes.forEach(route => {
         route.records?.forEach((rr: any) => {
           // Handle both camelCase and snake_case document number fields
           const docNumber = rr.record?.documentNumber || rr.record?.document_number || rr.documentNumber || rr.document_number;
