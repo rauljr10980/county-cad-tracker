@@ -1082,6 +1082,7 @@ export function PropertiesView() {
       hasNotes: 'any',
       hasLink: 'any',
       hasExemptions: 'any',
+      hasVisited: 'any',
       followUpDateFrom: undefined,
       followUpDateTo: undefined,
       lastPaymentDateFrom: undefined,
