@@ -462,32 +462,98 @@ export function AreaSelectorMap({
       }
 
       // Calculate TOTAL properties in zone (for display on map)
-      const allPropsInZone = properties.filter(p => {
-        if (!p.latitude || !p.longitude) return false;
+      // OPTIMIZATION: Use a more efficient approach - count first, then filter only what we need
+      let totalCount = 0;
+      const propsInZoneForDisplay: PropertyLike[] = [];
+      
+      // First pass: Count and collect properties (limit collection to avoid memory issues)
+      for (const p of properties) {
+        if (!p.latitude || !p.longitude) continue;
         const point = { lat: p.latitude, lng: p.longitude };
+        let isInZone = false;
 
         if (selectedShape.type === 'polygon' && selectedShape.polygon) {
-          return isPointInPolygon(point, selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })));
+          isInZone = isPointInPolygon(point, selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })));
         } else if (selectedShape.type === 'circle' && selectedShape.center && selectedShape.radius) {
           const radiusKm = selectedShape.radius / 1000;
-          return isPointInCircle(point, { lat: selectedShape.center.lat, lng: selectedShape.center.lng }, radiusKm);
+          isInZone = isPointInCircle(point, { lat: selectedShape.center.lat, lng: selectedShape.center.lng }, radiusKm);
         } else if (selectedShape.type === 'rectangle') {
           const ne = selectedShape.bounds.getNorthEast();
           const sw = selectedShape.bounds.getSouthWest();
-          return isPointInBounds(point, { north: ne.lat, south: sw.lat, east: ne.lng, west: sw.lng });
+          isInZone = isPointInBounds(point, { north: ne.lat, south: sw.lat, east: ne.lng, west: sw.lng });
         }
-        return false;
-      });
+
+        if (isInZone) {
+          totalCount++;
+          // Only collect properties that are available and not in routes (for optimization)
+          // Also limit collection to a reasonable number to avoid memory issues
+          if (propsInZoneForDisplay.length < 100 && (!p.id || !unavailablePropertyIds.has(p.id))) {
+            propsInZoneForDisplay.push(p);
+          }
+        }
+      }
 
       // Store total count for display
-      setTotalPropertiesInZone(allPropsInZone.length);
+      setTotalPropertiesInZone(totalCount);
+
+      // Warn user if area is too large
+      if (totalCount > 1000) {
+        toast({
+          title: "Large Area Selected",
+          description: `Found ${totalCount.toLocaleString()} properties in the area. Only the 24 closest properties will be used for route optimization. Consider selecting a smaller area for better results.`,
+          variant: "default",
+        });
+      }
 
       // Filter properties within the area AND exclude visited/in-route properties (for route optimization)
-      const propsInArea = allPropsInZone.filter(p => {
-        // Exclude unavailable properties (visited or in active routes)
-        if (p.id && unavailablePropertyIds.has(p.id)) return false;
-        return true;
-      });
+      // OPTIMIZATION: Only process properties we collected (max 100), not all thousands
+      // If we need more, we'll do a second pass with distance-based early termination
+      let propsInArea: PropertyLike[];
+      
+      if (totalCount <= 100) {
+        // Small area - use all collected properties
+        propsInArea = propsInZoneForDisplay;
+      } else {
+        // Large area - do a second pass with early termination
+        // We'll collect up to 50 closest properties, then sort and take top 24
+        const candidateProps: Array<{ prop: PropertyLike; distance: number }> = [];
+        const startingPoint = { lat: closestProperty.latitude!, lng: closestProperty.longitude! };
+        
+        for (const p of properties) {
+          if (!p.latitude || !p.longitude) continue;
+          if (p.id && unavailablePropertyIds.has(p.id)) continue;
+          
+          const point = { lat: p.latitude, lng: p.longitude };
+          let isInZone = false;
+
+          if (selectedShape.type === 'polygon' && selectedShape.polygon) {
+            isInZone = isPointInPolygon(point, selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })));
+          } else if (selectedShape.type === 'circle' && selectedShape.center && selectedShape.radius) {
+            const radiusKm = selectedShape.radius / 1000;
+            isInZone = isPointInCircle(point, { lat: selectedShape.center.lat, lng: selectedShape.center.lng }, radiusKm);
+          } else if (selectedShape.type === 'rectangle') {
+            const ne = selectedShape.bounds.getNorthEast();
+            const sw = selectedShape.bounds.getSouthWest();
+            isInZone = isPointInBounds(point, { north: ne.lat, south: sw.lat, east: ne.lng, west: sw.lng });
+          }
+
+          if (isInZone) {
+            const distance = calculateDistance(startingPoint.lat, startingPoint.lng, p.latitude!, p.longitude!);
+            candidateProps.push({ prop: p, distance });
+            
+            // Early termination: if we have enough candidates, only keep the closest ones
+            if (candidateProps.length > 50) {
+              // Sort and keep only the 50 closest
+              candidateProps.sort((a, b) => a.distance - b.distance);
+              candidateProps.splice(50);
+            }
+          }
+        }
+        
+        // Sort by distance and take top 24
+        candidateProps.sort((a, b) => a.distance - b.distance);
+        propsInArea = candidateProps.slice(0, 24).map(item => item.prop);
+      }
 
       // Ensure starting point property is included
       const startingPointProp = propsInArea.find(p => p.id === closestProperty.id) || closestProperty;
@@ -496,10 +562,10 @@ export function AreaSelectorMap({
       const propsWithoutStart = propsInArea.filter(p => p.id !== startingPointProp.id);
       
       // Sort remaining properties by distance from starting point (closest first)
-      // Use the existing startingPoint variable defined earlier
+      const startingPointCoords = { lat: closestProperty.latitude!, lng: closestProperty.longitude! };
       const sortedProps = propsWithoutStart.sort((a, b) => {
-        const distA = calculateDistance(startingPoint.lat, startingPoint.lng, a.latitude!, a.longitude!);
-        const distB = calculateDistance(startingPoint.lat, startingPoint.lng, b.latitude!, b.longitude!);
+        const distA = calculateDistance(startingPointCoords.lat, startingPointCoords.lng, a.latitude!, a.longitude!);
+        const distB = calculateDistance(startingPointCoords.lat, startingPointCoords.lng, b.latitude!, b.longitude!);
         return distA - distB;
       });
       
@@ -512,8 +578,8 @@ export function AreaSelectorMap({
       const finalProps = [startingPointProp, ...limitedProps];
 
       setSelectedProperties(finalProps);
-      const totalFound = propsInArea.length;
-      const propertiesToOptimize = Math.min(24, totalFound - (propsInArea.find(p => p.id === closestProperty.id) ? 1 : 0));
+      const totalFound = totalCount; // Use the total count we calculated earlier (for display)
+      const propertiesToOptimize = Math.min(24, propsInArea.length - (propsInArea.find(p => p.id === closestProperty.id) ? 1 : 0));
       const limitedMessage = totalFound > 25 
         ? `Found ${totalFound} properties in the area. Limiting to 24 properties for optimization (starting point is not a stop).`
         : totalFound > 1
