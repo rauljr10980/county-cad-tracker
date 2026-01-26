@@ -112,6 +112,7 @@ export function ZoneManager({ isOpen, onClose, onSelectZone, onEditZone, propert
   }, [isOpen]);
 
   // Calculate property counts for each zone
+  // IMPORTANT: Count ALL properties in zone, not just available ones (to match custom drawing behavior)
   const zoneCounts = useMemo(() => {
     const counts: Record<string, number> = {};
 
@@ -120,7 +121,8 @@ export function ZoneManager({ isOpen, onClose, onSelectZone, onEditZone, propert
 
       properties.forEach(p => {
         if (!p.latitude || !p.longitude) return;
-        if (p.id && unavailablePropertyIds.has(p.id)) return;
+        // NOTE: Count ALL properties in zone, including unavailable ones
+        // This matches the behavior when drawing custom shapes
 
         const point = { lat: p.latitude, lng: p.longitude };
         let isInZone = false;
