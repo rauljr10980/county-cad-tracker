@@ -362,10 +362,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
         </DialogHeader>
 
 
-        <div className="space-y-6 pt-4">
+        <div className="space-y-4 pt-2">
           {/* Property Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
               <div className="flex items-start gap-3">
                 <MapPin className="h-4 w-4 text-primary mt-1 shrink-0" />
                 <div>
@@ -393,72 +393,90 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             </div>
 
             <div className="space-y-4">
-              <div className="bg-secondary/50 rounded-lg p-4">
+              <div className="bg-secondary/50 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-3">
                   <DollarSign className="h-4 w-4 text-primary" />
                   <span className="text-sm font-medium">Financial Summary</span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <p className="text-xs text-muted-foreground">Amount Due</p>
                     <p className="text-lg font-semibold font-mono text-judgment">
                       {formatCurrency(property.totalAmountDue)}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Market Value</p>
-                    <p className="text-lg font-semibold font-mono">
-                      {property.marketValue ? formatCurrency(property.marketValue) : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Land Value</p>
-                    <p className="font-mono">
-                      {property.landValue ? formatCurrency(property.landValue) : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Improvement Value</p>
-                    <p className="font-mono">
-                      {property.improvementValue ? formatCurrency(property.improvementValue) : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Capped Value</p>
-                    <p className="font-mono">
-                      {property.cappedValue ? formatCurrency(property.cappedValue) : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Agricultural Value</p>
-                    <p className="font-mono">
-                      {property.agriculturalValue && property.agriculturalValue > 0 ? formatCurrency(property.agriculturalValue) : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Prior Years Amount Due</p>
-                    <p className="font-mono">
-                      {property.priorYearsAmountDue && property.priorYearsAmountDue > 0 ? formatCurrency(property.priorYearsAmountDue) : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Year Amount Due</p>
-                    <p className="font-mono">
-                      {property.yearAmountDue && property.yearAmountDue > 0 ? formatCurrency(property.yearAmountDue) : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Year Tax Levy</p>
-                    <p className="font-mono">
-                      {property.yearTaxLevy && property.yearTaxLevy > 0 ? formatCurrency(property.yearTaxLevy) : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Half Payment Option</p>
-                    <p className="font-mono">
-                      {property.halfPaymentOptionAmount && property.halfPaymentOptionAmount > 0 ? formatCurrency(property.halfPaymentOptionAmount) : 'N/A'}
-                    </p>
-                  </div>
+                  {property.marketValue && property.marketValue > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Market Value</p>
+                      <p className="text-lg font-semibold font-mono">
+                        {formatCurrency(property.marketValue)}
+                      </p>
+                    </div>
+                  )}
+                  {property.landValue && property.landValue > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Land Value</p>
+                      <p className="font-mono">
+                        {formatCurrency(property.landValue)}
+                      </p>
+                    </div>
+                  )}
+                  {property.improvementValue && property.improvementValue > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Improvement Value</p>
+                      <p className="font-mono">
+                        {formatCurrency(property.improvementValue)}
+                      </p>
+                    </div>
+                  )}
+                  {property.cappedValue && property.cappedValue > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Capped Value</p>
+                      <p className="font-mono">
+                        {formatCurrency(property.cappedValue)}
+                      </p>
+                    </div>
+                  )}
+                  {property.agriculturalValue && property.agriculturalValue > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Agricultural Value</p>
+                      <p className="font-mono">
+                        {formatCurrency(property.agriculturalValue)}
+                      </p>
+                    </div>
+                  )}
+                  {property.priorYearsAmountDue && property.priorYearsAmountDue > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Prior Years Amount Due</p>
+                      <p className="font-mono">
+                        {formatCurrency(property.priorYearsAmountDue)}
+                      </p>
+                    </div>
+                  )}
+                  {property.yearAmountDue && property.yearAmountDue > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Year Amount Due</p>
+                      <p className="font-mono">
+                        {formatCurrency(property.yearAmountDue)}
+                      </p>
+                    </div>
+                  )}
+                  {property.yearTaxLevy && property.yearTaxLevy > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Year Tax Levy</p>
+                      <p className="font-mono">
+                        {formatCurrency(property.yearTaxLevy)}
+                      </p>
+                    </div>
+                  )}
+                  {property.halfPaymentOptionAmount && property.halfPaymentOptionAmount > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Half Payment Option</p>
+                      <p className="font-mono">
+                        {formatCurrency(property.halfPaymentOptionAmount)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -476,9 +494,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               </div>
               
               {/* Payment & Tax Information and Exemptions & Jurisdictions - Side by Side */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Payment & Tax Information */}
-                <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                <div className="bg-secondary/30 rounded-lg p-3 space-y-2">
                   <div className="flex items-center gap-2 mb-2">
                     <Calendar className="h-3 w-3 text-primary" />
                     <p className="text-xs font-medium text-muted-foreground">Payment & Tax Information</p>
@@ -510,7 +528,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 </div>
                 
                 {/* Exemptions & Jurisdictions */}
-                <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                <div className="bg-secondary/30 rounded-lg p-3 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground mb-2">Exemptions & Jurisdictions</p>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Exemptions:</p>
@@ -535,7 +553,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
           
           {/* Additional Details Section */}
           {(property.link || property.ownerAddress) && (
-            <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+            <div className="bg-secondary/30 rounded-lg p-3 space-y-2">
               <p className="text-xs font-medium text-muted-foreground mb-2">Additional Details</p>
               {property.link && (
                 <div className="flex items-start gap-2">
@@ -567,7 +585,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
           {/* Payment History Chart */}
           {paymentChartData.length > 0 && (
-            <div className="bg-secondary/30 rounded-lg p-4">
+            <div className="bg-secondary/30 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">Payment History</span>
@@ -690,7 +708,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
           </div>
 
           {/* Actions & Tasks Section */}
-          <div className="bg-secondary/30 rounded-lg p-4">
+          <div className="bg-secondary/30 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">Actions & Tasks</span>
@@ -881,7 +899,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
           </div>
 
           {/* Phone Numbers Section */}
-          <div className="bg-secondary/30 rounded-lg p-4">
+          <div className="bg-secondary/30 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-3">
               <Phone className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">Phone Numbers</span>
