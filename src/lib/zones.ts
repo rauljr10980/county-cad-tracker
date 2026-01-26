@@ -40,7 +40,52 @@ export const ZONE_COLORS = [
 ];
 
 /**
- * Load all saved zones from API
+ * Load zones from localStorage (fallback/migration)
+ */
+function loadZonesFromLocalStorage(): SavedZone[] {
+  try {
+    const stored = localStorage.getItem('county-cad-zones');
+    if (!stored) return [];
+    const zones = JSON.parse(stored) as SavedZone[];
+    console.log('[Zones] Loaded from localStorage:', zones.length);
+    return zones;
+  } catch (error) {
+    console.error('[Zones] Failed to load from localStorage:', error);
+    return [];
+  }
+}
+
+/**
+ * Migrate localStorage zones to API
+ */
+async function migrateLocalStorageZones(localZones: SavedZone[]): Promise<void> {
+  console.log('[Zones] Migrating', localZones.length, 'zones from localStorage to API...');
+
+  for (const zone of localZones) {
+    try {
+      await saveZone({
+        name: zone.name,
+        description: zone.description,
+        type: zone.type,
+        color: zone.color,
+        bounds: zone.bounds,
+        center: zone.center,
+        radius: zone.radius,
+        polygon: zone.polygon,
+      });
+      console.log('[Zones] Migrated zone:', zone.name);
+    } catch (error) {
+      console.error('[Zones] Failed to migrate zone:', zone.name, error);
+    }
+  }
+
+  // Clear localStorage after successful migration
+  localStorage.removeItem('county-cad-zones');
+  console.log('[Zones] Migration complete, localStorage cleared');
+}
+
+/**
+ * Load all saved zones from API with localStorage fallback
  */
 export async function loadZones(): Promise<SavedZone[]> {
   try {
@@ -52,10 +97,30 @@ export async function loadZones(): Promise<SavedZone[]> {
     }
 
     const data = await response.json();
-    console.log('[Zones] Zones loaded:', data.zones?.length || 0);
+    console.log('[Zones] Zones loaded from API:', data.zones?.length || 0);
+
+    // Check if we need to migrate localStorage zones
+    const localZones = loadZonesFromLocalStorage();
+    if (localZones.length > 0 && data.zones.length === 0) {
+      console.log('[Zones] Found localStorage zones, migrating to API...');
+      // Migrate in background, return localStorage zones immediately
+      migrateLocalStorageZones(localZones).catch(err =>
+        console.error('[Zones] Background migration failed:', err)
+      );
+      return localZones;
+    }
+
     return data.zones || [];
   } catch (error) {
-    console.error('[Zones] Failed to load zones:', error);
+    console.error('[Zones] Failed to load zones from API:', error);
+
+    // Fallback to localStorage if API is not available
+    const localZones = loadZonesFromLocalStorage();
+    if (localZones.length > 0) {
+      console.log('[Zones] Using localStorage fallback:', localZones.length, 'zones');
+      return localZones;
+    }
+
     return [];
   }
 }
