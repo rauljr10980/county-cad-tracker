@@ -479,6 +479,25 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   )}
                 </div>
               </div>
+
+              {/* Tax Percentage Section - Expanded */}
+              <div className="bg-secondary/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Tax Percentage</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary rounded-full transition-all"
+                      style={{ width: `${Math.min(property.totalPercentage || 0, 100)}%` }}
+                    />
+                  </div>
+                  <span className="font-mono text-base font-semibold min-w-[50px] text-right">
+                    {property.totalPercentage || 0}%
+                  </span>
+                </div>
+              </div>
               
               {/* Payment & Tax Information and Exemptions & Jurisdictions - Side by Side */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
