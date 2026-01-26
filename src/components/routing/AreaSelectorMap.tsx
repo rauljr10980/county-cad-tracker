@@ -1125,8 +1125,8 @@ export function AreaSelectorMap({
                     className="flex-1 bg-green-600 hover:bg-green-700"
                     onClick={handleNextStep}
                     disabled={
-                      (step === 1 && (!closestProperty || !pinLocation)) ||
-                      (step === 2 && !selectedShape) ||
+                      (step === 1 && !selectedShape) ||
+                      (step === 2 && (!closestProperty || !pinLocation)) ||
                       (step === 3 && selectedProperties.length === 0)
                     }
                   >
