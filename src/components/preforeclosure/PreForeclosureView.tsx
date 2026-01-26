@@ -1679,7 +1679,8 @@ export function PreForeclosureView() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Pre-Foreclosure Records</h1>
-        {!isLoading && !error && (
+        {/* Hidden: Active records count */}
+        {/* {!isLoading && !error && (
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <span className="font-medium text-foreground">
             {filteredRecords.length.toLocaleString()} active record{filteredRecords.length !== 1 ? 's' : ''}
@@ -1691,7 +1692,7 @@ export function PreForeclosureView() {
                 </>
             )}
             </div>
-        )}
+        )} */}
       </div>
         <div className="flex flex-wrap gap-2 items-center">
         {selectedRecordIds.size > 0 && (
