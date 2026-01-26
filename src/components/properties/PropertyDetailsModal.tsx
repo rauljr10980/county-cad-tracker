@@ -356,135 +356,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 )}
               </DialogTitle>
               <p className="text-sm text-muted-foreground mt-1 font-mono">
-                Account: {property.accountNumber}
               </p>
             </div>
           </div>
         </DialogHeader>
 
-        {/* Actions Panel - Prominent at top */}
-        <div className="bg-secondary/30 rounded-lg p-4 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm font-medium">Actions</span>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant={activeAction === 'view' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                setActiveAction('view');
-                setShowPreForeclosure(true);
-              }}
-              className={cn(
-                "flex-1",
-                activeAction === 'view' && "bg-primary text-primary-foreground"
-              )}
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={activeAction === 'send' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveAction('send')}
-              className={cn(
-                "flex-1",
-                activeAction === 'send' && "bg-primary text-primary-foreground"
-              )}
-              disabled
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={activeAction === 'external' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                setActiveAction('external');
-                if (property.link) {
-                  window.open(property.link, '_blank');
-                } else {
-                  window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
-                }
-              }}
-              className={cn(
-                "flex-1",
-                activeAction === 'external' && "bg-primary text-primary-foreground"
-              )}
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          {/* Pre-Foreclosure Information */}
-          {showPreForeclosure && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium">Pre-Foreclosure Records</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowPreForeclosure(false)}
-                  className="h-6 w-6 p-0"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-              {loadingPreForeclosure ? (
-                <div className="text-sm text-muted-foreground">Loading...</div>
-              ) : preForeclosureRecords.length > 0 ? (
-                <div className="space-y-3">
-                  {preForeclosureRecords.map((record, index) => (
-                    <div key={index} className="bg-card rounded-lg p-3 border border-border">
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="text-muted-foreground">Document Number:</span>
-                          <div className="font-mono font-medium">{record.document_number}</div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Type:</span>
-                          <div className="font-medium">{record.type}</div>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-muted-foreground">Address:</span>
-                          <div>{record.address}, {record.city}, {record.zip}</div>
-                        </div>
-                        {record.filing_month && (
-                          <div>
-                            <span className="text-muted-foreground">Filing Month:</span>
-                            <div>{record.filing_month}</div>
-                          </div>
-                        )}
-                        {record.county && (
-                          <div>
-                            <span className="text-muted-foreground">County:</span>
-                            <div>{record.county}</div>
-                          </div>
-                        )}
-                        {record.internal_status && (
-                          <div className="col-span-2">
-                            <span className="text-muted-foreground">Status:</span>
-                            <div>
-                              <Badge variant="outline">{record.internal_status}</Badge>
-                            </div>
-                          </div>
-                        )}
-                        {record.notes && (
-                          <div className="col-span-2">
-                            <span className="text-muted-foreground">Notes:</span>
-                            <div className="text-xs mt-1">{record.notes}</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  No pre-foreclosure records found for this property.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
         <div className="space-y-6 pt-4">
           {/* Property Info */}
@@ -495,13 +371,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 <div>
                   <p className="text-xs text-muted-foreground">Property Address</p>
                   <p className="font-medium">{parsedAddress || property.propertyAddress}</p>
-                  {property.latitude && property.longitude && (
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      <span className="font-mono">Lat: {property.latitude.toFixed(6)}</span>
-                      {' • '}
-                      <span className="font-mono">Long: {property.longitude.toFixed(6)}</span>
-                    </div>
-                  )}
                 </div>
               </div>
               
