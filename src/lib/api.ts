@@ -553,6 +553,26 @@ export async function updatePropertyDealStage(
   return response.json();
 }
 
+export async function updatePropertyVisited(
+  propertyId: string,
+  visited: boolean,
+  visitedBy?: 'Luciano' | 'Raul'
+) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/visited`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ visited, visitedBy }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || 'Failed to update visited status');
+  }
+  return response.json();
+}
+
 /**
  * Login user
  */

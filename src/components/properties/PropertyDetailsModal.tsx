@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyDealStage, getPreForeclosures } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyDealStage, updatePropertyVisited, getPreForeclosures } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -47,6 +47,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [expectedCloseDate, setExpectedCloseDate] = useState<Date | undefined>(undefined);
   const [savingDealStage, setSavingDealStage] = useState(false);
 
+  // Visited status state
+  const [visited, setVisited] = useState(false);
+  const [visitedBy, setVisitedBy] = useState<'Luciano' | 'Raul' | ''>('');
+  const [savingVisited, setSavingVisited] = useState(false);
+
   // Pre-foreclosure state
   const [preForeclosureRecords, setPreForeclosureRecords] = useState<PreForeclosureRecord[]>([]);
   const [loadingPreForeclosure, setLoadingPreForeclosure] = useState(false);
@@ -80,6 +85,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setEstimatedDealValue(property.estimatedDealValue?.toString() || '');
       setOfferAmount(property.offerAmount?.toString() || '');
       setExpectedCloseDate(property.expectedCloseDate ? new Date(property.expectedCloseDate) : undefined);
+      
+      // Initialize visited status
+      setVisited(property.visited || false);
+      setVisitedBy(property.visitedBy || '');
       
       // Load pre-foreclosure records for this property
       loadPreForeclosureRecords();
@@ -292,6 +301,34 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       });
     } finally {
       setSavingAction(false);
+    }
+  };
+
+  const handleSaveVisited = async () => {
+    if (!property) return;
+    
+    setSavingVisited(true);
+    try {
+      await updatePropertyVisited(property.id, visited, visitedBy || undefined);
+      toast({
+        title: "Visited Status Updated",
+        description: `Property marked as ${visited ? 'visited' : 'not visited'}`,
+      });
+      // Update property object directly
+      property.visited = visited;
+      property.visitedAt = visited ? new Date().toISOString() : undefined;
+      property.visitedBy = visited && visitedBy ? visitedBy : undefined;
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['properties'] });
+    } catch (error: any) {
+      console.error('Error updating visited status:', error);
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to update visited status',
+        variant: "destructive",
+      });
+    } finally {
+      setSavingVisited(false);
     }
   };
 
@@ -846,6 +883,57 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   disabled={savingDealStage || !dealStage}
                 >
                   {savingDealStage ? 'Updating...' : 'Update Deal Stage'}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Visited Status Section */}
+          <div className="bg-secondary/30 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Visited Status</span>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="visited-checkbox"
+                  checked={visited}
+                  onChange={(e) => setVisited(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <label htmlFor="visited-checkbox" className="text-sm cursor-pointer">
+                  Mark as visited
+                </label>
+              </div>
+              {visited && (
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Visited By</label>
+                  <Select value={visitedBy} onValueChange={(value) => setVisitedBy(value as 'Luciano' | 'Raul')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select who visited" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Luciano">Luciano</SelectItem>
+                      <SelectItem value="Raul">Raul</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {property.visitedAt && (
+                <div className="text-xs text-muted-foreground">
+                  Last visited: {format(new Date(property.visitedAt), 'PPP p')}
+                  {property.visitedBy && ` by ${property.visitedBy}`}
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveVisited}
+                  disabled={savingVisited || (visited && !visitedBy)}
+                >
+                  {savingVisited ? 'Saving...' : 'Save Visited Status'}
                 </Button>
               </div>
             </div>

@@ -55,6 +55,10 @@ export interface Property {
   isRemoved?: boolean;
   statusChanged?: boolean;
   percentageChanged?: boolean;
+  // Visited Status
+  visited?: boolean;
+  visitedAt?: string;
+  visitedBy?: string;
 }
 
 export interface PaymentRecord {

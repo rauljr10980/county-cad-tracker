@@ -1305,6 +1305,49 @@ router.put('/:id/deal-stage', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
+// UPDATE PROPERTY VISITED STATUS
+// ============================================================================
+
+router.put('/:id/visited', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { visited, visitedBy } = req.body;
+
+    if (typeof visited !== 'boolean') {
+      return res.status(400).json({ error: 'visited must be a boolean' });
+    }
+
+    const updateData = {
+      visited,
+      visitedAt: visited ? new Date() : null,
+      visitedBy: visited && visitedBy ? visitedBy : null
+    };
+
+    const property = await prisma.property.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        visited: true,
+        visitedAt: true,
+        visitedBy: true
+      }
+    });
+
+    res.json({
+      success: true,
+      property
+    });
+  } catch (error) {
+    console.error('[PROPERTIES] Update visited status error:', error);
+    res.status(500).json({ 
+      error: 'Failed to update visited status', 
+      message: error.message 
+    });
+  }
+});
+
+// ============================================================================
 // BATCH GEOCODE PROPERTIES
 // ============================================================================
 

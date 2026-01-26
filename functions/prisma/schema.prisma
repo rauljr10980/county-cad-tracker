@@ -102,8 +102,13 @@ model Property {
   // Metadata
   isNew             Boolean @default(false)
   isRemoved         Boolean @default(false)
-  statusChanged     Boolean @default(false)
+  statusChanged      Boolean @default(false)
   percentageChanged Boolean @default(false)
+
+  // Visited Status
+  visited   Boolean   @default(false)
+  visitedAt DateTime?
+  visitedBy String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
