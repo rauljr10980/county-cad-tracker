@@ -301,6 +301,38 @@ export function AreaSelectorMap({
   const [loadedZone, setLoadedZone] = useState<SavedZone | null>(null);
   const [allSavedZones, setAllSavedZones] = useState<SavedZone[]>([]);
 
+  // Calculate property counts for all saved zones
+  const savedZoneCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+
+    allSavedZones.forEach(zone => {
+      let count = 0;
+
+      properties.forEach(p => {
+        if (!p.latitude || !p.longitude) return;
+        if (p.id && unavailablePropertyIds.has(p.id)) return;
+
+        const point = { lat: p.latitude, lng: p.longitude };
+        let isInZone = false;
+
+        if (zone.type === 'polygon' && zone.polygon) {
+          isInZone = isPointInPolygon(point, zone.polygon);
+        } else if (zone.type === 'circle' && zone.center && zone.radius) {
+          const radiusKm = zone.radius / 1000;
+          isInZone = isPointInCircle(point, zone.center, radiusKm);
+        } else if (zone.type === 'rectangle') {
+          isInZone = isPointInBounds(point, zone.bounds);
+        }
+
+        if (isInZone) count++;
+      });
+
+      counts[zone.id] = count;
+    });
+
+    return counts;
+  }, [allSavedZones, properties, unavailablePropertyIds]);
+
   // Reset when modal opens/closes
   useEffect(() => {
     if (isOpen) {
@@ -1117,6 +1149,62 @@ export function AreaSelectorMap({
                     );
                   }
                   return null;
+                })}
+
+                {/* Display property counts for saved zones */}
+                {step === 1 && allSavedZones.map((zone) => {
+                  const isLoadedZone = loadedZone?.id === zone.id;
+                  if (isLoadedZone) return null; // Don't show count for loaded zone
+
+                  const count = savedZoneCounts[zone.id] || 0;
+                  let center: { lat: number; lng: number } | null = null;
+
+                  if (zone.type === 'polygon' && zone.polygon && zone.polygon.length > 0) {
+                    // Calculate centroid of polygon
+                    const sumLat = zone.polygon.reduce((sum, p) => sum + p.lat, 0);
+                    const sumLng = zone.polygon.reduce((sum, p) => sum + p.lng, 0);
+                    center = {
+                      lat: sumLat / zone.polygon.length,
+                      lng: sumLng / zone.polygon.length
+                    };
+                  } else if (zone.type === 'circle' && zone.center) {
+                    center = { lat: zone.center.lat, lng: zone.center.lng };
+                  } else if (zone.type === 'rectangle') {
+                    center = {
+                      lat: (zone.bounds.north + zone.bounds.south) / 2,
+                      lng: (zone.bounds.east + zone.bounds.west) / 2
+                    };
+                  }
+
+                  if (!center) return null;
+
+                  const countIcon = new DivIcon({
+                    html: `<div style="
+                      background: ${zone.color};
+                      color: white;
+                      padding: 6px 12px;
+                      border-radius: 16px;
+                      font-weight: bold;
+                      font-size: 14px;
+                      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                      white-space: nowrap;
+                      border: 2px solid white;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    ">${count}</div>`,
+                    className: '',
+                    iconSize: [50, 32],
+                    iconAnchor: [25, 16]
+                  });
+
+                  return (
+                    <Marker
+                      key={`count-${zone.id}`}
+                      position={[center.lat, center.lng]}
+                      icon={countIcon}
+                    />
+                  );
                 })}
 
                 {/* Property count overlay */}
