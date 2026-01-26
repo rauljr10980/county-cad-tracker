@@ -305,12 +305,25 @@ export function AreaSelectorMap({
   const savedZoneCounts = useMemo(() => {
     const counts: Record<string, number> = {};
 
+    console.log('=== Calculating Saved Zone Counts ===');
+    console.log('Total properties to check:', properties.length);
+    console.log('Unavailable property IDs:', unavailablePropertyIds.size);
+    console.log('Number of saved zones:', allSavedZones.length);
+
     allSavedZones.forEach(zone => {
       let count = 0;
+      let skippedNoCoords = 0;
+      let skippedUnavailable = 0;
 
       properties.forEach(p => {
-        if (!p.latitude || !p.longitude) return;
-        if (p.id && unavailablePropertyIds.has(p.id)) return;
+        if (!p.latitude || !p.longitude) {
+          skippedNoCoords++;
+          return;
+        }
+        if (p.id && unavailablePropertyIds.has(p.id)) {
+          skippedUnavailable++;
+          return;
+        }
 
         const point = { lat: p.latitude, lng: p.longitude };
         let isInZone = false;
@@ -328,7 +341,17 @@ export function AreaSelectorMap({
       });
 
       counts[zone.id] = count;
+
+      console.log(`Zone: ${zone.name}`);
+      console.log(`  Type: ${zone.type}`);
+      console.log(`  Available properties in zone: ${count}`);
+      console.log(`  Skipped (no coords): ${skippedNoCoords}`);
+      console.log(`  Skipped (unavailable): ${skippedUnavailable}`);
+      console.log(`  Total checked: ${properties.length - skippedNoCoords - skippedUnavailable}`);
     });
+
+    console.log('Final counts:', counts);
+    console.log('=== End Zone Count Calculation ===');
 
     return counts;
   }, [allSavedZones, properties, unavailablePropertyIds]);
