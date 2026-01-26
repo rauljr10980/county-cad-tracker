@@ -2139,7 +2139,7 @@ export function PropertiesView() {
         {/* Header - Mobile First */}
         <div className="mb-4">
           <h2 className="text-lg md:text-xl font-semibold">Property List</h2>
-          <p className="text-xs md:text-sm text-muted-foreground mt-1">
+          {/* <p className="text-xs md:text-sm text-muted-foreground mt-1">
             Browse and filter tax-delinquent properties.
             <span className="hidden sm:inline"> Click on a property to view details.</span>
             {totalUnfiltered && typeof totalUnfiltered === 'number' && totalUnfiltered > 0 && (
@@ -2147,7 +2147,7 @@ export function PropertiesView() {
                 {' '}{totalUnfiltered.toLocaleString()} total properties.
               </span>
             )}
-          </p>
+          </p> */}
         </div>
 
         {/* Route Actions - Mobile Optimized */}
