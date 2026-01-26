@@ -364,140 +364,137 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
         <div className="space-y-4 pt-2">
           {/* Property Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <MapPin className="h-4 w-4 text-primary mt-1 shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Property Address</p>
-                  <p className="font-medium">{parsedAddress || property.propertyAddress}</p>
-                </div>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <MapPin className="h-4 w-4 text-primary mt-1 shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Property Address</p>
+                <p className="font-medium">{parsedAddress || property.propertyAddress}</p>
               </div>
-              
-              <div className="flex items-start gap-3">
-                <FileText className="h-4 w-4 text-primary mt-1 shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Legal Description</p>
-                  <p className="text-sm">{property.legalDescription || 'N/A'}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <Calendar className="h-4 w-4 text-primary mt-1 shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Owner</p>
-                  <p className="font-medium">{parsedOwnerName || property.ownerName}</p>
-                  <p className="text-sm text-muted-foreground">{property.mailingAddress}</p>
-                </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <FileText className="h-4 w-4 text-primary mt-1 shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Legal Description</p>
+                <p className="text-sm">{property.legalDescription || 'N/A'}</p>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="bg-secondary/50 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <DollarSign className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">Financial Summary</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Amount Due</p>
-                    <p className="text-lg font-semibold font-mono text-judgment">
-                      {formatCurrency(property.totalAmountDue)}
-                    </p>
-                  </div>
-                  {property.marketValue && property.marketValue > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Market Value</p>
-                      <p className="text-lg font-semibold font-mono">
-                        {formatCurrency(property.marketValue)}
-                      </p>
-                    </div>
-                  )}
-                  {property.landValue && property.landValue > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Land Value</p>
-                      <p className="font-mono">
-                        {formatCurrency(property.landValue)}
-                      </p>
-                    </div>
-                  )}
-                  {property.improvementValue && property.improvementValue > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Improvement Value</p>
-                      <p className="font-mono">
-                        {formatCurrency(property.improvementValue)}
-                      </p>
-                    </div>
-                  )}
-                  {property.cappedValue && property.cappedValue > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Capped Value</p>
-                      <p className="font-mono">
-                        {formatCurrency(property.cappedValue)}
-                      </p>
-                    </div>
-                  )}
-                  {property.agriculturalValue && property.agriculturalValue > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Agricultural Value</p>
-                      <p className="font-mono">
-                        {formatCurrency(property.agriculturalValue)}
-                      </p>
-                    </div>
-                  )}
-                  {property.priorYearsAmountDue && property.priorYearsAmountDue > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Prior Years Amount Due</p>
-                      <p className="font-mono">
-                        {formatCurrency(property.priorYearsAmountDue)}
-                      </p>
-                    </div>
-                  )}
-                  {property.yearAmountDue && property.yearAmountDue > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Year Amount Due</p>
-                      <p className="font-mono">
-                        {formatCurrency(property.yearAmountDue)}
-                      </p>
-                    </div>
-                  )}
-                  {property.yearTaxLevy && property.yearTaxLevy > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Year Tax Levy</p>
-                      <p className="font-mono">
-                        {formatCurrency(property.yearTaxLevy)}
-                      </p>
-                    </div>
-                  )}
-                  {property.halfPaymentOptionAmount && property.halfPaymentOptionAmount > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Half Payment Option</p>
-                      <p className="font-mono">
-                        {formatCurrency(property.halfPaymentOptionAmount)}
-                      </p>
-                    </div>
-                  )}
-                </div>
+            <div className="flex items-start gap-3">
+              <Calendar className="h-4 w-4 text-primary mt-1 shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Owner</p>
+                <p className="font-medium">{parsedOwnerName || property.ownerName}</p>
+                <p className="text-sm text-muted-foreground">{property.mailingAddress}</p>
               </div>
             </div>
+          </div>
 
-            {/* Tax Percentage Section - Full Width */}
-            <div className="col-span-1 md:col-span-2 bg-secondary/30 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Tax Percentage</span>
+          {/* Financial Summary */}
+          <div className="bg-secondary/50 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-3">
+              <DollarSign className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Financial Summary</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-xs text-muted-foreground">Amount Due</p>
+                <p className="text-lg font-semibold font-mono text-judgment">
+                  {formatCurrency(property.totalAmountDue)}
+                </p>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary rounded-full transition-all"
-                    style={{ width: `${Math.min(property.totalPercentage || 0, 100)}%` }}
-                  />
+              {property.marketValue && property.marketValue > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Market Value</p>
+                  <p className="text-lg font-semibold font-mono">
+                    {formatCurrency(property.marketValue)}
+                  </p>
                 </div>
-                <span className="font-mono text-base font-semibold min-w-[50px] text-right">
-                  {property.totalPercentage || 0}%
-                </span>
+              )}
+              {property.landValue && property.landValue > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Land Value</p>
+                  <p className="font-mono">
+                    {formatCurrency(property.landValue)}
+                  </p>
+                </div>
+              )}
+              {property.improvementValue && property.improvementValue > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Improvement Value</p>
+                  <p className="font-mono">
+                    {formatCurrency(property.improvementValue)}
+                  </p>
+                </div>
+              )}
+              {property.cappedValue && property.cappedValue > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Capped Value</p>
+                  <p className="font-mono">
+                    {formatCurrency(property.cappedValue)}
+                  </p>
+                </div>
+              )}
+              {property.agriculturalValue && property.agriculturalValue > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Agricultural Value</p>
+                  <p className="font-mono">
+                    {formatCurrency(property.agriculturalValue)}
+                  </p>
+                </div>
+              )}
+              {property.priorYearsAmountDue && property.priorYearsAmountDue > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Prior Years Amount Due</p>
+                  <p className="font-mono">
+                    {formatCurrency(property.priorYearsAmountDue)}
+                  </p>
+                </div>
+              )}
+              {property.yearAmountDue && property.yearAmountDue > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Year Amount Due</p>
+                  <p className="font-mono">
+                    {formatCurrency(property.yearAmountDue)}
+                  </p>
+                </div>
+              )}
+              {property.yearTaxLevy && property.yearTaxLevy > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Year Tax Levy</p>
+                  <p className="font-mono">
+                    {formatCurrency(property.yearTaxLevy)}
+                  </p>
+                </div>
+              )}
+              {property.halfPaymentOptionAmount && property.halfPaymentOptionAmount > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Half Payment Option</p>
+                  <p className="font-mono">
+                    {formatCurrency(property.halfPaymentOptionAmount)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tax Percentage Section */}
+          <div className="bg-secondary/30 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Tax Percentage</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary rounded-full transition-all"
+                  style={{ width: `${Math.min(property.totalPercentage || 0, 100)}%` }}
+                />
               </div>
+              <span className="font-mono text-base font-semibold min-w-[50px] text-right">
+                {property.totalPercentage || 0}%
+              </span>
             </div>
           </div>
               
