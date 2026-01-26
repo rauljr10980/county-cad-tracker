@@ -812,7 +812,19 @@ export function AreaSelectorMap({
           <div className="flex-shrink-0 w-full">
               {step === 1 && (
                 <div className="space-y-4">
-                  {/* Zone management buttons - moved to step 1 */}
+                  <div className="text-sm text-muted-foreground">
+                    Draw a shape around the area, or load a saved zone. The starting point must be inside this area.
+                  </div>
+                  {loadedZone && (
+                    <div className="text-xs p-2 bg-primary/10 rounded border border-primary/20">
+                      <div className="font-medium text-primary">Using saved zone: {loadedZone.name}</div>
+                      {loadedZone.description && (
+                        <div className="text-muted-foreground mt-1">{loadedZone.description}</div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Zone management buttons */}
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -822,21 +834,114 @@ export function AreaSelectorMap({
                       <FolderOpen className="h-4 w-4 mr-2" />
                       Load Saved Zone
                     </Button>
+                    {selectedShape && (
+                      <Button
+                        variant="outline"
+                        className="flex-1 justify-start"
+                        onClick={handleSaveCurrentZone}
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Zone
+                      </Button>
+                    )}
                   </div>
-                  
-                  <div className="border-t pt-4">
-                    <div className="text-sm text-muted-foreground mb-2">
-                      Or click on the map to drop a pin. The route will start from the closest property to your pin location.
+
+                  {!loadedZone && (
+                    <div className="border-t pt-4">
+                      <div className="text-xs text-muted-foreground mb-2">Or draw a custom area:</div>
                     </div>
-                  </div>
+                  )}
+
                   <Button
-                    variant={drawingMode === 'pin' ? 'default' : 'outline'}
+                    variant={drawingMode === 'rectangle' ? 'default' : 'outline'}
                     className="w-full justify-start"
-                    onClick={() => setDrawingMode('pin')}
+                    onClick={() => {
+                      setDrawingMode('rectangle');
+                      setSelectedShape(null);
+                      setDrawnRectangle(null);
+                      setDrawnCircle(null);
+                      setDrawnPolygon(null);
+                      setPolygonPointsBeingDrawn([]);
+                    }}
                   >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Drop Pin
+                    <Square className="h-4 w-4 mr-2" />
+                    Draw Rectangle
                   </Button>
+                  <Button
+                    variant={drawingMode === 'circle' ? 'default' : 'outline'}
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setDrawingMode('circle');
+                      setSelectedShape(null);
+                      setDrawnRectangle(null);
+                      setDrawnCircle(null);
+                      setDrawnPolygon(null);
+                      setPolygonPointsBeingDrawn([]);
+                    }}
+                  >
+                    <CircleIcon className="h-4 w-4 mr-2" />
+                    Draw Circle
+                  </Button>
+                  <Button
+                    variant={drawingMode === 'polygon' ? 'default' : 'outline'}
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setDrawingMode('polygon');
+                      setSelectedShape(null);
+                      setDrawnRectangle(null);
+                      setDrawnCircle(null);
+                      setDrawnPolygon(null);
+                      setPolygonPointsBeingDrawn([]);
+                    }}
+                  >
+                    <PenTool className="h-4 w-4 mr-2" />
+                    Custom Drawing
+                  </Button>
+                  {drawingMode === 'polygon' && (
+                    <div className="pt-2 text-xs text-muted-foreground">
+                      Click on the map to add points. Double-click or click "Finish" to complete.
+                    </div>
+                  )}
+                  {drawingMode === 'polygon' && polygonPointsBeingDrawn.length >= 3 && (
+                    <Button
+                      variant="secondary"
+                      className="w-full mt-2"
+                      onClick={handleFinishPolygon}
+                    >
+                      Finish Polygon ({polygonPointsBeingDrawn.length} points)
+                    </Button>
+                  )}
+                  {selectedShape && (
+                    <div className="text-xs text-green-600 p-2 bg-green-500/10 rounded">
+                      Area drawn successfully!
+                    </div>
+                  )}
+                </div>
+              )}
+
+            {step === 2 && (
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Click on the map to drop a pin. The route will start from the closest property to your pin location.
+                </div>
+                {startingPointValidation && !startingPointValidation.valid && (
+                  <div className="text-xs text-destructive p-2 bg-destructive/10 rounded">
+                    {startingPointValidation.message}
+                  </div>
+                )}
+                {startingPointValidation && startingPointValidation.valid && (
+                  <div className="text-xs text-green-600 p-2 bg-green-500/10 rounded">
+                    {startingPointValidation.message}
+                  </div>
+                )}
+                <Button
+                  variant={drawingMode === 'pin' ? 'default' : 'outline'}
+                  className="w-full justify-start"
+                  onClick={() => setDrawingMode('pin')}
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Drop Pin
+                </Button>
                 {pinLocation && (
                   <>
                     <div className="text-xs space-y-1 p-2 bg-muted rounded">
@@ -876,117 +981,6 @@ export function AreaSelectorMap({
                 )}
               </div>
             )}
-
-            {step === 2 && (
-              <div className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Draw a shape around the area. The starting point must be inside the drawn area.
-                </div>
-                {loadedZone && (
-                  <div className="text-xs p-2 bg-primary/10 rounded border border-primary/20">
-                    <div className="font-medium text-primary">Using saved zone: {loadedZone.name}</div>
-                    {loadedZone.description && (
-                      <div className="text-muted-foreground mt-1">{loadedZone.description}</div>
-                    )}
-                  </div>
-                )}
-                {startingPointValidation && !startingPointValidation.valid && (
-                  <div className="text-xs text-destructive p-2 bg-destructive/10 rounded">
-                    {startingPointValidation.message}
-                  </div>
-                )}
-                {startingPointValidation && startingPointValidation.valid && (
-                  <div className="text-xs text-green-600 p-2 bg-green-500/10 rounded">
-                    {startingPointValidation.message}
-                  </div>
-                )}
-
-                {/* Save Zone button - only show if shape is selected */}
-                {selectedShape && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1 justify-start"
-                      onClick={handleSaveCurrentZone}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Zone
-                    </Button>
-                  </div>
-                )}
-
-                {!loadedZone && (
-                  <div className="border-t pt-4">
-                    <div className="text-xs text-muted-foreground mb-2">Or draw a custom area:</div>
-                  </div>
-                )}
-
-                <Button
-                  variant={drawingMode === 'rectangle' ? 'default' : 'outline'}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setDrawingMode('rectangle');
-                    setSelectedShape(null);
-                    setDrawnRectangle(null);
-                    setDrawnCircle(null);
-                    setDrawnPolygon(null);
-                    setPolygonPointsBeingDrawn([]);
-                  }}
-                >
-                  <Square className="h-4 w-4 mr-2" />
-                  Draw Rectangle
-                </Button>
-                <Button
-                  variant={drawingMode === 'circle' ? 'default' : 'outline'}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setDrawingMode('circle');
-                    setSelectedShape(null);
-                    setDrawnRectangle(null);
-                    setDrawnCircle(null);
-                    setDrawnPolygon(null);
-                    setPolygonPointsBeingDrawn([]);
-                  }}
-                >
-                  <CircleIcon className="h-4 w-4 mr-2" />
-                  Draw Circle
-                </Button>
-                <Button
-                  variant={drawingMode === 'polygon' ? 'default' : 'outline'}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setDrawingMode('polygon');
-                    setSelectedShape(null);
-                    setDrawnRectangle(null);
-                    setDrawnCircle(null);
-                    setDrawnPolygon(null);
-                    setPolygonPointsBeingDrawn([]);
-                  }}
-                >
-                  <PenTool className="h-4 w-4 mr-2" />
-                  Custom Drawing
-                </Button>
-                {drawingMode === 'polygon' && (
-                  <div className="pt-2 text-xs text-muted-foreground">
-                    Click on the map to add points. Double-click or click "Finish" to complete.
-                  </div>
-                )}
-                {drawingMode === 'polygon' && polygonPointsBeingDrawn.length >= 3 && (
-                  <Button
-                    variant="secondary"
-                    className="w-full mt-2"
-                    onClick={handleFinishPolygon}
-                  >
-                    Finish Polygon ({polygonPointsBeingDrawn.length} points)
-                  </Button>
-                )}
-                {selectedShape && (
-                  <div className="text-xs text-green-600 p-2 bg-green-500/10 rounded">
-                    Area drawn successfully!
-                  </div>
-                )}
-                </div>
-              )}
 
               {step === 3 && (
                 <div className="space-y-4">
