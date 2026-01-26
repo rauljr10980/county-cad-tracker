@@ -278,7 +278,7 @@ export function PropertiesView() {
   const queryClient = useQueryClient();
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<Set<string>>(new Set());
-  const [numVehicles, setNumVehicles] = useState<1 | 2>(1);
+  const numVehicles = 1; // Always use 1 vehicle
   const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
@@ -2219,20 +2219,6 @@ export function PropertiesView() {
 
               {/* Route Controls - Stacked on Mobile */}
               <div className="flex flex-col sm:flex-row gap-2">
-                {/* Vehicle Select */}
-                <Select
-                  value={numVehicles.toString()}
-                  onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
-                >
-                  <SelectTrigger className="w-full sm:w-36 mobile-input">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 Vehicle</SelectItem>
-                    <SelectItem value="2">2 Vehicles</SelectItem>
-                  </SelectContent>
-                </Select>
-
                 {/* Area Selector Button */}
                 <Button
                   onClick={async () => {

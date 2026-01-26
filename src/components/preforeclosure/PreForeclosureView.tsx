@@ -319,7 +319,7 @@ export function PreForeclosureView() {
   const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [editingDateField, setEditingDateField] = useState<{ documentNumber: string; field: 'last_action_date' | 'next_follow_up_date' } | null>(null);
-  const [numVehicles, setNumVehicles] = useState<1 | 2>(1);
+  const numVehicles = 1; // Always use 1 vehicle
   const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
@@ -1701,18 +1701,6 @@ export function PreForeclosureView() {
                 <CheckCircle className="h-4 w-4" />
               {selectedRecordIds.size} selected
               </div>
-            <Select
-              value={numVehicles.toString()}
-              onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 Vehicle</SelectItem>
-                <SelectItem value="2">2 Vehicles</SelectItem>
-              </SelectContent>
-            </Select>
             <Button
               onClick={() => setAreaSelectorOpen(true)}
               variant="outline"
