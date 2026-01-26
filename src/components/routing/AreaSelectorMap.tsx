@@ -915,9 +915,11 @@ export function AreaSelectorMap({
                   </div>
                 )}
 
-                <div className="border-t pt-4">
-                  <div className="text-xs text-muted-foreground mb-2">Or draw a custom area:</div>
-                </div>
+                {!loadedZone && (
+                  <div className="border-t pt-4">
+                    <div className="text-xs text-muted-foreground mb-2">Or draw a custom area:</div>
+                  </div>
+                )}
 
                 <Button
                   variant={drawingMode === 'rectangle' ? 'default' : 'outline'}
