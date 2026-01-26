@@ -765,6 +765,8 @@ export function AreaSelectorMap({
   if (!isOpen) return null;
 
   const getStepTitle = () => {
+    // Step 1: Draw Area (user draws area first)
+    // Step 2: Select Starting Point (user drops pin within the drawn area)
     switch (step) {
       case 1: return 'Step 1: Draw Area';
       case 2: return 'Step 2: Select Starting Point';
