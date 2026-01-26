@@ -887,17 +887,9 @@ export function AreaSelectorMap({
                   </div>
                 )}
 
-                {/* Zone management buttons */}
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1 justify-start"
-                    onClick={() => setShowZoneManager(true)}
-                  >
-                    <FolderOpen className="h-4 w-4 mr-2" />
-                    Load Saved Zone
-                  </Button>
-                  {selectedShape && (
+                {/* Save Zone button - only show if shape is selected */}
+                {selectedShape && (
+                  <div className="flex gap-2">
                     <Button
                       variant="outline"
                       className="flex-1 justify-start"
@@ -906,8 +898,8 @@ export function AreaSelectorMap({
                       <Save className="h-4 w-4 mr-2" />
                       Save Zone
                     </Button>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <div className="border-t pt-4">
                   <div className="text-xs text-muted-foreground mb-2">Or draw a custom area:</div>
