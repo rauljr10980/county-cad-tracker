@@ -1,6 +1,6 @@
 /**
  * Area Selector Map Component using Leaflet - Wizard Version
- * Step-by-step wizard: 1. Starting Point -> 2. Draw Area -> 3. Preview -> 4. Optimize
+ * Step-by-step wizard: 1. Draw Area -> 2. Select Starting Point -> 3. Preview -> 4. Optimize
  */
 
 import { useEffect, useState, useMemo } from 'react';
