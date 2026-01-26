@@ -425,7 +425,7 @@ export function TasksView() {
       {/* Performance Stats */}
       <div className="mb-6 bg-card border border-border rounded-lg p-4">
         <h3 className="text-sm font-semibold mb-4">Today's Performance</h3>
-        <div className="grid grid-cols-4 gap-4 text-center">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
           <div>
             <p className="text-2xl font-bold text-primary">{todayStats.completed}</p>
             <p className="text-xs text-muted-foreground">Tasks Completed</p>
@@ -512,13 +512,135 @@ export function TasksView() {
             <div
               key={property.id}
               className={cn(
-                "bg-card border border-border rounded-lg p-5 hover:border-primary/50 hover:shadow-md transition-all shadow-sm",
+                "bg-card border border-border rounded-lg p-3 md:p-5 hover:border-primary/50 hover:shadow-md transition-all shadow-sm",
                 bulkMode && "cursor-pointer",
                 selectedIds.has(property.id) && "border-primary bg-primary/5 shadow-md"
               )}
               onClick={() => bulkMode && handleBulkToggle(property.id)}
             >
-              <div className="flex items-center justify-between gap-6">
+              {/* Mobile Layout */}
+              <div className="md:hidden space-y-3">
+                {/* Top Row: Action + Amount */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {bulkMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(property.id)}
+                        onChange={() => handleBulkToggle(property.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-5 w-5 rounded border-2 border-border cursor-pointer accent-primary"
+                      />
+                    )}
+                    <span className="text-lg font-bold uppercase tracking-wide text-foreground">
+                      {actionLabel.replace(/[📞💬✉️🚗]/g, '').trim()}
+                    </span>
+                  </div>
+
+                  <div className="flex-shrink-0">
+                    {property.totalAmountDue > 0 ? (
+                      <span className="text-lg font-bold font-mono tracking-tight text-green-500">
+                        {formatCurrency(property.totalAmountDue)}
+                      </span>
+                    ) : isPreForeclosureTask(property) && (property as any).type ? (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-xs font-semibold px-2 py-1 rounded-md border-2",
+                          (property as any).type === 'Mortgage'
+                            ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                            : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                        )}
+                      >
+                        {(property as any).type}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Second Row: Priority + Assigned */}
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs font-semibold px-2 py-1 rounded-md border-2",
+                      PRIORITY_COLORS[priority]
+                    )}
+                  >
+                    {priority.toUpperCase()}
+                  </Badge>
+                  {property.assignedTo && (
+                    <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      {property.assignedTo}
+                    </span>
+                  )}
+                </div>
+
+                {/* Notes */}
+                {property.notes && property.notes.trim() && (
+                  <div className="text-sm text-muted-foreground break-words whitespace-pre-wrap">
+                    {property.notes}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="flex-1 border-border hover:border-primary hover:bg-primary/10 min-h-[44px]"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (isPreForeclosureTask(property)) {
+                        const docNumber = (property as any).documentNumber || property.accountNumber;
+                        try {
+                          const allRecords = await getPreForeclosures();
+                          const fullRecord = allRecords.find(r => r.document_number === docNumber);
+                          if (fullRecord) {
+                            setSelectedPreForeclosure(fullRecord);
+                          } else {
+                            toast({
+                              title: "Record Not Found",
+                              description: "Could not find full pre-foreclosure record",
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error) {
+                          console.error('Failed to fetch pre-foreclosure:', error);
+                          toast({
+                            title: "Error",
+                            description: "Failed to load pre-foreclosure details",
+                            variant: "destructive",
+                          });
+                        }
+                        setSelectedProperty(null);
+                      } else {
+                        setSelectedProperty(property);
+                        setSelectedPreForeclosure(null);
+                      }
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="default"
+                    size="default"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-md hover:shadow-lg transition-all min-h-[44px]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedForOutcome(property);
+                      setSelectedOutcome(property.lastOutcome || '');
+                    }}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Mark Done
+                  </Button>
+                </div>
+              </div>
+
+              {/* Desktop Layout */}
+              <div className="hidden md:flex items-center justify-between gap-6">
                 {/* Checkbox (bulk mode) */}
                 {bulkMode && (
                   <div className="flex-shrink-0">
