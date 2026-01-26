@@ -514,3 +514,46 @@ model RouteRecord {
   @@index([routeId, orderIndex])
   @@map("route_records")
 }
+
+// ============================================================================
+// ZONE MANAGEMENT (FOR PROPERTY FILTERING & ROUTE OPTIMIZATION)
+// ============================================================================
+
+model Zone {
+  id String @id @default(cuid())
+
+  // Zone Details
+  name        String
+  description String? @db.Text
+  type        ZoneType
+  color       String // Hex color code
+
+  // Bounds (always stored for all zone types)
+  boundsNorth Float
+  boundsSouth Float
+  boundsEast  Float
+  boundsWest  Float
+
+  // Circle-specific data
+  centerLat Float?
+  centerLng Float?
+  radius    Float? // in meters
+
+  // Polygon-specific data (stored as JSON array of {lat, lng} points)
+  polygon Json?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Indexes for efficient querying
+  @@index([type])
+  @@index([createdAt])
+  @@map("zones")
+}
+
+enum ZoneType {
+  RECTANGLE
+  CIRCLE
+  POLYGON
+}

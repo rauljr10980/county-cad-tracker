@@ -375,7 +375,10 @@ export function AreaSelectorMap({
       setSelectedProperties([]);
       setStartingPointValidation(null);
       // Load all saved zones to display on map
-      setAllSavedZones(loadZones());
+      loadZones().then(setAllSavedZones).catch(error => {
+        console.error('Failed to load zones:', error);
+        setAllSavedZones([]);
+      });
     }
   }, [isOpen]);
 
@@ -744,7 +747,7 @@ export function AreaSelectorMap({
     setShowSaveZoneDialog(true);
   };
 
-  const handleConfirmSaveZone = () => {
+  const handleConfirmSaveZone = async () => {
     if (!selectedShape || !zoneName.trim()) {
       toast({
         title: 'Invalid Zone',
@@ -754,38 +757,51 @@ export function AreaSelectorMap({
       return;
     }
 
-    const existingZones = loadZones();
-    const color = getNextColor(existingZones);
+    try {
+      const existingZones = await loadZones();
+      const color = getNextColor(existingZones);
 
-    const bounds = selectedShape.bounds;
-    const ne = bounds.getNorthEast();
-    const sw = bounds.getSouthWest();
+      const bounds = selectedShape.bounds;
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
 
-    const newZone = saveZone({
-      name: zoneName.trim(),
-      description: zoneDescription.trim() || undefined,
-      type: selectedShape.type,
-      color,
-      bounds: {
-        north: ne.lat,
-        south: sw.lat,
-        east: ne.lng,
-        west: sw.lng,
-      },
-      center: selectedShape.center ? { lat: selectedShape.center.lat, lng: selectedShape.center.lng } : undefined,
-      radius: selectedShape.radius,
-      polygon: selectedShape.polygon ? selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })) : undefined,
-    });
+      const newZone = await saveZone({
+        name: zoneName.trim(),
+        description: zoneDescription.trim() || undefined,
+        type: selectedShape.type,
+        color,
+        bounds: {
+          north: ne.lat,
+          south: sw.lat,
+          east: ne.lng,
+          west: sw.lng,
+        },
+        center: selectedShape.center ? { lat: selectedShape.center.lat, lng: selectedShape.center.lng } : undefined,
+        radius: selectedShape.radius,
+        polygon: selectedShape.polygon ? selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })) : undefined,
+      });
 
-    toast({
-      title: 'Zone Saved',
-      description: `Saved "${newZone.name}" for future use`,
-    });
+      toast({
+        title: 'Zone Saved',
+        description: `Saved "${newZone.name}" for future use`,
+      });
 
-    setShowSaveZoneDialog(false);
-    setZoneName('');
-    setZoneDescription('');
-    setLoadedZone(newZone);
+      setShowSaveZoneDialog(false);
+      setZoneName('');
+      setZoneDescription('');
+      setLoadedZone(newZone);
+
+      // Reload all zones to update the displayed zones on the map
+      const updatedZones = await loadZones();
+      setAllSavedZones(updatedZones);
+    } catch (error) {
+      console.error('Failed to save zone:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save zone. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleOptimize = () => {

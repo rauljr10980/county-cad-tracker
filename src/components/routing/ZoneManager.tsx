@@ -104,10 +104,18 @@ function MapBoundsAdjuster({ zones }: { zones: SavedZone[] }) {
 export function ZoneManager({ isOpen, onClose, onSelectZone, onEditZone, properties, unavailablePropertyIds = new Set() }: ZoneManagerProps) {
   const [zones, setZones] = useState<SavedZone[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setZones(loadZones());
+      setIsLoading(true);
+      loadZones()
+        .then(setZones)
+        .catch(error => {
+          console.error('Failed to load zones:', error);
+          setZones([]);
+        })
+        .finally(() => setIsLoading(false));
     }
   }, [isOpen]);
 
@@ -150,10 +158,16 @@ export function ZoneManager({ isOpen, onClose, onSelectZone, onEditZone, propert
     return counts;
   }, [zones, properties, unavailablePropertyIds]);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this zone?')) {
-      deleteZone(id);
-      setZones(loadZones());
+      try {
+        await deleteZone(id);
+        const updatedZones = await loadZones();
+        setZones(updatedZones);
+      } catch (error) {
+        console.error('Failed to delete zone:', error);
+        alert('Failed to delete zone. Please try again.');
+      }
     }
   };
 

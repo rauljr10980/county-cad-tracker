@@ -1,7 +1,10 @@
 /**
  * Predefined Service Zones Management
  * Allows saving, loading, and managing custom geographic zones
+ * Now uses API instead of localStorage for cross-device sync
  */
+
+import { API_BASE_URL } from './api';
 
 export interface SavedZone {
   id: string;
@@ -24,8 +27,6 @@ export interface SavedZone {
   polygon?: { lat: number; lng: number }[];
 }
 
-const STORAGE_KEY = 'county-cad-zones';
-
 // Predefined color palette for zones
 export const ZONE_COLORS = [
   '#4285F4', // Blue
@@ -39,15 +40,20 @@ export const ZONE_COLORS = [
 ];
 
 /**
- * Load all saved zones from localStorage
+ * Load all saved zones from API
  */
-export function loadZones(): SavedZone[] {
+export async function loadZones(): Promise<SavedZone[]> {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
+    console.log('[Zones] Fetching zones from API...');
+    const response = await fetch(`${API_BASE_URL}/api/zones`);
 
-    const zones = JSON.parse(stored) as SavedZone[];
-    return zones;
+    if (!response.ok) {
+      throw new Error(`Failed to fetch zones: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('[Zones] Zones loaded:', data.zones?.length || 0);
+    return data.zones || [];
   } catch (error) {
     console.error('[Zones] Failed to load zones:', error);
     return [];
@@ -57,60 +63,109 @@ export function loadZones(): SavedZone[] {
 /**
  * Save a new zone
  */
-export function saveZone(zone: Omit<SavedZone, 'id' | 'createdAt' | 'updatedAt'>): SavedZone {
-  const zones = loadZones();
+export async function saveZone(zone: Omit<SavedZone, 'id' | 'createdAt' | 'updatedAt'>): Promise<SavedZone> {
+  try {
+    console.log('[Zones] Creating zone:', zone.name);
+    const response = await fetch(`${API_BASE_URL}/api/zones`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(zone),
+    });
 
-  const newZone: SavedZone = {
-    ...zone,
-    id: `zone_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create zone');
+    }
 
-  zones.push(newZone);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(zones));
-
-  return newZone;
+    const data = await response.json();
+    console.log('[Zones] Zone created:', data.zone.id);
+    return data.zone;
+  } catch (error) {
+    console.error('[Zones] Failed to save zone:', error);
+    throw error;
+  }
 }
 
 /**
  * Update an existing zone
  */
-export function updateZone(id: string, updates: Partial<Omit<SavedZone, 'id' | 'createdAt'>>): SavedZone | null {
-  const zones = loadZones();
-  const index = zones.findIndex(z => z.id === id);
+export async function updateZone(id: string, updates: Partial<Omit<SavedZone, 'id' | 'createdAt'>>): Promise<SavedZone | null> {
+  try {
+    console.log('[Zones] Updating zone:', id);
+    const response = await fetch(`${API_BASE_URL}/api/zones/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
 
-  if (index === -1) return null;
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update zone');
+    }
 
-  zones[index] = {
-    ...zones[index],
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(zones));
-  return zones[index];
+    const data = await response.json();
+    console.log('[Zones] Zone updated:', data.zone.id);
+    return data.zone;
+  } catch (error) {
+    console.error('[Zones] Failed to update zone:', error);
+    throw error;
+  }
 }
 
 /**
  * Delete a zone
  */
-export function deleteZone(id: string): boolean {
-  const zones = loadZones();
-  const filtered = zones.filter(z => z.id !== id);
+export async function deleteZone(id: string): Promise<boolean> {
+  try {
+    console.log('[Zones] Deleting zone:', id);
+    const response = await fetch(`${API_BASE_URL}/api/zones/${id}`, {
+      method: 'DELETE',
+    });
 
-  if (filtered.length === zones.length) return false;
+    if (!response.ok) {
+      if (response.status === 404) {
+        return false;
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete zone');
+    }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  return true;
+    console.log('[Zones] Zone deleted:', id);
+    return true;
+  } catch (error) {
+    console.error('[Zones] Failed to delete zone:', error);
+    throw error;
+  }
 }
 
 /**
  * Get a specific zone by ID
  */
-export function getZone(id: string): SavedZone | null {
-  const zones = loadZones();
-  return zones.find(z => z.id === id) || null;
+export async function getZone(id: string): Promise<SavedZone | null> {
+  try {
+    console.log('[Zones] Fetching zone:', id);
+    const response = await fetch(`${API_BASE_URL}/api/zones/${id}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Failed to fetch zone: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.zone;
+  } catch (error) {
+    console.error('[Zones] Failed to get zone:', error);
+    return null;
+  }
 }
 
 /**
