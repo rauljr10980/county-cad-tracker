@@ -1308,10 +1308,12 @@ export function PropertiesView() {
         // Allow depot property even if it's visited (it's the starting point)
         if (depotPropertyId && p.id === depotPropertyId) return true;
         // Filter out properties that are explicitly marked as visited (not just in routes)
-        // This matches pre-foreclosure behavior - only exclude if visited
-        const isVisited = propertiesInRoutes.has(p.id);
+        // Check both: properties in routes marked as visited AND properties with visited: true on the Property model
+        const isVisitedInRoute = propertiesInRoutes.has(p.id);
+        const isVisitedOnProperty = p.visited === true;
+        const isVisited = isVisitedInRoute || isVisitedOnProperty;
         if (isVisited) {
-          console.log('[handleCreateRouteWithDepot] Selected property is marked as visited, excluding:', p.id);
+          console.log('[handleCreateRouteWithDepot] Selected property is marked as visited, excluding:', p.id, { isVisitedInRoute, isVisitedOnProperty });
         }
         return !isVisited;
       });
@@ -1686,6 +1688,9 @@ export function PropertiesView() {
       // IMPORTANT: Only mark properties as "in route" if they are explicitly marked as VISITED
       // This matches the pre-foreclosure behavior where properties are only excluded when marked as visited
       const activePropertyIds = new Set<string>();
+      
+      // Also check properties that have visited: true directly on the Property model
+      // This ensures properties marked as visited in the property details modal are also excluded
       propertyRoutes.forEach((route: RouteType) => {
         route.records?.forEach((rr: any) => {
           const propId = rr.record?.id;
