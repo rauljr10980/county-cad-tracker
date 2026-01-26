@@ -697,6 +697,57 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             )}
           </div>
 
+          {/* Visited Status Section */}
+          <div className="bg-secondary/30 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-3">
+              <MapPinIcon className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Visited Status</span>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="visited-checkbox"
+                  checked={visited}
+                  onChange={(e) => setVisited(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                />
+                <label htmlFor="visited-checkbox" className="text-sm cursor-pointer">
+                  Mark as visited
+                </label>
+              </div>
+              {visited && (
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Visited By</label>
+                  <Select value={visitedBy} onValueChange={(value) => setVisitedBy(value as 'Luciano' | 'Raul')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select who visited" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Luciano">Luciano</SelectItem>
+                      <SelectItem value="Raul">Raul</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {property.visitedAt && (
+                <div className="text-xs text-muted-foreground">
+                  Last visited: {format(new Date(property.visitedAt), 'PPP p')}
+                  {property.visitedBy && ` by ${property.visitedBy}`}
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveVisited}
+                  disabled={savingVisited || (visited && !visitedBy)}
+                >
+                  {savingVisited ? 'Saving...' : 'Save Visited Status'}
+                </Button>
+              </div>
+            </div>
+          </div>
+
           {/* Actions & Tasks Section */}
           <div className="bg-secondary/30 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-3">
