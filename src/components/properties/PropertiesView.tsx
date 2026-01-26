@@ -2829,7 +2829,14 @@ export function PropertiesView() {
           // The backend will exclude the depot from visitable stops, so it won't appear as a stop
           await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation, propertiesToOptimize);
         }}
-        properties={filteredProperties.filter(p => p.latitude != null && p.longitude != null).map(p => ({
+        properties={filteredProperties.filter(p => {
+          // Must have coordinates
+          if (p.latitude == null || p.longitude == null) return false;
+          // Exclude properties that are in routes OR marked as visited
+          const isVisitedInRoute = propertiesInRoutes.has(p.id);
+          const isVisitedOnProperty = p.visited === true;
+          return !isVisitedInRoute && !isVisitedOnProperty;
+        }).map(p => ({
           id: p.id,
           latitude: p.latitude!,
           longitude: p.longitude!,
