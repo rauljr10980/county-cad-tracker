@@ -475,56 +475,59 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 </div>
               </div>
               
-              {/* Additional Payment Information - Always show */}
-              <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-3 w-3 text-primary" />
-                  <p className="text-xs font-medium text-muted-foreground">Payment & Tax Information</p>
+              {/* Payment & Tax Information and Exemptions & Jurisdictions - Side by Side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Payment & Tax Information */}
+                <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calendar className="h-3 w-3 text-primary" />
+                    <p className="text-xs font-medium text-muted-foreground">Payment & Tax Information</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex justify-between">
+                      <span className="text-xs text-muted-foreground">Tax Year:</span>
+                      <span className="text-xs font-mono font-medium">{property.taxYear || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-muted-foreground">Last Payment Date:</span>
+                      <span className="text-xs font-mono font-medium">{property.lastPaymentDate || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-muted-foreground">Last Payment Amount:</span>
+                      <span className="text-xs font-mono font-medium">
+                        {property.lastPaymentAmount ? formatCurrency(property.lastPaymentAmount) : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between col-span-2">
+                      <span className="text-xs text-muted-foreground">Last Payer:</span>
+                      <span className="text-xs text-right flex-1 ml-2">{property.lastPayer || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between col-span-2">
+                      <span className="text-xs text-muted-foreground">Delinquent After:</span>
+                      <span className="text-xs font-mono font-medium">{property.delinquentAfter || 'N/A'}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Tax Year:</span>
-                    <span className="text-xs font-mono font-medium">{property.taxYear || 'N/A'}</span>
+                
+                {/* Exemptions & Jurisdictions */}
+                <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Exemptions & Jurisdictions</p>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Exemptions:</p>
+                    <p className="text-xs">
+                      {property.exemptions && property.exemptions.length > 0 
+                        ? property.exemptions.join(', ') 
+                        : 'N/A'}
+                    </p>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Last Payment Date:</span>
-                    <span className="text-xs font-mono font-medium">{property.lastPaymentDate || 'N/A'}</span>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Jurisdictions:</p>
+                    <p className="text-xs">
+                      {property.jurisdictions && property.jurisdictions.length > 0 
+                        ? property.jurisdictions.join(', ') 
+                        : 'N/A'}
+                    </p>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Last Payment Amount:</span>
-                    <span className="text-xs font-mono font-medium">
-                      {property.lastPaymentAmount ? formatCurrency(property.lastPaymentAmount) : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between col-span-2">
-                    <span className="text-xs text-muted-foreground">Last Payer:</span>
-                    <span className="text-xs text-right flex-1 ml-2">{property.lastPayer || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between col-span-2">
-                    <span className="text-xs text-muted-foreground">Delinquent After:</span>
-                    <span className="text-xs font-mono font-medium">{property.delinquentAfter || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Exemptions & Jurisdictions - Always show */}
-              <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Exemptions & Jurisdictions</p>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Exemptions:</p>
-                  <p className="text-xs">
-                    {property.exemptions && property.exemptions.length > 0 
-                      ? property.exemptions.join(', ') 
-                      : 'N/A'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Jurisdictions:</p>
-                  <p className="text-xs">
-                    {property.jurisdictions && property.jurisdictions.length > 0 
-                      ? property.jurisdictions.join(', ') 
-                      : 'N/A'}
-                  </p>
                 </div>
               </div>
             </div>
