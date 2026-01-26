@@ -233,10 +233,12 @@ function MapBoundsFitter({ bounds }: { bounds: LatLngBounds | null }) {
 
 // Component to display property count within the drawn zone
 function PropertyCountOverlay({
-  count,
+  available,
+  total,
   center
 }: {
-  count: number;
+  available: number;
+  total: number;
   center: { lat: number; lng: number }
 }) {
   const countIcon = useMemo(() => {
@@ -254,12 +256,12 @@ function PropertyCountOverlay({
         display: flex;
         align-items: center;
         justify-content: center;
-      ">${count}</div>`,
+      ">${available}/${total}</div>`,
       className: '',
       iconSize: [60, 40],
       iconAnchor: [30, 20],
     });
-  }, [count]);
+  }, [available, total]);
 
   return (
     <Marker
@@ -291,7 +293,7 @@ export function AreaSelectorMap({
   const [polygonPointsBeingDrawn, setPolygonPointsBeingDrawn] = useState<LatLng[]>([]);
   const [selectedProperties, setSelectedProperties] = useState<PropertyLike[]>([]);
   const [startingPointValidation, setStartingPointValidation] = useState<{ valid: boolean; message: string } | null>(null);
-  const [totalPropertiesInZone, setTotalPropertiesInZone] = useState<number>(0);
+  const [propertiesInZone, setPropertiesInZone] = useState<{ available: number; total: number }>({ available: 0, total: 0 });
 
   // Zone management state
   const [showZoneManager, setShowZoneManager] = useState(false);
@@ -302,9 +304,9 @@ export function AreaSelectorMap({
   const [allSavedZones, setAllSavedZones] = useState<SavedZone[]>([]);
 
   // Calculate property counts for all saved zones
-  // IMPORTANT: Count ALL properties in zone, not just available ones (to match custom drawing behavior)
+  // Track both total properties and available properties (not in routes)
   const savedZoneCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const counts: Record<string, { total: number; available: number }> = {};
 
     console.log('=== Calculating Saved Zone Counts ===');
     console.log('Total properties to check:', properties.length);
@@ -312,7 +314,8 @@ export function AreaSelectorMap({
     console.log('Number of saved zones:', allSavedZones.length);
 
     allSavedZones.forEach(zone => {
-      let count = 0;
+      let totalCount = 0;
+      let availableCount = 0;
       let skippedNoCoords = 0;
 
       properties.forEach(p => {
@@ -320,8 +323,6 @@ export function AreaSelectorMap({
           skippedNoCoords++;
           return;
         }
-        // NOTE: We count ALL properties in the zone, including unavailable ones
-        // This matches the behavior of custom drawing which shows total properties in zone
 
         const point = { lat: p.latitude, lng: p.longitude };
         let isInZone = false;
@@ -335,14 +336,21 @@ export function AreaSelectorMap({
           isInZone = isPointInBounds(point, zone.bounds);
         }
 
-        if (isInZone) count++;
+        if (isInZone) {
+          totalCount++;
+          // Count as available if not in unavailablePropertyIds (not already in a route)
+          if (!p.id || !unavailablePropertyIds.has(p.id)) {
+            availableCount++;
+          }
+        }
       });
 
-      counts[zone.id] = count;
+      counts[zone.id] = { total: totalCount, available: availableCount };
 
       console.log(`Zone: ${zone.name}`);
       console.log(`  Type: ${zone.type}`);
-      console.log(`  Total properties in zone: ${count}`);
+      console.log(`  Total properties in zone: ${totalCount}`);
+      console.log(`  Available properties: ${availableCount}`);
       console.log(`  Skipped (no coords): ${skippedNoCoords}`);
     });
 
@@ -375,26 +383,36 @@ export function AreaSelectorMap({
   // IMPORTANT: This uses the 'properties' prop, which should be filteredProperties from the parent
   // This ensures we only count properties that match the current filters (e.g., 435 filtered properties)
   const calculatePropertiesInBounds = (shape: { type: 'rectangle' | 'circle' | 'polygon'; bounds: LatLngBounds; center?: LatLng; radius?: number; polygon?: LatLng[] }) => {
-    // Filter properties that are within the drawn area
-    // Only considers properties passed to this component (should be filteredProperties)
-    const count = properties.filter(p => {
-      if (!p.latitude || !p.longitude) return false;
+    // Count both total and available properties within the drawn area
+    let totalCount = 0;
+    let availableCount = 0;
+
+    properties.forEach(p => {
+      if (!p.latitude || !p.longitude) return;
       const point = { lat: p.latitude, lng: p.longitude };
+      let isInZone = false;
 
       if (shape.type === 'polygon' && shape.polygon) {
-        return isPointInPolygon(point, shape.polygon.map(p => ({ lat: p.lat, lng: p.lng })));
+        isInZone = isPointInPolygon(point, shape.polygon.map(p => ({ lat: p.lat, lng: p.lng })));
       } else if (shape.type === 'circle' && shape.center && shape.radius) {
         const radiusKm = shape.radius / 1000;
-        return isPointInCircle(point, { lat: shape.center.lat, lng: shape.center.lng }, radiusKm);
+        isInZone = isPointInCircle(point, { lat: shape.center.lat, lng: shape.center.lng }, radiusKm);
       } else if (shape.type === 'rectangle') {
         const ne = shape.bounds.getNorthEast();
         const sw = shape.bounds.getSouthWest();
-        return isPointInBounds(point, { north: ne.lat, south: sw.lat, east: ne.lng, west: sw.lng });
+        isInZone = isPointInBounds(point, { north: ne.lat, south: sw.lat, east: ne.lng, west: sw.lng });
       }
-      return false;
-    }).length;
 
-    setTotalPropertiesInZone(count);
+      if (isInZone) {
+        totalCount++;
+        // Count as available if not in unavailablePropertyIds (not already in a route)
+        if (!p.id || !unavailablePropertyIds.has(p.id)) {
+          availableCount++;
+        }
+      }
+    });
+
+    setPropertiesInZone({ available: availableCount, total: totalCount });
   };
 
   const handleRectangleComplete = (bounds: LatLngBounds) => {
@@ -525,8 +543,9 @@ export function AreaSelectorMap({
       // This ensures when you have 435 filtered properties, the map only considers those 435, not all properties
       // OPTIMIZATION: Use a more efficient approach - count first, then filter only what we need
       let totalCount = 0;
+      let availableCount = 0;
       const propsInZoneForDisplay: PropertyLike[] = [];
-      
+
       // First pass: Count and collect properties from the filtered set (limit collection to avoid memory issues)
       // This only considers properties that match current filters (e.g., 435 filtered properties)
       for (const p of properties) {
@@ -547,16 +566,21 @@ export function AreaSelectorMap({
 
         if (isInZone) {
           totalCount++;
-          // Only collect properties that are available and not in routes (for optimization)
-          // Also limit collection to a reasonable number to avoid memory issues
-          if (propsInZoneForDisplay.length < 100 && (!p.id || !unavailablePropertyIds.has(p.id))) {
-            propsInZoneForDisplay.push(p);
+
+          // Count as available if not in unavailablePropertyIds (not already in a route)
+          const isAvailable = !p.id || !unavailablePropertyIds.has(p.id);
+          if (isAvailable) {
+            availableCount++;
+            // Only collect available properties for display (limit to avoid memory issues)
+            if (propsInZoneForDisplay.length < 100) {
+              propsInZoneForDisplay.push(p);
+            }
           }
         }
       }
 
-      // Store total count for display
-      setTotalPropertiesInZone(totalCount);
+      // Store counts for display
+      setPropertiesInZone({ available: availableCount, total: totalCount });
 
       // Warn user if area is too large
       if (totalCount > 1000) {
@@ -1175,7 +1199,7 @@ export function AreaSelectorMap({
                   const isLoadedZone = loadedZone?.id === zone.id;
                   if (isLoadedZone) return null; // Don't show count for loaded zone
 
-                  const count = savedZoneCounts[zone.id] || 0;
+                  const counts = savedZoneCounts[zone.id] || { total: 0, available: 0 };
                   let center: { lat: number; lng: number } | null = null;
 
                   if (zone.type === 'polygon' && zone.polygon && zone.polygon.length > 0) {
@@ -1211,7 +1235,7 @@ export function AreaSelectorMap({
                       display: flex;
                       align-items: center;
                       justify-content: center;
-                    ">${count}</div>`,
+                    ">${counts.available}/${counts.total}</div>`,
                     className: '',
                     iconSize: [50, 32],
                     iconAnchor: [25, 16]
@@ -1227,14 +1251,14 @@ export function AreaSelectorMap({
                 })}
 
                 {/* Property count overlay */}
-                {selectedShape && totalPropertiesInZone > 0 && (() => {
+                {selectedShape && propertiesInZone.total > 0 && (() => {
                   const center = selectedShape.center
                     ? { lat: selectedShape.center.lat, lng: selectedShape.center.lng }
                     : {
                         lat: (selectedShape.bounds.getNorthEast().lat + selectedShape.bounds.getSouthWest().lat) / 2,
                         lng: (selectedShape.bounds.getNorthEast().lng + selectedShape.bounds.getSouthWest().lng) / 2
                       };
-                  return <PropertyCountOverlay count={totalPropertiesInZone} center={center} />;
+                  return <PropertyCountOverlay available={propertiesInZone.available} total={propertiesInZone.total} center={center} />;
                 })()}
                 {pinLocation && (
                   <Marker

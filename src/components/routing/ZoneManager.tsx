@@ -112,17 +112,16 @@ export function ZoneManager({ isOpen, onClose, onSelectZone, onEditZone, propert
   }, [isOpen]);
 
   // Calculate property counts for each zone
-  // IMPORTANT: Count ALL properties in zone, not just available ones (to match custom drawing behavior)
+  // Track both total properties and available properties (not in routes)
   const zoneCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const counts: Record<string, { total: number; available: number }> = {};
 
     zones.forEach(zone => {
-      let count = 0;
+      let totalCount = 0;
+      let availableCount = 0;
 
       properties.forEach(p => {
         if (!p.latitude || !p.longitude) return;
-        // NOTE: Count ALL properties in zone, including unavailable ones
-        // This matches the behavior when drawing custom shapes
 
         const point = { lat: p.latitude, lng: p.longitude };
         let isInZone = false;
@@ -136,10 +135,16 @@ export function ZoneManager({ isOpen, onClose, onSelectZone, onEditZone, propert
           isInZone = isPointInBounds(point, zone.bounds);
         }
 
-        if (isInZone) count++;
+        if (isInZone) {
+          totalCount++;
+          // Count as available if not in unavailablePropertyIds (not already in a route)
+          if (!p.id || !unavailablePropertyIds.has(p.id)) {
+            availableCount++;
+          }
+        }
       });
 
-      counts[zone.id] = count;
+      counts[zone.id] = { total: totalCount, available: availableCount };
     });
 
     return counts;
@@ -202,7 +207,7 @@ export function ZoneManager({ isOpen, onClose, onSelectZone, onEditZone, propert
               </div>
             ) : (
               zones.map((zone) => {
-                const count = zoneCounts[zone.id] || 0;
+                const counts = zoneCounts[zone.id] || { total: 0, available: 0 };
                 return (
                   <div
                     key={zone.id}
@@ -225,7 +230,7 @@ export function ZoneManager({ isOpen, onClose, onSelectZone, onEditZone, propert
                           <div className="flex items-center justify-between gap-2">
                             <h3 className="font-medium text-sm">{zone.name}</h3>
                             <span className="text-xs font-semibold px-2 py-1 rounded-full bg-primary/10 text-primary">
-                              {count} {count === 1 ? 'property' : 'properties'}
+                              {counts.available}/{counts.total}
                             </span>
                           </div>
                           {zone.description && (
