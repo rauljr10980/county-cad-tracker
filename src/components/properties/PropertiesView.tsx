@@ -1689,8 +1689,6 @@ export function PropertiesView() {
       // This matches the pre-foreclosure behavior where properties are only excluded when marked as visited
       const activePropertyIds = new Set<string>();
       
-      // Also check properties that have visited: true directly on the Property model
-      // This ensures properties marked as visited in the property details modal are also excluded
       propertyRoutes.forEach((route: RouteType) => {
         route.records?.forEach((rr: any) => {
           const propId = rr.record?.id;
@@ -1701,6 +1699,15 @@ export function PropertiesView() {
           }
         });
       });
+      
+      // Also add properties that have visited: true directly on the Property model
+      // This ensures properties marked as visited in the property details modal are also excluded
+      rawProperties.forEach((p: Property) => {
+        if (p.visited === true) {
+          activePropertyIds.add(p.id);
+        }
+      });
+      
       setPropertiesInRoutes(activePropertyIds);
     } catch (error) {
       console.error('[Properties] Error loading active routes:', error);
