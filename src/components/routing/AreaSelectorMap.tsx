@@ -812,8 +812,22 @@ export function AreaSelectorMap({
           <div className="flex-shrink-0 w-full">
               {step === 1 && (
                 <div className="space-y-4">
-                  <div className="text-sm text-muted-foreground">
-                    Click on the map to drop a pin. The route will start from the closest property to your pin location.
+                  {/* Zone management buttons - moved to step 1 */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 justify-start"
+                      onClick={() => setShowZoneManager(true)}
+                    >
+                      <FolderOpen className="h-4 w-4 mr-2" />
+                      Load Saved Zone
+                    </Button>
+                  </div>
+                  
+                  <div className="border-t pt-4">
+                    <div className="text-sm text-muted-foreground mb-2">
+                      Or click on the map to drop a pin. The route will start from the closest property to your pin location.
+                    </div>
                   </div>
                   <Button
                     variant={drawingMode === 'pin' ? 'default' : 'outline'}
