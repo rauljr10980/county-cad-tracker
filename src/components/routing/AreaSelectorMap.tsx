@@ -435,15 +435,15 @@ export function AreaSelectorMap({
 
   const handleNextStep = () => {
     if (step === 1) {
-      // Validate starting point is selected
-      if (!closestProperty || !pinLocation) {
+      // Validate area is drawn
+      if (!selectedShape) {
         return;
       }
       setStep(2);
       setDrawingMode(null);
     } else if (step === 2) {
-      // Validate area is drawn and starting point is inside
-      if (!selectedShape || !closestProperty || !pinLocation) {
+      // Validate starting point is selected and inside the area
+      if (!closestProperty || !pinLocation || !selectedShape) {
         return;
       }
 
