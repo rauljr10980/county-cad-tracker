@@ -766,8 +766,8 @@ export function AreaSelectorMap({
 
   const getStepTitle = () => {
     switch (step) {
-      case 1: return 'Step 1: Select Starting Point';
-      case 2: return 'Step 2: Draw Area';
+      case 1: return 'Step 1: Draw Area';
+      case 2: return 'Step 2: Select Starting Point';
       case 3: return 'Step 3: Preview Results';
       case 4: return 'Step 4: Optimize Routes';
       default: return 'Route Optimization Wizard';
@@ -780,8 +780,8 @@ export function AreaSelectorMap({
         <DialogHeader>
           <DialogTitle>{getStepTitle()}</DialogTitle>
           <DialogDescription>
-            {step === 1 && 'Drop a pin on the map to set the starting point for your route.'}
-            {step === 2 && 'Draw a polygon, rectangle, or circle around the area. The starting point must be inside this area.'}
+            {step === 1 && 'Draw a polygon, rectangle, or circle around the area, or load a saved zone.'}
+            {step === 2 && 'Drop a pin on the map to set the starting point for your route. The starting point must be inside the drawn area.'}
             {step === 3 && 'Review the selected properties before optimizing the route.'}
             {step === 4 && 'Confirm and optimize your route.'}
           </DialogDescription>
@@ -1046,12 +1046,12 @@ export function AreaSelectorMap({
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <ShapeDrawer
-                  drawingMode={step === 1 ? (drawingMode === 'pin' ? 'pin' : null) : (step === 2 ? drawingMode : null)}
+                  drawingMode={step === 1 ? drawingMode : (step === 2 ? (drawingMode === 'pin' ? 'pin' : null) : null)}
                   onRectangleComplete={handleRectangleComplete}
                   onCircleComplete={handleCircleComplete}
                   onPolygonComplete={handlePolygonComplete}
                   onPolygonPointAdd={handlePolygonPointAdd}
-                  onPinDrop={step === 1 ? handlePinDrop : undefined}
+                  onPinDrop={step === 2 ? handlePinDrop : undefined}
                 />
                 {drawnRectangle && (
                   <Rectangle bounds={drawnRectangle} pathOptions={{ color: '#4285F4', fillColor: '#4285F4', fillOpacity: 0.2, weight: 2 }} />
