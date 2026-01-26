@@ -1162,6 +1162,8 @@ export function AreaSelectorMap({
         isOpen={showZoneManager}
         onClose={() => setShowZoneManager(false)}
         onSelectZone={handleLoadZone}
+        properties={properties}
+        unavailablePropertyIds={unavailablePropertyIds}
       />
 
       {/* Save Zone Dialog */}
