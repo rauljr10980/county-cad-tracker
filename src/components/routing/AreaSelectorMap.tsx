@@ -299,6 +299,7 @@ export function AreaSelectorMap({
   const [zoneName, setZoneName] = useState('');
   const [zoneDescription, setZoneDescription] = useState('');
   const [loadedZone, setLoadedZone] = useState<SavedZone | null>(null);
+  const [allSavedZones, setAllSavedZones] = useState<SavedZone[]>([]);
 
   // Reset when modal opens/closes
   useEffect(() => {
@@ -314,6 +315,8 @@ export function AreaSelectorMap({
       setPolygonPointsBeingDrawn([]);
       setSelectedProperties([]);
       setStartingPointValidation(null);
+      // Load all saved zones to display on map
+      setAllSavedZones(loadZones());
     }
   }, [isOpen]);
 
@@ -1058,6 +1061,64 @@ export function AreaSelectorMap({
                 {drawnPolygon && drawnPolygon.length >= 3 && (
                   <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
                 )}
+
+                {/* Display all saved zones as background overlays */}
+                {step === 1 && allSavedZones.map((zone) => {
+                  const isLoadedZone = loadedZone?.id === zone.id;
+                  const opacity = isLoadedZone ? 0 : 0.15; // Hide loaded zone, show others faintly
+                  const weight = 1;
+
+                  if (zone.type === 'rectangle') {
+                    const bounds = new LatLngBounds(
+                      [zone.bounds.south, zone.bounds.west],
+                      [zone.bounds.north, zone.bounds.east]
+                    );
+                    return (
+                      <Rectangle
+                        key={`saved-${zone.id}`}
+                        bounds={bounds}
+                        pathOptions={{
+                          color: zone.color,
+                          fillColor: zone.color,
+                          fillOpacity: opacity,
+                          weight: weight,
+                          dashArray: '5, 5'
+                        }}
+                      />
+                    );
+                  } else if (zone.type === 'circle' && zone.center && zone.radius) {
+                    return (
+                      <Circle
+                        key={`saved-${zone.id}`}
+                        center={[zone.center.lat, zone.center.lng]}
+                        radius={zone.radius}
+                        pathOptions={{
+                          color: zone.color,
+                          fillColor: zone.color,
+                          fillOpacity: opacity,
+                          weight: weight,
+                          dashArray: '5, 5'
+                        }}
+                      />
+                    );
+                  } else if (zone.type === 'polygon' && zone.polygon) {
+                    return (
+                      <Polygon
+                        key={`saved-${zone.id}`}
+                        positions={zone.polygon.map(p => [p.lat, p.lng])}
+                        pathOptions={{
+                          color: zone.color,
+                          fillColor: zone.color,
+                          fillOpacity: opacity,
+                          weight: weight,
+                          dashArray: '5, 5'
+                        }}
+                      />
+                    );
+                  }
+                  return null;
+                })}
+
                 {/* Property count overlay */}
                 {selectedShape && totalPropertiesInZone > 0 && (() => {
                   const center = selectedShape.center
