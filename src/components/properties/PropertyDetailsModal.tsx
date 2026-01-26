@@ -397,86 +397,34 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               <DollarSign className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">Financial Summary</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-xs text-muted-foreground">Amount Due</p>
-                <p className="text-lg font-semibold font-mono text-judgment">
-                  {formatCurrency(property.totalAmountDue)}
-                </p>
-              </div>
-              {property.marketValue && property.marketValue > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Market Value</p>
-                  <p className="text-lg font-semibold font-mono">
-                    {formatCurrency(property.marketValue)}
-                  </p>
+            {(() => {
+              // Collect all financial fields that should be displayed
+              const financialFields = [
+                { label: 'Amount Due', value: property.totalAmountDue, isJudgment: true, isLarge: true },
+                property.marketValue && property.marketValue > 0 ? { label: 'Market Value', value: property.marketValue, isLarge: true } : null,
+                property.landValue && property.landValue > 0 ? { label: 'Land Value', value: property.landValue } : null,
+                property.improvementValue && property.improvementValue > 0 ? { label: 'Improvement Value', value: property.improvementValue } : null,
+                property.cappedValue && property.cappedValue > 0 ? { label: 'Capped Value', value: property.cappedValue } : null,
+                property.agriculturalValue && property.agriculturalValue > 0 ? { label: 'Agricultural Value', value: property.agriculturalValue } : null,
+                property.priorYearsAmountDue && property.priorYearsAmountDue > 0 ? { label: 'Prior Years Amount Due', value: property.priorYearsAmountDue } : null,
+                property.yearAmountDue && property.yearAmountDue > 0 ? { label: 'Year Amount Due', value: property.yearAmountDue } : null,
+                property.yearTaxLevy && property.yearTaxLevy > 0 ? { label: 'Year Tax Levy', value: property.yearTaxLevy } : null,
+                property.halfPaymentOptionAmount && property.halfPaymentOptionAmount > 0 ? { label: 'Half Payment Option', value: property.halfPaymentOptionAmount } : null,
+              ].filter(Boolean);
+
+              return (
+                <div className="grid grid-cols-2 gap-2">
+                  {financialFields.map((field, index) => (
+                    <div key={index}>
+                      <p className="text-xs text-muted-foreground">{field.label}</p>
+                      <p className={`font-mono ${field.isLarge ? 'text-lg font-semibold' : ''} ${field.isJudgment ? 'text-judgment' : ''}`}>
+                        {formatCurrency(field.value)}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              )}
-              {property.landValue && property.landValue > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Land Value</p>
-                  <p className="font-mono">
-                    {formatCurrency(property.landValue)}
-                  </p>
-                </div>
-              )}
-              {property.improvementValue && property.improvementValue > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Improvement Value</p>
-                  <p className="font-mono">
-                    {formatCurrency(property.improvementValue)}
-                  </p>
-                </div>
-              )}
-              {property.cappedValue && property.cappedValue > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Capped Value</p>
-                  <p className="font-mono">
-                    {formatCurrency(property.cappedValue)}
-                  </p>
-                </div>
-              )}
-              {property.agriculturalValue && property.agriculturalValue > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Agricultural Value</p>
-                  <p className="font-mono">
-                    {formatCurrency(property.agriculturalValue)}
-                  </p>
-                </div>
-              )}
-              {property.priorYearsAmountDue && property.priorYearsAmountDue > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Prior Years Amount Due</p>
-                  <p className="font-mono">
-                    {formatCurrency(property.priorYearsAmountDue)}
-                  </p>
-                </div>
-              )}
-              {property.yearAmountDue && property.yearAmountDue > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Year Amount Due</p>
-                  <p className="font-mono">
-                    {formatCurrency(property.yearAmountDue)}
-                  </p>
-                </div>
-              )}
-              {property.yearTaxLevy && property.yearTaxLevy > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Year Tax Levy</p>
-                  <p className="font-mono">
-                    {formatCurrency(property.yearTaxLevy)}
-                  </p>
-                </div>
-              )}
-              {property.halfPaymentOptionAmount && property.halfPaymentOptionAmount > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Half Payment Option</p>
-                  <p className="font-mono">
-                    {formatCurrency(property.halfPaymentOptionAmount)}
-                  </p>
-                </div>
-              )}
-            </div>
+              );
+            })()}
           </div>
 
           {/* Tax Percentage Section */}
