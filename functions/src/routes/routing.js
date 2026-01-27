@@ -98,157 +98,81 @@ function nearestNeighbor(dist, depot, nodes) {
 }
 
 /**
- * Find and remove the longest edge, then reconnect route optimally
- * This eliminates inefficient long jumps and connects close stops together
+ * 2-opt local search improvement
+ * Removes crossings by reversing segments until no improvement found
+ * Uses incremental cost calculation for efficiency
  */
-function removeLongestEdge(route, dist) {
-  if (route.length <= 3) return false; // Need at least depot -> node -> depot
-  
-  // Find the longest edge (prioritize non-depot edges)
-  let maxDist = -1;
-  let maxIdx = -1;
-  let maxDistDepot = -1;
-  let maxIdxDepot = -1;
-  
-  for (let i = 0; i < route.length - 1; i++) {
-    const edgeDist = dist[route[i]][route[i + 1]];
-    const isDepotEdge = (i === 0 || i === route.length - 2) && 
-                        (route[i] === route[0] || route[i + 1] === route[0]);
-    
-    if (isDepotEdge) {
-      // Track depot edges separately
-      if (edgeDist > maxDistDepot) {
-        maxDistDepot = edgeDist;
-        maxIdxDepot = i;
-      }
-    } else {
-      // Track non-depot edges (preferred to break)
-      if (edgeDist > maxDist) {
-        maxDist = edgeDist;
-        maxIdx = i;
-      }
-    }
-  }
-  
-  // Use longest non-depot edge if available, otherwise use depot edge
-  let targetIdx = maxIdx >= 0 ? maxIdx : maxIdxDepot;
-  if (targetIdx === -1) return false;
-  
-  const longestEdgeDist = maxIdx >= 0 ? maxDist : maxDistDepot;
-  
-  // Special case: If first and last stops (excluding depot) are close, 
-  // break at longest edge and reconnect to form a loop
-  if (route.length > 3) {
-    const firstStop = route[1]; // First stop after depot
-    const lastStop = route[route.length - 2]; // Last stop before depot
-    const distBetweenEnds = dist[firstStop][lastStop];
-    
-    // If first and last stops are close (within 20% of longest edge), 
-    // and longest edge is much longer, reconnect
-    if (distBetweenEnds < longestEdgeDist * 0.8 && longestEdgeDist > distBetweenEnds * 2) {
-      // Break at longest edge and reconnect
-      if (targetIdx > 0 && targetIdx < route.length - 2) {
-        // Split: [depot, ...before break, nodeA, nodeB (break), ...after break, depot]
-        const beforeBreak = route.slice(1, targetIdx + 1); // From first stop to node before break
-        const afterBreak = route.slice(targetIdx + 1, route.length - 1); // From node after break to last stop
-        
-        // Try reconnecting: start from after break, go to before break, connect ends
-        const newRoute1 = [
-          route[0], // Depot
-          ...afterBreak,
-          ...beforeBreak,
-          route[0] // Back to depot
-        ];
-        
-        // Or: start from before break, reverse order, connect ends
-        const newRoute2 = [
-          route[0], // Depot
-          ...beforeBreak.reverse(),
-          ...afterBreak.reverse(),
-          route[0] // Back to depot
-        ];
-        
-        const originalCost = routeCost(route, dist);
-        const cost1 = routeCost(newRoute1, dist);
-        const cost2 = routeCost(newRoute2, dist);
-        
-        if (cost1 < originalCost || cost2 < originalCost) {
-          route.length = 0;
-          route.push(...(cost1 < cost2 ? newRoute1 : newRoute2));
-          return true;
+function twoOpt(route, dist) {
+  let improved = true;
+
+  while (improved) {
+    improved = false;
+
+    for (let i = 1; i < route.length - 2; i++) {
+      for (let j = i + 1; j < route.length - 1; j++) {
+        // Calculate cost change from reversing segment [i..j]
+        const oldCost = dist[route[i - 1]][route[i]] + dist[route[j]][route[j + 1]];
+        const newCost = dist[route[i - 1]][route[j]] + dist[route[i]][route[j + 1]];
+
+        if (newCost < oldCost - 0.0001) {
+          // Reverse the segment in place
+          let left = i;
+          let right = j;
+          while (left < right) {
+            const temp = route[left];
+            route[left] = route[right];
+            route[right] = temp;
+            left++;
+            right--;
+          }
+          improved = true;
         }
       }
     }
   }
-  
-  // General case: Break at longest edge and try reconnecting
-  if (targetIdx > 0 && targetIdx < route.length - 2) {
-    const firstPart = route.slice(0, targetIdx + 1);
-    const secondPart = route.slice(targetIdx + 1);
-    secondPart.pop(); // Remove depot from end
-    
-    // Try reconnecting in different ways
-    const options = [
-      [...firstPart, ...secondPart.reverse(), route[0]], // Reverse second part
-      [route[0], ...firstPart.slice(1).reverse(), ...secondPart, route[0]], // Reverse first part
-      [route[0], ...secondPart, ...firstPart.slice(1).reverse(), route[0]] // Swap and reverse
-    ];
-    
-    const originalCost = routeCost(route, dist);
-    let bestRoute = route;
-    let bestCost = originalCost;
-    
-    for (const option of options) {
-      if (option.length === route.length) {
-        const cost = routeCost(option, dist);
-        if (cost < bestCost) {
-          bestRoute = option;
-          bestCost = cost;
-        }
-      }
-    }
-    
-    if (bestCost < originalCost * 0.98) { // Only accept if at least 2% improvement
-      route.length = 0;
-      route.push(...bestRoute);
-      return true;
-    }
-  }
-  
-  return false;
 }
 
 /**
- * 2-opt local search improvement
- * Removes crossings and shortens routes
+ * Or-opt: relocate segments of 1, 2, or 3 nodes to better positions
+ * Complements 2-opt by handling moves that 2-opt cannot find
  */
-function twoOpt(route, dist) {
-  let improved = false;
-  let bestCost = routeCost(route, dist);
+function orOpt(route, dist) {
+  let improved = true;
 
-  for (let i = 1; i < route.length - 2; i++) {
-    for (let j = i + 1; j < route.length - 1; j++) {
-      if (j - i === 1) continue;
-      
-      // Reverse segment between i and j
-      const newRoute = [
-        ...route.slice(0, i),
-        ...route.slice(i, j + 1).reverse(),
-        ...route.slice(j + 1)
-      ];
-      
-      const newCost = routeCost(newRoute, dist);
-      
-      if (newCost < bestCost) {
-        route.length = 0;
-        route.push(...newRoute);
-        bestCost = newCost;
-        improved = true;
+  while (improved) {
+    improved = false;
+
+    for (let segLen = 1; segLen <= 3 && !improved; segLen++) {
+      for (let i = 1; i <= route.length - 1 - segLen && !improved; i++) {
+        // Cost of removing segment [i..i+segLen-1] from its current position
+        const removeSaving =
+          dist[route[i - 1]][route[i]] +
+          dist[route[i + segLen - 1]][route[i + segLen]] -
+          dist[route[i - 1]][route[i + segLen]];
+
+        for (let j = 0; j < route.length - 1; j++) {
+          // Skip positions that overlap with the segment
+          if (j >= i - 1 && j <= i + segLen - 1) continue;
+
+          // Cost of inserting segment between j and j+1
+          const insertCost =
+            dist[route[j]][route[i]] +
+            dist[route[i + segLen - 1]][route[j + 1]] -
+            dist[route[j]][route[j + 1]];
+
+          if (insertCost - removeSaving < -0.0001) {
+            // Extract the segment
+            const segment = route.splice(i, segLen);
+            // Adjust insertion index after removal
+            const insertIdx = j < i ? j + 1 : j + 1 - segLen;
+            route.splice(insertIdx, 0, ...segment);
+            improved = true;
+            break;
+          }
+        }
       }
     }
   }
-  
-  return improved;
 }
 
 /**
@@ -263,23 +187,18 @@ function relocate(routes, dist) {
   // Try moving nodes from r1 to r2
   for (let i = 1; i < r1.length - 1; i++) {
     const node = r1[i];
-    const newR1 = [...r1.slice(0, i), ...r1.slice(i + 1)];
+    const removeSaving = dist[r1[i - 1]][r1[i]] + dist[r1[i]][r1[i + 1]] - dist[r1[i - 1]][r1[i + 1]];
 
-    for (let j = 1; j < r2.length; j++) {
-      const newR2 = [...r2.slice(0, j), node, ...r2.slice(j)];
-      const cost = routeCost(newR1, dist) + routeCost(newR2, dist);
+    for (let j = 0; j < r2.length - 1; j++) {
+      const insertCost = dist[r2[j]][node] + dist[node][r2[j + 1]] - dist[r2[j]][r2[j + 1]];
 
-      if (cost < bestTotal) {
-        routes[0].length = 0;
-        routes[0].push(...newR1);
-        routes[1].length = 0;
-        routes[1].push(...newR2);
-        bestTotal = cost;
+      if (insertCost - removeSaving < -0.0001) {
+        r1.splice(i, 1);
+        r2.splice(j + 1, 0, node);
         improved = true;
-        break; // Accept first improvement
+        break;
       }
     }
-    
     if (improved) break;
   }
 
@@ -287,23 +206,18 @@ function relocate(routes, dist) {
   if (!improved) {
     for (let i = 1; i < r2.length - 1; i++) {
       const node = r2[i];
-      const newR2 = [...r2.slice(0, i), ...r2.slice(i + 1)];
+      const removeSaving = dist[r2[i - 1]][r2[i]] + dist[r2[i]][r2[i + 1]] - dist[r2[i - 1]][r2[i + 1]];
 
-      for (let j = 1; j < r1.length; j++) {
-        const newR1 = [...r1.slice(0, j), node, ...r1.slice(j)];
-        const cost = routeCost(newR1, dist) + routeCost(newR2, dist);
+      for (let j = 0; j < r1.length - 1; j++) {
+        const insertCost = dist[r1[j]][node] + dist[node][r1[j + 1]] - dist[r1[j]][r1[j + 1]];
 
-        if (cost < bestTotal) {
-          routes[0].length = 0;
-          routes[0].push(...newR1);
-          routes[1].length = 0;
-          routes[1].push(...newR2);
-          bestTotal = cost;
+        if (insertCost - removeSaving < -0.0001) {
+          r2.splice(i, 1);
+          r1.splice(j + 1, 0, node);
           improved = true;
           break;
         }
       }
-      
       if (improved) break;
     }
   }
@@ -313,69 +227,98 @@ function relocate(routes, dist) {
 
 /**
  * Main VRP solver
- * @param {Array} dist - Distance matrix
- * @param {Array} depots - Array of depot indices (usually [0] for single vehicle, [0, 0] for two vehicles)
- * @param {number} numVehicles - Number of vehicles (1 or 2)
- * @returns {Object} {routes, totalCost}
+ * Uses nearest-neighbor for initial solution, then 2-opt + or-opt for optimization
  */
 function solveVRP(dist, depots, numVehicles) {
   const n = dist.length;
-  const nodes = Array.from({ length: n - 1 }, (_, i) => i + 1); // All nodes except depot (0)
+  const nodes = Array.from({ length: n - 1 }, (_, i) => i + 1);
 
-  let routes;
+  let bestRoutes;
+  let bestCost = Infinity;
 
-  // Phase 1: Initial solution using Nearest Neighbor
-  if (numVehicles === 1) {
-    routes = [nearestNeighbor(dist, depots[0], nodes)];
+  // Try multiple starting points for nearest neighbor to find better initial solutions
+  const startNodes = [depots[0]];
+  // Also try starting nearest-neighbor from different nodes
+  if (n <= 50) {
+    // For small instances, try all starting points
+    for (let s = 0; s < n; s++) {
+      if (!startNodes.includes(s)) startNodes.push(s);
+    }
   } else {
-    // For 2 vehicles, split nodes roughly in half
-    const half = Math.ceil(nodes.length / 2);
-    routes = [
-      nearestNeighbor(dist, depots[0], nodes.slice(0, half)),
-      nearestNeighbor(dist, depots[1] !== undefined ? depots[1] : depots[0], nodes.slice(half))
-    ];
+    // For larger instances, sample a subset
+    const step = Math.max(1, Math.floor(n / 20));
+    for (let s = 0; s < n; s += step) {
+      if (!startNodes.includes(s)) startNodes.push(s);
+    }
   }
 
-  // Phase 2: Local search improvement
-  let improved = true;
-  let iterations = 0;
-  const maxIterations = 100; // Prevent infinite loops
+  for (const startNode of startNodes) {
+    let routes;
 
-  while (improved && iterations < maxIterations) {
-    improved = false;
-    iterations++;
-
-    // Apply longest edge removal first (helps close loops)
-    for (const route of routes) {
-      if (removeLongestEdge(route, dist)) {
-        improved = true;
+    if (numVehicles === 1) {
+      // Build nearest-neighbor from startNode, but route must start/end at depot
+      if (startNode === depots[0]) {
+        routes = [nearestNeighbor(dist, depots[0], nodes)];
+      } else {
+        // Build NN from startNode, then restructure to start at depot
+        const allNodes = [depots[0], ...nodes.filter(n => n !== startNode)];
+        const nnRoute = nearestNeighbor(dist, startNode, allNodes.filter(n => n !== startNode));
+        // Find depot position in route and rotate
+        const depotIdx = nnRoute.indexOf(depots[0]);
+        if (depotIdx > 0 && depotIdx < nnRoute.length - 1) {
+          const rotated = [
+            depots[0],
+            ...nnRoute.slice(depotIdx + 1, nnRoute.length - 1),
+            ...nnRoute.slice(1, depotIdx),
+            startNode,
+            depots[0]
+          ];
+          routes = [rotated];
+        } else {
+          routes = [nearestNeighbor(dist, depots[0], nodes)];
+        }
       }
+    } else {
+      const half = Math.ceil(nodes.length / 2);
+      routes = [
+        nearestNeighbor(dist, depots[0], nodes.slice(0, half)),
+        nearestNeighbor(dist, depots[1] !== undefined ? depots[1] : depots[0], nodes.slice(half))
+      ];
     }
 
-    // Apply 2-opt to each route
+    // Optimize each route with 2-opt then or-opt
     for (const route of routes) {
-      if (twoOpt(route, dist)) {
-        improved = true;
-      }
+      twoOpt(route, dist);
+      orOpt(route, dist);
+      twoOpt(route, dist); // Final 2-opt pass after or-opt
     }
 
     // Cross-route improvements for 2 vehicles
-    if (numVehicles > 1 && relocate(routes, dist)) {
-      improved = true;
+    if (numVehicles > 1) {
+      let crossImproved = true;
+      let crossIter = 0;
+      while (crossImproved && crossIter < 50) {
+        crossImproved = relocate(routes, dist);
+        if (crossImproved) {
+          for (const route of routes) {
+            twoOpt(route, dist);
+          }
+        }
+        crossIter++;
+      }
+    }
+
+    const cost = routes.reduce((sum, route) => sum + routeCost(route, dist), 0);
+    if (cost < bestCost) {
+      bestCost = cost;
+      bestRoutes = routes.map(r => [...r]);
     }
   }
-  
-  // Final pass: Apply longest edge removal one more time after all optimizations
-  for (const route of routes) {
-    removeLongestEdge(route, dist);
-  }
-
-  const totalCost = routes.reduce((sum, route) => sum + routeCost(route, dist), 0);
 
   return {
-    routes,
-    totalCost,
-    iterations
+    routes: bestRoutes,
+    totalCost: bestCost,
+    iterations: startNodes.length
   };
 }
 
