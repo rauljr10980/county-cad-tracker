@@ -392,7 +392,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // PATCH endpoint for partial updates (like geocoding)
-router.patch('/:id', optionalAuth, async (req, res) => {
+router.patch('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;

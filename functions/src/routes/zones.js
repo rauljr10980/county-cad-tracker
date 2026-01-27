@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { optionalAuth } = require('../middleware/auth');
+const { optionalAuth, authenticateToken } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 
 // Helper function to format zone for response
@@ -82,7 +82,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 });
 
 // POST /api/zones - Create a new zone
-router.post('/', optionalAuth, async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const {
       name,
@@ -150,7 +150,7 @@ router.post('/', optionalAuth, async (req, res) => {
 });
 
 // PUT /api/zones/:id - Update a zone
-router.put('/:id', optionalAuth, async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -232,7 +232,7 @@ router.put('/:id', optionalAuth, async (req, res) => {
 });
 
 // DELETE /api/zones/:id - Delete a zone
-router.delete('/:id', optionalAuth, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
