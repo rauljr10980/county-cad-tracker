@@ -194,6 +194,26 @@ export function PropertyTable({
     <>
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3">
+        {onPropertySelect && (
+          <div className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg">
+            <Checkbox
+              checked={selectedPropertyIds.size > 0 && selectedPropertyIds.size === displayProperties.length}
+              onCheckedChange={(checked) => {
+                displayProperties.forEach(prop => {
+                  onPropertySelect(prop.id, checked as boolean);
+                });
+              }}
+            />
+            <span className="text-sm text-muted-foreground">
+              Select All ({displayProperties.length})
+            </span>
+            {selectedPropertyIds.size > 0 && (
+              <span className="text-sm font-medium text-primary ml-auto">
+                {selectedPropertyIds.size} selected
+              </span>
+            )}
+          </div>
+        )}
         {displayProperties.map((property) => {
           const followUpDate = localFollowUps[property.id] || property.lastFollowUp;
 
