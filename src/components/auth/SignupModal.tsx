@@ -3,8 +3,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Lock, User, Mail, CheckCircle2, KeyRound } from 'lucide-react';
+import { Loader2, Lock, User, Mail, KeyRound } from 'lucide-react';
 import { register } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 
 interface SignupModalProps {
@@ -14,18 +15,17 @@ interface SignupModalProps {
 }
 
 export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalProps) {
+  const { loginWithToken } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !inviteCode.trim()) {
       toast({
         title: 'Error',
@@ -56,14 +56,12 @@ export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalPro
     setIsLoading(true);
     try {
       const result = await register(username, email, password, inviteCode);
-      setIsSuccess(true);
-      if (result.verificationUrl) {
-        setVerificationUrl(result.verificationUrl);
-      }
+      loginWithToken(result.token, result.user);
       toast({
-        title: 'Success',
-        description: 'Account created! Please check your email to verify your account.',
+        title: 'Welcome!',
+        description: 'Account created and logged in.',
       });
+      handleClose();
     } catch (error: any) {
       toast({
         title: 'Registration Failed',
@@ -76,8 +74,6 @@ export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalPro
   };
 
   const handleClose = () => {
-    setIsSuccess(false);
-    setVerificationUrl(null);
     setUsername('');
     setEmail('');
     setPassword('');
@@ -85,51 +81,6 @@ export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalPro
     setInviteCode('');
     onClose();
   };
-
-  if (isSuccess) {
-    return (
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-success" />
-              Registration Successful!
-            </DialogTitle>
-            <DialogDescription>
-              Please verify your email address to complete registration
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              We've sent a verification link to <strong>{email}</strong>. 
-              Please check your email and click the verification link to activate your account.
-            </p>
-            {verificationUrl && (
-              <div className="bg-secondary/50 rounded-lg p-4">
-                <p className="text-xs text-muted-foreground mb-2">Development mode - Verification link:</p>
-                <a 
-                  href={verificationUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline break-all"
-                >
-                  {verificationUrl}
-                </a>
-              </div>
-            )}
-            <div className="flex gap-2">
-              <Button onClick={handleClose} className="flex-1">
-                Close
-              </Button>
-              <Button onClick={onSwitchToLogin} variant="outline" className="flex-1">
-                Go to Login
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -245,4 +196,3 @@ export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalPro
     </Dialog>
   );
 }
-

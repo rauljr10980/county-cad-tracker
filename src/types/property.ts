@@ -36,6 +36,7 @@ export interface Property {
   phoneNumbers?: string[];
   ownerPhoneIndex?: number; // Index of which phone number is the owner's (0-5)
   // Task/Action fields
+  taskId?: string;
   actionType?: 'call' | 'text' | 'mail' | 'driveby';
   priority?: 'high' | 'med' | 'low';
   dueTime?: string; // ISO datetime string

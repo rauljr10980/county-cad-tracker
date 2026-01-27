@@ -195,6 +195,7 @@ router.get('/',
         
         return {
           ...property,
+          taskId: task.id,
           // Map task fields to property fields (frontend expects these on Property)
           actionType: task.actionType.toLowerCase(), // CALL -> call
           priority: task.priority === 'MEDIUM' ? 'med' : task.priority.toLowerCase(), // HIGH -> high, MEDIUM -> med, LOW -> low

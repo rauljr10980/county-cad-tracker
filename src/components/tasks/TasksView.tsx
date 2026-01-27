@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Phone, MessageSquare, Mail, Car, CheckSquare, Loader2, AlertCircle, Eye, Clock, Flag, Filter, CheckCircle2, X } from 'lucide-react';
+import { Phone, MessageSquare, Mail, Car, CheckSquare, Loader2, AlertCircle, Eye, Clock, Flag, Filter, CheckCircle2, X, Trash2 } from 'lucide-react';
 import { Property, PreForeclosure } from '@/types/property';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getTasks, updatePropertyAction, markTaskDone, updatePropertyPriority, updatePreForeclosure, getPreForeclosures } from '@/lib/api';
+import { getTasks, updatePropertyAction, markTaskDone, deleteTask, updatePropertyPriority, updatePreForeclosure, getPreForeclosures } from '@/lib/api';
 import { format, isToday, isPast, parseISO, startOfDay, isBefore, isAfter } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -63,6 +63,24 @@ export function TasksView() {
   const [sortBy, setSortBy] = useState<'urgency' | 'action' | 'overdue'>('urgency');
   const [updatingPriority, setUpdatingPriority] = useState<Set<string>>(new Set());
   const [priorityPopoverOpen, setPriorityPopoverOpen] = useState<{ [key: string]: boolean }>({});
+
+  const handleDeleteTask = async (property: Property) => {
+    if (!property.taskId) return;
+    try {
+      await deleteTask(property.taskId);
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast({
+        title: 'Task Deleted',
+        description: 'Task has been removed.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete task',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Helper to check if a task is from a pre-foreclosure (has documentNumber)
   const isPreForeclosureTask = (task: Property): boolean => {
@@ -636,6 +654,19 @@ export function TasksView() {
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark Done
                   </Button>
+                  {property.taskId && (
+                    <Button
+                      variant="outline"
+                      size="default"
+                      className="border-destructive/50 hover:border-destructive hover:bg-destructive/10 text-destructive min-h-[44px]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTask(property);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -775,6 +806,22 @@ export function TasksView() {
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark Done
                   </Button>
+
+                  {/* Delete Task Button */}
+                  {property.taskId && (
+                    <Button
+                      variant="outline"
+                      size="default"
+                      className="border-destructive/50 hover:border-destructive hover:bg-destructive/10 text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTask(property);
+                      }}
+                      title="Delete task"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
