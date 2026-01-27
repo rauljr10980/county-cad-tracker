@@ -28,8 +28,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('authToken');
       if (token) {
         try {
-          const userData = await checkSession();
-          setUser(userData);
+          const sessionData = await checkSession();
+          setUser(sessionData.user || sessionData);
         } catch (error) {
           // Invalid token, clear it
           localStorage.removeItem('authToken');
