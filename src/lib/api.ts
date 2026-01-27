@@ -648,13 +648,13 @@ export async function checkSession() {
 /**
  * Register new user
  */
-export async function register(username: string, email: string, password: string) {
+export async function register(username: string, email: string, password: string, inviteCode: string) {
   const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ username, email, password }),
+    body: JSON.stringify({ username, email, password, inviteCode }),
   });
   
   if (!response.ok) {

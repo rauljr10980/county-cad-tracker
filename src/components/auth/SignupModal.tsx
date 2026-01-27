@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Lock, User, Mail, CheckCircle2 } from 'lucide-react';
+import { Loader2, Lock, User, Mail, CheckCircle2, KeyRound } from 'lucide-react';
 import { register } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
@@ -18,6 +18,7 @@ export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalPro
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
@@ -25,7 +26,7 @@ export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalPro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+    if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !inviteCode.trim()) {
       toast({
         title: 'Error',
         description: 'Please fill in all fields',
@@ -54,7 +55,7 @@ export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalPro
 
     setIsLoading(true);
     try {
-      const result = await register(username, email, password);
+      const result = await register(username, email, password, inviteCode);
       setIsSuccess(true);
       if (result.verificationUrl) {
         setVerificationUrl(result.verificationUrl);
@@ -81,6 +82,7 @@ export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalPro
     setEmail('');
     setPassword('');
     setConfirmPassword('');
+    setInviteCode('');
     onClose();
   };
 
@@ -198,6 +200,21 @@ export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalPro
                 placeholder="Confirm your password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                className="pl-9"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="inviteCode">Invite Code</Label>
+            <div className="relative">
+              <KeyRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="inviteCode"
+                type="text"
+                placeholder="Enter your invite code"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
                 className="pl-9"
                 disabled={isLoading}
               />
