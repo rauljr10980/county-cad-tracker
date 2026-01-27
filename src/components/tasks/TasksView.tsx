@@ -65,9 +65,21 @@ export function TasksView() {
   const [priorityPopoverOpen, setPriorityPopoverOpen] = useState<{ [key: string]: boolean }>({});
 
   const handleDeleteTask = async (property: Property) => {
-    if (!property.taskId) return;
     try {
-      await deleteTask(property.taskId);
+      if (isPreForeclosureTask(property)) {
+        const docNumber = (property as any).documentNumber || property.accountNumber;
+        await updatePreForeclosure({
+          document_number: docNumber,
+          actionType: null as any,
+          dueTime: null as any,
+          priority: null as any,
+          assignedTo: null as any,
+        });
+      } else if (property.taskId) {
+        await deleteTask(property.taskId);
+      } else {
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast({
         title: 'Task Deleted',
@@ -654,8 +666,7 @@ export function TasksView() {
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark Done
                   </Button>
-                  {property.taskId && (
-                    <Button
+                  <Button
                       variant="outline"
                       size="default"
                       className="border-destructive/50 hover:border-destructive hover:bg-destructive/10 text-destructive min-h-[44px]"
@@ -666,7 +677,6 @@ export function TasksView() {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                  )}
                 </div>
               </div>
 
@@ -808,20 +818,18 @@ export function TasksView() {
                   </Button>
 
                   {/* Delete Task Button */}
-                  {property.taskId && (
-                    <Button
-                      variant="outline"
-                      size="default"
-                      className="border-destructive/50 hover:border-destructive hover:bg-destructive/10 text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteTask(property);
-                      }}
-                      title="Delete task"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="border-destructive/50 hover:border-destructive hover:bg-destructive/10 text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteTask(property);
+                    }}
+                    title="Delete task"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>
