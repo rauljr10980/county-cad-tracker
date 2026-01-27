@@ -134,7 +134,7 @@ function SortableRouteRow({
                 variant="default"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleRemoveRecordFromRoute(viewRoute.id, propertyId);
+                  handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id);
                 }}
                 disabled={removingRecordId === routeRecord.id}
                 className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
@@ -155,7 +155,7 @@ function SortableRouteRow({
                 variant="default"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleRemoveRecordFromRoute(viewRoute.id, propertyId);
+                  handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id);
                 }}
                 disabled={removingRecordId === routeRecord.id}
                 className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2004,10 +2004,10 @@ export function PropertiesView() {
     }
   };
 
-  const handleRemoveRecordFromRoute = async (routeId: string, propertyId: string) => {
-    setRemovingRecordId(propertyId);
+  const handleRemoveRecordFromRoute = async (routeId: string, routeRecordId: string) => {
+    setRemovingRecordId(routeRecordId);
     try {
-      await removeRecordFromRoute(routeId, propertyId);
+      await removeRecordFromRoute(routeId, routeRecordId);
       toast({
         title: 'Property Removed',
         description: 'Property has been removed from the route',
@@ -2015,7 +2015,7 @@ export function PropertiesView() {
 
       // Update viewRoute
       if (viewRoute && viewRoute.id === routeId) {
-        const updatedRecords = viewRoute.records.filter(r => r.record.id !== propertyId);
+        const updatedRecords = viewRoute.records.filter(r => r.id !== routeRecordId);
         setViewRoute({ ...viewRoute, records: updatedRecords, recordCount: updatedRecords.length });
       }
 
