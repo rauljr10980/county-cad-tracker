@@ -1,4 +1,4 @@
-import { ExternalLink, Eye, Navigation, Calendar, MapPin } from 'lucide-react';
+import { ExternalLink, Eye, Navigation, Calendar, MapPin, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -17,6 +17,8 @@ interface PropertyCardProps {
   localFollowUp?: string;
   isSelected?: boolean;
   onSelect?: (selected: boolean) => void;
+  isInRoute?: boolean;
+  onDelete?: () => void;
 }
 
 export function PropertyCard({
@@ -27,7 +29,9 @@ export function PropertyCard({
   savingFollowUp,
   localFollowUp,
   isSelected,
-  onSelect
+  onSelect,
+  isInRoute,
+  onDelete
 }: PropertyCardProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -180,6 +184,16 @@ export function PropertyCard({
               />
             </PopoverContent>
           </Popover>
+        )}
+        {isInRoute && onDelete && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-shrink-0 text-xs text-destructive border-destructive/50 hover:bg-destructive/10"
+            onClick={onDelete}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
         )}
       </div>
     </div>

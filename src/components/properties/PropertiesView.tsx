@@ -286,6 +286,7 @@ export function PropertiesView() {
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotPropertyId, setCustomDepotPropertyId] = useState<string | null>(null);
   const [propertiesInRoutes, setPropertiesInRoutes] = useState<Set<string>>(new Set());
+  const [propertyRouteMap, setPropertyRouteMap] = useState<Map<string, { routeId: string; routeRecordId: string }>>(new Map());
 
   // Geocoding state
   const [geocodeOpen, setGeocodeOpen] = useState(false);
@@ -1690,10 +1691,14 @@ export function PropertiesView() {
       // IMPORTANT: Only mark properties as "in route" if they are explicitly marked as VISITED
       // This matches the pre-foreclosure behavior where properties are only excluded when marked as visited
       const activePropertyIds = new Set<string>();
-      
+      const routeMap = new Map<string, { routeId: string; routeRecordId: string }>();
+
       propertyRoutes.forEach((route: RouteType) => {
         route.records?.forEach((rr: any) => {
           const propId = rr.record?.id;
+          if (propId) {
+            routeMap.set(propId, { routeId: route.id, routeRecordId: rr.id });
+          }
           // Only add to propertiesInRoutes if the property is explicitly marked as visited
           // Properties in routes but not visited can still be selected for new routes
           if (propId && (rr.visited === true || rr.record?.visited === true)) {
@@ -1701,7 +1706,7 @@ export function PropertiesView() {
           }
         });
       });
-      
+
       // Also add properties that have visited: true directly on the Property model
       // This ensures properties marked as visited in the property details modal are also excluded
       rawProperties.forEach((p: Property) => {
@@ -1709,8 +1714,9 @@ export function PropertiesView() {
           activePropertyIds.add(p.id);
         }
       });
-      
+
       setPropertiesInRoutes(activePropertyIds);
+      setPropertyRouteMap(routeMap);
     } catch (error) {
       console.error('[Properties] Error loading active routes:', error);
     } finally {
@@ -1975,6 +1981,26 @@ export function PropertiesView() {
       });
     } finally {
       setDeletingRoute(null);
+    }
+  };
+
+  const handleRemovePropertyFromRoute = async (propertyId: string) => {
+    const mapping = propertyRouteMap.get(propertyId);
+    if (!mapping) {
+      toast({ title: 'Error', description: 'Property is not on any route', variant: 'destructive' });
+      return;
+    }
+    try {
+      await removeRecordFromRoute(mapping.routeId, mapping.routeRecordId);
+      toast({ title: 'Removed from Route', description: 'Property has been removed from its route' });
+      await loadActiveRoutes();
+    } catch (error) {
+      console.error('Error removing property from route:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to remove property from route',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -2452,6 +2478,8 @@ export function PropertiesView() {
             selectedPropertyIds={selectedPropertyIds}
             onPropertySelect={handlePropertySelect}
             allFilteredPropertyIds={allFilteredPropertyIds}
+            propertiesInRoutes={new Set(propertyRouteMap.keys())}
+            onDeleteProperty={handleRemovePropertyFromRoute}
           />
           
           {/* Pagination controls - Mobile First */}

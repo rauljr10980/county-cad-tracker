@@ -530,6 +530,22 @@ export async function markTaskDone(
 }
 
 /**
+ * Delete a property
+ */
+export async function deleteProperty(propertyId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}`, {
+    method: 'DELETE',
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete property');
+  }
+  return response.json();
+}
+
+/**
  * Delete a task (remove without marking done)
  */
 export async function deleteTask(taskId: string) {

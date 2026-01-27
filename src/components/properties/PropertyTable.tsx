@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar, CalendarPlus, ArrowUp, ArrowDown, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar, CalendarPlus, ArrowUp, ArrowDown, MapPin, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -24,6 +24,8 @@ interface PropertyTableProps {
   selectedPropertyIds?: Set<string>;
   onPropertySelect?: (propertyId: string, selected: boolean) => void;
   allFilteredPropertyIds?: string[];
+  propertiesInRoutes?: Set<string>;
+  onDeleteProperty?: (propertyId: string) => void;
 }
 
 
@@ -38,7 +40,9 @@ export function PropertyTable({
   onSort,
   selectedPropertyIds = new Set(),
   onPropertySelect,
-  allFilteredPropertyIds
+  allFilteredPropertyIds,
+  propertiesInRoutes = new Set(),
+  onDeleteProperty
 }: PropertyTableProps) {
   // Use external sort state if provided, otherwise use internal state (fallback)
   const [internalSortField, setInternalSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
@@ -231,6 +235,8 @@ export function PropertyTable({
               localFollowUp={followUpDate}
               isSelected={selectedPropertyIds.has(property.id)}
               onSelect={onPropertySelect ? (checked) => onPropertySelect(property.id, checked) : undefined}
+              isInRoute={propertiesInRoutes.has(property.id)}
+              onDelete={onDeleteProperty ? () => onDeleteProperty(property.id) : undefined}
             />
           );
         })}
@@ -435,14 +441,14 @@ export function PropertyTable({
                       >
                         <Navigation className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-7 w-7"
                         asChild
                         title={property.link ? "View Property Details" : "View on Bexar County Tax Office"}
                       >
-                        <a 
+                        <a
                           href={property.link || "https://bexar.acttax.com/act_webdev/bexar/index.jsp"}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -450,6 +456,17 @@ export function PropertyTable({
                           <ExternalLink className="h-4 w-4" />
                         </a>
                       </Button>
+                      {onDeleteProperty && propertiesInRoutes.has(property.id) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => onDeleteProperty(property.id)}
+                          title="Remove from route"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
