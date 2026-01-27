@@ -23,6 +23,7 @@ interface PropertyTableProps {
   onSort?: (field: keyof Property | 'ratio') => void;
   selectedPropertyIds?: Set<string>;
   onPropertySelect?: (propertyId: string, selected: boolean) => void;
+  allFilteredPropertyIds?: string[];
 }
 
 
@@ -36,7 +37,8 @@ export function PropertyTable({
   sortDirection: externalSortDirection = 'asc',
   onSort,
   selectedPropertyIds = new Set(),
-  onPropertySelect
+  onPropertySelect,
+  allFilteredPropertyIds
 }: PropertyTableProps) {
   // Use external sort state if provided, otherwise use internal state (fallback)
   const [internalSortField, setInternalSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
@@ -197,15 +199,16 @@ export function PropertyTable({
         {onPropertySelect && (
           <div className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg">
             <Checkbox
-              checked={selectedPropertyIds.size > 0 && selectedPropertyIds.size === displayProperties.length}
+              checked={selectedPropertyIds.size > 0 && selectedPropertyIds.size === (allFilteredPropertyIds?.length || displayProperties.length)}
               onCheckedChange={(checked) => {
-                displayProperties.forEach(prop => {
-                  onPropertySelect(prop.id, checked as boolean);
+                const idsToToggle = allFilteredPropertyIds || displayProperties.map(p => p.id);
+                idsToToggle.forEach(id => {
+                  onPropertySelect(id, checked as boolean);
                 });
               }}
             />
             <span className="text-sm text-muted-foreground">
-              Select All ({displayProperties.length})
+              Select All ({allFilteredPropertyIds?.length || displayProperties.length})
             </span>
             {selectedPropertyIds.size > 0 && (
               <span className="text-sm font-medium text-primary ml-auto">
@@ -242,10 +245,11 @@ export function PropertyTable({
               <th className="w-12">
                 {onPropertySelect && (
                   <Checkbox
-                    checked={selectedPropertyIds.size > 0 && selectedPropertyIds.size === displayProperties.length}
+                    checked={selectedPropertyIds.size > 0 && selectedPropertyIds.size === (allFilteredPropertyIds?.length || displayProperties.length)}
                     onCheckedChange={(checked) => {
-                      displayProperties.forEach(prop => {
-                        onPropertySelect(prop.id, checked as boolean);
+                      const idsToToggle = allFilteredPropertyIds || displayProperties.map(p => p.id);
+                      idsToToggle.forEach(id => {
+                        onPropertySelect(id, checked as boolean);
                       });
                     }}
                     title="Select all"

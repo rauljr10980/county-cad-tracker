@@ -909,7 +909,7 @@ export function PropertiesView() {
   }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, rawProperties, sortField, sortDirection, isSortingActive]);
   
   // Calculate totals and pagination
-  const { properties, total, totalPages } = useMemo(() => {
+  const { properties, total, totalPages, allFilteredPropertyIds } = useMemo(() => {
     try {
       console.log('[PropertiesView] Calculating pagination:', {
         selectedStatuses: selectedStatuses.length,
@@ -956,6 +956,7 @@ export function PropertiesView() {
       properties: finalProperties || [],
       total: finalTotal || 0,
       totalPages: finalTotalPages || 1,
+      allFilteredPropertyIds: propertiesToPaginate.map(p => p.id),
     };
     
     // Ensure all values are numbers, not undefined
@@ -980,6 +981,7 @@ export function PropertiesView() {
         properties: [],
         total: 0,
         totalPages: 1,
+        allFilteredPropertyIds: [],
       };
     }
   }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data, isSortingActive]);
@@ -2449,6 +2451,7 @@ export function PropertiesView() {
             onSort={handleSort}
             selectedPropertyIds={selectedPropertyIds}
             onPropertySelect={handlePropertySelect}
+            allFilteredPropertyIds={allFilteredPropertyIds}
           />
           
           {/* Pagination controls - Mobile First */}
