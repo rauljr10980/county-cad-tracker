@@ -365,11 +365,20 @@ export function PropertyTable({
                       )}
                     </div>
                   </td>
-                  <td className="max-w-[180px] truncate">
-                    {(() => {
-                      const parsed = parsePropertyAddress(property.propertyAddress);
-                      return parsed.ownerName || property.ownerName || '';
-                    })()}
+                  <td className="max-w-[180px]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate">
+                        {(() => {
+                          const parsed = parsePropertyAddress(property.propertyAddress);
+                          return parsed.ownerName || property.ownerName || '';
+                        })()}
+                      </span>
+                      {property.isPrimaryProperty === false && (
+                        <span className="flex-shrink-0 text-[10px] px-1 py-0.5 rounded bg-orange-500/20 text-orange-500 font-medium">
+                          2nd
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="max-w-[250px] truncate text-muted-foreground">
                     {(() => {

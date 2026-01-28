@@ -35,6 +35,7 @@ export interface AdvancedFilters {
   hasLink?: 'yes' | 'no' | 'any';
   hasExemptions?: 'yes' | 'no' | 'any';
   hasVisited?: 'yes' | 'no' | 'any';
+  propertyType?: 'any' | 'primary' | 'secondary';
   followUpDateFrom?: string;
   followUpDateTo?: string;
   lastPaymentDateFrom?: string;
@@ -520,6 +521,37 @@ export function AdvancedFiltersPanel({
                 className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 No
+              </Button>
+            </div>
+          </div>
+
+          {/* Property Type */}
+          <div className="space-y-3">
+            <Label>Property Type</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={filters.propertyType === 'any' || !filters.propertyType ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('propertyType', 'any')}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                Any
+              </Button>
+              <Button
+                variant={filters.propertyType === 'primary' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('propertyType', 'primary')}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                Primary
+              </Button>
+              <Button
+                variant={filters.propertyType === 'secondary' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('propertyType', 'secondary')}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                2nd Property
               </Button>
             </div>
           </div>

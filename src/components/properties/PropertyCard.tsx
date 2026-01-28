@@ -85,8 +85,13 @@ export function PropertyCard({
             />
           )}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <StatusBadge status={property.status} />
+              {property.isPrimaryProperty === false && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 font-medium">
+                  2nd Property
+                </span>
+              )}
               {property.previousStatus && (
                 <span className="text-xs text-muted-foreground">
                   was {property.previousStatus}

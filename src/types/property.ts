@@ -56,6 +56,8 @@ export interface Property {
   isRemoved?: boolean;
   statusChanged?: boolean;
   percentageChanged?: boolean;
+  // Property type: true if ownerName appears in propertyAddress (same property)
+  isPrimaryProperty?: boolean;
   // Visited Status
   visited?: boolean;
   visitedAt?: string;

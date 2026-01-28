@@ -339,6 +339,7 @@ export function PropertiesView() {
     hasLink: 'any',
     hasExemptions: 'any',
     hasVisited: 'any',
+    propertyType: 'any',
     followUpDateFrom: undefined,
     followUpDateTo: undefined,
     lastPaymentDateFrom: undefined,
@@ -381,6 +382,7 @@ export function PropertiesView() {
       (advancedFilters.hasLink !== 'any') ||
       (advancedFilters.hasExemptions !== 'any') ||
       (advancedFilters.hasVisited !== 'any') ||
+      (advancedFilters.propertyType !== 'any' && advancedFilters.propertyType !== undefined) ||
       (advancedFilters.followUpDateFrom !== undefined) ||
       (advancedFilters.followUpDateTo !== undefined) ||
       (advancedFilters.lastPaymentDateFrom !== undefined) ||
@@ -748,6 +750,13 @@ export function PropertiesView() {
         if (propertiesInRoutes.has(p.id)) return false;
       }
       
+      // Property Type (primary vs secondary)
+      if (advancedFilters.propertyType === 'primary') {
+        if (p.isPrimaryProperty === false) return false;
+      } else if (advancedFilters.propertyType === 'secondary') {
+        if (p.isPrimaryProperty !== false) return false;
+      }
+
       // Follow-up Date range
       if (advancedFilters.followUpDateFrom) {
         if (!p.lastFollowUp) return false;
@@ -1092,6 +1101,7 @@ export function PropertiesView() {
       hasLink: 'any',
       hasExemptions: 'any',
       hasVisited: 'any',
+      propertyType: 'any',
       followUpDateFrom: undefined,
       followUpDateTo: undefined,
       lastPaymentDateFrom: undefined,
