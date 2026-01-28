@@ -51,6 +51,8 @@ router.get('/', optionalAuth, async (req, res) => {
       latitude: record.latitude,
       longitude: record.longitude,
       school_district: record.schoolDistrict,
+      recorded_date: record.recordedDate ? record.recordedDate.toISOString() : null,
+      sale_date: record.saleDate ? record.saleDate.toISOString() : null,
       internal_status: record.internalStatus,
       notes: record.notes,
       phoneNumbers: record.phoneNumbers || [],
@@ -467,16 +469,46 @@ router.post('/upload-address-only', optionalAuth, async (req, res) => {
       const row = rows[i];
       const rowKeys = Object.keys(row);
 
-      // Find address field (case-insensitive)
-      let fullAddress = row['Address'] || row['address'] || row['ADDRESS'];
+      // Find address field (case-insensitive, supports "Address" and "Full Address")
+      let fullAddress = row['Full Address'] || row['full address'] || row['FULL ADDRESS'] ||
+        row['Address'] || row['address'] || row['ADDRESS'];
       if (!fullAddress) {
-        const addrKey = rowKeys.find(k => k.toLowerCase().trim() === 'address');
+        const addrKey = rowKeys.find(k => {
+          const lower = k.toLowerCase().trim();
+          return lower === 'full address' || lower === 'address';
+        });
         fullAddress = addrKey ? row[addrKey] : null;
       }
 
       if (!fullAddress || String(fullAddress).trim() === '') {
         errors.push(`Row ${i + 2}: Missing or empty address`);
         continue;
+      }
+
+      // Find date fields (optional)
+      let recordedDate = row['Recorded Date'] || row['recorded date'] || row['RECORDED DATE'] || row['RecordedDate'];
+      if (!recordedDate) {
+        const rdKey = rowKeys.find(k => k.toLowerCase().trim() === 'recorded date' || k.toLowerCase().trim() === 'recordeddate');
+        recordedDate = rdKey ? row[rdKey] : null;
+      }
+
+      let saleDate = row['Sale Date'] || row['sale date'] || row['SALE DATE'] || row['SaleDate'];
+      if (!saleDate) {
+        const sdKey = rowKeys.find(k => k.toLowerCase().trim() === 'sale date' || k.toLowerCase().trim() === 'saledate');
+        saleDate = sdKey ? row[sdKey] : null;
+      }
+
+      // Parse dates
+      let parsedRecordedDate = null;
+      if (recordedDate) {
+        const d = new Date(String(recordedDate).trim());
+        if (!isNaN(d.getTime())) parsedRecordedDate = d;
+      }
+
+      let parsedSaleDate = null;
+      if (saleDate) {
+        const d = new Date(String(saleDate).trim());
+        if (!isNaN(d.getTime())) parsedSaleDate = d;
       }
 
       const rowNumber = i + 1;
@@ -491,6 +523,8 @@ router.post('/upload-address-only', optionalAuth, async (req, res) => {
         zip: parsed.zip || '',
         filingMonth: currentMonth,
         county: 'Bexar',
+        recordedDate: parsedRecordedDate,
+        saleDate: parsedSaleDate,
       });
 
       geocodeInputs.push({
@@ -548,6 +582,8 @@ router.post('/upload-address-only', optionalAuth, async (req, res) => {
               county: record.county,
               latitude,
               longitude,
+              recordedDate: record.recordedDate,
+              saleDate: record.saleDate,
               inactive: false,
               lastSeenMonth: currentMonth,
               updatedAt: new Date(),
@@ -567,6 +603,8 @@ router.post('/upload-address-only', optionalAuth, async (req, res) => {
               county: record.county,
               latitude,
               longitude,
+              recordedDate: record.recordedDate,
+              saleDate: record.saleDate,
               internalStatus: 'New',
               inactive: false,
               firstSeenMonth: currentMonth,
@@ -755,6 +793,8 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
       latitude: record.latitude,
       longitude: record.longitude,
       school_district: record.schoolDistrict,
+      recorded_date: record.recordedDate ? record.recordedDate.toISOString() : null,
+      sale_date: record.saleDate ? record.saleDate.toISOString() : null,
       internal_status: record.internalStatus,
       notes: record.notes,
       phoneNumbers: record.phoneNumbers || [],

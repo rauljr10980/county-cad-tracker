@@ -372,6 +372,8 @@ model PreForeclosure {
   latitude         Float?
   longitude        Float?
   schoolDistrict   String?
+  recordedDate     DateTime?
+  saleDate         DateTime?
   internalStatus   String      @default("New") // "New", "Contact Attempted", "Monitoring", "Dead"
   notes            String?     @db.Text
   phoneNumbers     String[] // Array of phone numbers (up to 6)

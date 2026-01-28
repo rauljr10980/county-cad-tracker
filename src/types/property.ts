@@ -185,7 +185,9 @@ export interface PreForeclosureRecord {
   latitude?: number;
   longitude?: number;
   school_district?: string;
-  
+  recorded_date?: string; // ISO date string
+  sale_date?: string; // ISO date string
+
   // Operator-Entered (manual only)
   internal_status: PreForeclosureStatus;
   notes?: string;
