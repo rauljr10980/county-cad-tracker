@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { PreForeclosureType, PreForeclosureStatus } from '@/types/property';
 import { Filter, X } from 'lucide-react';
 
@@ -27,6 +28,10 @@ export interface PreForeclosureAdvancedFilters {
   hasTask: boolean;
   showNewOnly: boolean;
   missingGeocode: boolean;
+  recordedDateFrom: string;
+  recordedDateTo: string;
+  saleDateFrom: string;
+  saleDateTo: string;
 }
 
 interface AdvancedFiltersProps {
@@ -167,6 +172,56 @@ export function AdvancedFiltersPanel({
                 <SelectItem value="Dead">Dead</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Recorded Date Range */}
+          <div className="space-y-3">
+            <Label>Recorded Date Range</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">From</Label>
+                <Input
+                  type="date"
+                  className="h-9 text-sm"
+                  value={filters.recordedDateFrom}
+                  onChange={(e) => updateFilter('recordedDateFrom', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">To</Label>
+                <Input
+                  type="date"
+                  className="h-9 text-sm"
+                  value={filters.recordedDateTo}
+                  onChange={(e) => updateFilter('recordedDateTo', e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Sale Date Range */}
+          <div className="space-y-3">
+            <Label>Sale Date Range</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">From</Label>
+                <Input
+                  type="date"
+                  className="h-9 text-sm"
+                  value={filters.saleDateFrom}
+                  onChange={(e) => updateFilter('saleDateFrom', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">To</Label>
+                <Input
+                  type="date"
+                  className="h-9 text-sm"
+                  value={filters.saleDateTo}
+                  onChange={(e) => updateFilter('saleDateTo', e.target.value)}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Needs Follow-Up Filter */}

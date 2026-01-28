@@ -301,6 +301,10 @@ export function PreForeclosureView() {
     hasTask: false,
     showNewOnly: false,
     missingGeocode: false,
+    recordedDateFrom: '',
+    recordedDateTo: '',
+    saleDateFrom: '',
+    saleDateTo: '',
   });
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosureRecord | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -465,6 +469,26 @@ export function PreForeclosureView() {
       filtered = filtered.filter(r => r.latitude == null || r.longitude == null);
     }
 
+    // Recorded date range filter
+    if (advancedFilters.recordedDateFrom) {
+      const from = new Date(advancedFilters.recordedDateFrom);
+      filtered = filtered.filter(r => r.recorded_date && new Date(r.recorded_date) >= from);
+    }
+    if (advancedFilters.recordedDateTo) {
+      const to = new Date(advancedFilters.recordedDateTo + 'T23:59:59');
+      filtered = filtered.filter(r => r.recorded_date && new Date(r.recorded_date) <= to);
+    }
+
+    // Sale date range filter
+    if (advancedFilters.saleDateFrom) {
+      const from = new Date(advancedFilters.saleDateFrom);
+      filtered = filtered.filter(r => r.sale_date && new Date(r.sale_date) >= from);
+    }
+    if (advancedFilters.saleDateTo) {
+      const to = new Date(advancedFilters.saleDateTo + 'T23:59:59');
+      filtered = filtered.filter(r => r.sale_date && new Date(r.sale_date) <= to);
+    }
+
     return filtered;
   }, [records, searchQuery, advancedFilters, uploadStats]);
 
@@ -483,6 +507,8 @@ export function PreForeclosureView() {
     if (advancedFilters.hasTask) count++;
     if (advancedFilters.showNewOnly) count++;
     if (advancedFilters.missingGeocode) count++;
+    if (advancedFilters.recordedDateFrom || advancedFilters.recordedDateTo) count++;
+    if (advancedFilters.saleDateFrom || advancedFilters.saleDateTo) count++;
     return count;
   }, [advancedFilters]);
 
@@ -506,6 +532,10 @@ export function PreForeclosureView() {
       hasTask: false,
       showNewOnly: false,
       missingGeocode: false,
+      recordedDateFrom: '',
+      recordedDateTo: '',
+      saleDateFrom: '',
+      saleDateTo: '',
     });
     setSearchQuery('');
   };
@@ -2333,6 +2363,24 @@ export function PreForeclosureView() {
                 </div>
               </div>
 
+              {/* Recorded Date / Sale Date */}
+              {(record.recorded_date || record.sale_date) && (
+                <div className="flex gap-4 mb-3 px-8 text-xs text-muted-foreground">
+                  {record.recorded_date && (
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>Recorded: {format(new Date(record.recorded_date), 'MM/dd/yyyy')}</span>
+                    </div>
+                  )}
+                  {record.sale_date && (
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>Sale: {format(new Date(record.sale_date), 'MM/dd/yyyy')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Status and Visited Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div className="min-w-0">
@@ -2850,6 +2898,14 @@ export function PreForeclosureView() {
                   <div>
                     <Label className="text-muted-foreground text-xs">County</Label>
                     <p className="text-sm">{viewRecord.county}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Recorded Date</Label>
+                    <p className="text-sm">{viewRecord.recorded_date ? format(new Date(viewRecord.recorded_date), 'MM/dd/yyyy') : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Sale Date</Label>
+                    <p className="text-sm">{viewRecord.sale_date ? format(new Date(viewRecord.sale_date), 'MM/dd/yyyy') : 'N/A'}</p>
                   </div>
                 </div>
               </div>
