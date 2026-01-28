@@ -26,6 +26,7 @@ export interface PreForeclosureAdvancedFilters {
   hasPhoneNumbers: boolean;
   hasTask: boolean;
   showNewOnly: boolean;
+  missingGeocode: boolean;
 }
 
 interface AdvancedFiltersProps {
@@ -248,6 +249,20 @@ export function AdvancedFiltersPanel({
               />
               <Label htmlFor="showNewOnly" className="cursor-pointer">
                 New Records Only
+              </Label>
+            </div>
+          </div>
+
+          {/* Missing Geocode Filter */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="missingGeocode"
+                checked={filters.missingGeocode}
+                onCheckedChange={(checked) => updateFilter('missingGeocode', checked as boolean)}
+              />
+              <Label htmlFor="missingGeocode" className="cursor-pointer">
+                Missing Geocode
               </Label>
             </div>
           </div>

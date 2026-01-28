@@ -300,6 +300,7 @@ export function PreForeclosureView() {
     hasPhoneNumbers: false,
     hasTask: false,
     showNewOnly: false,
+    missingGeocode: false,
   });
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosureRecord | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -459,6 +460,11 @@ export function PreForeclosureView() {
       console.log('[FILTER DEBUG] Records after filter:', filtered.length);
     }
 
+    // Missing geocode filter
+    if (advancedFilters.missingGeocode) {
+      filtered = filtered.filter(r => r.latitude == null || r.longitude == null);
+    }
+
     return filtered;
   }, [records, searchQuery, advancedFilters, uploadStats]);
 
@@ -476,6 +482,7 @@ export function PreForeclosureView() {
     if (advancedFilters.hasPhoneNumbers) count++;
     if (advancedFilters.hasTask) count++;
     if (advancedFilters.showNewOnly) count++;
+    if (advancedFilters.missingGeocode) count++;
     return count;
   }, [advancedFilters]);
 
@@ -498,6 +505,7 @@ export function PreForeclosureView() {
       hasPhoneNumbers: false,
       hasTask: false,
       showNewOnly: false,
+      missingGeocode: false,
     });
     setSearchQuery('');
   };
