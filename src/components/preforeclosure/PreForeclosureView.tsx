@@ -1948,10 +1948,17 @@ export function PreForeclosureView() {
                           file: uploadFile,
                           type: uploadType,
                         });
+                        const failedGeocode = result.recordsProcessed - result.geocoded;
+                        const geocodeSummary = failedGeocode > 0
+                          ? `Geocoded ${result.geocoded}/${result.recordsProcessed} addresses. ${failedGeocode} need manual geocoding.`
+                          : `All ${result.geocoded} addresses geocoded successfully.`;
                         toast({
                           title: 'Upload successful',
-                          description: `Processed ${result.recordsProcessed} addresses. Geocoded: ${result.geocoded}. Created: ${result.created}, Updated: ${result.updated}.`,
+                          description: `${geocodeSummary} Created: ${result.created}, Updated: ${result.updated}.`,
                         });
+                        // Auto-enable "Show New Only" filter and refresh upload stats
+                        await queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-stats-latest'] });
+                        setAdvancedFilters(prev => ({ ...prev, showNewOnly: true }));
                       }
                       setUploadOpen(false);
                       setUploadFile(null);
