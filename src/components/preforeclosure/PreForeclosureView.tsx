@@ -1998,7 +1998,7 @@ export function PreForeclosureView() {
         <DialogHeader>
           <DialogTitle>Geocoding Addresses</DialogTitle>
           <DialogDescription>
-            Converting addresses to GPS coordinates for mapping and routing
+            Converting addresses to GPS coordinates via US Census Bureau API
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -2027,8 +2027,7 @@ export function PreForeclosureView() {
               <div className="bg-secondary/30 rounded-lg p-4 text-sm space-y-2">
                 <p className="font-medium">Please wait...</p>
                 <p className="text-muted-foreground">
-                  This process takes about 1 second per address due to rate limiting.
-                  Don't close this window.
+                  Using US Census Bureau API. Don't close this window.
                 </p>
               </div>
             </div>
@@ -2040,8 +2039,11 @@ export function PreForeclosureView() {
                   <div>
                     <p className="font-medium text-green-700">Geocoding Complete!</p>
                     <p className="text-muted-foreground mt-1">
-                      Successfully processed {geocodeResults.size} addresses.
-                      Coordinates have been saved to the database.
+                      {geocodeResults.size > 0
+                        ? `Geocoded ${geocodeResults.size} of ${geocodeProgress.total} addresses via US Census Bureau API. Coordinates have been saved.`
+                        : geocodeProgress.total > 0
+                          ? `Census API could not match any of the ${geocodeProgress.total} addresses. Try the "Geocode Addresses" button again or verify the addresses.`
+                          : 'All records already have coordinates.'}
                     </p>
                   </div>
                 </div>
