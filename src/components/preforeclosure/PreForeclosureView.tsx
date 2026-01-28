@@ -2791,15 +2791,43 @@ export function PreForeclosureView() {
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">Latitude</Label>
-                    <p className="font-mono text-sm">
-                      {viewRecord.latitude != null ? viewRecord.latitude.toFixed(6) : 'N/A'}
-                    </p>
+                    <Input
+                      className="font-mono text-sm h-8 mt-1"
+                      type="number"
+                      step="any"
+                      placeholder="N/A"
+                      defaultValue={viewRecord.latitude != null ? viewRecord.latitude : ''}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim();
+                        const newLat = val ? parseFloat(val) : null;
+                        if (newLat !== viewRecord.latitude) {
+                          updateMutation.mutateAsync({
+                            document_number: viewRecord.document_number,
+                            latitude: newLat,
+                          });
+                        }
+                      }}
+                    />
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">Longitude</Label>
-                    <p className="font-mono text-sm">
-                      {viewRecord.longitude != null ? viewRecord.longitude.toFixed(6) : 'N/A'}
-                    </p>
+                    <Input
+                      className="font-mono text-sm h-8 mt-1"
+                      type="number"
+                      step="any"
+                      placeholder="N/A"
+                      defaultValue={viewRecord.longitude != null ? viewRecord.longitude : ''}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim();
+                        const newLng = val ? parseFloat(val) : null;
+                        if (newLng !== viewRecord.longitude) {
+                          updateMutation.mutateAsync({
+                            document_number: viewRecord.document_number,
+                            longitude: newLng,
+                          });
+                        }
+                      }}
+                    />
                   </div>
                   {viewRecord.school_district && (
                     <div className="col-span-2">
