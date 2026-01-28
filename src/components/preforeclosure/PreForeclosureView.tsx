@@ -2315,7 +2315,7 @@ export function PreForeclosureView() {
               {/* Address */}
               <div className="mb-4 pr-8 pl-8">
                 <div className="flex items-start gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <MapPin className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${record.latitude != null && record.longitude != null ? 'text-green-500' : 'text-red-500'}`} />
                   <div className="text-sm text-muted-foreground min-w-0 flex-1 break-words">
                     <div className="break-words">{record.address}</div>
                     <div className="text-xs mt-0.5 break-words">{record.city}, TX <span className="hidden sm:inline">{record.zip}</span></div>
