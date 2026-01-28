@@ -3,6 +3,7 @@ import {
   getPreForeclosures,
   updatePreForeclosure,
   uploadPreForeclosureFile,
+  uploadAddressOnlyPreForeclosureFile,
   deletePreForeclosures,
   getPreForeclosureUploadHistory,
   getLatestPreForeclosureUploadStats
@@ -54,6 +55,18 @@ export function useUploadPreForeclosureFile() {
 
   return useMutation({
     mutationFn: uploadPreForeclosureFile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+    },
+  });
+}
+
+export function useUploadAddressOnlyPreForeclosureFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ file, type }: { file: File; type: 'Mortgage' | 'Tax' }) =>
+      uploadAddressOnlyPreForeclosureFile(file, type),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
     },

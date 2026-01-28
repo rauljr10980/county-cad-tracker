@@ -841,6 +841,56 @@ export async function uploadPreForeclosureFile(file: File): Promise<{
 }
 
 /**
+ * Upload address-only pre-foreclosure file
+ */
+export async function uploadAddressOnlyPreForeclosureFile(
+  file: File,
+  type: 'Mortgage' | 'Tax'
+): Promise<{
+  success: boolean;
+  fileId: string;
+  recordsProcessed: number;
+  created: number;
+  updated: number;
+  geocoded: number;
+  totalRecords: number;
+  activeRecords: number;
+  inactiveRecords: number;
+}> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      try {
+        const base64 = (e.target?.result as string).split(',')[1];
+
+        const response = await fetch(`${API_BASE_URL}/api/preforeclosure/upload-address-only`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            filename: file.name,
+            fileData: base64,
+            type,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Upload failed');
+        }
+
+        resolve(await response.json());
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * Get pre-foreclosure upload history
  */
 export async function getPreForeclosureUploadHistory(limit: number = 10): Promise<any[]> {

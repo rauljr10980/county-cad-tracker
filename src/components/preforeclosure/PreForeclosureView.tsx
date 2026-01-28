@@ -28,13 +28,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats } from '@/hooks/usePreForeclosure';
+import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useUploadAddressOnlyPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats } from '@/hooks/usePreForeclosure';
 import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute, reorderRecordInRoute } from '@/lib/api';
-import { batchGeocodeAddresses } from '@/lib/geocoding';
+import { batchGeocodeAddressesCensus } from '@/lib/geocoding';
 
 // Local type alias to avoid runtime reference issues
 type RouteType = {
@@ -312,9 +312,12 @@ export function PreForeclosureView() {
   const { data: uploadStats } = useLatestPreForeclosureUploadStats();
   const updateMutation = useUpdatePreForeclosure();
   const uploadMutation = useUploadPreForeclosureFile();
+  const addressOnlyUploadMutation = useUploadAddressOnlyPreForeclosureFile();
   const deleteMutation = useDeletePreForeclosures();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadMode, setUploadMode] = useState<'standard' | 'address-only'>('standard');
+  const [uploadType, setUploadType] = useState<'Mortgage' | 'Tax'>('Mortgage');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
@@ -1628,7 +1631,7 @@ export function PreForeclosureView() {
         zip: r.zip,
       }));
 
-      const results = await batchGeocodeAddresses(
+      const results = await batchGeocodeAddressesCensus(
         addressesToGeocode,
         (completed, total, current) => {
           setGeocodeProgress({ current: completed, total, address: current });
@@ -1804,17 +1807,59 @@ export function PreForeclosureView() {
   );
 
   // Upload Modal Component (rendered once at the end)
+  const isUploading = uploadMutation.isPending || addressOnlyUploadMutation.isPending;
   const uploadModal = (
-    <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-          <DialogContent>
+    <Dialog open={uploadOpen} onOpenChange={(open) => {
+      setUploadOpen(open);
+      if (!open) {
+        setUploadFile(null);
+        setUploadMode('standard');
+        setUploadType('Mortgage');
+      }
+    }}>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Upload Pre-Foreclosure File</DialogTitle>
               <DialogDescription>
-                Upload an Excel file (.xlsx or .xls) or CSV file (.csv) with pre-foreclosure records.
-                Required columns: Doc Number (or Document Number), Type (Mortgage/Tax), Address, City, ZIP, Filing Month (optional).
+                Choose an upload mode and select your file.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Mode Toggle */}
+              <div className="flex gap-2">
+                <Button
+                  variant={uploadMode === 'standard' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => { setUploadMode('standard'); setUploadFile(null); }}
+                >
+                  Standard Upload
+                </Button>
+                <Button
+                  variant={uploadMode === 'address-only' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => { setUploadMode('address-only'); setUploadFile(null); }}
+                >
+                  Address-Only Upload
+                </Button>
+              </div>
+
+              {/* Type Dropdown (address-only mode only) */}
+              {uploadMode === 'address-only' && (
+                <div>
+                  <Label>Filing Type</Label>
+                  <Select value={uploadType} onValueChange={(v) => setUploadType(v as 'Mortgage' | 'Tax')}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Mortgage">Mortgage</SelectItem>
+                      <SelectItem value="Tax">Tax</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* File Input */}
               <div>
                 <Label>Select File (.xlsx, .xls, or .csv)</Label>
                 <Input
@@ -1823,24 +1868,22 @@ export function PreForeclosureView() {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      // Validate file type
                       if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls') && !file.name.endsWith('.csv')) {
                         toast({
                           title: 'Invalid file type',
                           description: 'Please select an Excel file (.xlsx or .xls) or CSV file (.csv)',
                           variant: 'destructive',
                         });
-                        e.target.value = ''; // Clear the input
+                        e.target.value = '';
                         return;
                       }
-                      // Validate file size (100MB limit)
                       if (file.size > 100 * 1024 * 1024) {
                         toast({
                           title: 'File too large',
                           description: 'File size must be less than 100MB',
                           variant: 'destructive',
                         });
-                        e.target.value = ''; // Clear the input
+                        e.target.value = '';
                         return;
                       }
                       setUploadFile(file);
@@ -1859,18 +1902,30 @@ export function PreForeclosureView() {
                   </div>
                 )}
               </div>
+
+              {/* Requirements Info */}
               <div className="bg-secondary/30 rounded-lg p-4 text-sm space-y-2">
                 <p className="font-medium">File Requirements:</p>
-                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                  <li>Document Number (required)</li>
-                  <li>Type: Mortgage or Tax</li>
-                  <li>Address, City, ZIP</li>
-                  <li>Filing Month (optional, defaults to current month)</li>
-                </ul>
+                {uploadMode === 'standard' ? (
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    <li>Document Number (required)</li>
+                    <li>Type: Mortgage or Tax</li>
+                    <li>Address, City, ZIP</li>
+                    <li>Filing Month (optional, defaults to current month)</li>
+                  </ul>
+                ) : (
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    <li>Address column (full address, e.g., "123 Main St, San Antonio, TX 78201")</li>
+                  </ul>
+                )}
                 <p className="text-xs text-muted-foreground mt-2">
-                  Records are matched by Document Number. Missing records from new uploads are marked inactive.
+                  {uploadMode === 'standard'
+                    ? 'Records are matched by Document Number. Missing records from new uploads are marked inactive.'
+                    : 'Row numbers will be used as document numbers. Addresses will be automatically geocoded using the US Census API.'}
                 </p>
               </div>
+
+              {/* Action Buttons */}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => {
                   setUploadOpen(false);
@@ -1882,11 +1937,22 @@ export function PreForeclosureView() {
                   onClick={async () => {
                     if (!uploadFile) return;
                     try {
-                      const result = await uploadMutation.mutateAsync(uploadFile);
-                      toast({
-                        title: 'Upload successful',
-                        description: `Processed ${result.recordsProcessed} records. Total: ${result.totalRecords} (${result.activeRecords} active, ${result.inactiveRecords} inactive)`,
-                      });
+                      if (uploadMode === 'standard') {
+                        const result = await uploadMutation.mutateAsync(uploadFile);
+                        toast({
+                          title: 'Upload successful',
+                          description: `Processed ${result.recordsProcessed} records. Total: ${result.totalRecords} (${result.activeRecords} active, ${result.inactiveRecords} inactive)`,
+                        });
+                      } else {
+                        const result = await addressOnlyUploadMutation.mutateAsync({
+                          file: uploadFile,
+                          type: uploadType,
+                        });
+                        toast({
+                          title: 'Upload successful',
+                          description: `Processed ${result.recordsProcessed} addresses. Geocoded: ${result.geocoded}. Created: ${result.created}, Updated: ${result.updated}.`,
+                        });
+                      }
                       setUploadOpen(false);
                       setUploadFile(null);
                     } catch (error) {
@@ -1898,9 +1964,9 @@ export function PreForeclosureView() {
                       console.error('Upload error:', error);
                     }
                   }}
-                  disabled={!uploadFile || uploadMutation.isPending}
+                  disabled={!uploadFile || isUploading}
                 >
-                  {uploadMutation.isPending ? (
+                  {isUploading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Uploading...
