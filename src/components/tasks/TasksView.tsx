@@ -493,20 +493,6 @@ export function TasksView() {
 
   const tasks = data || [];
 
-  if (tasks.length === 0) {
-    return (
-      <div className="p-6">
-        <div className="bg-secondary/30 rounded-lg p-12 text-center">
-          <CheckSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Tasks</h3>
-          <p className="text-muted-foreground">
-            Set action types and due times on properties to see them here.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6">
       {/* Person Selector Cards */}
@@ -544,9 +530,13 @@ export function TasksView() {
       </div>
 
       {/* Sales Funnel - Deal Workflow */}
-      <div className="mb-6 rounded-xl border border-border bg-card p-6">
-        <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
-        <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
+      <div className="mb-6 rounded-xl border border-border bg-card p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
+            <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
+          </div>
+        </div>
         {isLoadingProperties ? (
           <div className="mt-5 flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
@@ -558,32 +548,34 @@ export function TasksView() {
             <span className="ml-2 text-sm text-destructive">Failed to load pipeline data</span>
           </div>
         ) : (
-          <>
-            <div className="mt-5 space-y-3">
-              {DEAL_STAGES.map((stage) => {
-                const count = dealStageCounts[stage.key] || 0;
-                const width = maxDealStageCount > 0 ? Math.max(count > 0 ? 5 : 0, (count / maxDealStageCount) * 100) : 0;
-                const showNumberInside = width > 20;
-                return (
-                  <div key={stage.key}>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="font-medium">{stage.label}</span>
-                      <span className="text-muted-foreground">{count} {count === 1 ? 'lead' : 'leads'}</span>
-                    </div>
-                    <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden">
-                      {count > 0 && (
-                        <div
-                          className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
-                          style={{ backgroundColor: stage.color, width: `${width}%` }}
-                        >
-                          {showNumberInside ? count : ''}
-                        </div>
-                      )}
-                    </div>
+          <div className="mt-5 space-y-3">
+            {DEAL_STAGES.map((stage) => {
+              const count = dealStageCounts[stage.key] || 0;
+              const width = maxDealStageCount > 0 ? Math.max(count > 0 ? 5 : 0, (count / maxDealStageCount) * 100) : 0;
+              const showNumberInside = width > 20;
+              return (
+                <div key={stage.key} className="min-h-[3rem]">
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium text-foreground">{stage.label}</span>
+                    <span className="text-muted-foreground font-medium">{count} {count === 1 ? 'lead' : 'leads'}</span>
                   </div>
-                );
-              })}
-            </div>
+                  <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden border border-border/50">
+                    {count > 0 ? (
+                      <div
+                        className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
+                        style={{ backgroundColor: stage.color, width: `${width}%`, minWidth: count > 0 ? '5%' : '0%' }}
+                      >
+                        {showNumberInside ? count : ''}
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center">
+                        <span className="text-xs text-muted-foreground/50">0</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
             {/* Dead Leads - separated */}
             {dealStageCounts.dead > 0 && (
               <div className="mt-4 pt-4 border-t border-border">
@@ -596,9 +588,20 @@ export function TasksView() {
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
+
+      {/* No Tasks Message */}
+      {tasks.length === 0 && (
+        <div className="mb-6 bg-secondary/30 rounded-lg p-12 text-center">
+          <CheckSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No Tasks</h3>
+          <p className="text-muted-foreground">
+            Set action types and due times on properties to see them here.
+          </p>
+        </div>
+      )}
 
       {/* Deal Workflow Pipeline Funnel (Pre-Foreclosure) */}
       {preForeclosureRecords && preForeclosureRecords.length > 0 && (
