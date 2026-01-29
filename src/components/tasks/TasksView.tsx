@@ -60,6 +60,7 @@ export function TasksView() {
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [selectedPerson, setSelectedPerson] = useState<'luciano' | 'raul' | null>(null);
   const [sortBy, setSortBy] = useState<'urgency' | 'action' | 'overdue'>('urgency');
   const [updatingPriority, setUpdatingPriority] = useState<Set<string>>(new Set());
   const [priorityPopoverOpen, setPriorityPopoverOpen] = useState<{ [key: string]: boolean }>({});
@@ -180,6 +181,11 @@ export function TasksView() {
 
     let filtered = [...tasksData];
 
+    // Apply person filter
+    if (selectedPerson) {
+      filtered = filtered.filter(p => p.assignedTo && p.assignedTo.toLowerCase() === selectedPerson);
+    }
+
     // Apply filters
     if (filterMode === 'call' || filterMode === 'text' || filterMode === 'mail' || filterMode === 'driveby') {
       filtered = filtered.filter(p => p.actionType === filterMode);
@@ -231,7 +237,7 @@ export function TasksView() {
     });
 
     return filtered;
-  }, [data, filterMode, sortBy]);
+  }, [data, filterMode, sortBy, selectedPerson]);
 
   // Task summary stats - Total tasks and assigned to users
   const taskStats = useMemo(() => {
@@ -419,60 +425,38 @@ export function TasksView() {
 
   return (
     <div className="p-6">
-      {/* Task Summary Cards */}
-      <div className="mb-6 bg-card border border-border rounded-lg p-4">
-        <h3 className="text-sm font-semibold mb-4">Tasks & Actions Overview</h3>
-        <div className="space-y-4">
-          {[
-            { label: 'Total Tasks', count: taskStats.total, color: '#3B82F6', icon: '📋' },
-            { label: 'Luciano', count: taskStats.luciano, color: '#10B981', icon: '👤' },
-            { label: 'Raul', count: taskStats.raul, color: '#F59E0B', icon: '👤' },
-          ].map((task, index) => (
-            <div key={index} className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{task.icon}</span>
-                  <span className="text-muted-foreground">{task.label}</span>
-                </div>
-                <span className="font-bold" style={{ color: task.color }}>
-                  {task.count}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-1.5">
-                <div
-                  className="h-1.5 rounded-full transition-all"
-                  style={{
-                    backgroundColor: task.color,
-                    width: `${Math.min((task.count / Math.max(taskStats.total, 1)) * 100, 100)}%`
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Performance Stats */}
-      <div className="mb-6 bg-card border border-border rounded-lg p-4">
-        <h3 className="text-sm font-semibold mb-4">Today's Performance</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          <div>
-            <p className="text-2xl font-bold text-primary">{todayStats.completed}</p>
-            <p className="text-xs text-muted-foreground">Tasks Completed</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-primary">{todayStats.contacts}</p>
-            <p className="text-xs text-muted-foreground">Contacts Made</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-primary">{todayStats.warm}</p>
-            <p className="text-xs text-muted-foreground">Warm Conversations</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-primary">{todayStats.followUps}</p>
-            <p className="text-xs text-muted-foreground">Follow-ups Created</p>
-          </div>
-        </div>
+      {/* Person Selector Cards */}
+      <div className="mb-6 grid grid-cols-2 gap-4">
+        <button
+          onClick={() => setSelectedPerson(selectedPerson === 'luciano' ? null : 'luciano')}
+          className={cn(
+            "rounded-xl border-2 p-6 text-center transition-all cursor-pointer",
+            selectedPerson === 'luciano'
+              ? "border-green-500 bg-green-500/10"
+              : selectedPerson === null
+                ? "border-border bg-card hover:border-green-500/50"
+                : "border-border bg-card/50 opacity-50 hover:opacity-75"
+          )}
+        >
+          <p className="text-4xl font-bold text-green-500">{taskStats.luciano}</p>
+          <p className="text-lg font-semibold mt-2">Luciano</p>
+          <p className="text-xs text-muted-foreground mt-1">tasks</p>
+        </button>
+        <button
+          onClick={() => setSelectedPerson(selectedPerson === 'raul' ? null : 'raul')}
+          className={cn(
+            "rounded-xl border-2 p-6 text-center transition-all cursor-pointer",
+            selectedPerson === 'raul'
+              ? "border-orange-500 bg-orange-500/10"
+              : selectedPerson === null
+                ? "border-border bg-card hover:border-orange-500/50"
+                : "border-border bg-card/50 opacity-50 hover:opacity-75"
+          )}
+        >
+          <p className="text-4xl font-bold text-orange-500">{taskStats.raul}</p>
+          <p className="text-lg font-semibold mt-2">Raul</p>
+          <p className="text-xs text-muted-foreground mt-1">tasks</p>
+        </button>
       </div>
 
       {/* Header Controls */}
