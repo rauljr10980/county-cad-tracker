@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Phone, MessageSquare, Mail, Car, CheckSquare, Loader2, AlertCircle, Eye, Clock, Flag, Filter, CheckCircle2, X } from 'lucide-react';
+import { Phone, MessageSquare, Mail, Car, CheckSquare, Loader2, AlertCircle, Eye, Clock, Flag, Filter, CheckCircle2, X, Trash2 } from 'lucide-react';
 import { Property, PreForeclosure } from '@/types/property';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getTasks, updatePropertyAction, markTaskDone, updatePropertyPriority, updatePreForeclosure, getPreForeclosures } from '@/lib/api';
+import { getTasks, updatePropertyAction, markTaskDone, deleteTask, updatePropertyPriority, updatePreForeclosure, getPreForeclosures } from '@/lib/api';
 import { format, isToday, isPast, parseISO, startOfDay, isBefore, isAfter } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from '@/hooks/use-toast';
+import { usePreForeclosures } from '@/hooks/usePreForeclosure';
+import type { WorkflowStage } from '@/types/property';
 
 type ActionType = 'call' | 'text' | 'mail' | 'driveby';
 type Priority = 'high' | 'med' | 'low';
@@ -60,9 +62,40 @@ export function TasksView() {
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [selectedPerson, setSelectedPerson] = useState<'luciano' | 'raul' | null>(null);
   const [sortBy, setSortBy] = useState<'urgency' | 'action' | 'overdue'>('urgency');
   const [updatingPriority, setUpdatingPriority] = useState<Set<string>>(new Set());
   const [priorityPopoverOpen, setPriorityPopoverOpen] = useState<{ [key: string]: boolean }>({});
+
+  const handleDeleteTask = async (property: Property) => {
+    try {
+      if (isPreForeclosureTask(property)) {
+        const docNumber = (property as any).documentNumber || property.accountNumber;
+        await updatePreForeclosure({
+          document_number: docNumber,
+          actionType: null as any,
+          dueTime: null as any,
+          priority: null as any,
+          assignedTo: null as any,
+        });
+      } else if (property.taskId) {
+        await deleteTask(property.taskId);
+      } else {
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast({
+        title: 'Task Deleted',
+        description: 'Task has been removed.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete task',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Helper to check if a task is from a pre-foreclosure (has documentNumber)
   const isPreForeclosureTask = (task: Property): boolean => {
@@ -150,6 +183,11 @@ export function TasksView() {
 
     let filtered = [...tasksData];
 
+    // Apply person filter
+    if (selectedPerson) {
+      filtered = filtered.filter(p => p.assignedTo && p.assignedTo.toLowerCase() === selectedPerson);
+    }
+
     // Apply filters
     if (filterMode === 'call' || filterMode === 'text' || filterMode === 'mail' || filterMode === 'driveby') {
       filtered = filtered.filter(p => p.actionType === filterMode);
@@ -201,7 +239,7 @@ export function TasksView() {
     });
 
     return filtered;
-  }, [data, filterMode, sortBy]);
+  }, [data, filterMode, sortBy, selectedPerson]);
 
   // Task summary stats - Total tasks and assigned to users
   const taskStats = useMemo(() => {
@@ -238,6 +276,38 @@ export function TasksView() {
       followUps: tasksData.filter(p => p.dueTime && isAfter(parseISO(p.dueTime), todayStart)).length,
     };
   }, [data]);
+
+  // Workflow stage funnel data
+  const { data: preForeclosureRecords } = usePreForeclosures();
+
+  const FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
+    { key: 'not_started', label: 'Not Started', color: '#6B7280' },
+    { key: 'initial_visit', label: 'Initial Visit', color: '#3B82F6' },
+    { key: 'people_search', label: 'People Search', color: '#8B5CF6' },
+    { key: 'call_owner', label: 'Call Owner', color: '#EC4899' },
+    { key: 'land_records', label: 'Land Records', color: '#F59E0B' },
+    { key: 'visit_heirs', label: 'Visit Heirs', color: '#F97316' },
+    { key: 'call_heirs', label: 'Call Heirs', color: '#EF4444' },
+    { key: 'negotiating', label: 'Negotiating', color: '#10B981' },
+    { key: 'dead_end', label: 'Dead End', color: '#6B7280' },
+  ];
+
+  const stageCounts = useMemo(() => {
+    const records = preForeclosureRecords || [];
+    const counts: Record<WorkflowStage, number> = {
+      not_started: 0, initial_visit: 0, people_search: 0, call_owner: 0,
+      land_records: 0, visit_heirs: 0, call_heirs: 0, negotiating: 0, dead_end: 0,
+    };
+    for (const r of records) {
+      const stage = (r.workflow_stage as WorkflowStage) || 'not_started';
+      if (stage in counts) counts[stage]++;
+    }
+    return counts;
+  }, [preForeclosureRecords]);
+
+  const maxStageCount = useMemo(() => {
+    return Math.max(1, ...Object.values(stageCounts));
+  }, [stageCounts]);
 
   const handleMarkDone = async (property: Property) => {
     if (!selectedOutcome) {
@@ -389,61 +459,83 @@ export function TasksView() {
 
   return (
     <div className="p-6">
-      {/* Task Summary Cards */}
-      <div className="mb-6 bg-card border border-border rounded-lg p-4">
-        <h3 className="text-sm font-semibold mb-4">Tasks & Actions Overview</h3>
-        <div className="space-y-4">
-          {[
-            { label: 'Total Tasks', count: taskStats.total, color: '#3B82F6', icon: '📋' },
-            { label: 'Luciano', count: taskStats.luciano, color: '#10B981', icon: '👤' },
-            { label: 'Raul', count: taskStats.raul, color: '#F59E0B', icon: '👤' },
-          ].map((task, index) => (
-            <div key={index} className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{task.icon}</span>
-                  <span className="text-muted-foreground">{task.label}</span>
-                </div>
-                <span className="font-bold" style={{ color: task.color }}>
-                  {task.count}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-1.5">
-                <div
-                  className="h-1.5 rounded-full transition-all"
-                  style={{
-                    backgroundColor: task.color,
-                    width: `${Math.min((task.count / Math.max(taskStats.total, 1)) * 100, 100)}%`
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* Person Selector Cards */}
+      <div className="mb-6 grid grid-cols-2 gap-4">
+        <button
+          onClick={() => setSelectedPerson(selectedPerson === 'luciano' ? null : 'luciano')}
+          className={cn(
+            "rounded-xl border-2 p-6 text-center transition-all cursor-pointer",
+            selectedPerson === 'luciano'
+              ? "border-green-500 bg-green-500/10"
+              : selectedPerson === null
+                ? "border-border bg-card hover:border-green-500/50"
+                : "border-border bg-card/50 opacity-50 hover:opacity-75"
+          )}
+        >
+          <p className="text-4xl font-bold text-green-500">{taskStats.luciano}</p>
+          <p className="text-lg font-semibold mt-2">Luciano</p>
+          <p className="text-xs text-muted-foreground mt-1">tasks</p>
+        </button>
+        <button
+          onClick={() => setSelectedPerson(selectedPerson === 'raul' ? null : 'raul')}
+          className={cn(
+            "rounded-xl border-2 p-6 text-center transition-all cursor-pointer",
+            selectedPerson === 'raul'
+              ? "border-orange-500 bg-orange-500/10"
+              : selectedPerson === null
+                ? "border-border bg-card hover:border-orange-500/50"
+                : "border-border bg-card/50 opacity-50 hover:opacity-75"
+          )}
+        >
+          <p className="text-4xl font-bold text-orange-500">{taskStats.raul}</p>
+          <p className="text-lg font-semibold mt-2">Raul</p>
+          <p className="text-xs text-muted-foreground mt-1">tasks</p>
+        </button>
       </div>
 
-      {/* Performance Stats */}
-      <div className="mb-6 bg-card border border-border rounded-lg p-4">
-        <h3 className="text-sm font-semibold mb-4">Today's Performance</h3>
-        <div className="grid grid-cols-4 gap-4 text-center">
-          <div>
-            <p className="text-2xl font-bold text-primary">{todayStats.completed}</p>
-            <p className="text-xs text-muted-foreground">Tasks Completed</p>
+      {/* Deal Workflow Pipeline Funnel */}
+      {preForeclosureRecords && preForeclosureRecords.length > 0 && (
+        <div className="mb-6 rounded-xl border border-border bg-card p-6">
+          <h3 className="text-xl font-bold tracking-tight">Deal Pipeline</h3>
+          <p className="text-sm text-muted-foreground mt-1">Current stage distribution</p>
+          <div className="mt-5 space-y-3">
+            {FUNNEL_STAGES.filter(s => s.key !== 'dead_end').map((stage) => {
+              const count = stageCounts[stage.key];
+              const width = Math.max(count > 0 ? 5 : 0, (count / maxStageCount) * 100);
+              return (
+                <div key={stage.key}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium">{stage.label}</span>
+                    <span className="text-muted-foreground">{count} {count === 1 ? 'deal' : 'deals'}</span>
+                  </div>
+                  <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden">
+                    {count > 0 && (
+                      <div
+                        className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
+                        style={{ backgroundColor: stage.color, width: `${width}%` }}
+                      >
+                        {width > 15 ? count : ''}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div>
-            <p className="text-2xl font-bold text-primary">{todayStats.contacts}</p>
-            <p className="text-xs text-muted-foreground">Contacts Made</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-primary">{todayStats.warm}</p>
-            <p className="text-xs text-muted-foreground">Warm Conversations</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-primary">{todayStats.followUps}</p>
-            <p className="text-xs text-muted-foreground">Follow-ups Created</p>
-          </div>
+          {/* Dead End - separated */}
+          {stageCounts.dead_end > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
+                  Dead End
+                </span>
+                <span className="text-muted-foreground">{stageCounts.dead_end} deals</span>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Header Controls */}
       <div className="mb-8 flex items-center justify-between flex-wrap gap-6 pb-4 border-b border-border">
@@ -512,13 +604,146 @@ export function TasksView() {
             <div
               key={property.id}
               className={cn(
-                "bg-card border border-border rounded-lg p-5 hover:border-primary/50 hover:shadow-md transition-all shadow-sm",
+                "bg-card border border-border rounded-lg p-3 md:p-5 hover:border-primary/50 hover:shadow-md transition-all shadow-sm",
                 bulkMode && "cursor-pointer",
                 selectedIds.has(property.id) && "border-primary bg-primary/5 shadow-md"
               )}
               onClick={() => bulkMode && handleBulkToggle(property.id)}
             >
-              <div className="flex items-center justify-between gap-6">
+              {/* Mobile Layout */}
+              <div className="md:hidden space-y-3">
+                {/* Top Row: Action + Amount */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {bulkMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(property.id)}
+                        onChange={() => handleBulkToggle(property.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-5 w-5 rounded border-2 border-border cursor-pointer accent-primary"
+                      />
+                    )}
+                    <span className="text-lg font-bold uppercase tracking-wide text-foreground">
+                      {actionLabel.replace(/[📞💬✉️🚗]/g, '').trim()}
+                    </span>
+                  </div>
+
+                  <div className="flex-shrink-0">
+                    {property.totalAmountDue > 0 ? (
+                      <span className="text-lg font-bold font-mono tracking-tight text-green-500">
+                        {formatCurrency(property.totalAmountDue)}
+                      </span>
+                    ) : isPreForeclosureTask(property) && (property as any).type ? (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-xs font-semibold px-2 py-1 rounded-md border-2",
+                          (property as any).type === 'Mortgage'
+                            ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                            : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                        )}
+                      >
+                        {(property as any).type}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Second Row: Priority + Assigned */}
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs font-semibold px-2 py-1 rounded-md border-2",
+                      PRIORITY_COLORS[priority]
+                    )}
+                  >
+                    {priority.toUpperCase()}
+                  </Badge>
+                  {property.assignedTo && (
+                    <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      {property.assignedTo}
+                    </span>
+                  )}
+                </div>
+
+                {/* Notes */}
+                {property.notes && property.notes.trim() && (
+                  <div className="text-sm text-muted-foreground break-words whitespace-pre-wrap">
+                    {property.notes}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="flex-1 border-border hover:border-primary hover:bg-primary/10 min-h-[44px]"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (isPreForeclosureTask(property)) {
+                        const docNumber = (property as any).documentNumber || property.accountNumber;
+                        try {
+                          const allRecords = await getPreForeclosures();
+                          const fullRecord = allRecords.find(r => r.document_number === docNumber);
+                          if (fullRecord) {
+                            setSelectedPreForeclosure(fullRecord);
+                          } else {
+                            toast({
+                              title: "Record Not Found",
+                              description: "Could not find full pre-foreclosure record",
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error) {
+                          console.error('Failed to fetch pre-foreclosure:', error);
+                          toast({
+                            title: "Error",
+                            description: "Failed to load pre-foreclosure details",
+                            variant: "destructive",
+                          });
+                        }
+                        setSelectedProperty(null);
+                      } else {
+                        setSelectedProperty(property);
+                        setSelectedPreForeclosure(null);
+                      }
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="default"
+                    size="default"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-md hover:shadow-lg transition-all min-h-[44px]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedForOutcome(property);
+                      setSelectedOutcome(property.lastOutcome || '');
+                    }}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Mark Done
+                  </Button>
+                  <Button
+                      variant="outline"
+                      size="default"
+                      className="border-destructive/50 hover:border-destructive hover:bg-destructive/10 text-destructive min-h-[44px]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTask(property);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
+              </div>
+
+              {/* Desktop Layout */}
+              <div className="hidden md:flex items-center justify-between gap-6">
                 {/* Checkbox (bulk mode) */}
                 {bulkMode && (
                   <div className="flex-shrink-0">
@@ -652,6 +877,20 @@ export function TasksView() {
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark Done
+                  </Button>
+
+                  {/* Delete Task Button */}
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="border-destructive/50 hover:border-destructive hover:bg-destructive/10 text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteTask(property);
+                    }}
+                    title="Delete task"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

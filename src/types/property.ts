@@ -36,6 +36,7 @@ export interface Property {
   phoneNumbers?: string[];
   ownerPhoneIndex?: number; // Index of which phone number is the owner's (0-5)
   // Task/Action fields
+  taskId?: string; // Task ID for deletion
   actionType?: 'call' | 'text' | 'mail' | 'driveby';
   priority?: 'high' | 'med' | 'low';
   dueTime?: string; // ISO datetime string
@@ -170,6 +171,18 @@ export interface ProcessingStatus {
 export type PreForeclosureType = 'Mortgage' | 'Tax';
 export type PreForeclosureStatus = 'New' | 'Contact Attempted' | 'Monitoring' | 'Dead';
 
+// Workflow stage for pre-foreclosure pipeline tracking
+export type WorkflowStage = 
+  | 'not_started'
+  | 'initial_visit'
+  | 'people_search'
+  | 'call_owner'
+  | 'land_records'
+  | 'visit_heirs'
+  | 'call_heirs'
+  | 'negotiating'
+  | 'dead_end';
+
 export interface PreForeclosureRecord {
   // Immutable (from file)
   document_number: string; // Primary key
@@ -208,6 +221,9 @@ export interface PreForeclosureRecord {
   visited?: boolean;
   visited_at?: string; // ISO date string
   visited_by?: 'Luciano' | 'Raul';
+  
+  // Workflow stage for pipeline tracking
+  workflow_stage?: WorkflowStage;
 }
 
 // Type alias for backward compatibility

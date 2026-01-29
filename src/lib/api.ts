@@ -530,6 +530,20 @@ export async function markTaskDone(
 }
 
 /**
+ * Delete a task
+ */
+export async function deleteTask(taskId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete task');
+  }
+  return response.json();
+}
+
+/**
  * Update property deal stage
  */
 export async function updatePropertyDealStage(
