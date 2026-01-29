@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { PreForeclosureRecord, WorkflowStage, WorkflowLogEntry } from '@/types/property';
 import { WORKFLOW_STAGES, STAGE_TASK_MAP } from '@/types/property';
 import { useUpdatePreForeclosure } from '@/hooks/usePreForeclosure';
+import { useAuth } from '@/contexts/AuthContext';
 
 const STAGE_ORDER: WorkflowStage[] = [
   'not_started', 'initial_visit', 'people_search', 'call_owner',
@@ -20,28 +21,26 @@ interface WorkflowTrackerProps {
   onRecordUpdate: (updated: Partial<PreForeclosureRecord>) => void;
 }
 
-function getStoredActingAs(): 'Luciano' | 'Raul' | null {
-  const v = localStorage.getItem('workflowActingAs');
-  return v === 'Luciano' || v === 'Raul' ? v : null;
+function resolveActingAs(username?: string): 'Luciano' | 'Raul' | null {
+  if (!username) return null;
+  const lower = username.toLowerCase();
+  if (lower === 'luciano' || lower.startsWith('luciano')) return 'Luciano';
+  if (lower === 'raul' || lower.startsWith('raul')) return 'Raul';
+  return null;
 }
 
 export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps) {
   const queryClient = useQueryClient();
   const updateMutation = useUpdatePreForeclosure();
+  const { user } = useAuth();
   const [stepNote, setStepNote] = useState('');
   const [logExpanded, setLogExpanded] = useState(false);
-  const [actingAs, setActingAs] = useState<'Luciano' | 'Raul' | null>(
-    () => record.assignedTo || getStoredActingAs()
-  );
+
+  const actingAs = resolveActingAs(user?.username);
 
   const currentStage: WorkflowStage = (record.workflow_stage as WorkflowStage) || 'not_started';
   const workflowLog: WorkflowLogEntry[] = (record.workflow_log as WorkflowLogEntry[]) || [];
   const stageInfo = WORKFLOW_STAGES[currentStage] || WORKFLOW_STAGES.not_started;
-
-  const handleActingAsChange = (person: 'Luciano' | 'Raul') => {
-    setActingAs(person);
-    localStorage.setItem('workflowActingAs', person);
-  };
 
   const visitedStages = new Set<WorkflowStage>();
   visitedStages.add('not_started');
@@ -145,28 +144,19 @@ export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps
         )}
       </div>
 
-      {/* Acting As selector */}
-      <div className="flex items-center gap-2">
-        <User className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Acting as:</span>
-        <div className="flex gap-1">
-          {(['Luciano', 'Raul'] as const).map((person) => (
-            <Button
-              key={person}
-              size="sm"
-              variant={actingAs === person ? 'default' : 'outline'}
-              className={cn(
-                'h-6 text-xs px-2.5',
-                actingAs === person && person === 'Luciano' && 'bg-green-600 hover:bg-green-700',
-                actingAs === person && person === 'Raul' && 'bg-orange-600 hover:bg-orange-700',
-              )}
-              onClick={() => handleActingAsChange(person)}
-            >
-              {person}
-            </Button>
-          ))}
+      {/* Logged-in user indicator */}
+      {actingAs && (
+        <div className="flex items-center gap-1.5">
+          <User className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Acting as</span>
+          <span className={cn(
+            'text-xs font-medium px-1.5 py-0.5 rounded',
+            actingAs === 'Luciano' ? 'bg-green-600/20 text-green-400' : 'bg-orange-600/20 text-orange-400',
+          )}>
+            {actingAs}
+          </span>
         </div>
-      </div>
+      )}
 
       {/* Stepper */}
       <div className="flex items-center gap-0.5 overflow-x-auto pb-2">
@@ -239,9 +229,6 @@ export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps
             {stageInfo.question && (
               <p className="text-sm text-muted-foreground">{stageInfo.question}</p>
             )}
-            {!actingAs && (
-              <p className="text-xs text-amber-400">Select who you are above before proceeding.</p>
-            )}
             <div className="flex flex-wrap gap-2">
               {stageInfo.outcomes?.map((outcome) => (
                 <Button
@@ -249,7 +236,7 @@ export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps
                   size="sm"
                   variant={outcome.nextStage === 'negotiating' ? 'default' : 'outline'}
                   onClick={() => handleAdvance(outcome.nextStage, outcome.label)}
-                  disabled={updateMutation.isPending || !actingAs}
+                  disabled={updateMutation.isPending}
                 >
                   {outcome.label}
                 </Button>
