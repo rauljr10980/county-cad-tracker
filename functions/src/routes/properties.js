@@ -149,6 +149,7 @@ router.get('/',
       // Map database fields to frontend format
       // Map totalDue (database) to totalAmountDue (frontend)
       // Map percentageDue (database) to totalPercentage (frontend)
+      // Map dealStage from uppercase (NEW_LEAD) to lowercase (new_lead) for frontend
       const mappedProperties = properties.map(prop => {
         const ownerUpper = (prop.ownerName || '').toUpperCase().trim();
         const addressUpper = (prop.propertyAddress || '').toUpperCase().trim();
@@ -158,6 +159,8 @@ router.get('/',
           totalAmountDue: prop.totalDue || 0,
           totalPercentage: prop.percentageDue || 0,
           isPrimaryProperty,
+          // Convert dealStage from uppercase enum to lowercase for frontend
+          dealStage: prop.dealStage ? prop.dealStage.toLowerCase() : null,
         };
       });
 

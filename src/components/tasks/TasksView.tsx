@@ -314,8 +314,12 @@ export function TasksView() {
     };
 
     for (const prop of properties) {
-      if (prop.dealStage && prop.dealStage in counts) {
-        counts[prop.dealStage]++;
+      if (prop.dealStage) {
+        // Normalize dealStage to lowercase (backend may return uppercase)
+        const normalizedStage = prop.dealStage.toLowerCase();
+        if (normalizedStage in counts) {
+          counts[normalizedStage]++;
+        }
       }
     }
 
