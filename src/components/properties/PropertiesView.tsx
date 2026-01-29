@@ -77,7 +77,7 @@ type RouteType = {
   }>;
 };
 
-// Sortable Row Component for Route Details (matching pre-foreclosure design)
+// Sortable Row Component for Route Details - mobile card + desktop table row
 function SortableRouteRow({
   routeRecord,
   index,
@@ -102,7 +102,6 @@ function SortableRouteRow({
     setActivatorNodeRef,
   } = useSortable({
     id: routeRecord.id,
-    // Only allow dragging from the drag handle, not the entire row
     strategy: undefined,
   });
 
@@ -113,164 +112,171 @@ function SortableRouteRow({
   };
 
   const isDepot = routeRecord.isDepot === true;
-  // Get visited status from routeRecord (for properties, stored on RouteRecord)
   const visited = routeRecord.visited === true || record?.visited === true;
 
-  return (
-    <tr
-      ref={setNodeRef}
-      style={style}
-      className={`border-t border-border hover:bg-secondary/30 ${
-        routeRecord.isDepot ? 'bg-primary/10' : ''
-      } ${isDragging ? 'bg-secondary/50' : ''}`}
+  const removeButton = (
+    <Button
+      size="sm"
+      variant="default"
+      onClick={(e) => {
+        e.stopPropagation();
+        handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id);
+      }}
+      disabled={removingRecordId === routeRecord.id}
+      className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+      title="Remove from route"
     >
-      <td className="px-4 py-2 text-sm">
-        <div className="flex items-center gap-2 flex-wrap">
-          {routeRecord.isDepot ? (
-            <>
-              <Badge variant="default" className="bg-primary">Depot</Badge>
-              <Button
-                size="sm"
-                variant="default"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemoveRecordFromRoute(viewRoute.id, propertyId);
-                }}
-                disabled={removingRecordId === routeRecord.id}
-                className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Remove from route"
-              >
-                {removingRecordId === routeRecord.id ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <X className="h-5 w-5" />
-                )}
-              </Button>
-            </>
-          ) : (
-            <>
-              <span className="font-medium">{routeRecord.orderIndex}</span>
-              <Button
-                size="sm"
-                variant="default"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemoveRecordFromRoute(viewRoute.id, propertyId);
-                }}
-                disabled={removingRecordId === routeRecord.id}
-                className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Remove from route"
-              >
-                {removingRecordId === routeRecord.id ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <X className="h-5 w-5" />
-                )}
-              </Button>
-            </>
-          )}
-        </div>
-      </td>
-      <td className="px-4 py-2 text-sm font-mono hidden">{record?.accountNumber || 'N/A'}</td>
-      <td className="px-4 py-2 text-sm">{record?.propertyAddress || record?.address || 'N/A'}</td>
-      <td className="px-4 py-2 text-sm hidden">{record?.ownerName || 'N/A'}</td>
-      <td className="px-4 py-2 text-sm hidden">{record?.city || 'N/A'}</td>
-      <td className="px-4 py-2 text-sm" style={{ position: 'relative', zIndex: 1 }}>
-        {propertyId && record && handleDealStageChange && (
-          <Select
-            value={(record as any).dealStage || 'new_lead'}
-            onValueChange={async (value) => {
-              if (handleDealStageChange) {
-                try {
-                  await handleDealStageChange(propertyId, value as any);
-                } catch (error) {
-                  console.error('Error updating deal stage:', error);
-                }
-              }
-            }}
-          >
-            <SelectTrigger 
-              className="h-8 text-xs w-full cursor-pointer hover:bg-secondary/50 border-border"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="z-[100]">
-              <SelectItem value="new_lead">New Lead</SelectItem>
-              <SelectItem value="contacted">Contacted</SelectItem>
-              <SelectItem value="interested">Interested</SelectItem>
-              <SelectItem value="offer_sent">Offer Sent</SelectItem>
-              <SelectItem value="negotiating">Negotiating</SelectItem>
-              <SelectItem value="under_contract">Under Contract</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
-              <SelectItem value="dead">Dead</SelectItem>
-            </SelectContent>
-          </Select>
+      {removingRecordId === routeRecord.id ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <X className="h-4 w-4" />
+      )}
+    </Button>
+  );
+
+  const dealStageSelect = propertyId && record && handleDealStageChange ? (
+    <Select
+      value={(record as any).dealStage || 'new_lead'}
+      onValueChange={async (value) => {
+        try {
+          await handleDealStageChange(propertyId, value as any);
+        } catch (error) {
+          console.error('Error updating deal stage:', error);
+        }
+      }}
+    >
+      <SelectTrigger className="h-8 text-xs w-full cursor-pointer hover:bg-secondary/50 border-border">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="z-[100]">
+        <SelectItem value="new_lead">New Lead</SelectItem>
+        <SelectItem value="contacted">Contacted</SelectItem>
+        <SelectItem value="interested">Interested</SelectItem>
+        <SelectItem value="offer_sent">Offer Sent</SelectItem>
+        <SelectItem value="negotiating">Negotiating</SelectItem>
+        <SelectItem value="under_contract">Under Contract</SelectItem>
+        <SelectItem value="closed">Closed</SelectItem>
+        <SelectItem value="dead">Dead</SelectItem>
+      </SelectContent>
+    </Select>
+  ) : null;
+
+  const visitedButton = propertyId ? (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={(e) => {
+        e.stopPropagation();
+        handleMarkVisited(propertyId, viewRoute.driver, !visited);
+      }}
+      disabled={markingVisited === propertyId}
+      className={`h-7 text-xs ${
+        visited
+          ? 'bg-green-500/20 text-green-600 border-green-500 hover:bg-green-500/30'
+          : ''
+      }`}
+    >
+      {markingVisited === propertyId ? (
+        <>
+          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+          {visited ? 'Updating...' : 'Marking...'}
+        </>
+      ) : (
+        visited ? 'Visited' : 'Pending'
+      )}
+    </Button>
+  ) : null;
+
+  const detailsButton = propertyId ? (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={(e) => {
+        e.stopPropagation();
+        handleViewRecordDetails(propertyId);
+      }}
+      className="h-7 text-xs"
+    >
+      <Eye className="h-3 w-3 mr-1" />
+      Details
+    </Button>
+  ) : null;
+
+  const dragHandle = (
+    <div
+      ref={setActivatorNodeRef}
+      {...attributes}
+      {...listeners}
+      className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded flex items-center justify-center flex-shrink-0"
+      title="Drag to reorder"
+      onPointerDown={(e) => { e.stopPropagation(); }}
+    >
+      <GripVertical className="h-5 w-5 text-muted-foreground" />
+    </div>
+  );
+
+  return (
+    <>
+      {/* Mobile card layout */}
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={cn(
+          'md:hidden border border-border rounded-lg p-3 bg-card',
+          isDepot && 'bg-primary/10 border-primary/30',
+          isDragging && 'bg-secondary/50'
         )}
-      </td>
-      <td className="px-4 py-2 text-sm">
-        {propertyId && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (visited) {
-                handleMarkVisited(propertyId, viewRoute.driver, false);
-              } else {
-                handleMarkVisited(propertyId, viewRoute.driver, true);
-              }
-            }}
-            disabled={markingVisited === propertyId}
-            className={`h-7 text-xs w-full ${
-              visited 
-                ? 'bg-green-500/20 text-green-600 border-green-500 hover:bg-green-500/30' 
-                : ''
-            }`}
-          >
-            {markingVisited === propertyId ? (
-              <>
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                {visited ? 'Updating...' : 'Marking...'}
-              </>
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {isDepot ? (
+              <Badge variant="default" className="bg-primary flex-shrink-0">Depot</Badge>
             ) : (
-              visited ? 'Visited' : 'Pending'
+              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center">
+                {routeRecord.orderIndex}
+              </span>
             )}
-          </Button>
-        )}
-      </td>
-      <td className="px-4 py-2 text-sm">
-        {propertyId && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleViewRecordDetails(propertyId);
-            }}
-            className="h-7 text-xs"
-          >
-            <Eye className="h-3 w-3 mr-1" />
-            Details
-          </Button>
-        )}
-      </td>
-      <td className="px-4 py-2 text-sm">
-        {/* Drag Handle - Far Right */}
-        <div
-          ref={setActivatorNodeRef}
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded flex items-center justify-center"
-          title="Drag to reorder"
-          onPointerDown={(e) => {
-            // Only allow dragging from this handle
-            e.stopPropagation();
-          }}
-        >
-          <GripVertical className="h-5 w-5 text-muted-foreground" />
+            <p className="text-sm font-medium line-clamp-2">{record?.propertyAddress || record?.address || 'N/A'}</p>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {removeButton}
+            {dragHandle}
+          </div>
         </div>
-      </td>
-    </tr>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex-1 min-w-[120px]">{dealStageSelect}</div>
+          {visitedButton}
+          {detailsButton}
+        </div>
+      </div>
+
+      {/* Desktop table row */}
+      <tr
+        ref={setNodeRef}
+        style={style}
+        className={cn(
+          'hidden md:table-row border-t border-border hover:bg-secondary/30',
+          isDepot && 'bg-primary/10',
+          isDragging && 'bg-secondary/50'
+        )}
+      >
+        <td className="px-4 py-2 text-sm">
+          <div className="flex items-center gap-2">
+            {isDepot ? (
+              <Badge variant="default" className="bg-primary">Depot</Badge>
+            ) : (
+              <span className="font-medium">{routeRecord.orderIndex}</span>
+            )}
+            {removeButton}
+          </div>
+        </td>
+        <td className="px-4 py-2 text-sm">{record?.propertyAddress || record?.address || 'N/A'}</td>
+        <td className="px-4 py-2 text-sm" style={{ position: 'relative', zIndex: 1 }}>{dealStageSelect}</td>
+        <td className="px-4 py-2 text-sm">{visitedButton}</td>
+        <td className="px-4 py-2 text-sm">{detailsButton}</td>
+        <td className="px-4 py-2 text-sm">{dragHandle}</td>
+      </tr>
+    </>
   );
 }
 
@@ -278,7 +284,7 @@ export function PropertiesView() {
   const queryClient = useQueryClient();
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<Set<string>>(new Set());
-  const [numVehicles, setNumVehicles] = useState<1 | 2>(1);
+  const numVehicles = 1; // Always use 1 vehicle
   const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
@@ -286,6 +292,7 @@ export function PropertiesView() {
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotPropertyId, setCustomDepotPropertyId] = useState<string | null>(null);
   const [propertiesInRoutes, setPropertiesInRoutes] = useState<Set<string>>(new Set());
+  const [propertyRouteMap, setPropertyRouteMap] = useState<Map<string, { routeId: string; routeRecordId: string }>>(new Map());
 
   // Geocoding state
   const [geocodeOpen, setGeocodeOpen] = useState(false);
@@ -332,6 +339,7 @@ export function PropertiesView() {
     hasLink: 'any',
     hasExemptions: 'any',
     hasVisited: 'any',
+    propertyType: 'any',
     followUpDateFrom: undefined,
     followUpDateTo: undefined,
     lastPaymentDateFrom: undefined,
@@ -374,6 +382,7 @@ export function PropertiesView() {
       (advancedFilters.hasLink !== 'any') ||
       (advancedFilters.hasExemptions !== 'any') ||
       (advancedFilters.hasVisited !== 'any') ||
+      (advancedFilters.propertyType !== 'any' && advancedFilters.propertyType !== undefined) ||
       (advancedFilters.followUpDateFrom !== undefined) ||
       (advancedFilters.followUpDateTo !== undefined) ||
       (advancedFilters.lastPaymentDateFrom !== undefined) ||
@@ -741,6 +750,13 @@ export function PropertiesView() {
         if (propertiesInRoutes.has(p.id)) return false;
       }
       
+      // Property Type (primary vs secondary)
+      if (advancedFilters.propertyType === 'primary') {
+        if (p.isPrimaryProperty === false) return false;
+      } else if (advancedFilters.propertyType === 'secondary') {
+        if (p.isPrimaryProperty !== false) return false;
+      }
+
       // Follow-up Date range
       if (advancedFilters.followUpDateFrom) {
         if (!p.lastFollowUp) return false;
@@ -909,7 +925,7 @@ export function PropertiesView() {
   }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, rawProperties, sortField, sortDirection, isSortingActive]);
   
   // Calculate totals and pagination
-  const { properties, total, totalPages } = useMemo(() => {
+  const { properties, total, totalPages, allFilteredPropertyIds } = useMemo(() => {
     try {
       console.log('[PropertiesView] Calculating pagination:', {
         selectedStatuses: selectedStatuses.length,
@@ -956,6 +972,7 @@ export function PropertiesView() {
       properties: finalProperties || [],
       total: finalTotal || 0,
       totalPages: finalTotalPages || 1,
+      allFilteredPropertyIds: propertiesToPaginate.map(p => p.id),
     };
     
     // Ensure all values are numbers, not undefined
@@ -980,6 +997,7 @@ export function PropertiesView() {
         properties: [],
         total: 0,
         totalPages: 1,
+        allFilteredPropertyIds: [],
       };
     }
   }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data, isSortingActive]);
@@ -1083,6 +1101,7 @@ export function PropertiesView() {
       hasLink: 'any',
       hasExemptions: 'any',
       hasVisited: 'any',
+      propertyType: 'any',
       followUpDateFrom: undefined,
       followUpDateTo: undefined,
       lastPaymentDateFrom: undefined,
@@ -1688,10 +1707,14 @@ export function PropertiesView() {
       // IMPORTANT: Only mark properties as "in route" if they are explicitly marked as VISITED
       // This matches the pre-foreclosure behavior where properties are only excluded when marked as visited
       const activePropertyIds = new Set<string>();
-      
+      const routeMap = new Map<string, { routeId: string; routeRecordId: string }>();
+
       propertyRoutes.forEach((route: RouteType) => {
         route.records?.forEach((rr: any) => {
           const propId = rr.record?.id;
+          if (propId) {
+            routeMap.set(propId, { routeId: route.id, routeRecordId: rr.id });
+          }
           // Only add to propertiesInRoutes if the property is explicitly marked as visited
           // Properties in routes but not visited can still be selected for new routes
           if (propId && (rr.visited === true || rr.record?.visited === true)) {
@@ -1699,7 +1722,7 @@ export function PropertiesView() {
           }
         });
       });
-      
+
       // Also add properties that have visited: true directly on the Property model
       // This ensures properties marked as visited in the property details modal are also excluded
       rawProperties.forEach((p: Property) => {
@@ -1707,8 +1730,9 @@ export function PropertiesView() {
           activePropertyIds.add(p.id);
         }
       });
-      
+
       setPropertiesInRoutes(activePropertyIds);
+      setPropertyRouteMap(routeMap);
     } catch (error) {
       console.error('[Properties] Error loading active routes:', error);
     } finally {
@@ -1976,10 +2000,30 @@ export function PropertiesView() {
     }
   };
 
-  const handleRemoveRecordFromRoute = async (routeId: string, propertyId: string) => {
-    setRemovingRecordId(propertyId);
+  const handleRemovePropertyFromRoute = async (propertyId: string) => {
+    const mapping = propertyRouteMap.get(propertyId);
+    if (!mapping) {
+      toast({ title: 'Error', description: 'Property is not on any route', variant: 'destructive' });
+      return;
+    }
     try {
-      await removeRecordFromRoute(routeId, propertyId);
+      await removeRecordFromRoute(mapping.routeId, mapping.routeRecordId);
+      toast({ title: 'Removed from Route', description: 'Property has been removed from its route' });
+      await loadActiveRoutes();
+    } catch (error) {
+      console.error('Error removing property from route:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to remove property from route',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRemoveRecordFromRoute = async (routeId: string, routeRecordId: string) => {
+    setRemovingRecordId(routeRecordId);
+    try {
+      await removeRecordFromRoute(routeId, routeRecordId);
       toast({
         title: 'Property Removed',
         description: 'Property has been removed from the route',
@@ -1987,7 +2031,7 @@ export function PropertiesView() {
 
       // Update viewRoute
       if (viewRoute && viewRoute.id === routeId) {
-        const updatedRecords = viewRoute.records.filter(r => r.record.id !== propertyId);
+        const updatedRecords = viewRoute.records.filter(r => r.id !== routeRecordId);
         setViewRoute({ ...viewRoute, records: updatedRecords, recordCount: updatedRecords.length });
       }
 
@@ -2139,7 +2183,7 @@ export function PropertiesView() {
         {/* Header - Mobile First */}
         <div className="mb-4">
           <h2 className="text-lg md:text-xl font-semibold">Property List</h2>
-          <p className="text-xs md:text-sm text-muted-foreground mt-1">
+          {/* <p className="text-xs md:text-sm text-muted-foreground mt-1">
             Browse and filter tax-delinquent properties.
             <span className="hidden sm:inline"> Click on a property to view details.</span>
             {totalUnfiltered && typeof totalUnfiltered === 'number' && totalUnfiltered > 0 && (
@@ -2147,7 +2191,7 @@ export function PropertiesView() {
                 {' '}{totalUnfiltered.toLocaleString()} total properties.
               </span>
             )}
-          </p>
+          </p> */}
         </div>
 
         {/* Route Actions - Mobile Optimized */}
@@ -2219,20 +2263,6 @@ export function PropertiesView() {
 
               {/* Route Controls - Stacked on Mobile */}
               <div className="flex flex-col sm:flex-row gap-2">
-                {/* Vehicle Select */}
-                <Select
-                  value={numVehicles.toString()}
-                  onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
-                >
-                  <SelectTrigger className="w-full sm:w-36 mobile-input">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 Vehicle</SelectItem>
-                    <SelectItem value="2">2 Vehicles</SelectItem>
-                  </SelectContent>
-                </Select>
-
                 {/* Area Selector Button */}
                 <Button
                   onClick={async () => {
@@ -2463,6 +2493,9 @@ export function PropertiesView() {
             onSort={handleSort}
             selectedPropertyIds={selectedPropertyIds}
             onPropertySelect={handlePropertySelect}
+            allFilteredPropertyIds={allFilteredPropertyIds}
+            propertiesInRoutes={new Set(propertyRouteMap.keys())}
+            onDeleteProperty={handleRemovePropertyFromRoute}
           />
           
           {/* Pagination controls - Mobile First */}
@@ -2857,7 +2890,7 @@ export function PropertiesView() {
 
       {/* Route Details Modal - Matching pre-foreclosure design */}
       <Dialog open={routeDetailsOpen} onOpenChange={setRouteDetailsOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <RouteIcon className="h-5 w-5" />
@@ -2922,7 +2955,7 @@ export function PropertiesView() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex justify-end gap-2">
+                  <div className="flex flex-col sm:flex-row justify-end gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -3035,59 +3068,84 @@ export function PropertiesView() {
                       return (
                         <>
                           <h3 className="text-lg font-semibold mb-3">Route Stops ({validRecords.length})</h3>
-                          <div className="border border-border rounded-lg overflow-hidden">
-                            <div className="overflow-x-auto">
-                              <table className="w-full">
-                                <thead className="bg-secondary/50">
-                                  <tr>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Account #</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Owner</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Deal Stage</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {sortedRecords.length === 0 ? (
-                                    <tr>
-                                      <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
-                                        No properties in this route.
-                                      </td>
-                                    </tr>
-                                  ) : (
-                                    sortedRecords.map((routeRecord, index) => {
-                                      const record = routeRecord.record;
-                                      if (!record) return null; // Safety check
-                                      const propertyId = record.id;
-                                      if (!propertyId) return null; // Skip if no property ID
-                                      return (
-                                        <SortableRouteRow
-                                          key={routeRecord.id}
-                                          routeRecord={routeRecord}
-                                          index={index}
-                                          viewRoute={viewRoute}
-                                          propertyId={propertyId}
-                                          record={record}
-                                          removingRecordId={removingRecordId}
-                                          reorderingRecordId={reorderingRecordId}
-                                          handleRemoveRecordFromRoute={handleRemoveRecordFromRoute}
-                                          handleMarkVisited={handleMarkVisited}
-                                          handleViewRecordDetails={handleViewRecordDetails}
-                                          markingVisited={markingVisited}
-                                          handleDealStageChange={handleDealStageChange}
-                                        />
-                                      );
-                                    })
-                                  )}
-                                </tbody>
-                              </table>
+
+                          {sortedRecords.length === 0 ? (
+                            <div className="px-4 py-8 text-center text-muted-foreground border border-border rounded-lg">
+                              No properties in this route.
                             </div>
-                          </div>
+                          ) : (
+                            <>
+                              {/* Mobile: card list */}
+                              <div className="md:hidden space-y-2">
+                                {sortedRecords.map((routeRecord, index) => {
+                                  const record = routeRecord.record;
+                                  if (!record) return null;
+                                  const propertyId = record.id;
+                                  if (!propertyId) return null;
+                                  return (
+                                    <SortableRouteRow
+                                      key={routeRecord.id}
+                                      routeRecord={routeRecord}
+                                      index={index}
+                                      viewRoute={viewRoute}
+                                      propertyId={propertyId}
+                                      record={record}
+                                      removingRecordId={removingRecordId}
+                                      reorderingRecordId={reorderingRecordId}
+                                      handleRemoveRecordFromRoute={handleRemoveRecordFromRoute}
+                                      handleMarkVisited={handleMarkVisited}
+                                      handleViewRecordDetails={handleViewRecordDetails}
+                                      markingVisited={markingVisited}
+                                      handleDealStageChange={handleDealStageChange}
+                                    />
+                                  );
+                                })}
+                              </div>
+
+                              {/* Desktop: table */}
+                              <div className="hidden md:block border border-border rounded-lg overflow-hidden">
+                                <div className="overflow-x-auto">
+                                  <table className="w-full">
+                                    <thead className="bg-secondary/50">
+                                      <tr>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Deal Stage</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {sortedRecords.map((routeRecord, index) => {
+                                        const record = routeRecord.record;
+                                        if (!record) return null;
+                                        const propertyId = record.id;
+                                        if (!propertyId) return null;
+                                        return (
+                                          <SortableRouteRow
+                                            key={routeRecord.id}
+                                            routeRecord={routeRecord}
+                                            index={index}
+                                            viewRoute={viewRoute}
+                                            propertyId={propertyId}
+                                            record={record}
+                                            removingRecordId={removingRecordId}
+                                            reorderingRecordId={reorderingRecordId}
+                                            handleRemoveRecordFromRoute={handleRemoveRecordFromRoute}
+                                            handleMarkVisited={handleMarkVisited}
+                                            handleViewRecordDetails={handleViewRecordDetails}
+                                            markingVisited={markingVisited}
+                                            handleDealStageChange={handleDealStageChange}
+                                          />
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </>
                       );
                     })()}

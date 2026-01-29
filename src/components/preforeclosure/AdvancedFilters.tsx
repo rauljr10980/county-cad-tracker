@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { PreForeclosureType, PreForeclosureStatus } from '@/types/property';
+import { Input } from '@/components/ui/input';
+import { PreForeclosureType, PreForeclosureStatus, WorkflowStage } from '@/types/property';
 import { Filter, X } from 'lucide-react';
 
 export interface PreForeclosureAdvancedFilters {
@@ -26,6 +27,12 @@ export interface PreForeclosureAdvancedFilters {
   hasPhoneNumbers: boolean;
   hasTask: boolean;
   showNewOnly: boolean;
+  missingGeocode: boolean;
+  recordedDateFrom: string;
+  recordedDateTo: string;
+  saleDateFrom: string;
+  saleDateTo: string;
+  workflowStage: WorkflowStage | 'all';
 }
 
 interface AdvancedFiltersProps {
@@ -168,6 +175,78 @@ export function AdvancedFiltersPanel({
             </Select>
           </div>
 
+          {/* Workflow Stage Filter */}
+          <div className="space-y-3">
+            <Label>Workflow Stage</Label>
+            <Select value={filters.workflowStage} onValueChange={(v) => updateFilter('workflowStage', v as WorkflowStage | 'all')}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="All Stages" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stages</SelectItem>
+                <SelectItem value="not_started">Not Started</SelectItem>
+                <SelectItem value="initial_visit">Initial Visit</SelectItem>
+                <SelectItem value="people_search">People Search</SelectItem>
+                <SelectItem value="call_owner">Call Owner</SelectItem>
+                <SelectItem value="land_records">Land Records</SelectItem>
+                <SelectItem value="visit_heirs">Visit Heirs</SelectItem>
+                <SelectItem value="call_heirs">Call Heirs</SelectItem>
+                <SelectItem value="negotiating">Negotiating</SelectItem>
+                <SelectItem value="dead_end">Dead End</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Recorded Date Range */}
+          <div className="space-y-3">
+            <Label>Recorded Date Range</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">From</Label>
+                <Input
+                  type="date"
+                  className="h-9 text-sm"
+                  value={filters.recordedDateFrom}
+                  onChange={(e) => updateFilter('recordedDateFrom', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">To</Label>
+                <Input
+                  type="date"
+                  className="h-9 text-sm"
+                  value={filters.recordedDateTo}
+                  onChange={(e) => updateFilter('recordedDateTo', e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Sale Date Range */}
+          <div className="space-y-3">
+            <Label>Sale Date Range</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">From</Label>
+                <Input
+                  type="date"
+                  className="h-9 text-sm"
+                  value={filters.saleDateFrom}
+                  onChange={(e) => updateFilter('saleDateFrom', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">To</Label>
+                <Input
+                  type="date"
+                  className="h-9 text-sm"
+                  value={filters.saleDateTo}
+                  onChange={(e) => updateFilter('saleDateTo', e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Needs Follow-Up Filter */}
           <div className="space-y-3">
             <div className="flex items-center space-x-2">
@@ -248,6 +327,20 @@ export function AdvancedFiltersPanel({
               />
               <Label htmlFor="showNewOnly" className="cursor-pointer">
                 New Records Only
+              </Label>
+            </div>
+          </div>
+
+          {/* Missing Geocode Filter */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="missingGeocode"
+                checked={filters.missingGeocode}
+                onCheckedChange={(checked) => updateFilter('missingGeocode', checked as boolean)}
+              />
+              <Label htmlFor="missingGeocode" className="cursor-pointer">
+                Missing Geocode
               </Label>
             </div>
           </div>

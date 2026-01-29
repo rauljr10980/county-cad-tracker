@@ -56,6 +56,8 @@ export interface Property {
   isRemoved?: boolean;
   statusChanged?: boolean;
   percentageChanged?: boolean;
+  // Property type: true if ownerName appears in propertyAddress (same property)
+  isPrimaryProperty?: boolean;
   // Visited Status
   visited?: boolean;
   visitedAt?: string;
@@ -171,8 +173,13 @@ export interface ProcessingStatus {
 export type PreForeclosureType = 'Mortgage' | 'Tax';
 export type PreForeclosureStatus = 'New' | 'Contact Attempted' | 'Monitoring' | 'Dead';
 
+<<<<<<< HEAD
 // Workflow stage for pre-foreclosure pipeline tracking
 export type WorkflowStage = 
+=======
+// Workflow Decision Tree
+export type WorkflowStage =
+>>>>>>> e087294455d6c30c47ea668cb5da3780e95757d1
   | 'not_started'
   | 'initial_visit'
   | 'people_search'
@@ -183,6 +190,113 @@ export type WorkflowStage =
   | 'negotiating'
   | 'dead_end';
 
+<<<<<<< HEAD
+=======
+export interface WorkflowLogEntry {
+  id: string;
+  fromStage: WorkflowStage;
+  toStage: WorkflowStage;
+  outcome: string;
+  note?: string;
+  actingAs?: 'Luciano' | 'Raul';
+  timestamp: string;
+}
+
+// Auto-task mapping: when entering a stage, auto-create this task
+export const STAGE_TASK_MAP: Record<WorkflowStage, { actionType: 'call' | 'driveby'; priority: 'high' | 'med' } | null> = {
+  not_started: null,
+  initial_visit: { actionType: 'driveby', priority: 'high' },
+  people_search: { actionType: 'call', priority: 'med' },
+  call_owner: { actionType: 'call', priority: 'high' },
+  land_records: { actionType: 'driveby', priority: 'med' },
+  visit_heirs: { actionType: 'driveby', priority: 'high' },
+  call_heirs: { actionType: 'call', priority: 'high' },
+  negotiating: { actionType: 'call', priority: 'high' },
+  dead_end: null,
+};
+
+export const WORKFLOW_STAGES: Record<WorkflowStage, {
+  label: string;
+  shortLabel: string;
+  question?: string;
+  outcomes?: Array<{ label: string; nextStage: WorkflowStage }>;
+  terminal?: boolean;
+  terminalType?: 'success' | 'failure';
+}> = {
+  not_started: {
+    label: 'Not Started',
+    shortLabel: 'Not Started',
+    outcomes: [{ label: 'Begin Workflow', nextStage: 'initial_visit' }],
+  },
+  initial_visit: {
+    label: 'Initial Visit',
+    shortLabel: 'Visit',
+    question: 'Did the owner answer the door?',
+    outcomes: [
+      { label: 'Yes - Owner answered', nextStage: 'negotiating' },
+      { label: 'No - Not home', nextStage: 'people_search' },
+    ],
+  },
+  people_search: {
+    label: 'People Search',
+    shortLabel: 'Search',
+    question: 'Found a valid phone number?',
+    outcomes: [
+      { label: 'Yes - Found number', nextStage: 'call_owner' },
+      { label: 'No - Nothing found', nextStage: 'land_records' },
+    ],
+  },
+  call_owner: {
+    label: 'Call Owner',
+    shortLabel: 'Call',
+    question: 'Reached the owner?',
+    outcomes: [
+      { label: 'Yes - Reached owner', nextStage: 'negotiating' },
+      { label: "Can't reach", nextStage: 'land_records' },
+    ],
+  },
+  land_records: {
+    label: 'Land Records / Due Diligence',
+    shortLabel: 'Records',
+    question: 'Found heirs?',
+    outcomes: [
+      { label: 'Yes - Found heirs', nextStage: 'visit_heirs' },
+      { label: 'No heirs found', nextStage: 'dead_end' },
+    ],
+  },
+  visit_heirs: {
+    label: 'Visit Heirs',
+    shortLabel: 'Visit Heirs',
+    question: 'Did heirs answer the door?',
+    outcomes: [
+      { label: 'Yes - Heirs answered', nextStage: 'negotiating' },
+      { label: 'No - Not home', nextStage: 'call_heirs' },
+    ],
+  },
+  call_heirs: {
+    label: 'Call Heirs',
+    shortLabel: 'Call Heirs',
+    question: 'Reached heirs?',
+    outcomes: [
+      { label: 'Yes - Reached heirs', nextStage: 'negotiating' },
+      { label: "Can't reach", nextStage: 'dead_end' },
+    ],
+  },
+  negotiating: {
+    label: 'Negotiating',
+    shortLabel: 'Negotiating',
+    terminal: true,
+    terminalType: 'success',
+  },
+  dead_end: {
+    label: 'Dead End',
+    shortLabel: 'Dead End',
+    terminal: true,
+    terminalType: 'failure',
+  },
+};
+
+>>>>>>> e087294455d6c30c47ea668cb5da3780e95757d1
 export interface PreForeclosureRecord {
   // Immutable (from file)
   document_number: string; // Primary key
@@ -195,7 +309,9 @@ export interface PreForeclosureRecord {
   latitude?: number;
   longitude?: number;
   school_district?: string;
-  
+  recorded_date?: string; // ISO date string
+  sale_date?: string; // ISO date string
+
   // Operator-Entered (manual only)
   internal_status: PreForeclosureStatus;
   notes?: string;
@@ -221,9 +337,16 @@ export interface PreForeclosureRecord {
   visited?: boolean;
   visited_at?: string; // ISO date string
   visited_by?: 'Luciano' | 'Raul';
+<<<<<<< HEAD
   
   // Workflow stage for pipeline tracking
   workflow_stage?: WorkflowStage;
+=======
+
+  // Workflow decision tree
+  workflow_stage?: WorkflowStage;
+  workflow_log?: WorkflowLogEntry[];
+>>>>>>> e087294455d6c30c47ea668cb5da3780e95757d1
 }
 
 // Type alias for backward compatibility

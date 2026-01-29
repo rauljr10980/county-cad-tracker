@@ -233,10 +233,12 @@ function MapBoundsFitter({ bounds }: { bounds: LatLngBounds | null }) {
 
 // Component to display property count within the drawn zone
 function PropertyCountOverlay({
-  count,
+  available,
+  total,
   center
 }: {
-  count: number;
+  available: number;
+  total: number;
   center: { lat: number; lng: number }
 }) {
   const countIcon = useMemo(() => {
@@ -254,12 +256,12 @@ function PropertyCountOverlay({
         display: flex;
         align-items: center;
         justify-content: center;
-      ">${count}</div>`,
+      ">${available}/${total}</div>`,
       className: '',
       iconSize: [60, 40],
       iconAnchor: [30, 20],
     });
-  }, [count]);
+  }, [available, total]);
 
   return (
     <Marker
@@ -291,7 +293,7 @@ export function AreaSelectorMap({
   const [polygonPointsBeingDrawn, setPolygonPointsBeingDrawn] = useState<LatLng[]>([]);
   const [selectedProperties, setSelectedProperties] = useState<PropertyLike[]>([]);
   const [startingPointValidation, setStartingPointValidation] = useState<{ valid: boolean; message: string } | null>(null);
-  const [totalPropertiesInZone, setTotalPropertiesInZone] = useState<number>(0);
+  const [propertiesInZone, setPropertiesInZone] = useState<{ available: number; total: number }>({ available: 0, total: 0 });
 
   // Zone management state
   const [showZoneManager, setShowZoneManager] = useState(false);
@@ -299,6 +301,64 @@ export function AreaSelectorMap({
   const [zoneName, setZoneName] = useState('');
   const [zoneDescription, setZoneDescription] = useState('');
   const [loadedZone, setLoadedZone] = useState<SavedZone | null>(null);
+  const [allSavedZones, setAllSavedZones] = useState<SavedZone[]>([]);
+
+  // Calculate property counts for all saved zones
+  // Track both total properties and available properties (not in routes)
+  const savedZoneCounts = useMemo(() => {
+    const counts: Record<string, { total: number; available: number }> = {};
+
+    console.log('=== Calculating Saved Zone Counts ===');
+    console.log('Total properties to check:', properties.length);
+    console.log('Unavailable property IDs:', unavailablePropertyIds.size);
+    console.log('Number of saved zones:', allSavedZones.length);
+
+    allSavedZones.forEach(zone => {
+      let totalCount = 0;
+      let availableCount = 0;
+      let skippedNoCoords = 0;
+
+      properties.forEach(p => {
+        if (!p.latitude || !p.longitude) {
+          skippedNoCoords++;
+          return;
+        }
+
+        const point = { lat: p.latitude, lng: p.longitude };
+        let isInZone = false;
+
+        if (zone.type === 'polygon' && zone.polygon) {
+          isInZone = isPointInPolygon(point, zone.polygon);
+        } else if (zone.type === 'circle' && zone.center && zone.radius) {
+          const radiusKm = zone.radius / 1000;
+          isInZone = isPointInCircle(point, zone.center, radiusKm);
+        } else if (zone.type === 'rectangle') {
+          isInZone = isPointInBounds(point, zone.bounds);
+        }
+
+        if (isInZone) {
+          totalCount++;
+          // Count as available if not in unavailablePropertyIds (not already in a route)
+          if (!p.id || !unavailablePropertyIds.has(p.id)) {
+            availableCount++;
+          }
+        }
+      });
+
+      counts[zone.id] = { total: totalCount, available: availableCount };
+
+      console.log(`Zone: ${zone.name}`);
+      console.log(`  Type: ${zone.type}`);
+      console.log(`  Total properties in zone: ${totalCount}`);
+      console.log(`  Available properties: ${availableCount}`);
+      console.log(`  Skipped (no coords): ${skippedNoCoords}`);
+    });
+
+    console.log('Final counts:', counts);
+    console.log('=== End Zone Count Calculation ===');
+
+    return counts;
+  }, [allSavedZones, properties, unavailablePropertyIds]);
 
   // Reset when modal opens/closes
   useEffect(() => {
@@ -314,6 +374,11 @@ export function AreaSelectorMap({
       setPolygonPointsBeingDrawn([]);
       setSelectedProperties([]);
       setStartingPointValidation(null);
+      // Load all saved zones to display on map
+      loadZones().then(setAllSavedZones).catch(error => {
+        console.error('Failed to load zones:', error);
+        setAllSavedZones([]);
+      });
     }
   }, [isOpen]);
 
@@ -321,26 +386,36 @@ export function AreaSelectorMap({
   // IMPORTANT: This uses the 'properties' prop, which should be filteredProperties from the parent
   // This ensures we only count properties that match the current filters (e.g., 435 filtered properties)
   const calculatePropertiesInBounds = (shape: { type: 'rectangle' | 'circle' | 'polygon'; bounds: LatLngBounds; center?: LatLng; radius?: number; polygon?: LatLng[] }) => {
-    // Filter properties that are within the drawn area
-    // Only considers properties passed to this component (should be filteredProperties)
-    const count = properties.filter(p => {
-      if (!p.latitude || !p.longitude) return false;
+    // Count both total and available properties within the drawn area
+    let totalCount = 0;
+    let availableCount = 0;
+
+    properties.forEach(p => {
+      if (!p.latitude || !p.longitude) return;
       const point = { lat: p.latitude, lng: p.longitude };
+      let isInZone = false;
 
       if (shape.type === 'polygon' && shape.polygon) {
-        return isPointInPolygon(point, shape.polygon.map(p => ({ lat: p.lat, lng: p.lng })));
+        isInZone = isPointInPolygon(point, shape.polygon.map(p => ({ lat: p.lat, lng: p.lng })));
       } else if (shape.type === 'circle' && shape.center && shape.radius) {
         const radiusKm = shape.radius / 1000;
-        return isPointInCircle(point, { lat: shape.center.lat, lng: shape.center.lng }, radiusKm);
+        isInZone = isPointInCircle(point, { lat: shape.center.lat, lng: shape.center.lng }, radiusKm);
       } else if (shape.type === 'rectangle') {
         const ne = shape.bounds.getNorthEast();
         const sw = shape.bounds.getSouthWest();
-        return isPointInBounds(point, { north: ne.lat, south: sw.lat, east: ne.lng, west: sw.lng });
+        isInZone = isPointInBounds(point, { north: ne.lat, south: sw.lat, east: ne.lng, west: sw.lng });
       }
-      return false;
-    }).length;
 
-    setTotalPropertiesInZone(count);
+      if (isInZone) {
+        totalCount++;
+        // Count as available if not in unavailablePropertyIds (not already in a route)
+        if (!p.id || !unavailablePropertyIds.has(p.id)) {
+          availableCount++;
+        }
+      }
+    });
+
+    setPropertiesInZone({ available: availableCount, total: totalCount });
   };
 
   const handleRectangleComplete = (bounds: LatLngBounds) => {
@@ -471,8 +546,9 @@ export function AreaSelectorMap({
       // This ensures when you have 435 filtered properties, the map only considers those 435, not all properties
       // OPTIMIZATION: Use a more efficient approach - count first, then filter only what we need
       let totalCount = 0;
+      let availableCount = 0;
       const propsInZoneForDisplay: PropertyLike[] = [];
-      
+
       // First pass: Count and collect properties from the filtered set (limit collection to avoid memory issues)
       // This only considers properties that match current filters (e.g., 435 filtered properties)
       for (const p of properties) {
@@ -493,16 +569,21 @@ export function AreaSelectorMap({
 
         if (isInZone) {
           totalCount++;
-          // Only collect properties that are available and not in routes (for optimization)
-          // Also limit collection to a reasonable number to avoid memory issues
-          if (propsInZoneForDisplay.length < 100 && (!p.id || !unavailablePropertyIds.has(p.id))) {
-            propsInZoneForDisplay.push(p);
+
+          // Count as available if not in unavailablePropertyIds (not already in a route)
+          const isAvailable = !p.id || !unavailablePropertyIds.has(p.id);
+          if (isAvailable) {
+            availableCount++;
+            // Only collect available properties for display (limit to avoid memory issues)
+            if (propsInZoneForDisplay.length < 100) {
+              propsInZoneForDisplay.push(p);
+            }
           }
         }
       }
 
-      // Store total count for display
-      setTotalPropertiesInZone(totalCount);
+      // Store counts for display
+      setPropertiesInZone({ available: availableCount, total: totalCount });
 
       // Warn user if area is too large
       if (totalCount > 1000) {
@@ -666,7 +747,7 @@ export function AreaSelectorMap({
     setShowSaveZoneDialog(true);
   };
 
-  const handleConfirmSaveZone = () => {
+  const handleConfirmSaveZone = async () => {
     if (!selectedShape || !zoneName.trim()) {
       toast({
         title: 'Invalid Zone',
@@ -676,38 +757,51 @@ export function AreaSelectorMap({
       return;
     }
 
-    const existingZones = loadZones();
-    const color = getNextColor(existingZones);
+    try {
+      const existingZones = await loadZones();
+      const color = getNextColor(existingZones);
 
-    const bounds = selectedShape.bounds;
-    const ne = bounds.getNorthEast();
-    const sw = bounds.getSouthWest();
+      const bounds = selectedShape.bounds;
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
 
-    const newZone = saveZone({
-      name: zoneName.trim(),
-      description: zoneDescription.trim() || undefined,
-      type: selectedShape.type,
-      color,
-      bounds: {
-        north: ne.lat,
-        south: sw.lat,
-        east: ne.lng,
-        west: sw.lng,
-      },
-      center: selectedShape.center ? { lat: selectedShape.center.lat, lng: selectedShape.center.lng } : undefined,
-      radius: selectedShape.radius,
-      polygon: selectedShape.polygon ? selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })) : undefined,
-    });
+      const newZone = await saveZone({
+        name: zoneName.trim(),
+        description: zoneDescription.trim() || undefined,
+        type: selectedShape.type,
+        color,
+        bounds: {
+          north: ne.lat,
+          south: sw.lat,
+          east: ne.lng,
+          west: sw.lng,
+        },
+        center: selectedShape.center ? { lat: selectedShape.center.lat, lng: selectedShape.center.lng } : undefined,
+        radius: selectedShape.radius,
+        polygon: selectedShape.polygon ? selectedShape.polygon.map(p => ({ lat: p.lat, lng: p.lng })) : undefined,
+      });
 
-    toast({
-      title: 'Zone Saved',
-      description: `Saved "${newZone.name}" for future use`,
-    });
+      toast({
+        title: 'Zone Saved',
+        description: `Saved "${newZone.name}" for future use`,
+      });
 
-    setShowSaveZoneDialog(false);
-    setZoneName('');
-    setZoneDescription('');
-    setLoadedZone(newZone);
+      setShowSaveZoneDialog(false);
+      setZoneName('');
+      setZoneDescription('');
+      setLoadedZone(newZone);
+
+      // Reload all zones to update the displayed zones on the map
+      const updatedZones = await loadZones();
+      setAllSavedZones(updatedZones);
+    } catch (error) {
+      console.error('Failed to save zone:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save zone. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleOptimize = () => {
@@ -1058,15 +1152,129 @@ export function AreaSelectorMap({
                 {drawnPolygon && drawnPolygon.length >= 3 && (
                   <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
                 )}
+
+                {/* Display all saved zones as background overlays */}
+                {step === 1 && allSavedZones.map((zone) => {
+                  const isLoadedZone = loadedZone?.id === zone.id;
+                  const opacity = isLoadedZone ? 0 : 0.15; // Hide loaded zone, show others faintly
+                  const weight = 1;
+
+                  if (zone.type === 'rectangle') {
+                    const bounds = new LatLngBounds(
+                      [zone.bounds.south, zone.bounds.west],
+                      [zone.bounds.north, zone.bounds.east]
+                    );
+                    return (
+                      <Rectangle
+                        key={`saved-${zone.id}`}
+                        bounds={bounds}
+                        pathOptions={{
+                          color: zone.color,
+                          fillColor: zone.color,
+                          fillOpacity: opacity,
+                          weight: weight,
+                          dashArray: '5, 5'
+                        }}
+                      />
+                    );
+                  } else if (zone.type === 'circle' && zone.center && zone.radius) {
+                    return (
+                      <Circle
+                        key={`saved-${zone.id}`}
+                        center={[zone.center.lat, zone.center.lng]}
+                        radius={zone.radius}
+                        pathOptions={{
+                          color: zone.color,
+                          fillColor: zone.color,
+                          fillOpacity: opacity,
+                          weight: weight,
+                          dashArray: '5, 5'
+                        }}
+                      />
+                    );
+                  } else if (zone.type === 'polygon' && zone.polygon) {
+                    return (
+                      <Polygon
+                        key={`saved-${zone.id}`}
+                        positions={zone.polygon.map(p => [p.lat, p.lng])}
+                        pathOptions={{
+                          color: zone.color,
+                          fillColor: zone.color,
+                          fillOpacity: opacity,
+                          weight: weight,
+                          dashArray: '5, 5'
+                        }}
+                      />
+                    );
+                  }
+                  return null;
+                })}
+
+                {/* Display property counts for saved zones */}
+                {step === 1 && allSavedZones.map((zone) => {
+                  const isLoadedZone = loadedZone?.id === zone.id;
+                  if (isLoadedZone) return null; // Don't show count for loaded zone
+
+                  const counts = savedZoneCounts[zone.id] || { total: 0, available: 0 };
+                  let center: { lat: number; lng: number } | null = null;
+
+                  if (zone.type === 'polygon' && zone.polygon && zone.polygon.length > 0) {
+                    // Calculate centroid of polygon
+                    const sumLat = zone.polygon.reduce((sum, p) => sum + p.lat, 0);
+                    const sumLng = zone.polygon.reduce((sum, p) => sum + p.lng, 0);
+                    center = {
+                      lat: sumLat / zone.polygon.length,
+                      lng: sumLng / zone.polygon.length
+                    };
+                  } else if (zone.type === 'circle' && zone.center) {
+                    center = { lat: zone.center.lat, lng: zone.center.lng };
+                  } else if (zone.type === 'rectangle') {
+                    center = {
+                      lat: (zone.bounds.north + zone.bounds.south) / 2,
+                      lng: (zone.bounds.east + zone.bounds.west) / 2
+                    };
+                  }
+
+                  if (!center) return null;
+
+                  const countIcon = new DivIcon({
+                    html: `<div style="
+                      background: ${zone.color};
+                      color: white;
+                      padding: 6px 12px;
+                      border-radius: 16px;
+                      font-weight: bold;
+                      font-size: 14px;
+                      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                      white-space: nowrap;
+                      border: 2px solid white;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    ">${counts.available}/${counts.total}</div>`,
+                    className: '',
+                    iconSize: [50, 32],
+                    iconAnchor: [25, 16]
+                  });
+
+                  return (
+                    <Marker
+                      key={`count-${zone.id}`}
+                      position={[center.lat, center.lng]}
+                      icon={countIcon}
+                    />
+                  );
+                })}
+
                 {/* Property count overlay */}
-                {selectedShape && totalPropertiesInZone > 0 && (() => {
+                {selectedShape && propertiesInZone.total > 0 && (() => {
                   const center = selectedShape.center
                     ? { lat: selectedShape.center.lat, lng: selectedShape.center.lng }
                     : {
                         lat: (selectedShape.bounds.getNorthEast().lat + selectedShape.bounds.getSouthWest().lat) / 2,
                         lng: (selectedShape.bounds.getNorthEast().lng + selectedShape.bounds.getSouthWest().lng) / 2
                       };
-                  return <PropertyCountOverlay count={totalPropertiesInZone} center={center} />;
+                  return <PropertyCountOverlay available={propertiesInZone.available} total={propertiesInZone.total} center={center} />;
                 })()}
                 {pinLocation && (
                   <Marker
@@ -1162,6 +1370,8 @@ export function AreaSelectorMap({
         isOpen={showZoneManager}
         onClose={() => setShowZoneManager(false)}
         onSelectZone={handleLoadZone}
+        properties={properties}
+        unavailablePropertyIds={unavailablePropertyIds}
       />
 
       {/* Save Zone Dialog */}

@@ -149,12 +149,17 @@ router.get('/',
       // Map database fields to frontend format
       // Map totalDue (database) to totalAmountDue (frontend)
       // Map percentageDue (database) to totalPercentage (frontend)
-      const mappedProperties = properties.map(prop => ({
-        ...prop,
-        totalAmountDue: prop.totalDue || 0, // Map totalDue to totalAmountDue for frontend
-        totalPercentage: prop.percentageDue || 0, // Map percentageDue to totalPercentage for frontend
-        // Keep original fields for backward compatibility but prioritize mapped fields
-      }));
+      const mappedProperties = properties.map(prop => {
+        const ownerUpper = (prop.ownerName || '').toUpperCase().trim();
+        const addressUpper = (prop.propertyAddress || '').toUpperCase().trim();
+        const isPrimaryProperty = !!(ownerUpper && addressUpper && addressUpper.includes(ownerUpper));
+        return {
+          ...prop,
+          totalAmountDue: prop.totalDue || 0,
+          totalPercentage: prop.percentageDue || 0,
+          isPrimaryProperty,
+        };
+      });
 
       // Format status counts to match BOTH old and new frontend (backward compatible)
       const statusCounts = {
@@ -392,7 +397,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // PATCH endpoint for partial updates (like geocoding)
-router.patch('/:id', optionalAuth, async (req, res) => {
+router.patch('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;

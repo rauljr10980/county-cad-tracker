@@ -20,7 +20,8 @@ router.post('/register',
   [
     body('username').trim().isLength({ min: 3, max: 50 }).withMessage('Username must be 3-50 characters'),
     body('email').isEmail().normalizeEmail().withMessage('Invalid email address'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+    body('inviteCode').trim().notEmpty().withMessage('Invite code is required')
   ],
   async (req, res) => {
     try {
@@ -30,7 +31,12 @@ router.post('/register',
         return res.status(400).json({ error: errors.array()[0].msg });
       }
 
-      const { username, email, password } = req.body;
+      const { username, email, password, inviteCode } = req.body;
+
+      // Verify invite code
+      if (!process.env.INVITE_CODE || inviteCode !== process.env.INVITE_CODE) {
+        return res.status(403).json({ error: 'Invalid invite code' });
+      }
 
       // Check if user already exists
       const existingUser = await prisma.user.findFirst({

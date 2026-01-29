@@ -28,13 +28,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats } from '@/hooks/usePreForeclosure';
+import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useUploadAddressOnlyPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats } from '@/hooks/usePreForeclosure';
 import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute, reorderRecordInRoute } from '@/lib/api';
-import { batchGeocodeAddresses } from '@/lib/geocoding';
+import { batchGeocodeWithFallback } from '@/lib/geocoding';
 
 // Local type alias to avoid runtime reference issues
 type RouteType = {
@@ -70,6 +70,8 @@ type RouteType = {
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { AdvancedFiltersPanel, PreForeclosureAdvancedFilters } from './AdvancedFilters';
+import { WorkflowStageBadge } from './WorkflowStageBadge';
+import { WorkflowTracker } from './WorkflowTracker';
 import { UploadStatsCard } from './UploadStatsCard';
 import { OverallStatsCard } from './OverallStatsCard';
 import { UploadHistoryCard } from './UploadHistoryCard';
@@ -300,6 +302,12 @@ export function PreForeclosureView() {
     hasPhoneNumbers: false,
     hasTask: false,
     showNewOnly: false,
+    missingGeocode: false,
+    recordedDateFrom: '',
+    recordedDateTo: '',
+    saleDateFrom: '',
+    saleDateTo: '',
+    workflowStage: 'all',
   });
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosureRecord | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -312,14 +320,17 @@ export function PreForeclosureView() {
   const { data: uploadStats } = useLatestPreForeclosureUploadStats();
   const updateMutation = useUpdatePreForeclosure();
   const uploadMutation = useUploadPreForeclosureFile();
+  const addressOnlyUploadMutation = useUploadAddressOnlyPreForeclosureFile();
   const deleteMutation = useDeletePreForeclosures();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadMode, setUploadMode] = useState<'standard' | 'address-only'>('standard');
+  const [uploadType, setUploadType] = useState<'Mortgage' | 'Tax'>('Mortgage');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [editingDateField, setEditingDateField] = useState<{ documentNumber: string; field: 'last_action_date' | 'next_follow_up_date' } | null>(null);
-  const [numVehicles, setNumVehicles] = useState<1 | 2>(1);
+  const numVehicles = 1; // Always use 1 vehicle
   const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [optimizedRoutes, setOptimizedRoutes] = useState<any>(null);
@@ -456,6 +467,36 @@ export function PreForeclosureView() {
       console.log('[FILTER DEBUG] Records after filter:', filtered.length);
     }
 
+    // Missing geocode filter
+    if (advancedFilters.missingGeocode) {
+      filtered = filtered.filter(r => r.latitude == null || r.longitude == null);
+    }
+
+    // Recorded date range filter
+    if (advancedFilters.recordedDateFrom) {
+      const from = new Date(advancedFilters.recordedDateFrom);
+      filtered = filtered.filter(r => r.recorded_date && new Date(r.recorded_date) >= from);
+    }
+    if (advancedFilters.recordedDateTo) {
+      const to = new Date(advancedFilters.recordedDateTo + 'T23:59:59');
+      filtered = filtered.filter(r => r.recorded_date && new Date(r.recorded_date) <= to);
+    }
+
+    // Sale date range filter
+    if (advancedFilters.saleDateFrom) {
+      const from = new Date(advancedFilters.saleDateFrom);
+      filtered = filtered.filter(r => r.sale_date && new Date(r.sale_date) >= from);
+    }
+    if (advancedFilters.saleDateTo) {
+      const to = new Date(advancedFilters.saleDateTo + 'T23:59:59');
+      filtered = filtered.filter(r => r.sale_date && new Date(r.sale_date) <= to);
+    }
+
+    // Workflow stage filter
+    if (advancedFilters.workflowStage !== 'all') {
+      filtered = filtered.filter(r => (r.workflow_stage || 'not_started') === advancedFilters.workflowStage);
+    }
+
     return filtered;
   }, [records, searchQuery, advancedFilters, uploadStats]);
 
@@ -473,6 +514,10 @@ export function PreForeclosureView() {
     if (advancedFilters.hasPhoneNumbers) count++;
     if (advancedFilters.hasTask) count++;
     if (advancedFilters.showNewOnly) count++;
+    if (advancedFilters.missingGeocode) count++;
+    if (advancedFilters.recordedDateFrom || advancedFilters.recordedDateTo) count++;
+    if (advancedFilters.saleDateFrom || advancedFilters.saleDateTo) count++;
+    if (advancedFilters.workflowStage !== 'all') count++;
     return count;
   }, [advancedFilters]);
 
@@ -495,6 +540,12 @@ export function PreForeclosureView() {
       hasPhoneNumbers: false,
       hasTask: false,
       showNewOnly: false,
+      missingGeocode: false,
+      recordedDateFrom: '',
+      recordedDateTo: '',
+      saleDateFrom: '',
+      saleDateTo: '',
+      workflowStage: 'all',
     });
     setSearchQuery('');
   };
@@ -1628,7 +1679,7 @@ export function PreForeclosureView() {
         zip: r.zip,
       }));
 
-      const results = await batchGeocodeAddresses(
+      const results = await batchGeocodeWithFallback(
         addressesToGeocode,
         (completed, total, current) => {
           setGeocodeProgress({ current: completed, total, address: current });
@@ -1679,7 +1730,8 @@ export function PreForeclosureView() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Pre-Foreclosure Records</h1>
-        {!isLoading && !error && (
+        {/* Hidden: Active records count */}
+        {/* {!isLoading && !error && (
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <span className="font-medium text-foreground">
             {filteredRecords.length.toLocaleString()} active record{filteredRecords.length !== 1 ? 's' : ''}
@@ -1691,7 +1743,7 @@ export function PreForeclosureView() {
                 </>
             )}
             </div>
-        )}
+        )} */}
       </div>
         <div className="flex flex-wrap gap-2 items-center">
         {selectedRecordIds.size > 0 && (
@@ -1700,18 +1752,6 @@ export function PreForeclosureView() {
                 <CheckCircle className="h-4 w-4" />
               {selectedRecordIds.size} selected
               </div>
-            <Select
-              value={numVehicles.toString()}
-              onValueChange={(value) => setNumVehicles(parseInt(value) as 1 | 2)}
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 Vehicle</SelectItem>
-                <SelectItem value="2">2 Vehicles</SelectItem>
-              </SelectContent>
-            </Select>
             <Button
               onClick={() => setAreaSelectorOpen(true)}
               variant="outline"
@@ -1815,17 +1855,59 @@ export function PreForeclosureView() {
   );
 
   // Upload Modal Component (rendered once at the end)
+  const isUploading = uploadMutation.isPending || addressOnlyUploadMutation.isPending;
   const uploadModal = (
-    <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-          <DialogContent>
+    <Dialog open={uploadOpen} onOpenChange={(open) => {
+      setUploadOpen(open);
+      if (!open) {
+        setUploadFile(null);
+        setUploadMode('standard');
+        setUploadType('Mortgage');
+      }
+    }}>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Upload Pre-Foreclosure File</DialogTitle>
               <DialogDescription>
-                Upload an Excel file (.xlsx or .xls) or CSV file (.csv) with pre-foreclosure records.
-                Required columns: Doc Number (or Document Number), Type (Mortgage/Tax), Address, City, ZIP, Filing Month (optional).
+                Choose an upload mode and select your file.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Mode Toggle */}
+              <div className="flex gap-2">
+                <Button
+                  variant={uploadMode === 'standard' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => { setUploadMode('standard'); setUploadFile(null); }}
+                >
+                  Standard Upload
+                </Button>
+                <Button
+                  variant={uploadMode === 'address-only' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => { setUploadMode('address-only'); setUploadFile(null); }}
+                >
+                  Address-Only Upload
+                </Button>
+              </div>
+
+              {/* Type Dropdown (address-only mode only) */}
+              {uploadMode === 'address-only' && (
+                <div>
+                  <Label>Filing Type</Label>
+                  <Select value={uploadType} onValueChange={(v) => setUploadType(v as 'Mortgage' | 'Tax')}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Mortgage">Mortgage</SelectItem>
+                      <SelectItem value="Tax">Tax</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* File Input */}
               <div>
                 <Label>Select File (.xlsx, .xls, or .csv)</Label>
                 <Input
@@ -1834,24 +1916,22 @@ export function PreForeclosureView() {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      // Validate file type
                       if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls') && !file.name.endsWith('.csv')) {
                         toast({
                           title: 'Invalid file type',
                           description: 'Please select an Excel file (.xlsx or .xls) or CSV file (.csv)',
                           variant: 'destructive',
                         });
-                        e.target.value = ''; // Clear the input
+                        e.target.value = '';
                         return;
                       }
-                      // Validate file size (100MB limit)
                       if (file.size > 100 * 1024 * 1024) {
                         toast({
                           title: 'File too large',
                           description: 'File size must be less than 100MB',
                           variant: 'destructive',
                         });
-                        e.target.value = ''; // Clear the input
+                        e.target.value = '';
                         return;
                       }
                       setUploadFile(file);
@@ -1870,18 +1950,30 @@ export function PreForeclosureView() {
                   </div>
                 )}
               </div>
+
+              {/* Requirements Info */}
               <div className="bg-secondary/30 rounded-lg p-4 text-sm space-y-2">
                 <p className="font-medium">File Requirements:</p>
-                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                  <li>Document Number (required)</li>
-                  <li>Type: Mortgage or Tax</li>
-                  <li>Address, City, ZIP</li>
-                  <li>Filing Month (optional, defaults to current month)</li>
-                </ul>
+                {uploadMode === 'standard' ? (
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    <li>Document Number (required)</li>
+                    <li>Type: Mortgage or Tax</li>
+                    <li>Address, City, ZIP</li>
+                    <li>Filing Month (optional, defaults to current month)</li>
+                  </ul>
+                ) : (
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    <li>Address column (full address, e.g., "123 Main St, San Antonio, TX 78201")</li>
+                  </ul>
+                )}
                 <p className="text-xs text-muted-foreground mt-2">
-                  Records are matched by Document Number. Missing records from new uploads are marked inactive.
+                  {uploadMode === 'standard'
+                    ? 'Records are matched by Document Number. Missing records from new uploads are marked inactive.'
+                    : 'Row numbers will be used as document numbers. Addresses will be automatically geocoded using the US Census API.'}
                 </p>
               </div>
+
+              {/* Action Buttons */}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => {
                   setUploadOpen(false);
@@ -1893,11 +1985,29 @@ export function PreForeclosureView() {
                   onClick={async () => {
                     if (!uploadFile) return;
                     try {
-                      const result = await uploadMutation.mutateAsync(uploadFile);
-                      toast({
-                        title: 'Upload successful',
-                        description: `Processed ${result.recordsProcessed} records. Total: ${result.totalRecords} (${result.activeRecords} active, ${result.inactiveRecords} inactive)`,
-                      });
+                      if (uploadMode === 'standard') {
+                        const result = await uploadMutation.mutateAsync(uploadFile);
+                        toast({
+                          title: 'Upload successful',
+                          description: `Processed ${result.recordsProcessed} records. Total: ${result.totalRecords} (${result.activeRecords} active, ${result.inactiveRecords} inactive)`,
+                        });
+                      } else {
+                        const result = await addressOnlyUploadMutation.mutateAsync({
+                          file: uploadFile,
+                          type: uploadType,
+                        });
+                        const failedGeocode = result.recordsProcessed - result.geocoded;
+                        const geocodeSummary = failedGeocode > 0
+                          ? `Geocoded ${result.geocoded}/${result.recordsProcessed} addresses. ${failedGeocode} need manual geocoding.`
+                          : `All ${result.geocoded} addresses geocoded successfully.`;
+                        toast({
+                          title: 'Upload successful',
+                          description: `${geocodeSummary} Created: ${result.created}, Updated: ${result.updated}.`,
+                        });
+                        // Auto-enable "Show New Only" filter and refresh upload stats
+                        await queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-stats-latest'] });
+                        setAdvancedFilters(prev => ({ ...prev, showNewOnly: true }));
+                      }
                       setUploadOpen(false);
                       setUploadFile(null);
                     } catch (error) {
@@ -1909,9 +2019,9 @@ export function PreForeclosureView() {
                       console.error('Upload error:', error);
                     }
                   }}
-                  disabled={!uploadFile || uploadMutation.isPending}
+                  disabled={!uploadFile || isUploading}
                 >
-                  {uploadMutation.isPending ? (
+                  {isUploading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Uploading...
@@ -1936,7 +2046,7 @@ export function PreForeclosureView() {
         <DialogHeader>
           <DialogTitle>Geocoding Addresses</DialogTitle>
           <DialogDescription>
-            Converting addresses to GPS coordinates for mapping and routing
+            Converting addresses to GPS coordinates via US Census Bureau API
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -1965,8 +2075,7 @@ export function PreForeclosureView() {
               <div className="bg-secondary/30 rounded-lg p-4 text-sm space-y-2">
                 <p className="font-medium">Please wait...</p>
                 <p className="text-muted-foreground">
-                  This process takes about 1 second per address due to rate limiting.
-                  Don't close this window.
+                  Using US Census Bureau API. Don't close this window.
                 </p>
               </div>
             </div>
@@ -1978,8 +2087,11 @@ export function PreForeclosureView() {
                   <div>
                     <p className="font-medium text-green-700">Geocoding Complete!</p>
                     <p className="text-muted-foreground mt-1">
-                      Successfully processed {geocodeResults.size} addresses.
-                      Coordinates have been saved to the database.
+                      {geocodeResults.size > 0
+                        ? `Geocoded ${geocodeResults.size} of ${geocodeProgress.total} addresses via US Census Bureau API. Coordinates have been saved.`
+                        : geocodeProgress.total > 0
+                          ? `Census API could not match any of the ${geocodeProgress.total} addresses. Try the "Geocode Addresses" button again or verify the addresses.`
+                          : 'All records already have coordinates.'}
                     </p>
                   </div>
                 </div>
@@ -2241,11 +2353,12 @@ export function PreForeclosureView() {
                 </Button>
               </div> */}
 
-              {/* Type Badge */}
+              {/* Type Badge + Workflow Badge */}
               <div className="flex items-center gap-2 mb-2 pr-8 pl-8">
                       <Badge variant="outline" className={getTypeColor(record.type)}>
                         {record.type}
                       </Badge>
+                      <WorkflowStageBadge stage={record.workflow_stage || 'not_started'} />
               </div>
 
               {/* Document Number and Date - Hidden */}
@@ -2253,13 +2366,31 @@ export function PreForeclosureView() {
               {/* Address */}
               <div className="mb-4 pr-8 pl-8">
                 <div className="flex items-start gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <MapPin className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${record.latitude != null && record.longitude != null ? 'text-green-500' : 'text-red-500'}`} />
                   <div className="text-sm text-muted-foreground min-w-0 flex-1 break-words">
                     <div className="break-words">{record.address}</div>
                     <div className="text-xs mt-0.5 break-words">{record.city}, TX <span className="hidden sm:inline">{record.zip}</span></div>
                   </div>
                 </div>
               </div>
+
+              {/* Recorded Date / Sale Date */}
+              {(record.recorded_date || record.sale_date) && (
+                <div className="flex gap-4 mb-3 px-8 text-xs text-muted-foreground">
+                  {record.recorded_date && (
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>Recorded: {format(new Date(record.recorded_date), 'MM/dd/yyyy')}</span>
+                    </div>
+                  )}
+                  {record.sale_date && (
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>Sale: {format(new Date(record.sale_date), 'MM/dd/yyyy')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Status and Visited Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -2727,15 +2858,43 @@ export function PreForeclosureView() {
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">Latitude</Label>
-                    <p className="font-mono text-sm">
-                      {viewRecord.latitude != null ? viewRecord.latitude.toFixed(6) : 'N/A'}
-                    </p>
+                    <Input
+                      className="font-mono text-sm h-8 mt-1"
+                      type="number"
+                      step="any"
+                      placeholder="N/A"
+                      defaultValue={viewRecord.latitude != null ? viewRecord.latitude : ''}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim();
+                        const newLat = val ? parseFloat(val) : null;
+                        if (newLat !== viewRecord.latitude) {
+                          updateMutation.mutateAsync({
+                            document_number: viewRecord.document_number,
+                            latitude: newLat,
+                          });
+                        }
+                      }}
+                    />
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">Longitude</Label>
-                    <p className="font-mono text-sm">
-                      {viewRecord.longitude != null ? viewRecord.longitude.toFixed(6) : 'N/A'}
-                    </p>
+                    <Input
+                      className="font-mono text-sm h-8 mt-1"
+                      type="number"
+                      step="any"
+                      placeholder="N/A"
+                      defaultValue={viewRecord.longitude != null ? viewRecord.longitude : ''}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim();
+                        const newLng = val ? parseFloat(val) : null;
+                        if (newLng !== viewRecord.longitude) {
+                          updateMutation.mutateAsync({
+                            document_number: viewRecord.document_number,
+                            longitude: newLng,
+                          });
+                        }
+                      }}
+                    />
                   </div>
                   {viewRecord.school_district && (
                     <div className="col-span-2">
@@ -2751,8 +2910,22 @@ export function PreForeclosureView() {
                     <Label className="text-muted-foreground text-xs">County</Label>
                     <p className="text-sm">{viewRecord.county}</p>
                   </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Recorded Date</Label>
+                    <p className="text-sm">{viewRecord.recorded_date ? format(new Date(viewRecord.recorded_date), 'MM/dd/yyyy') : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Sale Date</Label>
+                    <p className="text-sm">{viewRecord.sale_date ? format(new Date(viewRecord.sale_date), 'MM/dd/yyyy') : 'N/A'}</p>
+                  </div>
                 </div>
               </div>
+
+              {/* Workflow Tracker */}
+              <WorkflowTracker
+                record={viewRecord}
+                onRecordUpdate={(updates) => setViewRecord(prev => prev ? { ...prev, ...updates } : prev)}
+              />
 
               {/* Phone Numbers Section - Always Visible */}
               <div className="bg-secondary/30 rounded-lg p-4" style={{ display: 'block' }}>

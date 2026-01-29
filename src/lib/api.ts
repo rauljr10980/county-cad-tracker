@@ -530,12 +530,30 @@ export async function markTaskDone(
 }
 
 /**
- * Delete a task
+ * Delete a property
+ */
+export async function deleteProperty(propertyId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}`, {
+    method: 'DELETE',
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete property');
+  }
+  return response.json();
+}
+
+/**
+ * Delete a task (remove without marking done)
  */
 export async function deleteTask(taskId: string) {
   const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
+    headers: {
+      ...getAuthHeaders(),
+    },
   });
   if (!response.ok) {
     throw new Error('Failed to delete task');
@@ -662,13 +680,13 @@ export async function checkSession() {
 /**
  * Register new user
  */
-export async function register(username: string, email: string, password: string) {
+export async function register(username: string, email: string, password: string, inviteCode: string) {
   const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ username, email, password }),
+    body: JSON.stringify({ username, email, password, inviteCode }),
   });
   
   if (!response.ok) {
@@ -758,10 +776,14 @@ export async function updatePreForeclosure(updates: {
   ownerPhoneIndex?: number;
   last_action_date?: string;
   next_follow_up_date?: string;
-  actionType?: 'call' | 'text' | 'mail' | 'driveby';
-  priority?: 'high' | 'med' | 'low';
-  dueTime?: string;
-  assignedTo?: 'Luciano' | 'Raul';
+  actionType?: 'call' | 'text' | 'mail' | 'driveby' | null;
+  priority?: 'high' | 'med' | 'low' | null;
+  dueTime?: string | null;
+  assignedTo?: 'Luciano' | 'Raul' | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  workflow_stage?: string;
+  workflow_log?: any[];
 }) {
   const response = await fetch(`${API_BASE_URL}/api/preforeclosure/${updates.document_number}`, {
     method: 'PUT',
@@ -812,6 +834,56 @@ export async function uploadPreForeclosureFile(file: File): Promise<{
 
         const result = await response.json();
         resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Upload address-only pre-foreclosure file
+ */
+export async function uploadAddressOnlyPreForeclosureFile(
+  file: File,
+  type: 'Mortgage' | 'Tax'
+): Promise<{
+  success: boolean;
+  fileId: string;
+  recordsProcessed: number;
+  created: number;
+  updated: number;
+  geocoded: number;
+  totalRecords: number;
+  activeRecords: number;
+  inactiveRecords: number;
+}> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      try {
+        const base64 = (e.target?.result as string).split(',')[1];
+
+        const response = await fetch(`${API_BASE_URL}/api/preforeclosure/upload-address-only`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            filename: file.name,
+            fileData: base64,
+            type,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Upload failed');
+        }
+
+        resolve(await response.json());
       } catch (error) {
         reject(error);
       }

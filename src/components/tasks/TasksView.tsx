@@ -492,6 +492,7 @@ export function TasksView() {
           <p className="text-xs text-muted-foreground mt-1">tasks</p>
         </button>
       </div>
+<<<<<<< HEAD
 
       {/* Deal Workflow Pipeline Funnel */}
       {preForeclosureRecords && preForeclosureRecords.length > 0 && (
@@ -536,6 +537,8 @@ export function TasksView() {
           )}
         </div>
       )}
+=======
+>>>>>>> e087294455d6c30c47ea668cb5da3780e95757d1
 
       {/* Header Controls */}
       <div className="mb-8 flex items-center justify-between flex-wrap gap-6 pb-4 border-b border-border">

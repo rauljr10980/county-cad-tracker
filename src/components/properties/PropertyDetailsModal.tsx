@@ -538,9 +538,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-          
+
           {/* Additional Details Section */}
           {(property.link || property.ownerAddress) && (
             <div className="bg-secondary/30 rounded-lg p-3 space-y-2">

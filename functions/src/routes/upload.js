@@ -6,7 +6,7 @@
 const express = require('express');
 const multer = require('multer');
 const XLSX = require('xlsx');
-const { optionalAuth } = require('../middleware/auth');
+const { optionalAuth, authenticateToken, requireRole } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 
 const router = express.Router();
@@ -725,12 +725,8 @@ router.get('/', optionalAuth, async (req, res) => {
 // CLEAR ALL PROPERTIES (Admin only)
 // ============================================================================
 
-router.delete('/properties/all', optionalAuth, async (req, res) => {
+router.delete('/properties/all', authenticateToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    // Check if user is admin (if authenticated)
-    if (req.user && req.user.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
 
     const count = await prisma.property.deleteMany({});
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar, CalendarPlus, ArrowUp, ArrowDown, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Eye, Navigation, Calendar, CalendarPlus, ArrowUp, ArrowDown, MapPin, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -23,6 +23,9 @@ interface PropertyTableProps {
   onSort?: (field: keyof Property | 'ratio') => void;
   selectedPropertyIds?: Set<string>;
   onPropertySelect?: (propertyId: string, selected: boolean) => void;
+  allFilteredPropertyIds?: string[];
+  propertiesInRoutes?: Set<string>;
+  onDeleteProperty?: (propertyId: string) => void;
 }
 
 
@@ -36,7 +39,10 @@ export function PropertyTable({
   sortDirection: externalSortDirection = 'asc',
   onSort,
   selectedPropertyIds = new Set(),
-  onPropertySelect
+  onPropertySelect,
+  allFilteredPropertyIds,
+  propertiesInRoutes = new Set(),
+  onDeleteProperty
 }: PropertyTableProps) {
   // Use external sort state if provided, otherwise use internal state (fallback)
   const [internalSortField, setInternalSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
@@ -194,6 +200,27 @@ export function PropertyTable({
     <>
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3">
+        {onPropertySelect && (
+          <div className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg">
+            <Checkbox
+              checked={selectedPropertyIds.size > 0 && selectedPropertyIds.size === (allFilteredPropertyIds?.length || displayProperties.length)}
+              onCheckedChange={(checked) => {
+                const idsToToggle = allFilteredPropertyIds || displayProperties.map(p => p.id);
+                idsToToggle.forEach(id => {
+                  onPropertySelect(id, checked as boolean);
+                });
+              }}
+            />
+            <span className="text-sm text-muted-foreground">
+              Select All ({allFilteredPropertyIds?.length || displayProperties.length})
+            </span>
+            {selectedPropertyIds.size > 0 && (
+              <span className="text-sm font-medium text-primary ml-auto">
+                {selectedPropertyIds.size} selected
+              </span>
+            )}
+          </div>
+        )}
         {displayProperties.map((property) => {
           const followUpDate = localFollowUps[property.id] || property.lastFollowUp;
 
@@ -208,6 +235,8 @@ export function PropertyTable({
               localFollowUp={followUpDate}
               isSelected={selectedPropertyIds.has(property.id)}
               onSelect={onPropertySelect ? (checked) => onPropertySelect(property.id, checked) : undefined}
+              isInRoute={propertiesInRoutes.has(property.id)}
+              onDelete={onDeleteProperty ? () => onDeleteProperty(property.id) : undefined}
             />
           );
         })}
@@ -222,10 +251,11 @@ export function PropertyTable({
               <th className="w-12">
                 {onPropertySelect && (
                   <Checkbox
-                    checked={selectedPropertyIds.size > 0 && selectedPropertyIds.size === displayProperties.length}
+                    checked={selectedPropertyIds.size > 0 && selectedPropertyIds.size === (allFilteredPropertyIds?.length || displayProperties.length)}
                     onCheckedChange={(checked) => {
-                      displayProperties.forEach(prop => {
-                        onPropertySelect(prop.id, checked as boolean);
+                      const idsToToggle = allFilteredPropertyIds || displayProperties.map(p => p.id);
+                      idsToToggle.forEach(id => {
+                        onPropertySelect(id, checked as boolean);
                       });
                     }}
                     title="Select all"
@@ -335,11 +365,20 @@ export function PropertyTable({
                       )}
                     </div>
                   </td>
-                  <td className="max-w-[180px] truncate">
-                    {(() => {
-                      const parsed = parsePropertyAddress(property.propertyAddress);
-                      return parsed.ownerName || property.ownerName || '';
-                    })()}
+                  <td className="max-w-[180px]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate">
+                        {(() => {
+                          const parsed = parsePropertyAddress(property.propertyAddress);
+                          return parsed.ownerName || property.ownerName || '';
+                        })()}
+                      </span>
+                      {property.isPrimaryProperty === false && (
+                        <span className="flex-shrink-0 text-[10px] px-1 py-0.5 rounded bg-orange-500/20 text-orange-500 font-medium">
+                          2nd
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="max-w-[250px] truncate text-muted-foreground">
                     {(() => {
@@ -411,14 +450,14 @@ export function PropertyTable({
                       >
                         <Navigation className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-7 w-7"
                         asChild
                         title={property.link ? "View Property Details" : "View on Bexar County Tax Office"}
                       >
-                        <a 
+                        <a
                           href={property.link || "https://bexar.acttax.com/act_webdev/bexar/index.jsp"}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -426,6 +465,17 @@ export function PropertyTable({
                           <ExternalLink className="h-4 w-4" />
                         </a>
                       </Button>
+                      {onDeleteProperty && propertiesInRoutes.has(property.id) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => onDeleteProperty(property.id)}
+                          title="Remove from route"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

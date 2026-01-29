@@ -9,6 +9,9 @@ const { optionalAuth, authenticateToken } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 const XLSX = require('xlsx');
 
+const { parseFullAddress } = require('../lib/addressParser');
+const { batchGeocodeCensus } = require('../lib/censusGeocode');
+
 const router = express.Router();
 
 // ============================================================================
@@ -48,6 +51,8 @@ router.get('/', optionalAuth, async (req, res) => {
       latitude: record.latitude,
       longitude: record.longitude,
       school_district: record.schoolDistrict,
+      recorded_date: record.recordedDate ? record.recordedDate.toISOString() : null,
+      sale_date: record.saleDate ? record.saleDate.toISOString() : null,
       internal_status: record.internalStatus,
       notes: record.notes,
       phoneNumbers: record.phoneNumbers || [],
@@ -62,6 +67,8 @@ router.get('/', optionalAuth, async (req, res) => {
       visited: record.visited,
       visited_at: record.visitedAt ? record.visitedAt.toISOString() : null,
       visited_by: record.visitedBy,
+      workflow_stage: record.workflowStage || 'not_started',
+      workflow_log: record.workflowLog || [],
       first_seen_month: record.firstSeenMonth,
       last_seen_month: record.lastSeenMonth,
       created_at: record.createdAt.toISOString(),
@@ -407,6 +414,274 @@ router.post('/upload', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
+// UPLOAD ADDRESS-ONLY PRE-FORECLOSURE FILE
+// ============================================================================
+
+router.post('/upload-address-only', optionalAuth, async (req, res) => {
+  try {
+    const { filename, fileData, type } = req.body;
+
+    if (!filename || !fileData) {
+      return res.status(400).json({ error: 'Filename and fileData are required' });
+    }
+
+    if (!type || (type !== 'Mortgage' && type !== 'Tax')) {
+      return res.status(400).json({ error: 'Type must be "Mortgage" or "Tax"' });
+    }
+
+    // Decode base64 file data
+    const buffer = Buffer.from(fileData, 'base64');
+
+    // Parse Excel/CSV file
+    let workbook;
+    try {
+      const isCSV = filename.toLowerCase().endsWith('.csv');
+      if (isCSV) {
+        const csvString = buffer.toString('utf-8');
+        workbook = XLSX.read(csvString, { type: 'string' });
+      } else {
+        workbook = XLSX.read(buffer, { type: 'buffer' });
+      }
+    } catch (parseError) {
+      console.error('[PRE-FORECLOSURE] Parse error:', parseError);
+      return res.status(400).json({ error: 'Invalid file format. Please upload a valid Excel or CSV file.' });
+    }
+
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      return res.status(400).json({ error: 'File has no sheets' });
+    }
+
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: null, raw: false });
+
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'File is empty or has no data rows' });
+    }
+
+    const now = new Date();
+    const currentMonth = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // Process records - expect a single "Address" column
+    const processedRecords = [];
+    const geocodeInputs = [];
+    const errors = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowKeys = Object.keys(row);
+
+      // Find address field (case-insensitive, supports "Address" and "Full Address")
+      let fullAddress = row['Full Address'] || row['full address'] || row['FULL ADDRESS'] ||
+        row['Address'] || row['address'] || row['ADDRESS'];
+      if (!fullAddress) {
+        const addrKey = rowKeys.find(k => {
+          const lower = k.toLowerCase().trim();
+          return lower === 'full address' || lower === 'address';
+        });
+        fullAddress = addrKey ? row[addrKey] : null;
+      }
+
+      if (!fullAddress || String(fullAddress).trim() === '') {
+        errors.push(`Row ${i + 2}: Missing or empty address`);
+        continue;
+      }
+
+      // Find date fields (optional)
+      let recordedDate = row['Recorded Date'] || row['recorded date'] || row['RECORDED DATE'] || row['RecordedDate'];
+      if (!recordedDate) {
+        const rdKey = rowKeys.find(k => k.toLowerCase().trim() === 'recorded date' || k.toLowerCase().trim() === 'recordeddate');
+        recordedDate = rdKey ? row[rdKey] : null;
+      }
+
+      let saleDate = row['Sale Date'] || row['sale date'] || row['SALE DATE'] || row['SaleDate'];
+      if (!saleDate) {
+        const sdKey = rowKeys.find(k => k.toLowerCase().trim() === 'sale date' || k.toLowerCase().trim() === 'saledate');
+        saleDate = sdKey ? row[sdKey] : null;
+      }
+
+      // Parse dates
+      let parsedRecordedDate = null;
+      if (recordedDate) {
+        const d = new Date(String(recordedDate).trim());
+        if (!isNaN(d.getTime())) parsedRecordedDate = d;
+      }
+
+      let parsedSaleDate = null;
+      if (saleDate) {
+        const d = new Date(String(saleDate).trim());
+        if (!isNaN(d.getTime())) parsedSaleDate = d;
+      }
+
+      const rowNumber = i + 1;
+      const docNumber = `ADDR-${rowNumber}`;
+      const parsed = parseFullAddress(String(fullAddress).trim());
+
+      processedRecords.push({
+        documentNumber: docNumber,
+        type: type,
+        address: parsed.street || parsed.raw,
+        city: parsed.city || '',
+        zip: parsed.zip || '',
+        filingMonth: currentMonth,
+        county: 'Bexar',
+        recordedDate: parsedRecordedDate,
+        saleDate: parsedSaleDate,
+      });
+
+      geocodeInputs.push({
+        id: docNumber,
+        street: parsed.street || parsed.raw,
+        city: parsed.city || '',
+        state: parsed.state || 'TX',
+        zip: parsed.zip || '',
+      });
+    }
+
+    if (processedRecords.length === 0) {
+      return res.status(400).json({
+        error: 'No valid addresses found in file. Make sure you have an "Address" column.',
+        errors: errors.slice(0, 10),
+      });
+    }
+
+    // Batch geocode via Census API
+    let geocodeResults = new Map();
+    try {
+      geocodeResults = await batchGeocodeCensus(geocodeInputs);
+      console.log(`[PRE-FORECLOSURE] Census geocoding: ${geocodeResults.size}/${geocodeInputs.length} matched`);
+    } catch (geoError) {
+      console.error('[PRE-FORECLOSURE] Census geocoding error:', geoError);
+      // Continue without coordinates
+    }
+
+    // Upsert records (no inactive marking for address-only uploads)
+    let created = 0;
+    let updated = 0;
+    const dbErrors = [];
+    const newDocNumbers = [];
+    const updatedDocNumbers = [];
+
+    for (const record of processedRecords) {
+      try {
+        const geoResult = geocodeResults.get(record.documentNumber);
+        const latitude = geoResult?.latitude || null;
+        const longitude = geoResult?.longitude || null;
+
+        const existing = await prisma.preForeclosure.findUnique({
+          where: { documentNumber: record.documentNumber }
+        });
+
+        if (existing) {
+          await prisma.preForeclosure.update({
+            where: { documentNumber: record.documentNumber },
+            data: {
+              type: record.type,
+              address: record.address,
+              city: record.city,
+              zip: record.zip,
+              filingMonth: record.filingMonth,
+              county: record.county,
+              latitude,
+              longitude,
+              recordedDate: record.recordedDate,
+              saleDate: record.saleDate,
+              inactive: false,
+              lastSeenMonth: currentMonth,
+              updatedAt: new Date(),
+            }
+          });
+          updated++;
+          updatedDocNumbers.push(record.documentNumber);
+        } else {
+          await prisma.preForeclosure.create({
+            data: {
+              documentNumber: record.documentNumber,
+              type: record.type,
+              address: record.address,
+              city: record.city,
+              zip: record.zip,
+              filingMonth: record.filingMonth,
+              county: record.county,
+              latitude,
+              longitude,
+              recordedDate: record.recordedDate,
+              saleDate: record.saleDate,
+              internalStatus: 'New',
+              inactive: false,
+              firstSeenMonth: currentMonth,
+              lastSeenMonth: currentMonth,
+            }
+          });
+          created++;
+          newDocNumbers.push(record.documentNumber);
+        }
+      } catch (dbError) {
+        console.error(`[PRE-FORECLOSURE] Database error for record ${record.documentNumber}:`, dbError);
+        dbErrors.push(`Failed to save record ${record.documentNumber}: ${dbError.message}`);
+      }
+    }
+
+    if (created === 0 && updated === 0 && dbErrors.length > 0) {
+      return res.status(500).json({
+        error: 'Failed to save records to database',
+        errors: dbErrors.slice(0, 10),
+      });
+    }
+
+    // Get counts
+    const totalRecords = await prisma.preForeclosure.count();
+    const activeRecords = await prisma.preForeclosure.count({ where: { inactive: false } });
+    const inactiveRecords = await prisma.preForeclosure.count({ where: { inactive: true } });
+
+    // Save upload history
+    try {
+      await prisma.preForeclosureUploadHistory.create({
+        data: {
+          filename,
+          uploadedBy: req.user?.username || 'System',
+          recordsProcessed: processedRecords.length,
+          newRecords: created,
+          updatedRecords: updated,
+          inactiveRecords: 0,
+          totalRecords,
+          activeRecords,
+          success: true,
+          newDocumentNumbers: newDocNumbers,
+          updatedDocumentNumbers: updatedDocNumbers,
+          inactiveDocumentNumbers: [],
+        }
+      });
+    } catch (historyError) {
+      console.error('[PRE-FORECLOSURE] Failed to save upload history:', historyError);
+    }
+
+    console.log(`[PRE-FORECLOSURE] Address-only upload complete: ${created} created, ${updated} updated, ${geocodeResults.size} geocoded`);
+
+    res.json({
+      success: true,
+      fileId: filename,
+      recordsProcessed: processedRecords.length,
+      created,
+      updated,
+      geocoded: geocodeResults.size,
+      totalRecords,
+      activeRecords,
+      inactiveRecords,
+      errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+      dbErrors: dbErrors.length > 0 ? dbErrors.slice(0, 10) : undefined,
+    });
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Address-only upload error:', error);
+    console.error('[PRE-FORECLOSURE] Error stack:', error.stack);
+    res.status(500).json({
+      error: 'Failed to process address-only upload',
+      details: error.message,
+    });
+  }
+});
+
+// ============================================================================
 // UPDATE PRE-FORECLOSURE RECORD
 // ============================================================================
 
@@ -446,6 +721,20 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
     // Also handle direct latitude/longitude fields
     if (updates.latitude !== undefined) dbUpdates.latitude = updates.latitude;
     if (updates.longitude !== undefined) dbUpdates.longitude = updates.longitude;
+
+    // Workflow fields
+    if (updates.workflow_stage !== undefined) {
+      const validStages = [
+        'not_started', 'initial_visit', 'people_search', 'call_owner',
+        'land_records', 'visit_heirs', 'call_heirs', 'negotiating', 'dead_end'
+      ];
+      if (validStages.includes(updates.workflow_stage)) {
+        dbUpdates.workflowStage = updates.workflow_stage;
+      }
+    }
+    if (updates.workflow_log !== undefined) {
+      dbUpdates.workflowLog = updates.workflow_log;
+    }
 
     // Action/Task fields
     if (updates.actionType !== undefined) {
@@ -520,6 +809,8 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
       latitude: record.latitude,
       longitude: record.longitude,
       school_district: record.schoolDistrict,
+      recorded_date: record.recordedDate ? record.recordedDate.toISOString() : null,
+      sale_date: record.saleDate ? record.saleDate.toISOString() : null,
       internal_status: record.internalStatus,
       notes: record.notes,
       phoneNumbers: record.phoneNumbers || [],
@@ -531,6 +822,8 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
       dueTime: record.dueTime ? record.dueTime.toISOString() : undefined,
       assignedTo: record.assignedTo,
       inactive: record.inactive,
+      workflow_stage: record.workflowStage || 'not_started',
+      workflow_log: record.workflowLog || [],
       first_seen_month: record.firstSeenMonth,
       last_seen_month: record.lastSeenMonth,
       created_at: record.createdAt.toISOString(),
