@@ -244,6 +244,79 @@ export async function batchGeocodeAddressesCensus(
 }
 
 /**
+ * Batch geocode with fallback: Census API first, then Nominatim for failures.
+ * This ensures near-100% success rate since Nominatim is more forgiving
+ * with abbreviated street names and non-standard addresses.
+ */
+export async function batchGeocodeWithFallback(
+  addresses: Array<{
+    id: string;
+    address: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+  }>,
+  onProgress?: (completed: number, total: number, current: string) => void,
+  shouldCancel?: () => boolean
+): Promise<Map<string, GeocodeResult>> {
+  const results = new Map<string, GeocodeResult>();
+  const total = addresses.length;
+  let completed = 0;
+
+  // Phase 1: Census API (fast, 10 concurrent, no rate limit)
+  const CENSUS_BATCH = 10;
+  const censusFailures: typeof addresses = [];
+
+  for (let i = 0; i < addresses.length; i += CENSUS_BATCH) {
+    if (shouldCancel?.()) break;
+    const batch = addresses.slice(i, i + CENSUS_BATCH);
+
+    const batchPromises = batch.map(async (item) => {
+      const result = await geocodeAddressCensus(
+        item.address, item.city, item.state || 'TX', item.zip
+      );
+      if ('latitude' in result) {
+        results.set(item.id, result);
+      } else {
+        censusFailures.push(item);
+      }
+      completed++;
+      onProgress?.(completed, total, `Census: ${item.address}`);
+    });
+    await Promise.all(batchPromises);
+  }
+
+  // Phase 2: Nominatim fallback for Census failures (rate-limited, 2 concurrent + 500ms delay)
+  if (censusFailures.length > 0 && !shouldCancel?.()) {
+    const NOM_BATCH = 2;
+    const NOM_DELAY = 500;
+
+    for (let i = 0; i < censusFailures.length; i += NOM_BATCH) {
+      if (shouldCancel?.()) break;
+      const batch = censusFailures.slice(i, i + NOM_BATCH);
+
+      const batchPromises = batch.map(async (item) => {
+        const result = await geocodeAddress(
+          item.address, item.city, item.state || 'TX', item.zip
+        );
+        if ('latitude' in result) {
+          results.set(item.id, result);
+        }
+        onProgress?.(completed, total, `Nominatim: ${item.address}`);
+      });
+      await Promise.all(batchPromises);
+
+      if (i + NOM_BATCH < censusFailures.length) {
+        await new Promise(resolve => setTimeout(resolve, NOM_DELAY));
+      }
+    }
+  }
+
+  onProgress?.(total, total, 'Complete');
+  return results;
+}
+
+/**
  * Reverse geocode: convert coordinates to address
  */
 export async function reverseGeocode(

@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute, reorderRecordInRoute } from '@/lib/api';
-import { batchGeocodeAddressesCensus } from '@/lib/geocoding';
+import { batchGeocodeWithFallback } from '@/lib/geocoding';
 
 // Local type alias to avoid runtime reference issues
 type RouteType = {
@@ -1669,7 +1669,7 @@ export function PreForeclosureView() {
         zip: r.zip,
       }));
 
-      const results = await batchGeocodeAddressesCensus(
+      const results = await batchGeocodeWithFallback(
         addressesToGeocode,
         (completed, total, current) => {
           setGeocodeProgress({ current: completed, total, address: current });
