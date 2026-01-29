@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Phone, MessageSquare, Mail, Car, CheckSquare, Loader2, AlertCircle, Eye, Clock, Flag, Filter, CheckCircle2, X, Trash2 } from 'lucide-react';
 import { Property, PreForeclosure } from '@/types/property';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getTasks, updatePropertyAction, markTaskDone, deleteTask, updatePropertyPriority, updatePreForeclosure, getPreForeclosures } from '@/lib/api';
+import { getTasks, updatePropertyAction, markTaskDone, deleteTask, updatePropertyPriority, updatePreForeclosure, getPreForeclosures, getProperties } from '@/lib/api';
 import { format, isToday, isPast, parseISO, startOfDay, isBefore, isAfter } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -107,6 +107,14 @@ export function TasksView() {
     queryFn: getTasks,
     refetchOnMount: true,
     refetchInterval: 30000,
+  });
+
+  // Fetch all properties for deal funnel
+  const { data: allPropertiesData } = useQuery<{ properties: Property[] } | Property[]>({
+    queryKey: ['properties', 'all'],
+    queryFn: () => getProperties(1, 50000), // Fetch all properties
+    refetchOnMount: false,
+    refetchInterval: 60000, // Refresh every minute
   });
 
   const formatCurrency = (amount: number) => {
@@ -277,7 +285,48 @@ export function TasksView() {
     };
   }, [data]);
 
-  // Workflow stage funnel data
+  // Deal workflow funnel data
+  const DEAL_STAGES: { key: string; label: string; color: string }[] = [
+    { key: 'new_lead', label: 'New Leads', color: '#3B82F6' }, // Blue
+    { key: 'contacted', label: 'Contacted', color: '#8B5CF6' }, // Purple
+    { key: 'interested', label: 'Interested', color: '#EC4899' }, // Pink
+    { key: 'offer_sent', label: 'Offer Sent', color: '#F59E0B' }, // Orange
+    { key: 'negotiating', label: 'Negotiating', color: '#EF4444' }, // Red
+    { key: 'under_contract', label: 'Under Contract', color: '#10B981' }, // Light green
+    { key: 'closed', label: 'Closed', color: '#059669' }, // Dark green
+  ];
+
+  const dealStageCounts = useMemo(() => {
+    const properties = Array.isArray(allPropertiesData) 
+      ? allPropertiesData 
+      : (allPropertiesData?.properties || []);
+    
+    const counts: Record<string, number> = {
+      new_lead: 0,
+      contacted: 0,
+      interested: 0,
+      offer_sent: 0,
+      negotiating: 0,
+      under_contract: 0,
+      closed: 0,
+      dead: 0,
+    };
+
+    for (const prop of properties) {
+      if (prop.dealStage && prop.dealStage in counts) {
+        counts[prop.dealStage]++;
+      }
+    }
+
+    return counts;
+  }, [allPropertiesData]);
+
+  const maxDealStageCount = useMemo(() => {
+    const activeStages = DEAL_STAGES.map(s => dealStageCounts[s.key]);
+    return Math.max(1, ...activeStages);
+  }, [dealStageCounts]);
+
+  // Workflow stage funnel data (pre-foreclosure)
   const { data: preForeclosureRecords } = usePreForeclosures();
 
   const FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
@@ -492,9 +541,53 @@ export function TasksView() {
           <p className="text-xs text-muted-foreground mt-1">tasks</p>
         </button>
       </div>
-<<<<<<< HEAD
 
-      {/* Deal Workflow Pipeline Funnel */}
+      {/* Sales Funnel - Deal Workflow */}
+      {allPropertiesData && (
+        <div className="mb-6 rounded-xl border border-border bg-card p-6">
+          <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
+          <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
+          <div className="mt-5 space-y-3">
+            {DEAL_STAGES.map((stage) => {
+              const count = dealStageCounts[stage.key] || 0;
+              const width = Math.max(count > 0 ? 5 : 0, (count / maxDealStageCount) * 100);
+              const showNumberInside = width > 20;
+              return (
+                <div key={stage.key}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium">{stage.label}</span>
+                    <span className="text-muted-foreground">{count} {count === 1 ? 'lead' : 'leads'}</span>
+                  </div>
+                  <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden">
+                    {count > 0 && (
+                      <div
+                        className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
+                        style={{ backgroundColor: stage.color, width: `${width}%` }}
+                      >
+                        {showNumberInside ? count : ''}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Dead Leads - separated */}
+          {dealStageCounts.dead > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
+                  Dead Leads
+                </span>
+                <span className="text-muted-foreground">{dealStageCounts.dead} leads</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Deal Workflow Pipeline Funnel (Pre-Foreclosure) */}
       {preForeclosureRecords && preForeclosureRecords.length > 0 && (
         <div className="mb-6 rounded-xl border border-border bg-card p-6">
           <h3 className="text-xl font-bold tracking-tight">Deal Pipeline</h3>
@@ -537,8 +630,6 @@ export function TasksView() {
           )}
         </div>
       )}
-=======
->>>>>>> e087294455d6c30c47ea668cb5da3780e95757d1
 
       {/* Header Controls */}
       <div className="mb-8 flex items-center justify-between flex-wrap gap-6 pb-4 border-b border-border">
