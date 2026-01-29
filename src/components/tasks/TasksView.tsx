@@ -110,11 +110,12 @@ export function TasksView() {
   });
 
   // Fetch all properties for deal funnel
-  const { data: allPropertiesData } = useQuery<{ properties: Property[] } | Property[]>({
+  const { data: allPropertiesData, isLoading: isLoadingProperties, error: propertiesError } = useQuery<{ properties: Property[] } | Property[]>({
     queryKey: ['properties', 'all'],
     queryFn: () => getProperties(1, 50000), // Fetch all properties
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchInterval: 60000, // Refresh every minute
+    retry: 1,
   });
 
   const formatCurrency = (amount: number) => {
@@ -543,49 +544,61 @@ export function TasksView() {
       </div>
 
       {/* Sales Funnel - Deal Workflow */}
-      {allPropertiesData && (
-        <div className="mb-6 rounded-xl border border-border bg-card p-6">
-          <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
-          <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
-          <div className="mt-5 space-y-3">
-            {DEAL_STAGES.map((stage) => {
-              const count = dealStageCounts[stage.key] || 0;
-              const width = Math.max(count > 0 ? 5 : 0, (count / maxDealStageCount) * 100);
-              const showNumberInside = width > 20;
-              return (
-                <div key={stage.key}>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">{stage.label}</span>
-                    <span className="text-muted-foreground">{count} {count === 1 ? 'lead' : 'leads'}</span>
-                  </div>
-                  <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden">
-                    {count > 0 && (
-                      <div
-                        className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
-                        style={{ backgroundColor: stage.color, width: `${width}%` }}
-                      >
-                        {showNumberInside ? count : ''}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+      <div className="mb-6 rounded-xl border border-border bg-card p-6">
+        <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
+        <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
+        {isLoadingProperties ? (
+          <div className="mt-5 flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+            <span className="ml-2 text-sm text-muted-foreground">Loading pipeline data...</span>
           </div>
-          {/* Dead Leads - separated */}
-          {dealStageCounts.dead > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
-                  Dead Leads
-                </span>
-                <span className="text-muted-foreground">{dealStageCounts.dead} leads</span>
-              </div>
+        ) : propertiesError ? (
+          <div className="mt-5 flex items-center justify-center py-8">
+            <AlertCircle className="h-6 w-6 text-destructive" />
+            <span className="ml-2 text-sm text-destructive">Failed to load pipeline data</span>
+          </div>
+        ) : (
+          <>
+            <div className="mt-5 space-y-3">
+              {DEAL_STAGES.map((stage) => {
+                const count = dealStageCounts[stage.key] || 0;
+                const width = maxDealStageCount > 0 ? Math.max(count > 0 ? 5 : 0, (count / maxDealStageCount) * 100) : 0;
+                const showNumberInside = width > 20;
+                return (
+                  <div key={stage.key}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium">{stage.label}</span>
+                      <span className="text-muted-foreground">{count} {count === 1 ? 'lead' : 'leads'}</span>
+                    </div>
+                    <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden">
+                      {count > 0 && (
+                        <div
+                          className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
+                          style={{ backgroundColor: stage.color, width: `${width}%` }}
+                        >
+                          {showNumberInside ? count : ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </div>
-      )}
+            {/* Dead Leads - separated */}
+            {dealStageCounts.dead > 0 && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
+                    Dead Leads
+                  </span>
+                  <span className="text-muted-foreground">{dealStageCounts.dead} leads</span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Deal Workflow Pipeline Funnel (Pre-Foreclosure) */}
       {preForeclosureRecords && preForeclosureRecords.length > 0 && (
