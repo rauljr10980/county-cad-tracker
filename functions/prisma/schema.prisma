@@ -390,6 +390,8 @@ model PreForeclosure {
   visitedBy        String? // Who visited (driver name)
   firstSeenMonth   String
   lastSeenMonth    String
+  workflowStage    String      @default("not_started")
+  workflowLog      Json        @default("[]")
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
@@ -402,6 +404,7 @@ model PreForeclosure {
   @@index([internalStatus])
   @@index([visited])
   @@index([visitedAt])
+  @@index([workflowStage])
   @@map("foreclosed")
 }
 

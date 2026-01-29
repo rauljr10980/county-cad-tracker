@@ -70,6 +70,8 @@ type RouteType = {
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { AdvancedFiltersPanel, PreForeclosureAdvancedFilters } from './AdvancedFilters';
+import { WorkflowStageBadge } from './WorkflowStageBadge';
+import { WorkflowTracker } from './WorkflowTracker';
 import { UploadStatsCard } from './UploadStatsCard';
 import { OverallStatsCard } from './OverallStatsCard';
 import { UploadHistoryCard } from './UploadHistoryCard';
@@ -305,6 +307,7 @@ export function PreForeclosureView() {
     recordedDateTo: '',
     saleDateFrom: '',
     saleDateTo: '',
+    workflowStage: 'all',
   });
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosureRecord | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -489,6 +492,11 @@ export function PreForeclosureView() {
       filtered = filtered.filter(r => r.sale_date && new Date(r.sale_date) <= to);
     }
 
+    // Workflow stage filter
+    if (advancedFilters.workflowStage !== 'all') {
+      filtered = filtered.filter(r => (r.workflow_stage || 'not_started') === advancedFilters.workflowStage);
+    }
+
     return filtered;
   }, [records, searchQuery, advancedFilters, uploadStats]);
 
@@ -509,6 +517,7 @@ export function PreForeclosureView() {
     if (advancedFilters.missingGeocode) count++;
     if (advancedFilters.recordedDateFrom || advancedFilters.recordedDateTo) count++;
     if (advancedFilters.saleDateFrom || advancedFilters.saleDateTo) count++;
+    if (advancedFilters.workflowStage !== 'all') count++;
     return count;
   }, [advancedFilters]);
 
@@ -536,6 +545,7 @@ export function PreForeclosureView() {
       recordedDateTo: '',
       saleDateFrom: '',
       saleDateTo: '',
+      workflowStage: 'all',
     });
     setSearchQuery('');
   };
@@ -2343,11 +2353,12 @@ export function PreForeclosureView() {
                 </Button>
               </div> */}
 
-              {/* Type Badge */}
+              {/* Type Badge + Workflow Badge */}
               <div className="flex items-center gap-2 mb-2 pr-8 pl-8">
                       <Badge variant="outline" className={getTypeColor(record.type)}>
                         {record.type}
                       </Badge>
+                      <WorkflowStageBadge stage={record.workflow_stage || 'not_started'} />
               </div>
 
               {/* Document Number and Date - Hidden */}
@@ -2909,6 +2920,12 @@ export function PreForeclosureView() {
                   </div>
                 </div>
               </div>
+
+              {/* Workflow Tracker */}
+              <WorkflowTracker
+                record={viewRecord}
+                onRecordUpdate={(updates) => setViewRecord(prev => prev ? { ...prev, ...updates } : prev)}
+              />
 
               {/* Phone Numbers Section - Always Visible */}
               <div className="bg-secondary/30 rounded-lg p-4" style={{ display: 'block' }}>

@@ -173,6 +173,108 @@ export interface ProcessingStatus {
 export type PreForeclosureType = 'Mortgage' | 'Tax';
 export type PreForeclosureStatus = 'New' | 'Contact Attempted' | 'Monitoring' | 'Dead';
 
+// Workflow Decision Tree
+export type WorkflowStage =
+  | 'not_started'
+  | 'initial_visit'
+  | 'people_search'
+  | 'call_owner'
+  | 'land_records'
+  | 'visit_heirs'
+  | 'call_heirs'
+  | 'negotiating'
+  | 'dead_end';
+
+export interface WorkflowLogEntry {
+  id: string;
+  fromStage: WorkflowStage;
+  toStage: WorkflowStage;
+  outcome: string;
+  note?: string;
+  timestamp: string;
+}
+
+export const WORKFLOW_STAGES: Record<WorkflowStage, {
+  label: string;
+  shortLabel: string;
+  question?: string;
+  outcomes?: Array<{ label: string; nextStage: WorkflowStage }>;
+  terminal?: boolean;
+  terminalType?: 'success' | 'failure';
+}> = {
+  not_started: {
+    label: 'Not Started',
+    shortLabel: 'Not Started',
+    outcomes: [{ label: 'Begin Workflow', nextStage: 'initial_visit' }],
+  },
+  initial_visit: {
+    label: 'Initial Visit',
+    shortLabel: 'Visit',
+    question: 'Did the owner answer the door?',
+    outcomes: [
+      { label: 'Yes - Owner answered', nextStage: 'negotiating' },
+      { label: 'No - Not home', nextStage: 'people_search' },
+    ],
+  },
+  people_search: {
+    label: 'People Search',
+    shortLabel: 'Search',
+    question: 'Found a valid phone number?',
+    outcomes: [
+      { label: 'Yes - Found number', nextStage: 'call_owner' },
+      { label: 'No - Nothing found', nextStage: 'land_records' },
+    ],
+  },
+  call_owner: {
+    label: 'Call Owner',
+    shortLabel: 'Call',
+    question: 'Reached the owner?',
+    outcomes: [
+      { label: 'Yes - Reached owner', nextStage: 'negotiating' },
+      { label: "Can't reach", nextStage: 'land_records' },
+    ],
+  },
+  land_records: {
+    label: 'Land Records / Due Diligence',
+    shortLabel: 'Records',
+    question: 'Found heirs?',
+    outcomes: [
+      { label: 'Yes - Found heirs', nextStage: 'visit_heirs' },
+      { label: 'No heirs found', nextStage: 'dead_end' },
+    ],
+  },
+  visit_heirs: {
+    label: 'Visit Heirs',
+    shortLabel: 'Visit Heirs',
+    question: 'Did heirs answer the door?',
+    outcomes: [
+      { label: 'Yes - Heirs answered', nextStage: 'negotiating' },
+      { label: 'No - Not home', nextStage: 'call_heirs' },
+    ],
+  },
+  call_heirs: {
+    label: 'Call Heirs',
+    shortLabel: 'Call Heirs',
+    question: 'Reached heirs?',
+    outcomes: [
+      { label: 'Yes - Reached heirs', nextStage: 'negotiating' },
+      { label: "Can't reach", nextStage: 'dead_end' },
+    ],
+  },
+  negotiating: {
+    label: 'Negotiating',
+    shortLabel: 'Negotiating',
+    terminal: true,
+    terminalType: 'success',
+  },
+  dead_end: {
+    label: 'Dead End',
+    shortLabel: 'Dead End',
+    terminal: true,
+    terminalType: 'failure',
+  },
+};
+
 export interface PreForeclosureRecord {
   // Immutable (from file)
   document_number: string; // Primary key
@@ -213,6 +315,10 @@ export interface PreForeclosureRecord {
   visited?: boolean;
   visited_at?: string; // ISO date string
   visited_by?: 'Luciano' | 'Raul';
+
+  // Workflow decision tree
+  workflow_stage?: WorkflowStage;
+  workflow_log?: WorkflowLogEntry[];
 }
 
 // Type alias for backward compatibility

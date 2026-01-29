@@ -782,6 +782,8 @@ export async function updatePreForeclosure(updates: {
   assignedTo?: 'Luciano' | 'Raul';
   latitude?: number | null;
   longitude?: number | null;
+  workflow_stage?: string;
+  workflow_log?: any[];
 }) {
   const response = await fetch(`${API_BASE_URL}/api/preforeclosure/${updates.document_number}`, {
     method: 'PUT',

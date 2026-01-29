@@ -67,6 +67,8 @@ router.get('/', optionalAuth, async (req, res) => {
       visited: record.visited,
       visited_at: record.visitedAt ? record.visitedAt.toISOString() : null,
       visited_by: record.visitedBy,
+      workflow_stage: record.workflowStage || 'not_started',
+      workflow_log: record.workflowLog || [],
       first_seen_month: record.firstSeenMonth,
       last_seen_month: record.lastSeenMonth,
       created_at: record.createdAt.toISOString(),
@@ -720,6 +722,20 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
     if (updates.latitude !== undefined) dbUpdates.latitude = updates.latitude;
     if (updates.longitude !== undefined) dbUpdates.longitude = updates.longitude;
 
+    // Workflow fields
+    if (updates.workflow_stage !== undefined) {
+      const validStages = [
+        'not_started', 'initial_visit', 'people_search', 'call_owner',
+        'land_records', 'visit_heirs', 'call_heirs', 'negotiating', 'dead_end'
+      ];
+      if (validStages.includes(updates.workflow_stage)) {
+        dbUpdates.workflowStage = updates.workflow_stage;
+      }
+    }
+    if (updates.workflow_log !== undefined) {
+      dbUpdates.workflowLog = updates.workflow_log;
+    }
+
     // Action/Task fields
     if (updates.actionType !== undefined) {
       if (updates.actionType) {
@@ -806,6 +822,8 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
       dueTime: record.dueTime ? record.dueTime.toISOString() : undefined,
       assignedTo: record.assignedTo,
       inactive: record.inactive,
+      workflow_stage: record.workflowStage || 'not_started',
+      workflow_log: record.workflowLog || [],
       first_seen_month: record.firstSeenMonth,
       last_seen_month: record.lastSeenMonth,
       created_at: record.createdAt.toISOString(),
