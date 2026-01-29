@@ -191,8 +191,22 @@ export interface WorkflowLogEntry {
   toStage: WorkflowStage;
   outcome: string;
   note?: string;
+  actingAs?: 'Luciano' | 'Raul';
   timestamp: string;
 }
+
+// Auto-task mapping: when entering a stage, auto-create this task
+export const STAGE_TASK_MAP: Record<WorkflowStage, { actionType: 'call' | 'driveby'; priority: 'high' | 'med' } | null> = {
+  not_started: null,
+  initial_visit: { actionType: 'driveby', priority: 'high' },
+  people_search: { actionType: 'call', priority: 'med' },
+  call_owner: { actionType: 'call', priority: 'high' },
+  land_records: { actionType: 'driveby', priority: 'med' },
+  visit_heirs: { actionType: 'driveby', priority: 'high' },
+  call_heirs: { actionType: 'call', priority: 'high' },
+  negotiating: { actionType: 'call', priority: 'high' },
+  dead_end: null,
+};
 
 export const WORKFLOW_STAGES: Record<WorkflowStage, {
   label: string;

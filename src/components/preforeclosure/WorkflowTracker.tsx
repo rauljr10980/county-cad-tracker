@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { RotateCcw, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { RotateCcw, CheckCircle, XCircle, ChevronDown, ChevronUp, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { PreForeclosureRecord, WorkflowStage, WorkflowLogEntry } from '@/types/property';
-import { WORKFLOW_STAGES } from '@/types/property';
+import { WORKFLOW_STAGES, STAGE_TASK_MAP } from '@/types/property';
 import { useUpdatePreForeclosure } from '@/hooks/usePreForeclosure';
 
 const STAGE_ORDER: WorkflowStage[] = [
@@ -20,15 +20,28 @@ interface WorkflowTrackerProps {
   onRecordUpdate: (updated: Partial<PreForeclosureRecord>) => void;
 }
 
+function getStoredActingAs(): 'Luciano' | 'Raul' | null {
+  const v = localStorage.getItem('workflowActingAs');
+  return v === 'Luciano' || v === 'Raul' ? v : null;
+}
+
 export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps) {
   const queryClient = useQueryClient();
   const updateMutation = useUpdatePreForeclosure();
   const [stepNote, setStepNote] = useState('');
   const [logExpanded, setLogExpanded] = useState(false);
+  const [actingAs, setActingAs] = useState<'Luciano' | 'Raul' | null>(
+    () => record.assignedTo || getStoredActingAs()
+  );
 
   const currentStage: WorkflowStage = (record.workflow_stage as WorkflowStage) || 'not_started';
   const workflowLog: WorkflowLogEntry[] = (record.workflow_log as WorkflowLogEntry[]) || [];
   const stageInfo = WORKFLOW_STAGES[currentStage] || WORKFLOW_STAGES.not_started;
+
+  const handleActingAsChange = (person: 'Luciano' | 'Raul') => {
+    setActingAs(person);
+    localStorage.setItem('workflowActingAs', person);
+  };
 
   const visitedStages = new Set<WorkflowStage>();
   visitedStages.add('not_started');
@@ -44,19 +57,40 @@ export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps
       toStage: nextStage,
       outcome: outcomeLabel,
       note: stepNote.trim() || undefined,
+      actingAs: actingAs || undefined,
       timestamp: new Date().toISOString(),
     };
     const updatedLog = [...workflowLog, newEntry];
+
+    // Auto-task: look up task for the next stage
+    const taskRule = STAGE_TASK_MAP[nextStage];
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const taskFields = taskRule
+      ? {
+          actionType: taskRule.actionType as 'call' | 'text' | 'mail' | 'driveby',
+          priority: taskRule.priority as 'high' | 'med' | 'low',
+          dueTime: today.toISOString(),
+          assignedTo: actingAs as 'Luciano' | 'Raul' | null,
+        }
+      : {
+          actionType: null as null,
+          priority: null as null,
+          dueTime: null as null,
+          assignedTo: null as null,
+        };
 
     try {
       await updateMutation.mutateAsync({
         document_number: record.document_number,
         workflow_stage: nextStage,
         workflow_log: updatedLog,
+        ...taskFields,
       });
-      onRecordUpdate({ workflow_stage: nextStage, workflow_log: updatedLog });
+      onRecordUpdate({ workflow_stage: nextStage, workflow_log: updatedLog, ...taskFields });
       setStepNote('');
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast({ title: 'Workflow Updated', description: `Moved to: ${WORKFLOW_STAGES[nextStage].label}` });
     } catch {
       toast({ title: 'Error', description: 'Failed to update workflow', variant: 'destructive' });
@@ -69,6 +103,7 @@ export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps
       fromStage: currentStage,
       toStage: 'not_started',
       outcome: 'Workflow Reset',
+      actingAs: actingAs || undefined,
       timestamp: new Date().toISOString(),
     };
     const updatedLog = [...workflowLog, newEntry];
@@ -78,9 +113,21 @@ export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps
         document_number: record.document_number,
         workflow_stage: 'not_started',
         workflow_log: updatedLog,
+        actionType: null,
+        priority: null,
+        dueTime: null,
+        assignedTo: null,
       });
-      onRecordUpdate({ workflow_stage: 'not_started', workflow_log: updatedLog });
+      onRecordUpdate({
+        workflow_stage: 'not_started',
+        workflow_log: updatedLog,
+        actionType: undefined,
+        priority: undefined,
+        dueTime: undefined,
+        assignedTo: undefined,
+      });
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast({ title: 'Workflow Reset', description: 'Workflow has been restarted' });
     } catch {
       toast({ title: 'Error', description: 'Failed to reset workflow', variant: 'destructive' });
@@ -96,6 +143,29 @@ export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps
             <RotateCcw className="h-3 w-3 mr-1" /> Reset
           </Button>
         )}
+      </div>
+
+      {/* Acting As selector */}
+      <div className="flex items-center gap-2">
+        <User className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Acting as:</span>
+        <div className="flex gap-1">
+          {(['Luciano', 'Raul'] as const).map((person) => (
+            <Button
+              key={person}
+              size="sm"
+              variant={actingAs === person ? 'default' : 'outline'}
+              className={cn(
+                'h-6 text-xs px-2.5',
+                actingAs === person && person === 'Luciano' && 'bg-green-600 hover:bg-green-700',
+                actingAs === person && person === 'Raul' && 'bg-orange-600 hover:bg-orange-700',
+              )}
+              onClick={() => handleActingAsChange(person)}
+            >
+              {person}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* Stepper */}
@@ -169,6 +239,9 @@ export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps
             {stageInfo.question && (
               <p className="text-sm text-muted-foreground">{stageInfo.question}</p>
             )}
+            {!actingAs && (
+              <p className="text-xs text-amber-400">Select who you are above before proceeding.</p>
+            )}
             <div className="flex flex-wrap gap-2">
               {stageInfo.outcomes?.map((outcome) => (
                 <Button
@@ -176,7 +249,7 @@ export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps
                   size="sm"
                   variant={outcome.nextStage === 'negotiating' ? 'default' : 'outline'}
                   onClick={() => handleAdvance(outcome.nextStage, outcome.label)}
-                  disabled={updateMutation.isPending}
+                  disabled={updateMutation.isPending || !actingAs}
                 >
                   {outcome.label}
                 </Button>
@@ -216,6 +289,9 @@ export function WorkflowTracker({ record, onRecordUpdate }: WorkflowTrackerProps
                       ({WORKFLOW_STAGES[entry.fromStage]?.shortLabel || entry.fromStage} &rarr; {WORKFLOW_STAGES[entry.toStage]?.shortLabel || entry.toStage})
                     </span>
                   </div>
+                  {entry.actingAs && (
+                    <span className="text-muted-foreground ml-1">by {entry.actingAs}</span>
+                  )}
                   {entry.note && (
                     <p className="text-muted-foreground italic mt-0.5">"{entry.note}"</p>
                   )}

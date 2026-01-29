@@ -776,10 +776,10 @@ export async function updatePreForeclosure(updates: {
   ownerPhoneIndex?: number;
   last_action_date?: string;
   next_follow_up_date?: string;
-  actionType?: 'call' | 'text' | 'mail' | 'driveby';
-  priority?: 'high' | 'med' | 'low';
-  dueTime?: string;
-  assignedTo?: 'Luciano' | 'Raul';
+  actionType?: 'call' | 'text' | 'mail' | 'driveby' | null;
+  priority?: 'high' | 'med' | 'low' | null;
+  dueTime?: string | null;
+  assignedTo?: 'Luciano' | 'Raul' | null;
   latitude?: number | null;
   longitude?: number | null;
   workflow_stage?: string;
