@@ -534,47 +534,47 @@ export function TasksView() {
       </div>
 
       {/* Sales Funnel - Deal Workflow - ALWAYS VISIBLE */}
-      <div className="mb-6 rounded-xl border-2 border-primary/30 bg-card p-6 shadow-lg" style={{ minHeight: '200px' }}>
+      <div className="mb-6 rounded-xl border-4 border-blue-500 bg-card p-6 shadow-2xl" style={{ minHeight: '300px', backgroundColor: 'hsl(var(--card))' }}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-2xl font-bold tracking-tight text-foreground">Sales Funnel</h3>
+            <h3 className="text-3xl font-bold tracking-tight text-foreground">Sales Funnel</h3>
             <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
           </div>
         </div>
         {isLoadingProperties ? (
           <div className="mt-5 flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
-            <span className="ml-2 text-sm text-muted-foreground">Loading pipeline data...</span>
+            <Loader2 className="h-8 w-8 text-primary animate-spin" />
+            <span className="ml-3 text-base text-foreground">Loading pipeline data...</span>
           </div>
         ) : propertiesError ? (
-          <div className="mt-5 flex items-center justify-center py-8">
-            <AlertCircle className="h-6 w-6 text-destructive" />
-            <span className="ml-2 text-sm text-destructive">Failed to load pipeline data</span>
-            <span className="ml-2 text-xs text-muted-foreground">({String(propertiesError)})</span>
+          <div className="mt-5 flex flex-col items-center justify-center py-8">
+            <AlertCircle className="h-8 w-8 text-destructive mb-2" />
+            <span className="text-base text-destructive font-semibold">Failed to load pipeline data</span>
+            <span className="text-xs text-muted-foreground mt-1">Error: {String(propertiesError)}</span>
           </div>
         ) : (
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 space-y-4">
             {DEAL_STAGES.map((stage) => {
               const count = dealStageCounts[stage.key] || 0;
               const width = maxDealStageCount > 0 ? Math.max(count > 0 ? 5 : 0, (count / maxDealStageCount) * 100) : 0;
               const showNumberInside = width > 20;
               return (
-                <div key={stage.key} className="min-h-[3rem]">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium text-foreground">{stage.label}</span>
-                    <span className="text-muted-foreground font-medium">{count} {count === 1 ? 'lead' : 'leads'}</span>
+                <div key={stage.key} className="min-h-[4rem]">
+                  <div className="flex items-center justify-between text-base mb-2">
+                    <span className="font-semibold text-foreground text-lg">{stage.label}</span>
+                    <span className="text-muted-foreground font-bold text-base">{count} {count === 1 ? 'lead' : 'leads'}</span>
                   </div>
-                  <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden border border-border/50">
+                  <div className="relative w-full h-10 bg-secondary/70 rounded-lg overflow-hidden border-2 border-border">
                     {count > 0 ? (
                       <div
-                        className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
+                        className="h-full flex items-center justify-center text-white font-bold text-base rounded-lg transition-all duration-300"
                         style={{ backgroundColor: stage.color, width: `${width}%`, minWidth: count > 0 ? '5%' : '0%' }}
                       >
                         {showNumberInside ? count : ''}
                       </div>
                     ) : (
-                      <div className="h-full flex items-center justify-center">
-                        <span className="text-xs text-muted-foreground/50">0</span>
+                      <div className="h-full flex items-center justify-center bg-secondary/30">
+                        <span className="text-sm text-muted-foreground">0</span>
                       </div>
                     )}
                   </div>
@@ -583,13 +583,13 @@ export function TasksView() {
             })}
             {/* Dead Leads - separated */}
             {dealStageCounts.dead > 0 && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
+              <div className="mt-6 pt-6 border-t-2 border-border">
+                <div className="flex items-center justify-between text-base">
+                  <span className="text-muted-foreground flex items-center gap-2 font-semibold">
+                    <span className="w-3 h-3 rounded-full bg-gray-500 inline-block" />
                     Dead Leads
                   </span>
-                  <span className="text-muted-foreground">{dealStageCounts.dead} leads</span>
+                  <span className="text-muted-foreground font-bold">{dealStageCounts.dead} leads</span>
                 </div>
               </div>
             )}
