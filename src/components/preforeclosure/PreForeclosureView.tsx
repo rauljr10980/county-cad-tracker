@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw, GripVertical, Phone, Star } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw, GripVertical, Phone, Star, ChevronUp, ChevronDown } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -338,6 +338,8 @@ export function PreForeclosureView() {
   const [areaSelectorOpen, setAreaSelectorOpen] = useState(false);
   const [customDepot, setCustomDepot] = useState<{ lat: number; lng: number } | null>(null);
   const [customDepotRecordId, setCustomDepotRecordId] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [recordsInRoutes, setRecordsInRoutes] = useState<Set<string>>(new Set());
   const [depotRecordIds, setDepotRecordIds] = useState<Set<string>>(new Set()); // Track which properties are depots (starting points)
   const [activeRoutes, setActiveRoutes] = useState<RouteType[]>([]);
@@ -497,8 +499,47 @@ export function PreForeclosureView() {
       filtered = filtered.filter(r => (r.workflow_stage || 'not_started') === advancedFilters.workflowStage);
     }
 
+    // Sorting
+    if (sortColumn) {
+      filtered.sort((a, b) => {
+        let aVal: any = null;
+        let bVal: any = null;
+
+        switch (sortColumn) {
+          case 'type':
+            aVal = a.type;
+            bVal = b.type;
+            break;
+          case 'workflow':
+            aVal = a.workflow_stage || 'not_started';
+            bVal = b.workflow_stage || 'not_started';
+            break;
+          case 'address':
+            aVal = a.address;
+            bVal = b.address;
+            break;
+          case 'recorded':
+            aVal = a.recorded_date ? new Date(a.recorded_date).getTime() : 0;
+            bVal = b.recorded_date ? new Date(b.recorded_date).getTime() : 0;
+            break;
+          case 'sale':
+            aVal = a.sale_date ? new Date(a.sale_date).getTime() : 0;
+            bVal = b.sale_date ? new Date(b.sale_date).getTime() : 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aVal === null || aVal === undefined) return 1;
+        if (bVal === null || bVal === undefined) return -1;
+
+        const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        return sortDirection === 'asc' ? comparison : -comparison;
+      });
+    }
+
     return filtered;
-  }, [records, searchQuery, advancedFilters, uploadStats]);
+  }, [records, searchQuery, advancedFilters, uploadStats, sortColumn, sortDirection]);
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
@@ -2378,11 +2419,96 @@ export function PreForeclosureView() {
                       }}
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Workflow</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Property Address</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Recorded</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Sale Date</th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:bg-secondary/70 select-none"
+                    onClick={() => {
+                      if (sortColumn === 'type') {
+                        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortColumn('type');
+                        setSortDirection('asc');
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Type
+                      {sortColumn === 'type' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:bg-secondary/70 select-none"
+                    onClick={() => {
+                      if (sortColumn === 'workflow') {
+                        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortColumn('workflow');
+                        setSortDirection('asc');
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Workflow
+                      {sortColumn === 'workflow' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:bg-secondary/70 select-none"
+                    onClick={() => {
+                      if (sortColumn === 'address') {
+                        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortColumn('address');
+                        setSortDirection('asc');
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Property Address
+                      {sortColumn === 'address' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:bg-secondary/70 select-none"
+                    onClick={() => {
+                      if (sortColumn === 'recorded') {
+                        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortColumn('recorded');
+                        setSortDirection('asc');
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Recorded
+                      {sortColumn === 'recorded' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:bg-secondary/70 select-none"
+                    onClick={() => {
+                      if (sortColumn === 'sale') {
+                        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortColumn('sale');
+                        setSortDirection('asc');
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Sale Date
+                      {sortColumn === 'sale' && (
+                        sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      )}
+                    </div>
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground w-32">Actions</th>
                 </tr>
               </thead>
