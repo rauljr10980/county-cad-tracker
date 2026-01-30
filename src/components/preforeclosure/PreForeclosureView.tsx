@@ -2578,17 +2578,37 @@ export function PreForeclosureView() {
                   <Send className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                   <span className="truncate">Maps</span>
                         </Button>
-                {/* External Link Button - Hidden */}
-                {/* <Button
+                        <Button
                           variant="outline"
                   size="sm"
-                  className="flex-shrink-0"
-                          onClick={() => {
-                            window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+                  className="flex-1 min-w-0 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                          onClick={async () => {
+                            if (!confirm(`Delete record ${record.document_number}?\n\nAddress: ${record.address}\n\nThis action cannot be undone.`)) {
+                              return;
+                            }
+                            try {
+                              const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/preforeclosure/${encodeURIComponent(record.document_number)}`, {
+                                method: 'DELETE',
+                              });
+                              if (!response.ok) throw new Error('Failed to delete record');
+                              toast({
+                                title: 'Record deleted',
+                                description: `Successfully deleted ${record.document_number}`,
+                              });
+                              queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                              queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-stats-latest'] });
+                            } catch (error) {
+                              toast({
+                                title: 'Delete failed',
+                                description: error instanceof Error ? error.message : 'Failed to delete record',
+                                variant: 'destructive',
+                              });
+                            }
                           }}
                         >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                </Button> */}
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                  <span className="truncate">Delete</span>
+                        </Button>
                       </div>
             </div>
                 ))}

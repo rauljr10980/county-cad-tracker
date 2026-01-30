@@ -1027,6 +1027,41 @@ router.delete('/upload-history/:id', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
+// DELETE INDIVIDUAL PRE-FORECLOSURE RECORD
+// ============================================================================
+
+router.delete('/:documentNumber', optionalAuth, async (req, res) => {
+  try {
+    const { documentNumber } = req.params;
+
+    const record = await prisma.preForeclosure.findUnique({
+      where: { documentNumber }
+    });
+
+    if (!record) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+
+    await prisma.preForeclosure.delete({
+      where: { documentNumber }
+    });
+
+    console.log(`[PRE-FORECLOSURE] Deleted record: ${documentNumber} at ${record.address}`);
+
+    res.json({
+      success: true,
+      message: 'Pre-foreclosure record deleted successfully'
+    });
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Delete record error:', error);
+    res.status(500).json({
+      error: 'Failed to delete pre-foreclosure record',
+      details: error.message
+    });
+  }
+});
+
+// ============================================================================
 // DELETE ALL PRE-FORECLOSURE RECORDS
 // ============================================================================
 
