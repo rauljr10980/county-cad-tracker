@@ -102,6 +102,8 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   // Calculate workflow stage counts from pre-foreclosure records
   const workflowStageCounts = useMemo(() => {
     const records = preForeclosureRecords || [];
+    console.log('[Dashboard] Calculating workflow stage counts from', records.length, 'pre-foreclosure records');
+    
     const counts: Record<WorkflowStage, number> = {
       not_started: 0,
       initial_visit: 0,
@@ -114,13 +116,27 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       dead_end: 0,
     };
 
+    // Debug: log sample records to see structure
+    if (records.length > 0) {
+      console.log('[Dashboard] Sample record:', {
+        document_number: records[0].document_number,
+        workflow_stage: records[0].workflow_stage,
+        hasWorkflowStage: 'workflow_stage' in records[0],
+        keys: Object.keys(records[0])
+      });
+    }
+
     for (const r of records) {
-      const stage = (r.workflow_stage as WorkflowStage) || 'not_started';
+      // Try both snake_case and camelCase
+      const stage = (r.workflow_stage || (r as any).workflowStage || 'not_started') as WorkflowStage;
       if (stage in counts) {
         counts[stage]++;
+      } else {
+        console.warn('[Dashboard] Unknown workflow stage:', stage, 'in record:', r.document_number);
       }
     }
 
+    console.log('[Dashboard] Workflow stage counts:', counts);
     return counts;
   }, [preForeclosureRecords]);
 
