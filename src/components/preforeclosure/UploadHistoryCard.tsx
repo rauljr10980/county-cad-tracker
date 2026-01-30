@@ -1,11 +1,52 @@
+import { useState } from 'react';
 import { usePreForeclosureUploadHistory } from '@/hooks/usePreForeclosure';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, FileText, Calendar, TrendingUp } from 'lucide-react';
+import { Loader2, FileText, Calendar, TrendingUp, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export function UploadHistoryCard() {
   const { data: history = [], isLoading, error } = usePreForeclosureUploadHistory(5);
+  const queryClient = useQueryClient();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (uploadId: string, filename: string) => {
+    if (!confirm(`Delete upload "${filename}"? This will remove the upload history entry but not the imported records.`)) {
+      return;
+    }
+
+    setDeletingId(uploadId);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/preforeclosure/upload-history/${uploadId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete upload history');
+      }
+
+      toast({
+        title: 'Upload deleted',
+        description: `Successfully deleted "${filename}"`,
+      });
+
+      // Refresh the upload history list
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-history'] });
+    } catch (error) {
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete upload',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -77,6 +118,19 @@ export function UploadHistoryCard() {
                       {uploadDate ? format(uploadDate, 'MMM d, yyyy h:mm a') : 'Unknown date'}
                     </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(upload.id, upload.filename || 'Unknown file')}
+                    disabled={deletingId === upload.id}
+                  >
+                    {deletingId === upload.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
 
                 {/* Stats */}

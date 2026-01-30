@@ -964,6 +964,41 @@ router.get('/upload-stats/latest', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
+// DELETE UPLOAD HISTORY ENTRY
+// ============================================================================
+
+router.delete('/upload-history/:id', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const upload = await prisma.preForeclosureUploadHistory.findUnique({
+      where: { id }
+    });
+
+    if (!upload) {
+      return res.status(404).json({ error: 'Upload history not found' });
+    }
+
+    await prisma.preForeclosureUploadHistory.delete({
+      where: { id }
+    });
+
+    console.log(`[PRE-FORECLOSURE] Deleted upload history: ${upload.filename} (id: ${id})`);
+
+    res.json({
+      success: true,
+      message: 'Upload history deleted successfully'
+    });
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Delete upload history error:', error);
+    res.status(500).json({
+      error: 'Failed to delete upload history',
+      details: error.message
+    });
+  }
+});
+
+// ============================================================================
 // DELETE ALL PRE-FORECLOSURE RECORDS
 // ============================================================================
 
