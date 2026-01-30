@@ -127,8 +127,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
     }
 
     for (const r of records) {
-      // Try both snake_case and camelCase
-      const stage = (r.workflow_stage || (r as any).workflowStage || 'not_started') as WorkflowStage;
+      const stage = (r.workflow_stage as WorkflowStage) || 'not_started';
       if (stage in counts) {
         counts[stage]++;
       } else {
