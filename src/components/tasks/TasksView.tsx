@@ -112,10 +112,33 @@ export function TasksView() {
   // Fetch all properties for deal funnel
   const { data: allPropertiesData, isLoading: isLoadingProperties, error: propertiesError } = useQuery<{ properties: Property[] } | Property[]>({
     queryKey: ['properties', 'all'],
-    queryFn: () => getProperties(1, 50000), // Fetch all properties
+    queryFn: async () => {
+      console.log('[TasksView] Fetching properties for Sales Funnel...');
+      try {
+        const result = await getProperties(1, 50000);
+        console.log('[TasksView] Properties fetched:', {
+          isArray: Array.isArray(result),
+          hasProperties: !!(result as any)?.properties,
+          count: Array.isArray(result) ? result.length : (result as any)?.properties?.length || 0
+        });
+        return result;
+      } catch (error) {
+        console.error('[TasksView] Error fetching properties:', error);
+        throw error;
+      }
+    },
     refetchOnMount: true,
     refetchInterval: 60000, // Refresh every minute
     retry: 1,
+  });
+
+  // Debug logging
+  console.log('[TasksView] Sales Funnel State:', {
+    isLoadingProperties,
+    hasError: !!propertiesError,
+    error: propertiesError,
+    hasData: !!allPropertiesData,
+    dataType: allPropertiesData ? (Array.isArray(allPropertiesData) ? 'array' : 'object') : 'null'
   });
 
   const formatCurrency = (amount: number) => {
