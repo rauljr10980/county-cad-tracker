@@ -1,8 +1,11 @@
+import { useState, useMemo } from 'react';
 import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2, Users, DollarSign, Package, ShoppingCart, Target, TrendingUp as Pipeline } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyStatus } from '@/types/property';
 import { useDashboardStats } from '@/hooks/useFiles';
+import { usePreForeclosures } from '@/hooks/usePreForeclosure';
+import type { WorkflowStage } from '@/types/property';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
@@ -12,6 +15,7 @@ interface DashboardProps {
 
 export function Dashboard({ onFilterChange }: DashboardProps) {
   const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats();
+  const { data: preForeclosureRecords, isLoading: isLoadingPreForeclosures } = usePreForeclosures();
 
   const isLoading = statsLoading;
   const error = statsError;
@@ -82,6 +86,48 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   const conversionRate = typeof pipelineData.conversionRate === 'number' 
     ? pipelineData.conversionRate 
     : parseFloat(String(pipelineData.conversionRate || 0)) || 0;
+
+  // Workflow stage funnel data (using pre-foreclosure workflow stages)
+  const SALES_FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
+    { key: 'not_started', label: 'Not Started', color: '#6B7280' }, // Gray
+    { key: 'initial_visit', label: 'Visit', color: '#3B82F6' }, // Blue
+    { key: 'people_search', label: 'Search', color: '#8B5CF6' }, // Purple
+    { key: 'call_owner', label: 'Call', color: '#EC4899' }, // Pink
+    { key: 'land_records', label: 'Records', color: '#F59E0B' }, // Orange
+    { key: 'visit_heirs', label: 'Visit Heirs', color: '#F97316' }, // Orange-red
+    { key: 'call_heirs', label: 'Call Heirs', color: '#EF4444' }, // Red
+    { key: 'negotiating', label: 'Negotiating', color: '#10B981' }, // Green
+  ];
+
+  // Calculate workflow stage counts from pre-foreclosure records
+  const workflowStageCounts = useMemo(() => {
+    const records = preForeclosureRecords || [];
+    const counts: Record<WorkflowStage, number> = {
+      not_started: 0,
+      initial_visit: 0,
+      people_search: 0,
+      call_owner: 0,
+      land_records: 0,
+      visit_heirs: 0,
+      call_heirs: 0,
+      negotiating: 0,
+      dead_end: 0,
+    };
+
+    for (const r of records) {
+      const stage = (r.workflow_stage as WorkflowStage) || 'not_started';
+      if (stage in counts) {
+        counts[stage]++;
+      }
+    }
+
+    return counts;
+  }, [preForeclosureRecords]);
+
+  const maxWorkflowStageCount = useMemo(() => {
+    const activeStages = SALES_FUNNEL_STAGES.map(s => workflowStageCounts[s.key]);
+    return Math.max(1, ...activeStages);
+  }, [workflowStageCounts]);
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
@@ -376,46 +422,63 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {[
-                { stage: 'New Leads', count: pipelineData.byStage.new_lead, color: '#3B82F6', width: 100 },
-                { stage: 'Contacted', count: pipelineData.byStage.contacted, color: '#8B5CF6', width: 85 },
-                { stage: 'Interested', count: pipelineData.byStage.interested, color: '#EC4899', width: 70 },
-                { stage: 'Offer Sent', count: pipelineData.byStage.offer_sent, color: '#F59E0B', width: 55 },
-                { stage: 'Negotiating', count: pipelineData.byStage.negotiating, color: '#EF4444', width: 40 },
-                { stage: 'Under Contract', count: pipelineData.byStage.under_contract, color: '#10B981', width: 25 },
-                { stage: 'Closed', count: pipelineData.byStage.closed, color: '#059669', width: 15 },
-              ].map((item, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{item.stage}</span>
-                    <span className="text-muted-foreground">{item.count.toLocaleString()} leads</span>
-                  </div>
-                  <div className="relative w-full h-8 bg-gray-100 rounded-lg overflow-hidden">
-                    <div
-                      className="h-full flex items-center justify-center text-white font-semibold text-sm transition-all duration-300"
-                      style={{
-                        backgroundColor: item.color,
-                        width: `${item.width}%`,
-                      }}
-                    >
-                      {item.width > 20 && `${item.count.toLocaleString()}`}
+            {isLoadingPreForeclosures ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading pipeline data...</span>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {SALES_FUNNEL_STAGES.map((stage) => {
+                    const count = workflowStageCounts[stage.key] || 0;
+                    const width = maxWorkflowStageCount > 0 
+                      ? Math.max(count > 0 ? 5 : 0, (count / maxWorkflowStageCount) * 100) 
+                      : 0;
+                    const showNumberInside = width > 20;
+                    return (
+                      <div key={stage.key} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium">{stage.label}</span>
+                          <span className="text-muted-foreground">{count.toLocaleString()} {count === 1 ? 'deal' : 'deals'}</span>
+                        </div>
+                        <div className="relative w-full h-8 bg-gray-100 rounded-lg overflow-hidden">
+                          {count > 0 ? (
+                            <div
+                              className="h-full flex items-center justify-center text-white font-semibold text-sm transition-all duration-300"
+                              style={{
+                                backgroundColor: stage.color,
+                                width: `${width}%`,
+                                minWidth: count > 0 ? '5%' : '0%',
+                              }}
+                            >
+                              {showNumberInside ? count.toLocaleString() : ''}
+                            </div>
+                          ) : (
+                            <div className="h-full flex items-center justify-center bg-gray-50">
+                              <span className="text-xs text-muted-foreground">0</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {workflowStageCounts.dead_end > 0 && (
+                  <div className="mt-6 pt-4 border-t border-border">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-sm bg-gray-400" />
+                        <span className="text-muted-foreground">Dead End</span>
+                      </div>
+                      <span className="font-medium text-muted-foreground">
+                        {workflowStageCounts.dead_end.toLocaleString()} deals
+                      </span>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 pt-4 border-t border-border">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-sm bg-gray-400" />
-                  <span className="text-muted-foreground">Dead Leads</span>
-                </div>
-                <span className="font-medium text-muted-foreground">
-                  {pipelineData.byStage.dead.toLocaleString()} leads
-                </span>
-              </div>
-            </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
 
