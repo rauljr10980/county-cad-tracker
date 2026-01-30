@@ -981,7 +981,17 @@ router.delete('/upload-history/:id', optionalAuth, async (req, res) => {
 
     // Delete the pre-foreclosure records that were created in this upload
     let deletedRecordsCount = 0;
+
+    console.log(`[PRE-FORECLOSURE] Upload history found:`, {
+      filename: upload.filename,
+      hasNewDocNumbers: !!upload.newDocumentNumbers,
+      newDocNumbersCount: upload.newDocumentNumbers && Array.isArray(upload.newDocumentNumbers) ? upload.newDocumentNumbers.length : 0,
+      newRecords: upload.newRecords
+    });
+
     if (upload.newDocumentNumbers && Array.isArray(upload.newDocumentNumbers) && upload.newDocumentNumbers.length > 0) {
+      console.log(`[PRE-FORECLOSURE] Deleting ${upload.newDocumentNumbers.length} records:`, upload.newDocumentNumbers.slice(0, 5));
+
       const deleteResult = await prisma.preForeclosure.deleteMany({
         where: {
           documentNumber: {
@@ -991,6 +1001,8 @@ router.delete('/upload-history/:id', optionalAuth, async (req, res) => {
       });
       deletedRecordsCount = deleteResult.count;
       console.log(`[PRE-FORECLOSURE] Deleted ${deletedRecordsCount} records from upload: ${upload.filename}`);
+    } else {
+      console.log(`[PRE-FORECLOSURE] WARNING: No newDocumentNumbers found for upload ${upload.filename}. Cannot delete associated records.`);
     }
 
     // Delete the upload history entry

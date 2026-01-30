@@ -32,15 +32,28 @@ export function UploadHistoryCard() {
 
       const result = await response.json();
 
-      toast({
-        title: 'Upload deleted',
-        description: `Successfully deleted "${filename}" and ${result.deletedRecords || 0} records`,
-      });
+      const deletedCount = result.deletedRecords || 0;
 
-      // Refresh both the upload history list and pre-foreclosure records
-      queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-history'] });
-      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
-      queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-stats-latest'] });
+      if (deletedCount === 0) {
+        toast({
+          title: 'Upload history deleted',
+          description: `Deleted "${filename}" but no records were removed. This upload may not have tracked which records it created. Please manually verify the data.`,
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'Upload deleted',
+          description: `Successfully deleted "${filename}" and ${deletedCount} records`,
+        });
+      }
+
+      // Force a hard refresh of all data
+      await queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-history'] });
+      await queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+      await queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-stats-latest'] });
+
+      // Force refetch to ensure UI updates
+      await queryClient.refetchQueries({ queryKey: ['preforeclosure'] });
     } catch (error) {
       toast({
         title: 'Delete failed',
