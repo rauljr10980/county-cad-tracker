@@ -20,6 +20,38 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   const isLoading = statsLoading;
   const error = statsError;
 
+  // Workflow stage funnel data (using pre-foreclosure workflow stages)
+  const SALES_FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
+    { key: 'not_started', label: 'Not Started', color: '#6B7280' },
+    { key: 'initial_visit', label: 'Visit', color: '#3B82F6' },
+    { key: 'people_search', label: 'Search', color: '#8B5CF6' },
+    { key: 'call_owner', label: 'Call', color: '#EC4899' },
+    { key: 'land_records', label: 'Records', color: '#F59E0B' },
+    { key: 'visit_heirs', label: 'Visit Heirs', color: '#F97316' },
+    { key: 'call_heirs', label: 'Call Heirs', color: '#EF4444' },
+    { key: 'negotiating', label: 'Negotiating', color: '#10B981' },
+  ];
+
+  // Calculate workflow stage counts from pre-foreclosure records
+  // NOTE: All hooks must be called before any early returns
+  const workflowStageCounts = useMemo(() => {
+    const records = (preForeclosureRecords ?? []) as PreForeclosureRecord[];
+    const counts: Record<WorkflowStage, number> = {
+      not_started: 0, initial_visit: 0, people_search: 0, call_owner: 0,
+      land_records: 0, visit_heirs: 0, call_heirs: 0, negotiating: 0, dead_end: 0,
+    };
+    for (const r of records) {
+      const stage = (r.workflow_stage as WorkflowStage) || 'not_started';
+      if (stage in counts) counts[stage]++;
+    }
+    return counts;
+  }, [preForeclosureRecords]);
+
+  const maxWorkflowStageCount = useMemo(() => {
+    const activeStages = SALES_FUNNEL_STAGES.map(s => workflowStageCounts[s.key]);
+    return Math.max(1, ...activeStages);
+  }, [workflowStageCounts]);
+
   if (error) {
     return (
       <div className="p-6">
@@ -86,47 +118,6 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   const conversionRate = typeof pipelineData.conversionRate === 'number' 
     ? pipelineData.conversionRate 
     : parseFloat(String(pipelineData.conversionRate || 0)) || 0;
-
-  // Workflow stage funnel data (using pre-foreclosure workflow stages)
-  const SALES_FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
-    { key: 'not_started', label: 'Not Started', color: '#6B7280' }, // Gray
-    { key: 'initial_visit', label: 'Visit', color: '#3B82F6' }, // Blue
-    { key: 'people_search', label: 'Search', color: '#8B5CF6' }, // Purple
-    { key: 'call_owner', label: 'Call', color: '#EC4899' }, // Pink
-    { key: 'land_records', label: 'Records', color: '#F59E0B' }, // Orange
-    { key: 'visit_heirs', label: 'Visit Heirs', color: '#F97316' }, // Orange-red
-    { key: 'call_heirs', label: 'Call Heirs', color: '#EF4444' }, // Red
-    { key: 'negotiating', label: 'Negotiating', color: '#10B981' }, // Green
-  ];
-
-  // Calculate workflow stage counts from pre-foreclosure records
-  const workflowStageCounts = useMemo(() => {
-    const records = (preForeclosureRecords ?? []) as PreForeclosureRecord[];
-    const counts: Record<WorkflowStage, number> = {
-      not_started: 0,
-      initial_visit: 0,
-      people_search: 0,
-      call_owner: 0,
-      land_records: 0,
-      visit_heirs: 0,
-      call_heirs: 0,
-      negotiating: 0,
-      dead_end: 0,
-    };
-
-    for (const r of records) {
-      const stage = (r.workflow_stage as WorkflowStage) || 'not_started';
-      if (stage in counts) {
-        counts[stage]++;
-      }
-    }
-    return counts;
-  }, [preForeclosureRecords]);
-
-  const maxWorkflowStageCount = useMemo(() => {
-    const activeStages = SALES_FUNNEL_STAGES.map(s => workflowStageCounts[s.key]);
-    return Math.max(1, ...activeStages);
-  }, [workflowStageCounts]);
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
