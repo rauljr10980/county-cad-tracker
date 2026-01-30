@@ -161,6 +161,9 @@ router.get('/',
           isPrimaryProperty,
           // Convert dealStage from uppercase enum to lowercase for frontend
           dealStage: prop.dealStage ? prop.dealStage.toLowerCase() : null,
+          // Workflow decision tree fields
+          workflow_stage: prop.workflowStage || 'not_started',
+          workflow_log: prop.workflowLog || [],
         };
       });
 
@@ -1309,6 +1312,55 @@ router.put('/:id/deal-stage', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Property not found' });
     }
     res.status(500).json({ error: 'Failed to update deal stage' });
+  }
+});
+
+// ============================================================================
+// UPDATE PROPERTY WORKFLOW STAGE
+// ============================================================================
+
+router.put('/:id/workflow-stage', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { workflow_stage, workflow_log } = req.body;
+
+    const validStages = [
+      'not_started', 'initial_visit', 'people_search', 'call_owner',
+      'land_records', 'visit_heirs', 'call_heirs', 'negotiating', 'dead_end'
+    ];
+
+    if (!workflow_stage || !validStages.includes(workflow_stage)) {
+      return res.status(400).json({ error: 'Invalid workflow_stage' });
+    }
+
+    const updateData = { workflowStage: workflow_stage };
+    if (workflow_log !== undefined) {
+      updateData.workflowLog = workflow_log;
+    }
+
+    const property = await prisma.property.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        accountNumber: true,
+        workflowStage: true,
+        workflowLog: true,
+      }
+    });
+
+    res.json({
+      id: property.id,
+      accountNumber: property.accountNumber,
+      workflow_stage: property.workflowStage || 'not_started',
+      workflow_log: property.workflowLog || [],
+    });
+  } catch (error) {
+    console.error('[PROPERTIES] Workflow stage update error:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+    res.status(500).json({ error: 'Failed to update workflow stage' });
   }
 });
 

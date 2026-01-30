@@ -21,7 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { AdvancedFiltersPanel, AdvancedFilters } from './AdvancedFilters';
-import { Property, PropertyStatus } from '@/types/property';
+import { Property, PropertyStatus, WorkflowStage } from '@/types/property';
 import { useProperties } from '@/hooks/useFiles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -511,43 +511,34 @@ export function PropertiesView() {
     return 0;
   }, [data]);
   
-  // Deal stage funnel data
-  type DealStage = 'new_lead' | 'contacted' | 'interested' | 'offer_sent' | 'negotiating' | 'under_contract' | 'closed' | 'dead';
-
-  const DEAL_STAGES: { key: DealStage; label: string; color: string }[] = [
-    { key: 'new_lead', label: 'New Lead', color: '#3B82F6' },
-    { key: 'contacted', label: 'Contacted', color: '#8B5CF6' },
-    { key: 'interested', label: 'Interested', color: '#EC4899' },
-    { key: 'offer_sent', label: 'Offer Sent', color: '#F59E0B' },
-    { key: 'negotiating', label: 'Negotiating', color: '#F97316' },
-    { key: 'under_contract', label: 'Under Contract', color: '#10B981' },
-    { key: 'closed', label: 'Closed', color: '#22C55E' },
+  // Workflow stage funnel data (same system as pre-foreclosure)
+  const WORKFLOW_FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
+    { key: 'not_started', label: 'Not Started', color: '#6B7280' },
+    { key: 'initial_visit', label: 'Initial Visit', color: '#3B82F6' },
+    { key: 'people_search', label: 'People Search', color: '#8B5CF6' },
+    { key: 'call_owner', label: 'Call Owner', color: '#EC4899' },
+    { key: 'land_records', label: 'Land Records', color: '#F59E0B' },
+    { key: 'visit_heirs', label: 'Visit Heirs', color: '#F97316' },
+    { key: 'call_heirs', label: 'Call Heirs', color: '#EF4444' },
+    { key: 'negotiating', label: 'Negotiating', color: '#10B981' },
   ];
 
-  const dealStageCounts = useMemo(() => {
-    const counts: Record<DealStage | 'none', number> = {
-      new_lead: 0, contacted: 0, interested: 0, offer_sent: 0,
-      negotiating: 0, under_contract: 0, closed: 0, dead: 0, none: 0,
+  const workflowStageCounts = useMemo(() => {
+    const counts: Record<WorkflowStage, number> = {
+      not_started: 0, initial_visit: 0, people_search: 0, call_owner: 0,
+      land_records: 0, visit_heirs: 0, call_heirs: 0, negotiating: 0, dead_end: 0,
     };
     for (const p of rawProperties) {
-      const stage = p.dealStage as DealStage | undefined;
-      if (stage && stage in counts) {
-        counts[stage]++;
-      } else {
-        counts.none++;
-      }
+      const stage = (p.workflow_stage as WorkflowStage) || 'not_started';
+      if (stage in counts) counts[stage]++;
     }
     return counts;
   }, [rawProperties]);
 
-  const maxDealStageCount = useMemo(() => {
-    const activeCounts = DEAL_STAGES.map(s => dealStageCounts[s.key]);
+  const maxWorkflowStageCount = useMemo(() => {
+    const activeCounts = WORKFLOW_FUNNEL_STAGES.map(s => workflowStageCounts[s.key]);
     return Math.max(1, ...activeCounts);
-  }, [dealStageCounts]);
-
-  const hasDealStageData = useMemo(() => {
-    return DEAL_STAGES.some(s => dealStageCounts[s.key] > 0) || dealStageCounts.dead > 0;
-  }, [dealStageCounts]);
+  }, [workflowStageCounts]);
 
   // Helper function to normalize status to single letter (J, A, P, U)
   // This matches exactly how StatusBadge handles statuses - it checks statusConfig keys
@@ -2232,48 +2223,46 @@ export function PropertiesView() {
           </p> */}
         </div>
 
-        {/* Sales Funnel - Deal Stages */}
-        {hasDealStageData && (
-          <div className="mb-4 rounded-xl border border-border bg-card p-6">
-            <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
-            <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
-            <div className="mt-5 space-y-3">
-              {DEAL_STAGES.map((stage) => {
-                const count = dealStageCounts[stage.key];
-                const width = Math.max(count > 0 ? 5 : 0, (count / maxDealStageCount) * 100);
-                return (
-                  <div key={stage.key}>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="font-medium">{stage.label}</span>
-                      <span className="text-muted-foreground">{count} {count === 1 ? 'deal' : 'deals'}</span>
-                    </div>
-                    <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden">
-                      {count > 0 && (
-                        <div
-                          className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
-                          style={{ backgroundColor: stage.color, width: `${width}%` }}
-                        >
-                          {width > 15 ? count : ''}
-                        </div>
-                      )}
-                    </div>
+        {/* Sales Funnel - Workflow Stages */}
+        <div className="mb-4 rounded-xl border border-border bg-card p-6">
+          <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
+          <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
+          <div className="mt-5 space-y-3">
+            {WORKFLOW_FUNNEL_STAGES.map((stage) => {
+              const count = workflowStageCounts[stage.key];
+              const width = Math.max(count > 0 ? 5 : 0, (count / maxWorkflowStageCount) * 100);
+              return (
+                <div key={stage.key}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium">{stage.label}</span>
+                    <span className="text-muted-foreground">{count} {count === 1 ? 'deal' : 'deals'}</span>
                   </div>
-                );
-              })}
-            </div>
-            {dealStageCounts.dead > 0 && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
-                    Dead
-                  </span>
-                  <span className="text-muted-foreground">{dealStageCounts.dead} deals</span>
+                  <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden">
+                    {count > 0 && (
+                      <div
+                        className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
+                        style={{ backgroundColor: stage.color, width: `${width}%` }}
+                      >
+                        {width > 15 ? count : ''}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })}
           </div>
-        )}
+          {workflowStageCounts.dead_end > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
+                  Dead End
+                </span>
+                <span className="text-muted-foreground">{workflowStageCounts.dead_end} deals</span>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Route Actions - Mobile Optimized */}
         {selectedPropertyIds.size > 0 && (

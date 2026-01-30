@@ -99,6 +99,10 @@ model Property {
   offerAmount        Float?
   expectedCloseDate  DateTime?
 
+  // Workflow Decision Tree (same system as pre-foreclosure)
+  workflowStage String @default("not_started")
+  workflowLog   Json   @default("[]")
+
   // Metadata
   isNew             Boolean @default(false)
   isRemoved         Boolean @default(false)
@@ -127,6 +131,7 @@ model Property {
   @@index([createdAt])
   @@index([updatedAt])
   @@index([status, dealStage]) // Composite index for filtering
+  @@index([workflowStage])
   @@map("properties")
 }
 

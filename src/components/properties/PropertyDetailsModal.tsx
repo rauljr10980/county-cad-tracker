@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, Target, Eye, Send, MapPin as MapPinIcon } from 'lucide-react';
+import { ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -12,11 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyDealStage, updatePropertyVisited, getPreForeclosures } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyVisited, getPreForeclosures } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { PreForeclosureRecord } from '@/types/property';
+import { PropertyWorkflowTracker } from './PropertyWorkflowTracker';
 
 interface PropertyDetailsModalProps {
   property: Property | null;
@@ -40,12 +41,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [assignedTo, setAssignedTo] = useState<'Luciano' | 'Raul' | ''>('');
   const [savingAction, setSavingAction] = useState(false);
 
-  // Deal Stage state
-  const [dealStage, setDealStage] = useState<'new_lead' | 'contacted' | 'interested' | 'offer_sent' | 'negotiating' | 'under_contract' | 'closed' | 'dead' | ''>('');
-  const [estimatedDealValue, setEstimatedDealValue] = useState('');
-  const [offerAmount, setOfferAmount] = useState('');
-  const [expectedCloseDate, setExpectedCloseDate] = useState<Date | undefined>(undefined);
-  const [savingDealStage, setSavingDealStage] = useState(false);
 
   // Visited status state
   const [visited, setVisited] = useState(false);
@@ -80,12 +75,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setDueDateTime(property.dueTime ? new Date(property.dueTime) : undefined);
       setAssignedTo(property.assignedTo || '');
 
-      // Initialize deal stage
-      setDealStage(property.dealStage || '');
-      setEstimatedDealValue(property.estimatedDealValue?.toString() || '');
-      setOfferAmount(property.offerAmount?.toString() || '');
-      setExpectedCloseDate(property.expectedCloseDate ? new Date(property.expectedCloseDate) : undefined);
-      
       // Initialize visited status
       setVisited(property.visited || false);
       setVisitedBy(property.visitedBy || '');
@@ -332,45 +321,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
     }
   };
 
-  const handleSaveDealStage = async () => {
-    if (!dealStage) {
-      toast({
-        title: "Missing Information",
-        description: "Please select a deal stage",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSavingDealStage(true);
-    try {
-      const closeDateISO = expectedCloseDate ? expectedCloseDate.toISOString() : undefined;
-      await updatePropertyDealStage(
-        property.id,
-        dealStage,
-        estimatedDealValue ? parseFloat(estimatedDealValue) : undefined,
-        offerAmount ? parseFloat(offerAmount) : undefined,
-        closeDateISO
-      );
-      toast({
-        title: "Deal Stage Updated",
-        description: `Deal stage updated to ${dealStage.replace(/_/g, ' ')} for ${property.accountNumber}`,
-      });
-      // Update property object
-      property.dealStage = dealStage;
-      property.estimatedDealValue = estimatedDealValue ? parseFloat(estimatedDealValue) : undefined;
-      property.offerAmount = offerAmount ? parseFloat(offerAmount) : undefined;
-      property.expectedCloseDate = closeDateISO;
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update deal stage",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingDealStage(false);
-    }
-  };
 
   const paymentChartData = property.paymentHistory?.map(p => ({
     date: new Date(p.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
@@ -855,87 +805,13 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             </div>
           </div>
 
-          {/* Deal Stage Section */}
-          <div className="bg-secondary/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Target className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Deal Stage</span>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">Current Stage</label>
-                <Select value={dealStage} onValueChange={(value) => setDealStage(value as any)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select deal stage" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new_lead">New Lead</SelectItem>
-                    <SelectItem value="contacted">Contacted</SelectItem>
-                    <SelectItem value="interested">Interested</SelectItem>
-                    <SelectItem value="offer_sent">Offer Sent</SelectItem>
-                    <SelectItem value="negotiating">Negotiating</SelectItem>
-                    <SelectItem value="under_contract">Under Contract</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                    <SelectItem value="dead">Dead</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Estimated Deal Value</label>
-                  <Input
-                    type="number"
-                    placeholder="0.00"
-                    value={estimatedDealValue}
-                    onChange={(e) => setEstimatedDealValue(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Offer Amount</label>
-                  <Input
-                    type="number"
-                    placeholder="0.00"
-                    value={offerAmount}
-                    onChange={(e) => setOfferAmount(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">Expected Close Date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !expectedCloseDate && "text-muted-foreground"
-                      )}
-                    >
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {expectedCloseDate ? format(expectedCloseDate, 'PPP') : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={expectedCloseDate}
-                      onSelect={setExpectedCloseDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  onClick={handleSaveDealStage}
-                  disabled={savingDealStage || !dealStage}
-                >
-                  {savingDealStage ? 'Updating...' : 'Update Deal Stage'}
-                </Button>
-              </div>
-            </div>
-          </div>
+          {/* Deal Workflow Section */}
+          <PropertyWorkflowTracker
+            property={property}
+            onPropertyUpdate={(updated) => {
+              Object.assign(property, updated);
+            }}
+          />
 
           {/* Phone Numbers Section */}
           <div className="bg-secondary/30 rounded-lg p-3">

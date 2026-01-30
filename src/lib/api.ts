@@ -545,6 +545,25 @@ export async function updatePropertyDealStage(
   return response.json();
 }
 
+export async function updatePropertyWorkflowStage(
+  propertyId: string,
+  workflow_stage: string,
+  workflow_log?: any[]
+) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/workflow-stage`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ workflow_stage, workflow_log }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update workflow stage');
+  }
+  return response.json();
+}
+
 export async function updatePropertyVisited(
   propertyId: string,
   visited: boolean,

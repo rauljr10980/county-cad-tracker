@@ -62,6 +62,9 @@ export interface Property {
   visited?: boolean;
   visitedAt?: string;
   visitedBy?: string;
+  // Workflow decision tree (same system as pre-foreclosure)
+  workflow_stage?: WorkflowStage;
+  workflow_log?: WorkflowLogEntry[];
 }
 
 export interface PaymentRecord {
