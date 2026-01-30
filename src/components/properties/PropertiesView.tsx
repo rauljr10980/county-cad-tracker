@@ -511,6 +511,44 @@ export function PropertiesView() {
     return 0;
   }, [data]);
   
+  // Deal stage funnel data
+  type DealStage = 'new_lead' | 'contacted' | 'interested' | 'offer_sent' | 'negotiating' | 'under_contract' | 'closed' | 'dead';
+
+  const DEAL_STAGES: { key: DealStage; label: string; color: string }[] = [
+    { key: 'new_lead', label: 'New Lead', color: '#3B82F6' },
+    { key: 'contacted', label: 'Contacted', color: '#8B5CF6' },
+    { key: 'interested', label: 'Interested', color: '#EC4899' },
+    { key: 'offer_sent', label: 'Offer Sent', color: '#F59E0B' },
+    { key: 'negotiating', label: 'Negotiating', color: '#F97316' },
+    { key: 'under_contract', label: 'Under Contract', color: '#10B981' },
+    { key: 'closed', label: 'Closed', color: '#22C55E' },
+  ];
+
+  const dealStageCounts = useMemo(() => {
+    const counts: Record<DealStage | 'none', number> = {
+      new_lead: 0, contacted: 0, interested: 0, offer_sent: 0,
+      negotiating: 0, under_contract: 0, closed: 0, dead: 0, none: 0,
+    };
+    for (const p of rawProperties) {
+      const stage = p.dealStage as DealStage | undefined;
+      if (stage && stage in counts) {
+        counts[stage]++;
+      } else {
+        counts.none++;
+      }
+    }
+    return counts;
+  }, [rawProperties]);
+
+  const maxDealStageCount = useMemo(() => {
+    const activeCounts = DEAL_STAGES.map(s => dealStageCounts[s.key]);
+    return Math.max(1, ...activeCounts);
+  }, [dealStageCounts]);
+
+  const hasDealStageData = useMemo(() => {
+    return DEAL_STAGES.some(s => dealStageCounts[s.key] > 0) || dealStageCounts.dead > 0;
+  }, [dealStageCounts]);
+
   // Helper function to normalize status to single letter (J, A, P, U)
   // This matches exactly how StatusBadge handles statuses - it checks statusConfig keys
   // StatusBadge does: status?.toString().toUpperCase() and looks up in statusConfig
@@ -2193,6 +2231,49 @@ export function PropertiesView() {
             )}
           </p> */}
         </div>
+
+        {/* Sales Funnel - Deal Stages */}
+        {hasDealStageData && (
+          <div className="mb-4 rounded-xl border border-border bg-card p-6">
+            <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
+            <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
+            <div className="mt-5 space-y-3">
+              {DEAL_STAGES.map((stage) => {
+                const count = dealStageCounts[stage.key];
+                const width = Math.max(count > 0 ? 5 : 0, (count / maxDealStageCount) * 100);
+                return (
+                  <div key={stage.key}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium">{stage.label}</span>
+                      <span className="text-muted-foreground">{count} {count === 1 ? 'deal' : 'deals'}</span>
+                    </div>
+                    <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden">
+                      {count > 0 && (
+                        <div
+                          className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
+                          style={{ backgroundColor: stage.color, width: `${width}%` }}
+                        >
+                          {width > 15 ? count : ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {dealStageCounts.dead > 0 && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
+                    Dead
+                  </span>
+                  <span className="text-muted-foreground">{dealStageCounts.dead} deals</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Route Actions - Mobile Optimized */}
         {selectedPropertyIds.size > 0 && (
