@@ -100,6 +100,51 @@ router.delete('/:fileId', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
+// GET /api/files/:fileId/status - Get file processing status
+// ============================================================================
+
+router.get('/:fileId/status', optionalAuth, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+
+    // Try to find by id first (database primary key), then by fileId (unique identifier)
+    let fileUpload = await prisma.fileUpload.findUnique({
+      where: { id: fileId }
+    });
+
+    if (!fileUpload) {
+      // If not found by id, try by fileId
+      fileUpload = await prisma.fileUpload.findUnique({
+        where: { fileId }
+      });
+    }
+
+    if (!fileUpload) {
+      return res.status(404).json({ error: 'File upload not found' });
+    }
+
+    // Map database status to frontend status
+    let status = fileUpload.status.toLowerCase();
+    if (status === 'failed') status = 'error';
+
+    res.json({
+      id: fileUpload.id,
+      fileId: fileUpload.fileId,
+      filename: fileUpload.filename,
+      status,
+      processedRecords: fileUpload.processedRecords || 0,
+      totalRecords: fileUpload.totalRecords || 0,
+      uploadedAt: fileUpload.uploadedAt.toISOString(),
+      processedAt: fileUpload.completedAt?.toISOString(),
+      errorMessage: fileUpload.errorMessage,
+    });
+  } catch (error) {
+    console.error('[FILES] Status error:', error);
+    res.status(500).json({ error: 'Failed to get file status' });
+  }
+});
+
+// ============================================================================
 // POST /api/files/:fileId/reprocess - Reprocess a file
 // ============================================================================
 
