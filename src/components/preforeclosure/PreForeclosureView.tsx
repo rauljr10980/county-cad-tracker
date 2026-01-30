@@ -2803,50 +2803,14 @@ export function PreForeclosureView() {
                     <Label className="text-muted-foreground text-xs">Document Number</Label>
                     <p className="font-mono text-sm">{viewRecord.document_number}</p>
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <Label className="text-muted-foreground text-xs">Type</Label>
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className={getTypeColor(viewRecord.type)}
                     >
                       {viewRecord.type}
                     </Badge>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs mb-1">Internal Status</Label>
-                    <Select
-                      value={viewRecord.internal_status || 'New'}
-                      onValueChange={async (value) => {
-                        console.log('Select onValueChange called with:', value, 'for document:', viewRecord.document_number);
-                        if (handleStatusChange) {
-                          try {
-                            await handleStatusChange(viewRecord, value as PreForeclosureStatus);
-                            // Update local state
-                            setViewRecord({
-                              ...viewRecord,
-                              internal_status: value as PreForeclosureStatus,
-                            });
-                            console.log('handleStatusChange completed successfully');
-                          } catch (error) {
-                            console.error('Error in onValueChange:', error);
-                          }
-                        } else {
-                          console.error('handleStatusChange is not available');
-                        }
-                      }}
-                    >
-                      <SelectTrigger 
-                        className="h-8 text-xs w-full cursor-pointer hover:bg-secondary/50 border-border"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="z-[100]">
-                        <SelectItem value="New">New</SelectItem>
-                        <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-                        <SelectItem value="Monitoring">Monitoring</SelectItem>
-                        <SelectItem value="Dead">Dead</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="col-span-2">
                     <Label className="text-muted-foreground text-xs flex items-center gap-1">
