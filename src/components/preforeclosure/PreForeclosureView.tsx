@@ -1753,6 +1753,48 @@ export function PreForeclosureView() {
               {selectedRecordIds.size} selected
               </div>
             <Button
+              onClick={async () => {
+                if (!confirm(`Delete ${selectedRecordIds.size} selected record${selectedRecordIds.size > 1 ? 's' : ''}?\n\nThis action cannot be undone.`)) {
+                  return;
+                }
+
+                const recordsToDelete = Array.from(selectedRecordIds);
+                let successCount = 0;
+                let failCount = 0;
+
+                for (const docNumber of recordsToDelete) {
+                  try {
+                    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/preforeclosure/${encodeURIComponent(docNumber)}`, {
+                      method: 'DELETE',
+                    });
+                    if (response.ok) {
+                      successCount++;
+                    } else {
+                      failCount++;
+                    }
+                  } catch (error) {
+                    failCount++;
+                  }
+                }
+
+                toast({
+                  title: successCount > 0 ? 'Records deleted' : 'Delete failed',
+                  description: `Successfully deleted ${successCount} record${successCount !== 1 ? 's' : ''}${failCount > 0 ? `. Failed: ${failCount}` : ''}`,
+                  variant: failCount > 0 && successCount === 0 ? 'destructive' : 'default',
+                });
+
+                setSelectedRecordIds(new Set());
+                queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-stats-latest'] });
+              }}
+              variant="destructive"
+              size="sm"
+              title="Delete selected records"
+            >
+                <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected
+            </Button>
+            <Button
               onClick={() => setAreaSelectorOpen(true)}
               variant="outline"
               size="sm"
