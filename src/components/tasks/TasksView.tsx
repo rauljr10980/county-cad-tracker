@@ -325,6 +325,8 @@ export function TasksView() {
       ? allPropertiesData 
       : (allPropertiesData?.properties || []);
     
+    console.log('[TasksView] Calculating deal stage counts from', properties.length, 'properties');
+    
     const counts: Record<string, number> = {
       new_lead: 0,
       contacted: 0,
@@ -342,10 +344,13 @@ export function TasksView() {
         const normalizedStage = prop.dealStage.toLowerCase();
         if (normalizedStage in counts) {
           counts[normalizedStage]++;
+        } else {
+          console.warn('[TasksView] Unknown dealStage:', prop.dealStage, 'normalized to:', normalizedStage);
         }
       }
     }
 
+    console.log('[TasksView] Deal stage counts:', counts);
     return counts;
   }, [allPropertiesData]);
 
