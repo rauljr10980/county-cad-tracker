@@ -2339,7 +2339,172 @@ export function PreForeclosureView() {
         </div>
       )}
 
-      {/* Cards Grid */}
+      {/* Desktop Table View */}
+      <div className="hidden lg:block">
+        {filteredRecords.length === 0 && records.length === 0 ? (
+          <div className="bg-secondary/30 rounded-lg p-12 text-center">
+            <FileSpreadsheet className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Records Found</h3>
+            <p className="text-muted-foreground">
+              Upload a pre-foreclosure file using the drop zone above to get started.
+            </p>
+          </div>
+        ) : filteredRecords.length === 0 ? (
+          <div className="bg-secondary/30 rounded-lg p-12 text-center">
+            <FileSpreadsheet className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Records Match Filters</h3>
+            <p className="text-muted-foreground">
+              No records match your current filters. Try adjusting your search or filters.
+            </p>
+          </div>
+        ) : (
+          <div className="border border-border rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-secondary/50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground w-12">
+                    <Checkbox
+                      checked={selectedRecordIds.size > 0 && selectedRecordIds.size === filteredRecords.length}
+                      onCheckedChange={(checked) => {
+                        const newSelectedIds = new Set<string>();
+                        if (checked) {
+                          filteredRecords.forEach(record => {
+                            if (record?.document_number) {
+                              newSelectedIds.add(record.document_number);
+                            }
+                          });
+                        }
+                        setSelectedRecordIds(newSelectedIds);
+                      }}
+                    />
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Workflow</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Property Address</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Recorded</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Sale Date</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground w-32">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRecords.map((record) => (
+                  <tr
+                    key={record.document_number}
+                    className={cn(
+                      "border-t border-border hover:bg-secondary/30 transition-colors",
+                      selectedRecordIds.has(record.document_number) && "bg-primary/5"
+                    )}
+                  >
+                    <td className="px-4 py-3">
+                      <Checkbox
+                        checked={selectedRecordIds.has(record.document_number)}
+                        onCheckedChange={(checked) => handleRecordSelect(record.document_number, checked as boolean)}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline" className={getTypeColor(record.type)}>
+                        {record.type}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <WorkflowStageBadge stage={record.workflow_stage || 'not_started'} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <MapPin className={`h-3.5 w-3.5 flex-shrink-0 ${record.latitude != null && record.longitude != null ? 'text-green-500' : 'text-red-500'}`} />
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate">{record.address}</div>
+                          <div className="text-xs text-muted-foreground">{record.city}, TX {record.zip}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                      {record.recorded_date ? format(new Date(record.recorded_date), 'MM/dd/yyyy') : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                      {record.sale_date ? format(new Date(record.sale_date), 'MM/dd/yyyy') : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            setViewRecord({
+                              ...record,
+                              phoneNumbers: record.phoneNumbers || [],
+                            });
+                            setViewOpen(true);
+                          }}
+                          title="View details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            if (record.latitude != null && record.longitude != null) {
+                              const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(record.address)},+${encodeURIComponent(record.city)},+TX+${record.zip}/@${record.latitude},${record.longitude},16z`;
+                              window.open(mapsUrl, '_blank');
+                            } else {
+                              toast({
+                                title: 'Location not available',
+                                description: 'Latitude and longitude are not available for this property',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                          disabled={record.latitude == null || record.longitude == null}
+                          title="Open in Google Maps"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                          onClick={async () => {
+                            if (!confirm(`Delete record ${record.document_number}?\n\nAddress: ${record.address}\n\nThis action cannot be undone.`)) {
+                              return;
+                            }
+                            try {
+                              const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/preforeclosure/${encodeURIComponent(record.document_number)}`, {
+                                method: 'DELETE',
+                              });
+                              if (!response.ok) throw new Error('Failed to delete record');
+                              toast({
+                                title: 'Record deleted',
+                                description: `Successfully deleted ${record.document_number}`,
+                              });
+                              queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                              queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-stats-latest'] });
+                            } catch (error) {
+                              toast({
+                                title: 'Delete failed',
+                                description: error instanceof Error ? error.message : 'Failed to delete record',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                          title="Delete record"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="lg:hidden">
       {filteredRecords.length === 0 && records.length === 0 ? (
         <div className="bg-secondary/30 rounded-lg p-12 text-center">
           <FileSpreadsheet className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
@@ -2656,6 +2821,7 @@ export function PreForeclosureView() {
                 ))}
         </div>
       )}
+      </div>
 
       {/* Upload Modal */}
       {uploadModal}
