@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Phone, MessageSquare, Mail, Car, CheckSquare, Loader2, AlertCircle, Eye, Clock, Flag, Filter, CheckCircle2, X, Trash2 } from 'lucide-react';
 import { Property, PreForeclosure } from '@/types/property';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getTasks, updatePropertyAction, markTaskDone, deleteTask, updatePropertyPriority, updatePreForeclosure, getPreForeclosures, getProperties } from '@/lib/api';
+import { getTasks, updatePropertyAction, markTaskDone, deleteTask, updatePropertyPriority, updatePreForeclosure, getPreForeclosures } from '@/lib/api';
 import { format, isToday, isPast, parseISO, startOfDay, isBefore, isAfter } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -107,38 +107,6 @@ export function TasksView() {
     queryFn: getTasks,
     refetchOnMount: true,
     refetchInterval: 30000,
-  });
-
-  // Fetch all properties for deal funnel
-  const { data: allPropertiesData, isLoading: isLoadingProperties, error: propertiesError } = useQuery<{ properties: Property[] } | Property[]>({
-    queryKey: ['properties', 'all'],
-    queryFn: async () => {
-      console.log('[TasksView] Fetching properties for Sales Funnel...');
-      try {
-        const result = await getProperties(1, 50000);
-        console.log('[TasksView] Properties fetched:', {
-          isArray: Array.isArray(result),
-          hasProperties: !!(result as any)?.properties,
-          count: Array.isArray(result) ? result.length : (result as any)?.properties?.length || 0
-        });
-        return result;
-      } catch (error) {
-        console.error('[TasksView] Error fetching properties:', error);
-        throw error;
-      }
-    },
-    refetchOnMount: true,
-    refetchInterval: 60000, // Refresh every minute
-    retry: 1,
-  });
-
-  // Debug logging
-  console.log('[TasksView] Sales Funnel State:', {
-    isLoadingProperties,
-    hasError: !!propertiesError,
-    error: propertiesError,
-    hasData: !!allPropertiesData,
-    dataType: allPropertiesData ? (Array.isArray(allPropertiesData) ? 'array' : 'object') : 'null'
   });
 
   const formatCurrency = (amount: number) => {
@@ -309,54 +277,8 @@ export function TasksView() {
     };
   }, [data]);
 
-  // Workflow stage funnel data (using pre-foreclosure workflow stages)
-  const SALES_FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
-    { key: 'not_started', label: 'Not Started', color: '#6B7280' }, // Gray
-    { key: 'initial_visit', label: 'Visit', color: '#3B82F6' }, // Blue
-    { key: 'people_search', label: 'Search', color: '#8B5CF6' }, // Purple
-    { key: 'call_owner', label: 'Call', color: '#EC4899' }, // Pink
-    { key: 'land_records', label: 'Records', color: '#F59E0B' }, // Orange
-    { key: 'visit_heirs', label: 'Visit Heirs', color: '#F97316' }, // Orange-red
-    { key: 'call_heirs', label: 'Call Heirs', color: '#EF4444' }, // Red
-    { key: 'negotiating', label: 'Negotiating', color: '#10B981' }, // Green
-  ];
-
-  // Use pre-foreclosure workflow stages for Sales Funnel
-  const workflowStageCounts = useMemo(() => {
-    const records = preForeclosureRecords || [];
-    
-    console.log('[TasksView] Calculating workflow stage counts from', records.length, 'pre-foreclosure records');
-    
-    const counts: Record<WorkflowStage, number> = {
-      not_started: 0,
-      initial_visit: 0,
-      people_search: 0,
-      call_owner: 0,
-      land_records: 0,
-      visit_heirs: 0,
-      call_heirs: 0,
-      negotiating: 0,
-      dead_end: 0,
-    };
-
-    for (const r of records) {
-      const stage = (r.workflow_stage as WorkflowStage) || 'not_started';
-      if (stage in counts) {
-        counts[stage]++;
-      }
-    }
-
-    console.log('[TasksView] Workflow stage counts:', counts);
-    return counts;
-  }, [preForeclosureRecords]);
-
-  const maxWorkflowStageCount = useMemo(() => {
-    const activeStages = SALES_FUNNEL_STAGES.map(s => workflowStageCounts[s.key]);
-    return Math.max(1, ...activeStages);
-  }, [workflowStageCounts]);
-
-  // Workflow stage funnel data (pre-foreclosure) - used for Sales Funnel
-  const { data: preForeclosureRecords, isLoading: isLoadingPreForeclosures, error: preForeclosureError } = usePreForeclosures();
+  // Workflow stage funnel data from pre-foreclosure records
+  const { data: preForeclosureRecords } = usePreForeclosures();
 
   const FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
     { key: 'not_started', label: 'Not Started', color: '#6B7280' },
@@ -557,86 +479,11 @@ export function TasksView() {
         </button>
       </div>
 
-      {/* Sales Funnel - Deal Workflow - ALWAYS VISIBLE */}
-      <div className="mb-6 rounded-xl border-4 border-blue-500 bg-card p-6 shadow-2xl" style={{ minHeight: '300px', backgroundColor: 'hsl(var(--card))' }}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-3xl font-bold tracking-tight text-foreground">Sales Funnel</h3>
-            <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
-          </div>
-        </div>
-        {isLoadingPreForeclosures ? (
-          <div className="mt-5 flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 text-primary animate-spin" />
-            <span className="ml-3 text-base text-foreground">Loading pipeline data...</span>
-          </div>
-        ) : preForeclosureError ? (
-          <div className="mt-5 flex flex-col items-center justify-center py-8">
-            <AlertCircle className="h-8 w-8 text-destructive mb-2" />
-            <span className="text-base text-destructive font-semibold">Failed to load pipeline data</span>
-            <span className="text-xs text-muted-foreground mt-1">Error: {String(preForeclosureError)}</span>
-          </div>
-        ) : (
-          <div className="mt-5 space-y-4">
-            {SALES_FUNNEL_STAGES.map((stage) => {
-              const count = workflowStageCounts[stage.key] || 0;
-              const width = maxWorkflowStageCount > 0 ? Math.max(count > 0 ? 5 : 0, (count / maxWorkflowStageCount) * 100) : 0;
-              const showNumberInside = width > 20;
-              return (
-                <div key={stage.key} className="min-h-[4rem]">
-                  <div className="flex items-center justify-between text-base mb-2">
-                    <span className="font-semibold text-foreground text-lg">{stage.label}</span>
-                    <span className="text-muted-foreground font-bold text-base">{count} {count === 1 ? 'deal' : 'deals'}</span>
-                  </div>
-                  <div className="relative w-full h-10 bg-secondary/70 rounded-lg overflow-hidden border-2 border-border">
-                    {count > 0 ? (
-                      <div
-                        className="h-full flex items-center justify-center text-white font-bold text-base rounded-lg transition-all duration-300"
-                        style={{ backgroundColor: stage.color, width: `${width}%`, minWidth: count > 0 ? '5%' : '0%' }}
-                      >
-                        {showNumberInside ? count : ''}
-                      </div>
-                    ) : (
-                      <div className="h-full flex items-center justify-center bg-secondary/30">
-                        <span className="text-sm text-muted-foreground">0</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {/* Dead End - separated */}
-            {workflowStageCounts.dead_end > 0 && (
-              <div className="mt-6 pt-6 border-t-2 border-border">
-                <div className="flex items-center justify-between text-base">
-                  <span className="text-muted-foreground flex items-center gap-2 font-semibold">
-                    <span className="w-3 h-3 rounded-full bg-gray-500 inline-block" />
-                    Dead End
-                  </span>
-                  <span className="text-muted-foreground font-bold">{workflowStageCounts.dead_end} deals</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* No Tasks Message */}
-      {tasks.length === 0 && (
-        <div className="mb-6 bg-secondary/30 rounded-lg p-12 text-center">
-          <CheckSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Tasks</h3>
-          <p className="text-muted-foreground">
-            Set action types and due times on properties to see them here.
-          </p>
-        </div>
-      )}
-
-      {/* Deal Workflow Pipeline Funnel (Pre-Foreclosure) */}
+      {/* Sales Funnel - Workflow Stages */}
       {preForeclosureRecords && preForeclosureRecords.length > 0 && (
         <div className="mb-6 rounded-xl border border-border bg-card p-6">
-          <h3 className="text-xl font-bold tracking-tight">Deal Pipeline</h3>
-          <p className="text-sm text-muted-foreground mt-1">Current stage distribution</p>
+          <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
+          <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
           <div className="mt-5 space-y-3">
             {FUNNEL_STAGES.filter(s => s.key !== 'dead_end').map((stage) => {
               const count = stageCounts[stage.key];

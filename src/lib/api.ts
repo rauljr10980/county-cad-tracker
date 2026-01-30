@@ -208,53 +208,13 @@ export async function getComparison(fileId: string) {
  * Get dashboard statistics
  */
 export async function getDashboardStats() {
-  // Return mock data for dashboard
-  return {
-    totalProperties: 58432,
-    byStatus: {
-      judgment: 3829,
-      active: 3965,
-      pending: 578,
-    },
-    totalAmountDue: 847293847,
-    avgAmountDue: 14500,
-    newThisMonth: 1243,
-    removedThisMonth: 702,
-    deadLeads: 702,
-    amountDueDistribution: [
-      { range: '$0-$5K', count: Math.floor(58432 * 0.25), color: '#3B82F6' },
-      { range: '$5K-$10K', count: Math.floor(58432 * 0.30), color: '#8B5CF6' },
-      { range: '$10K-$25K', count: Math.floor(58432 * 0.25), color: '#EC4899' },
-      { range: '$25K-$50K', count: Math.floor(58432 * 0.12), color: '#F59E0B' },
-      { range: '$50K+', count: Math.floor(58432 * 0.08), color: '#EF4444' },
-    ],
-    pipeline: {
-      totalValue: 2450000,
-      activeDeals: 127,
-      byStage: {
-        new_lead: 1245,
-        contacted: 892,
-        interested: 234,
-        offer_sent: 89,
-        negotiating: 45,
-        under_contract: 23,
-        closed: 156,
-        dead: 3412,
-      },
-      conversionRate: 12.3,
-      avgDealValue: 19291,
-    },
-    tasks: {
-      total: 1,
-      luciano: 1,
-      raul: 0,
-      callsDueToday: 0,
-      followUpsThisWeek: 0,
-      textsScheduled: 0,
-      mailCampaignActive: 0,
-      drivebyPlanned: 0,
-    },
-  };
+  const response = await fetch(`${API_BASE_URL}/api/properties/stats/dashboard`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch dashboard stats');
+  }
+  return response.json();
 }
 
 /**

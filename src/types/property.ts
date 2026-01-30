@@ -133,25 +133,18 @@ export interface DashboardStats {
   newThisMonth: number;
   removedThisMonth: number;
   deadLeads: number;
-  // Pipeline metrics
+  amountDueDistribution?: { range: string; count: number; color: string }[];
   pipeline?: {
     totalValue: number;
     activeDeals: number;
-    byStage: {
-      new_lead: number;
-      contacted: number;
-      interested: number;
-      offer_sent: number;
-      negotiating: number;
-      under_contract: number;
-      closed: number;
-      dead: number;
-    };
+    byStage: Record<string, number>;
     conversionRate: number;
     avgDealValue: number;
   };
-  // Task/Action metrics
   tasks?: {
+    total: number;
+    luciano: number;
+    raul: number;
     callsDueToday: number;
     followUpsThisWeek: number;
     textsScheduled: number;
@@ -173,13 +166,8 @@ export interface ProcessingStatus {
 export type PreForeclosureType = 'Mortgage' | 'Tax';
 export type PreForeclosureStatus = 'New' | 'Contact Attempted' | 'Monitoring' | 'Dead';
 
-<<<<<<< HEAD
-// Workflow stage for pre-foreclosure pipeline tracking
-export type WorkflowStage = 
-=======
 // Workflow Decision Tree
 export type WorkflowStage =
->>>>>>> e087294455d6c30c47ea668cb5da3780e95757d1
   | 'not_started'
   | 'initial_visit'
   | 'people_search'
@@ -190,8 +178,6 @@ export type WorkflowStage =
   | 'negotiating'
   | 'dead_end';
 
-<<<<<<< HEAD
-=======
 export interface WorkflowLogEntry {
   id: string;
   fromStage: WorkflowStage;
@@ -296,7 +282,6 @@ export const WORKFLOW_STAGES: Record<WorkflowStage, {
   },
 };
 
->>>>>>> e087294455d6c30c47ea668cb5da3780e95757d1
 export interface PreForeclosureRecord {
   // Immutable (from file)
   document_number: string; // Primary key
@@ -337,16 +322,10 @@ export interface PreForeclosureRecord {
   visited?: boolean;
   visited_at?: string; // ISO date string
   visited_by?: 'Luciano' | 'Raul';
-<<<<<<< HEAD
-  
-  // Workflow stage for pipeline tracking
-  workflow_stage?: WorkflowStage;
-=======
 
   // Workflow decision tree
   workflow_stage?: WorkflowStage;
   workflow_log?: WorkflowLogEntry[];
->>>>>>> e087294455d6c30c47ea668cb5da3780e95757d1
 }
 
 // Type alias for backward compatibility
