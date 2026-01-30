@@ -16,7 +16,7 @@ export function UploadHistoryCard() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDelete = async (uploadId: string, filename: string) => {
-    if (!confirm(`Delete upload "${filename}"? This will remove the upload history entry but not the imported records.`)) {
+    if (!confirm(`Delete upload "${filename}"? This will permanently remove the upload history and all records that were imported in this upload.`)) {
       return;
     }
 
@@ -30,13 +30,17 @@ export function UploadHistoryCard() {
         throw new Error('Failed to delete upload history');
       }
 
+      const result = await response.json();
+
       toast({
         title: 'Upload deleted',
-        description: `Successfully deleted "${filename}"`,
+        description: `Successfully deleted "${filename}" and ${result.deletedRecords || 0} records`,
       });
 
-      // Refresh the upload history list
+      // Refresh both the upload history list and pre-foreclosure records
       queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-history'] });
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure-upload-stats-latest'] });
     } catch (error) {
       toast({
         title: 'Delete failed',

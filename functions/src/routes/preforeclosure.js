@@ -979,6 +979,21 @@ router.delete('/upload-history/:id', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Upload history not found' });
     }
 
+    // Delete the pre-foreclosure records that were created in this upload
+    let deletedRecordsCount = 0;
+    if (upload.newDocumentNumbers && Array.isArray(upload.newDocumentNumbers) && upload.newDocumentNumbers.length > 0) {
+      const deleteResult = await prisma.preForeclosure.deleteMany({
+        where: {
+          documentNumber: {
+            in: upload.newDocumentNumbers
+          }
+        }
+      });
+      deletedRecordsCount = deleteResult.count;
+      console.log(`[PRE-FORECLOSURE] Deleted ${deletedRecordsCount} records from upload: ${upload.filename}`);
+    }
+
+    // Delete the upload history entry
     await prisma.preForeclosureUploadHistory.delete({
       where: { id }
     });
@@ -987,7 +1002,8 @@ router.delete('/upload-history/:id', optionalAuth, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Upload history deleted successfully'
+      message: 'Upload history and associated records deleted successfully',
+      deletedRecords: deletedRecordsCount
     });
   } catch (error) {
     console.error('[PRE-FORECLOSURE] Delete upload history error:', error);
