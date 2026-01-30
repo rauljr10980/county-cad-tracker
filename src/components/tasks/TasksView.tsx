@@ -533,11 +533,11 @@ export function TasksView() {
         </button>
       </div>
 
-      {/* Sales Funnel - Deal Workflow */}
-      <div className="mb-6 rounded-xl border border-border bg-card p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-2">
+      {/* Sales Funnel - Deal Workflow - ALWAYS VISIBLE */}
+      <div className="mb-6 rounded-xl border-2 border-primary/30 bg-card p-6 shadow-lg" style={{ minHeight: '200px' }}>
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
+            <h3 className="text-2xl font-bold tracking-tight text-foreground">Sales Funnel</h3>
             <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
           </div>
         </div>
@@ -550,6 +550,7 @@ export function TasksView() {
           <div className="mt-5 flex items-center justify-center py-8">
             <AlertCircle className="h-6 w-6 text-destructive" />
             <span className="ml-2 text-sm text-destructive">Failed to load pipeline data</span>
+            <span className="ml-2 text-xs text-muted-foreground">({String(propertiesError)})</span>
           </div>
         ) : (
           <div className="mt-5 space-y-3">
