@@ -309,58 +309,54 @@ export function TasksView() {
     };
   }, [data]);
 
-  // Deal workflow funnel data
-  const DEAL_STAGES: { key: string; label: string; color: string }[] = [
-    { key: 'new_lead', label: 'New Leads', color: '#3B82F6' }, // Blue
-    { key: 'contacted', label: 'Contacted', color: '#8B5CF6' }, // Purple
-    { key: 'interested', label: 'Interested', color: '#EC4899' }, // Pink
-    { key: 'offer_sent', label: 'Offer Sent', color: '#F59E0B' }, // Orange
-    { key: 'negotiating', label: 'Negotiating', color: '#EF4444' }, // Red
-    { key: 'under_contract', label: 'Under Contract', color: '#10B981' }, // Light green
-    { key: 'closed', label: 'Closed', color: '#059669' }, // Dark green
+  // Workflow stage funnel data (using pre-foreclosure workflow stages)
+  const SALES_FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
+    { key: 'not_started', label: 'Not Started', color: '#6B7280' }, // Gray
+    { key: 'initial_visit', label: 'Visit', color: '#3B82F6' }, // Blue
+    { key: 'people_search', label: 'Search', color: '#8B5CF6' }, // Purple
+    { key: 'call_owner', label: 'Call', color: '#EC4899' }, // Pink
+    { key: 'land_records', label: 'Records', color: '#F59E0B' }, // Orange
+    { key: 'visit_heirs', label: 'Visit Heirs', color: '#F97316' }, // Orange-red
+    { key: 'call_heirs', label: 'Call Heirs', color: '#EF4444' }, // Red
+    { key: 'negotiating', label: 'Negotiating', color: '#10B981' }, // Green
   ];
 
-  const dealStageCounts = useMemo(() => {
-    const properties = Array.isArray(allPropertiesData) 
-      ? allPropertiesData 
-      : (allPropertiesData?.properties || []);
+  // Use pre-foreclosure workflow stages for Sales Funnel
+  const workflowStageCounts = useMemo(() => {
+    const records = preForeclosureRecords || [];
     
-    console.log('[TasksView] Calculating deal stage counts from', properties.length, 'properties');
+    console.log('[TasksView] Calculating workflow stage counts from', records.length, 'pre-foreclosure records');
     
-    const counts: Record<string, number> = {
-      new_lead: 0,
-      contacted: 0,
-      interested: 0,
-      offer_sent: 0,
+    const counts: Record<WorkflowStage, number> = {
+      not_started: 0,
+      initial_visit: 0,
+      people_search: 0,
+      call_owner: 0,
+      land_records: 0,
+      visit_heirs: 0,
+      call_heirs: 0,
       negotiating: 0,
-      under_contract: 0,
-      closed: 0,
-      dead: 0,
+      dead_end: 0,
     };
 
-    for (const prop of properties) {
-      if (prop.dealStage) {
-        // Normalize dealStage to lowercase (backend may return uppercase)
-        const normalizedStage = prop.dealStage.toLowerCase();
-        if (normalizedStage in counts) {
-          counts[normalizedStage]++;
-        } else {
-          console.warn('[TasksView] Unknown dealStage:', prop.dealStage, 'normalized to:', normalizedStage);
-        }
+    for (const r of records) {
+      const stage = (r.workflow_stage as WorkflowStage) || 'not_started';
+      if (stage in counts) {
+        counts[stage]++;
       }
     }
 
-    console.log('[TasksView] Deal stage counts:', counts);
+    console.log('[TasksView] Workflow stage counts:', counts);
     return counts;
-  }, [allPropertiesData]);
+  }, [preForeclosureRecords]);
 
-  const maxDealStageCount = useMemo(() => {
-    const activeStages = DEAL_STAGES.map(s => dealStageCounts[s.key]);
+  const maxWorkflowStageCount = useMemo(() => {
+    const activeStages = SALES_FUNNEL_STAGES.map(s => workflowStageCounts[s.key]);
     return Math.max(1, ...activeStages);
-  }, [dealStageCounts]);
+  }, [workflowStageCounts]);
 
-  // Workflow stage funnel data (pre-foreclosure)
-  const { data: preForeclosureRecords } = usePreForeclosures();
+  // Workflow stage funnel data (pre-foreclosure) - used for Sales Funnel
+  const { data: preForeclosureRecords, isLoading: isLoadingPreForeclosures, error: preForeclosureError } = usePreForeclosures();
 
   const FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
     { key: 'not_started', label: 'Not Started', color: '#6B7280' },
@@ -569,28 +565,28 @@ export function TasksView() {
             <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
           </div>
         </div>
-        {isLoadingProperties ? (
+        {isLoadingPreForeclosures ? (
           <div className="mt-5 flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 text-primary animate-spin" />
             <span className="ml-3 text-base text-foreground">Loading pipeline data...</span>
           </div>
-        ) : propertiesError ? (
+        ) : preForeclosureError ? (
           <div className="mt-5 flex flex-col items-center justify-center py-8">
             <AlertCircle className="h-8 w-8 text-destructive mb-2" />
             <span className="text-base text-destructive font-semibold">Failed to load pipeline data</span>
-            <span className="text-xs text-muted-foreground mt-1">Error: {String(propertiesError)}</span>
+            <span className="text-xs text-muted-foreground mt-1">Error: {String(preForeclosureError)}</span>
           </div>
         ) : (
           <div className="mt-5 space-y-4">
-            {DEAL_STAGES.map((stage) => {
-              const count = dealStageCounts[stage.key] || 0;
-              const width = maxDealStageCount > 0 ? Math.max(count > 0 ? 5 : 0, (count / maxDealStageCount) * 100) : 0;
+            {SALES_FUNNEL_STAGES.map((stage) => {
+              const count = workflowStageCounts[stage.key] || 0;
+              const width = maxWorkflowStageCount > 0 ? Math.max(count > 0 ? 5 : 0, (count / maxWorkflowStageCount) * 100) : 0;
               const showNumberInside = width > 20;
               return (
                 <div key={stage.key} className="min-h-[4rem]">
                   <div className="flex items-center justify-between text-base mb-2">
                     <span className="font-semibold text-foreground text-lg">{stage.label}</span>
-                    <span className="text-muted-foreground font-bold text-base">{count} {count === 1 ? 'lead' : 'leads'}</span>
+                    <span className="text-muted-foreground font-bold text-base">{count} {count === 1 ? 'deal' : 'deals'}</span>
                   </div>
                   <div className="relative w-full h-10 bg-secondary/70 rounded-lg overflow-hidden border-2 border-border">
                     {count > 0 ? (
@@ -609,15 +605,15 @@ export function TasksView() {
                 </div>
               );
             })}
-            {/* Dead Leads - separated */}
-            {dealStageCounts.dead > 0 && (
+            {/* Dead End - separated */}
+            {workflowStageCounts.dead_end > 0 && (
               <div className="mt-6 pt-6 border-t-2 border-border">
                 <div className="flex items-center justify-between text-base">
                   <span className="text-muted-foreground flex items-center gap-2 font-semibold">
                     <span className="w-3 h-3 rounded-full bg-gray-500 inline-block" />
-                    Dead Leads
+                    Dead End
                   </span>
-                  <span className="text-muted-foreground font-bold">{dealStageCounts.dead} leads</span>
+                  <span className="text-muted-foreground font-bold">{workflowStageCounts.dead_end} deals</span>
                 </div>
               </div>
             )}
