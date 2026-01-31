@@ -2587,10 +2587,18 @@ export function PreForeclosureView() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {record.recorded_date ? format(new Date(record.recorded_date), 'MM/dd/yyyy') : '—'}
+                      {record.recorded_date ? (() => {
+                        const dateStr = record.recorded_date.split('T')[0];
+                        const [year, month, day] = dateStr.split('-');
+                        return `${month}/${day}/${year}`;
+                      })() : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {record.sale_date ? format(new Date(record.sale_date), 'MM/dd/yyyy') : '—'}
+                      {record.sale_date ? (() => {
+                        const dateStr = record.sale_date.split('T')[0];
+                        const [year, month, day] = dateStr.split('-');
+                        return `${month}/${day}/${year}`;
+                      })() : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
@@ -2756,13 +2764,21 @@ export function PreForeclosureView() {
                   {record.recorded_date && (
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      <span>Recorded: {format(new Date(record.recorded_date), 'MM/dd/yyyy')}</span>
+                      <span>Recorded: {(() => {
+                        const dateStr = record.recorded_date.split('T')[0];
+                        const [year, month, day] = dateStr.split('-');
+                        return `${month}/${day}/${year}`;
+                      })()}</span>
                     </div>
                   )}
                   {record.sale_date && (
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      <span>Sale: {format(new Date(record.sale_date), 'MM/dd/yyyy')}</span>
+                      <span>Sale: {(() => {
+                        const dateStr = record.sale_date.split('T')[0];
+                        const [year, month, day] = dateStr.split('-');
+                        return `${month}/${day}/${year}`;
+                      })()}</span>
                     </div>
                   )}
                 </div>
@@ -3273,11 +3289,19 @@ export function PreForeclosureView() {
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">Recorded Date</Label>
-                    <p className="text-sm">{viewRecord.recorded_date ? format(new Date(viewRecord.recorded_date), 'MM/dd/yyyy') : 'N/A'}</p>
+                    <p className="text-sm">{viewRecord.recorded_date ? (() => {
+                      const dateStr = viewRecord.recorded_date.split('T')[0];
+                      const [year, month, day] = dateStr.split('-');
+                      return `${month}/${day}/${year}`;
+                    })() : 'N/A'}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">Sale Date</Label>
-                    <p className="text-sm">{viewRecord.sale_date ? format(new Date(viewRecord.sale_date), 'MM/dd/yyyy') : 'N/A'}</p>
+                    <p className="text-sm">{viewRecord.sale_date ? (() => {
+                      const dateStr = viewRecord.sale_date.split('T')[0];
+                      const [year, month, day] = dateStr.split('-');
+                      return `${month}/${day}/${year}`;
+                    })() : 'N/A'}</p>
                   </div>
                 </div>
               </div>
