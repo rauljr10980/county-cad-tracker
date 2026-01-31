@@ -874,6 +874,54 @@ export async function uploadAddressOnlyPreForeclosureFile(
 }
 
 /**
+ * Upload foreclosure file
+ */
+export async function uploadForeclosureFile(
+  file: File,
+  mode: 'standard' | 'address-only'
+): Promise<{
+  success: boolean;
+  fileId: string;
+  recordsProcessed: number;
+  totalRecords: number;
+  activeRecords: number;
+  inactiveRecords: number;
+}> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      try {
+        const base64 = (e.target?.result as string).split(',')[1];
+
+        const response = await fetch(`${API_BASE_URL}/api/foreclosure/upload`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            filename: file.name,
+            fileData: base64,
+            mode,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Upload failed');
+        }
+
+        const result = await response.json();
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * Get pre-foreclosure upload history
  */
 export async function getPreForeclosureUploadHistory(limit: number = 10): Promise<any[]> {
@@ -918,6 +966,8 @@ export async function getLatestPreForeclosureUploadStats(): Promise<{
 }
 
 /**
+=======
+>>>>>>> 3962ca0 (Add Foreclosure upload feature with full UI integration)
  * Delete all pre-foreclosure records
  */
 export async function deletePreForeclosures(): Promise<{ success: boolean; message: string }> {

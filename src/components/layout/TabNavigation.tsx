@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, List, Upload, FileText, CheckSquare, Home } from 'lucide-react';
+import { LayoutDashboard, List, Upload, FileText, CheckSquare, Home, Gavel } from 'lucide-react';
 
-export type TabType = 'dashboard' | 'properties' | 'tasks' | 'upload' | 'files' | 'preforeclosure';
+export type TabType = 'dashboard' | 'properties' | 'tasks' | 'upload' | 'files' | 'preforeclosure' | 'foreclosure';
 
 interface TabNavigationProps {
   activeTab: TabType;
@@ -12,7 +12,10 @@ const tabs = [
   { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard, shortLabel: 'Dash' },
   { id: 'properties' as TabType, label: 'Properties', icon: List, shortLabel: 'Props' },
   { id: 'tasks' as TabType, label: 'Tasks', icon: CheckSquare, shortLabel: 'Tasks' },
+  { id: 'upload' as TabType, label: 'Upload', icon: Upload, shortLabel: 'Upload' },
+  { id: 'files' as TabType, label: 'Files', icon: FileText, shortLabel: 'Files' },
   { id: 'preforeclosure' as TabType, label: 'Pre-Foreclosure', icon: Home, shortLabel: 'Pre-FC' },
+  { id: 'foreclosure' as TabType, label: 'Foreclosure', icon: Gavel, shortLabel: 'FC' },
 ];
 
 export function TabNavigation({ activeTab, onTabChange }: TabNavigationProps) {

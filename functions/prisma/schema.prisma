@@ -362,7 +362,7 @@ enum FileStatus {
 }
 
 // ============================================================================
-// FORECLOSED PROPERTIES
+// FORECLOSED PROPERTIES (PRE-FORECLOSURE)
 // ============================================================================
 
 model PreForeclosure {
@@ -411,6 +411,47 @@ model PreForeclosure {
   @@index([visitedAt])
   @@index([workflowStage])
   @@map("foreclosed")
+}
+
+// ============================================================================
+// FORECLOSURE RECORDS (AUCTION NOTICES)
+// ============================================================================
+
+model Foreclosure {
+  id              String    @id @default(cuid())
+
+  // Document identifiers
+  docNumber       String
+  fileId          String?
+
+  // Dates
+  recordedDate    DateTime?
+  saleDate        DateTime?
+
+  // Property information
+  type            String?   // Mortgage or Tax
+  streetAddress   String?
+  city            String?
+  state           String?
+  zipCode         String?
+
+  // Additional information
+  remarks         String?   @db.Text
+  filingMonth     String?   // YYYY-MM format
+
+  // Upload metadata
+  uploadMode      String?   // standard or address-only
+  active          Boolean   @default(true)
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([docNumber])
+  @@index([saleDate])
+  @@index([active])
+  @@index([fileId])
+  @@map("foreclosures")
 }
 
 // ============================================================================
