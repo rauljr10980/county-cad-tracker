@@ -75,6 +75,7 @@ import { WorkflowTracker } from './WorkflowTracker';
 import { UploadStatsCard } from './UploadStatsCard';
 import { OverallStatsCard } from './OverallStatsCard';
 import { UploadHistoryCard } from './UploadHistoryCard';
+import { ForeclosureUpload } from '@/components/foreclosure/ForeclosureUpload';
 
 // Sortable Row Component
 function SortableRow({ 
@@ -1969,6 +1970,9 @@ export function PreForeclosureView() {
           <Upload className="h-4 w-4 mr-2" />
             Upload File
         </Button>
+          <ForeclosureUpload onUploadComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ['foreclosures'] });
+          }} />
         </div>
       </div>
     </div>
