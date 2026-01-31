@@ -712,6 +712,12 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
     if (updates.next_follow_up_date !== undefined) {
       dbUpdates.nextFollowUpDate = updates.next_follow_up_date ? new Date(updates.next_follow_up_date) : null;
     }
+    if (updates.recorded_date !== undefined) {
+      dbUpdates.recordedDate = updates.recorded_date ? new Date(updates.recorded_date) : null;
+    }
+    if (updates.sale_date !== undefined) {
+      dbUpdates.saleDate = updates.sale_date ? new Date(updates.sale_date) : null;
+    }
 
     // Geocoding fields - handle updates.updates nested object for geocoding
     if (updates.updates) {

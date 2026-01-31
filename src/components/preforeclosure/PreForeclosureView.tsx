@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw, GripVertical, Phone, Star, ChevronUp, ChevronDown } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, Route as RouteIcon, Check, RotateCcw, GripVertical, Phone, Star, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -2469,8 +2469,10 @@ export function PreForeclosureView() {
                   >
                     <div className="flex items-center gap-1">
                       Type
-                      {sortColumn === 'type' && (
+                      {sortColumn === 'type' ? (
                         sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronsUpDown className="h-3 w-3 opacity-50" />
                       )}
                     </div>
                   </th>
@@ -2487,8 +2489,10 @@ export function PreForeclosureView() {
                   >
                     <div className="flex items-center gap-1">
                       Workflow
-                      {sortColumn === 'workflow' && (
+                      {sortColumn === 'workflow' ? (
                         sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronsUpDown className="h-3 w-3 opacity-50" />
                       )}
                     </div>
                   </th>
@@ -2505,8 +2509,10 @@ export function PreForeclosureView() {
                   >
                     <div className="flex items-center gap-1">
                       Property Address
-                      {sortColumn === 'address' && (
+                      {sortColumn === 'address' ? (
                         sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronsUpDown className="h-3 w-3 opacity-50" />
                       )}
                     </div>
                   </th>
@@ -2523,8 +2529,10 @@ export function PreForeclosureView() {
                   >
                     <div className="flex items-center gap-1">
                       Recorded
-                      {sortColumn === 'recorded' && (
+                      {sortColumn === 'recorded' ? (
                         sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronsUpDown className="h-3 w-3 opacity-50" />
                       )}
                     </div>
                   </th>
@@ -2541,8 +2549,10 @@ export function PreForeclosureView() {
                   >
                     <div className="flex items-center gap-1">
                       Sale Date
-                      {sortColumn === 'sale' && (
+                      {sortColumn === 'sale' ? (
                         sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronsUpDown className="h-3 w-3 opacity-50" />
                       )}
                     </div>
                   </th>
