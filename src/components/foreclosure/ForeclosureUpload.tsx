@@ -11,29 +11,54 @@ export function ForeclosureUpload({ onUploadComplete }: ForeclosureUploadProps) 
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadMode, setUploadMode] = useState<'standard' | 'address-only'>('standard');
+  const [isDragging, setIsDragging] = useState(false);
   const uploadMutation = useUploadForeclosureFile();
+
+  const validateFile = (file: File): boolean => {
+    // Validate file type
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+
+    if (!validExtensions.includes(fileExtension)) {
+      toast.error('Invalid file type. Please upload .xlsx, .xls, or .csv files only.');
+      return false;
+    }
+
+    // Validate file size (100MB max)
+    const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+    if (file.size > maxSize) {
+      toast.error('File size exceeds 100MB limit.');
+      return false;
+    }
+
+    return true;
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type
-      const validExtensions = ['.xlsx', '.xls', '.csv'];
-      const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-
-      if (!validExtensions.includes(fileExtension)) {
-        toast.error('Invalid file type. Please upload .xlsx, .xls, or .csv files only.');
-        return;
-      }
-
-      // Validate file size (100MB max)
-      const maxSize = 100 * 1024 * 1024; // 100MB in bytes
-      if (file.size > maxSize) {
-        toast.error('File size exceeds 100MB limit.');
-        return;
-      }
-
+    if (file && validateFile(file)) {
       setSelectedFile(file);
     }
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+
+    const file = event.dataTransfer.files?.[0];
+    if (file && validateFile(file)) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
   };
 
   const handleUpload = async () => {
@@ -128,29 +153,61 @@ export function ForeclosureUpload({ onUploadComplete }: ForeclosureUploadProps) 
                 </button>
               </div>
 
-              {/* File Selection */}
+              {/* File Selection with Drag & Drop */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-900">
                   Select File (.xlsx, .xls, or .csv)
                 </label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleFileSelect}
-                    disabled={uploadMutation.isPending}
-                    className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed file:mr-4 file:py-2 file:px-4 file:rounded-l-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    isDragging
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+                  } ${uploadMutation.isPending ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  {selectedFile ? (
+                    <div className="space-y-2">
+                      <FileSpreadsheet className="w-12 h-12 mx-auto text-blue-600" />
+                      <div className="flex items-center justify-center gap-2 text-sm text-gray-900 font-medium">
+                        <span>{selectedFile.name}</span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </div>
+                      <button
+                        onClick={() => setSelectedFile(null)}
+                        className="text-xs text-blue-600 hover:text-blue-700 underline mt-2"
+                        disabled={uploadMutation.isPending}
+                      >
+                        Choose different file
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+                      <p className="text-sm text-gray-600 mb-2">
+                        {isDragging ? (
+                          <span className="text-blue-600 font-medium">Drop file here</span>
+                        ) : (
+                          <>
+                            <span className="font-medium text-blue-600">Click to upload</span> or drag and drop
+                          </>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500">XLSX, XLS, or CSV (max 100MB)</p>
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleFileSelect}
+                        disabled={uploadMutation.isPending}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                      />
+                    </>
+                  )}
                 </div>
-                {selectedFile && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
-                    <FileSpreadsheet className="w-4 h-4" />
-                    <span>{selectedFile.name}</span>
-                    <span className="text-gray-400">
-                      ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                    </span>
-                  </div>
-                )}
               </div>
 
               {/* File Requirements */}
