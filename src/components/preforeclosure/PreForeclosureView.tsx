@@ -1925,6 +1925,43 @@ export function PreForeclosureView() {
             )}
         </Button>
           <Button
+            onClick={async () => {
+              if (!confirm('Set all records to:\n\nRecorded Date: 01/01/2026\nSale Date: 02/02/2026\n\nThis will update all pre-foreclosure records. Continue?')) {
+                return;
+              }
+              try {
+                const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/preforeclosure/bulk-update-dates`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    recordedDate: '2026-01-01',
+                    saleDate: '2026-02-02',
+                  }),
+                });
+                if (!response.ok) throw new Error('Failed to update dates');
+                const result = await response.json();
+                toast({
+                  title: 'Dates updated',
+                  description: `Successfully updated ${result.updatedCount} records`,
+                });
+                queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+              } catch (error) {
+                toast({
+                  title: 'Update failed',
+                  description: error instanceof Error ? error.message : 'Failed to update dates',
+                  variant: 'destructive',
+                });
+              }
+            }}
+            size="default"
+            variant="outline"
+            disabled={records.length === 0}
+            className="shadow-sm"
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            Set Dates
+        </Button>
+          <Button
             onClick={() => setUploadOpen(true)}
             size="default"
             className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"

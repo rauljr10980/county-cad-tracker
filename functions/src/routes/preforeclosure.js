@@ -1027,6 +1027,47 @@ router.delete('/upload-history/:id', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
+// BULK UPDATE DATES FOR ALL RECORDS
+// ============================================================================
+
+router.patch('/bulk-update-dates', optionalAuth, async (req, res) => {
+  try {
+    const { recordedDate, saleDate, excludeDocNumbers } = req.body;
+
+    if (!recordedDate || !saleDate) {
+      return res.status(400).json({ error: 'recordedDate and saleDate are required' });
+    }
+
+    // Build where clause to exclude specific document numbers
+    const whereClause = excludeDocNumbers && Array.isArray(excludeDocNumbers) && excludeDocNumbers.length > 0
+      ? { documentNumber: { notIn: excludeDocNumbers } }
+      : {};
+
+    const result = await prisma.preForeclosure.updateMany({
+      where: whereClause,
+      data: {
+        recordedDate: new Date(recordedDate),
+        saleDate: new Date(saleDate),
+      }
+    });
+
+    console.log(`[PRE-FORECLOSURE] Bulk updated ${result.count} records with recordedDate=${recordedDate}, saleDate=${saleDate}`);
+
+    res.json({
+      success: true,
+      message: 'Bulk update completed',
+      updatedCount: result.count
+    });
+  } catch (error) {
+    console.error('[PRE-FORECLOSURE] Bulk update error:', error);
+    res.status(500).json({
+      error: 'Failed to bulk update dates',
+      details: error.message
+    });
+  }
+});
+
+// ============================================================================
 // DELETE INDIVIDUAL PRE-FORECLOSURE RECORD
 // ============================================================================
 
