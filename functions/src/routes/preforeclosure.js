@@ -692,6 +692,7 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
 
     // Map frontend fields to database fields
     const dbUpdates = {};
+    if (updates.document_number !== undefined) dbUpdates.documentNumber = updates.document_number;
     if (updates.internal_status !== undefined) dbUpdates.internalStatus = updates.internal_status;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
     if (updates.phoneNumbers !== undefined) {
