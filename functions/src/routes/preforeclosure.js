@@ -311,6 +311,26 @@ router.post('/upload', optionalAuth, async (req, res) => {
       });
     }
 
+    // Geocode records that don't already have coordinates
+    const recordsToGeocode = processedRecords.filter(r => !r.latitude || !r.longitude);
+    let geocodeResults = new Map();
+    if (recordsToGeocode.length > 0) {
+      try {
+        const geocodeInputs = recordsToGeocode.map(r => ({
+          id: r.documentNumber,
+          street: r.address,
+          city: r.city,
+          state: 'TX',
+          zip: r.zip,
+        }));
+        geocodeResults = await batchGeocodeCensus(geocodeInputs);
+        console.log(`[PRE-FORECLOSURE] Geocoded ${geocodeResults.size}/${recordsToGeocode.length} addresses`);
+      } catch (geoError) {
+        console.error('[PRE-FORECLOSURE] Geocoding error:', geoError);
+        // Continue without coordinates
+      }
+    }
+
     // Get all existing document numbers
     const existingRecords = await prisma.preForeclosure.findMany({
       select: { documentNumber: true }
@@ -342,6 +362,11 @@ router.post('/upload', optionalAuth, async (req, res) => {
 
     for (const record of processedRecords) {
       try {
+        // Apply geocode results if the record doesn't have coordinates
+        const geoResult = geocodeResults.get(record.documentNumber);
+        const latitude = record.latitude || (geoResult ? geoResult.latitude : null);
+        const longitude = record.longitude || (geoResult ? geoResult.longitude : null);
+
         const existing = await prisma.preForeclosure.findUnique({
           where: { documentNumber: record.documentNumber }
         });
@@ -355,8 +380,8 @@ router.post('/upload', optionalAuth, async (req, res) => {
             zip: record.zip,
             filingMonth: record.filingMonth,
             county: record.county,
-            latitude: record.latitude,
-            longitude: record.longitude,
+            latitude,
+            longitude,
             schoolDistrict: record.schoolDistrict,
             inactive: false,
             lastSeenMonth: currentMonth,
@@ -380,8 +405,8 @@ router.post('/upload', optionalAuth, async (req, res) => {
             zip: record.zip,
             filingMonth: record.filingMonth,
             county: record.county,
-            latitude: record.latitude,
-            longitude: record.longitude,
+            latitude,
+            longitude,
             schoolDistrict: record.schoolDistrict,
             internalStatus: 'New',
             inactive: false,
