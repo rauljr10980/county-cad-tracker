@@ -163,19 +163,19 @@ router.post('/upload', optionalAuth, async (req, res) => {
           const typeKey = rowKeys.find(key => key.toLowerCase() === 'type');
           type = typeKey ? row[typeKey] : null;
         }
-        
-        if (!type) {
-          errors.push(`Row ${i + 2}: Missing type`);
-          continue;
+
+        // Type is optional - default to "Mortgage" if not provided
+        if (type) {
+          type = String(type).trim().toUpperCase();
+          if (type !== 'MORTGAGE' && type !== 'TAX') {
+            errors.push(`Row ${i + 2}: Invalid type "${type}" (must be MORTGAGE or TAX)`);
+            continue;
+          }
+          // Convert to proper case: MORTGAGE -> Mortgage, TAX -> Tax
+          type = type.charAt(0) + type.slice(1).toLowerCase();
+        } else {
+          type = 'Mortgage';
         }
-        
-        type = String(type).trim().toUpperCase();
-        if (type !== 'MORTGAGE' && type !== 'TAX') {
-          errors.push(`Row ${i + 2}: Invalid type "${type}" (must be MORTGAGE or TAX)`);
-          continue;
-        }
-        // Convert to proper case: MORTGAGE -> Mortgage, TAX -> Tax
-        type = type.charAt(0) + type.slice(1).toLowerCase();
 
         // Find address fields - exact match first, then case-insensitive
         let address = row['Address'] || row['address'] || row['ADDRESS'];
@@ -183,21 +183,62 @@ router.post('/upload', optionalAuth, async (req, res) => {
           const addrKey = rowKeys.find(key => key.toLowerCase() === 'address');
           address = addrKey ? row[addrKey] : '';
         }
-        
+
         let city = row['City'] || row['city'] || row['CITY'];
         if (!city) {
           const cityKey = rowKeys.find(key => key.toLowerCase() === 'city');
           city = cityKey ? row[cityKey] : '';
         }
-        
+
         let zip = row['ZIP'] || row['zip'] || row['Zip'] || row['ZIP Code'] || row['zip code'];
         if (!zip) {
-          const zipKey = rowKeys.find(key => 
-            key.toLowerCase() === 'zip' || 
+          const zipKey = rowKeys.find(key =>
+            key.toLowerCase() === 'zip' ||
             key.toLowerCase() === 'zip code' ||
             key.toLowerCase() === 'zipcode'
           );
           zip = zipKey ? row[zipKey] : '';
+        }
+
+        // Support "Full Address" column - parse into address, city, zip
+        // Format: "231 BEAM, SAN ANTONIO, TEXAS, 78221"
+        if (!address) {
+          let fullAddress = row['Full Address'] || row['full address'] || row['FULL ADDRESS'];
+          if (!fullAddress) {
+            const fullAddrKey = rowKeys.find(key => key.toLowerCase().replace(/\s+/g, ' ') === 'full address');
+            fullAddress = fullAddrKey ? row[fullAddrKey] : null;
+          }
+          if (fullAddress) {
+            const parts = String(fullAddress).split(',').map(p => p.trim());
+            if (parts.length >= 1) address = parts[0]; // Street address
+            if (parts.length >= 2) city = parts[1]; // City
+            // Skip state (parts[2] if present), grab zip from last part
+            const lastPart = parts[parts.length - 1];
+            const zipMatch = lastPart ? lastPart.match(/\d{5}/) : null;
+            if (zipMatch) zip = zipMatch[0];
+          }
+        }
+
+        // Parse Recorded Date (optional)
+        let recordedDate = row['Recorded Date'] || row['recorded date'] || row['RECORDED DATE'] || row['Recorded'];
+        if (!recordedDate) {
+          const rdKey = rowKeys.find(key => key.toLowerCase().replace(/\s+/g, ' ').includes('recorded'));
+          recordedDate = rdKey ? row[rdKey] : null;
+        }
+        if (recordedDate) {
+          const parsed = new Date(String(recordedDate).trim());
+          recordedDate = isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        // Parse Sale Date (optional)
+        let saleDate = row['Sale Date'] || row['sale date'] || row['SALE DATE'];
+        if (!saleDate) {
+          const sdKey = rowKeys.find(key => key.toLowerCase().replace(/\s+/g, ' ') === 'sale date');
+          saleDate = sdKey ? row[sdKey] : null;
+        }
+        if (saleDate) {
+          const parsed = new Date(String(saleDate).trim());
+          saleDate = isNaN(parsed.getTime()) ? null : parsed;
         }
         
         // Filing Month is optional - default to current month
@@ -248,13 +289,15 @@ router.post('/upload', optionalAuth, async (req, res) => {
           documentNumber: String(documentNumber).trim(),
           type: type,
           address: String(address).trim(),
-          city: String(city).trim(),
-          zip: String(zip).trim(),
+          city: String(city || '').trim(),
+          zip: String(zip || '').trim(),
           filingMonth: String(filingMonth).trim(),
           county: String(county).trim(),
           latitude: latitude ? parseFloat(String(latitude).trim()) : null,
           longitude: longitude ? parseFloat(String(longitude).trim()) : null,
           schoolDistrict: schoolDistrict ? String(schoolDistrict).trim() : null,
+          recordedDate: recordedDate || null,
+          saleDate: saleDate || null,
         });
       } catch (rowError) {
         errors.push(`Row ${i + 2}: ${rowError.message}`);
@@ -305,9 +348,7 @@ router.post('/upload', optionalAuth, async (req, res) => {
 
         if (existing) {
         // Update existing record
-        await prisma.preForeclosure.update({
-          where: { documentNumber: record.documentNumber },
-          data: {
+        const updateData = {
             type: record.type,
             address: record.address,
             city: record.city,
@@ -320,14 +361,18 @@ router.post('/upload', optionalAuth, async (req, res) => {
             inactive: false,
             lastSeenMonth: currentMonth,
             updatedAt: new Date()
-          }
+        };
+        if (record.recordedDate) updateData.recordedDate = record.recordedDate;
+        if (record.saleDate) updateData.saleDate = record.saleDate;
+        await prisma.preForeclosure.update({
+          where: { documentNumber: record.documentNumber },
+          data: updateData
         });
           updated++;
           updatedDocNumbers.push(record.documentNumber);
         } else {
         // Create new record
-        await prisma.preForeclosure.create({
-          data: {
+        const createData = {
             documentNumber: record.documentNumber,
             type: record.type,
             address: record.address,
@@ -342,7 +387,11 @@ router.post('/upload', optionalAuth, async (req, res) => {
             inactive: false,
             firstSeenMonth: currentMonth,
             lastSeenMonth: currentMonth
-          }
+        };
+        if (record.recordedDate) createData.recordedDate = record.recordedDate;
+        if (record.saleDate) createData.saleDate = record.saleDate;
+        await prisma.preForeclosure.create({
+          data: createData
         });
           created++;
           newDocNumbers.push(record.documentNumber);
