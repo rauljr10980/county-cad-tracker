@@ -1698,15 +1698,25 @@ export function PreForeclosureView() {
   };
 
   const handleGeocodeAddresses = async () => {
-    // Get records that don't have coordinates
-    const recordsNeedingGeocode = filteredRecords.filter(
-      (r: any) => !r.latitude || !r.longitude
-    );
+    // If records are selected, geocode those (even if they already have coords - re-geocode).
+    // Otherwise, geocode all visible records missing coordinates.
+    let recordsToProcess: PreForeclosureRecord[];
+    if (selectedRecordIds.size > 0) {
+      recordsToProcess = filteredRecords.filter(
+        (r) => selectedRecordIds.has(r.document_number)
+      );
+    } else {
+      recordsToProcess = filteredRecords.filter(
+        (r) => !r.latitude || !r.longitude
+      );
+    }
 
-    if (recordsNeedingGeocode.length === 0) {
+    if (recordsToProcess.length === 0) {
       toast({
         title: 'No records to geocode',
-        description: 'All visible records already have coordinates',
+        description: selectedRecordIds.size > 0
+          ? 'No selected records found'
+          : 'All visible records already have coordinates',
       });
       return;
     }
@@ -1716,7 +1726,7 @@ export function PreForeclosureView() {
     setGeocodeResults(new Map());
 
     try {
-      const addressesToGeocode = recordsNeedingGeocode.map((r: any) => ({
+      const addressesToGeocode = recordsToProcess.map((r) => ({
         id: r.document_number,
         address: r.address,
         city: r.city,
@@ -1736,26 +1746,25 @@ export function PreForeclosureView() {
       // Update records with coordinates
       let successCount = 0;
       for (const [documentNumber, result] of results.entries()) {
-        const record = recordsNeedingGeocode.find((r: any) => r.document_number === documentNumber);
-        if (record) {
-          try {
-            await updateMutation.mutateAsync({
-              document_number: documentNumber,
-              updates: {
-                latitude: result.latitude,
-                longitude: result.longitude,
-              },
-            });
-            successCount++;
-          } catch (error) {
-            console.error(`Failed to update ${documentNumber}:`, error);
-          }
+        try {
+          await updateMutation.mutateAsync({
+            document_number: documentNumber,
+            updates: {
+              latitude: result.latitude,
+              longitude: result.longitude,
+            },
+          });
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to update ${documentNumber}:`, error);
         }
       }
 
+      const failedCount = recordsToProcess.length - successCount;
       toast({
         title: 'Geocoding complete',
-        description: `Successfully geocoded ${successCount} of ${recordsNeedingGeocode.length} addresses`,
+        description: `Successfully geocoded ${successCount} of ${recordsToProcess.length} addresses` +
+          (failedCount > 0 ? `. ${failedCount} failed — use Google Maps link in record detail to fix.` : ''),
       });
     } catch (error) {
       toast({
@@ -1924,7 +1933,7 @@ export function PreForeclosureView() {
             ) : (
               <>
                 <MapPin className="h-4 w-4 mr-2" />
-                Geocode Addresses
+                {selectedRecordIds.size > 0 ? `Geocode Selected (${selectedRecordIds.size})` : 'Geocode Addresses'}
               </>
             )}
         </Button>
@@ -3253,42 +3262,40 @@ export function PreForeclosureView() {
                       }}
                     />
                   </div>
-                  {(viewRecord.latitude == null || viewRecord.longitude == null) && (
-                    <div className="col-span-2">
-                      <Label className="text-muted-foreground text-xs flex items-center gap-1">
-                        <MapPin className="h-3 w-3" /> Paste Google Maps Link
-                      </Label>
-                      <Input
-                        className="font-mono text-xs h-8 mt-1"
-                        placeholder="https://www.google.com/maps/@..."
-                        onPaste={(e) => {
-                          const pasted = e.clipboardData.getData('text');
-                          const coords = extractCoordsFromGoogleMapsUrl(pasted);
-                          if (coords) {
-                            updateMutation.mutateAsync({
-                              document_number: viewRecord.document_number,
-                              latitude: coords.latitude,
-                              longitude: coords.longitude,
-                            }).then(() => {
-                              toast({
-                                title: 'Coordinates updated',
-                                description: `Set to ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)} from Google Maps link`,
-                              });
-                            });
-                          } else {
+                  <div className="col-span-2">
+                    <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> Paste Google Maps Link
+                    </Label>
+                    <Input
+                      className="font-mono text-xs h-8 mt-1"
+                      placeholder="https://www.google.com/maps/@..."
+                      onPaste={(e) => {
+                        const pasted = e.clipboardData.getData('text');
+                        const coords = extractCoordsFromGoogleMapsUrl(pasted);
+                        if (coords) {
+                          updateMutation.mutateAsync({
+                            document_number: viewRecord.document_number,
+                            latitude: coords.latitude,
+                            longitude: coords.longitude,
+                          }).then(() => {
                             toast({
-                              title: 'Invalid link',
-                              description: 'Could not extract coordinates from that URL. Make sure it\'s a Google Maps link.',
-                              variant: 'destructive',
+                              title: 'Coordinates updated',
+                              description: `Set to ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)} from Google Maps link`,
                             });
-                          }
-                        }}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Search the address on Google Maps, copy the URL, and paste it here
-                      </p>
-                    </div>
-                  )}
+                          });
+                        } else {
+                          toast({
+                            title: 'Invalid link',
+                            description: 'Could not extract coordinates from that URL. Make sure it\'s a Google Maps link.',
+                            variant: 'destructive',
+                          });
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Search the address on Google Maps, copy the URL, and paste it here
+                    </p>
+                  </div>
                   {viewRecord.school_district && (
                     <div className="col-span-2">
                       <Label className="text-muted-foreground text-xs">School District</Label>
