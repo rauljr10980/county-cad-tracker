@@ -10,7 +10,7 @@ const prisma = require('../lib/prisma');
 const XLSX = require('xlsx');
 
 const { parseFullAddress, normalizeAddress } = require('../lib/addressParser');
-const { batchGeocodeCensus } = require('../lib/censusGeocode');
+const { batchGeocodeCensus, batchGeocodeNominatim } = require('../lib/censusGeocode');
 
 const router = express.Router();
 
@@ -317,20 +317,38 @@ router.post('/upload', optionalAuth, async (req, res) => {
     const recordsToGeocode = processedRecords.filter(r => !r.latitude || !r.longitude);
     let geocodeResults = new Map();
     if (recordsToGeocode.length > 0) {
+      const geocodeInputs = recordsToGeocode.map(r => ({
+        id: r.documentNumber,
+        street: r.address,
+        city: r.city,
+        state: 'TX',
+        zip: r.zip,
+      }));
+
+      // Phase 1: Census batch geocoding (fast, handles most addresses)
       try {
-        const geocodeInputs = recordsToGeocode.map(r => ({
-          id: r.documentNumber,
-          street: r.address,
-          city: r.city,
-          state: 'TX',
-          zip: r.zip,
-        }));
         geocodeResults = await batchGeocodeCensus(geocodeInputs);
-        console.log(`[PRE-FORECLOSURE] Geocoded ${geocodeResults.size}/${recordsToGeocode.length} addresses`);
+        console.log(`[PRE-FORECLOSURE] Census geocoded ${geocodeResults.size}/${recordsToGeocode.length} addresses`);
       } catch (geoError) {
-        console.error('[PRE-FORECLOSURE] Geocoding error:', geoError);
-        // Continue without coordinates
+        console.error('[PRE-FORECLOSURE] Census geocoding error:', geoError);
       }
+
+      // Phase 2: Nominatim fallback for addresses Census couldn't match
+      const censusFailed = geocodeInputs.filter(a => !geocodeResults.has(a.id));
+      if (censusFailed.length > 0) {
+        try {
+          console.log(`[PRE-FORECLOSURE] Trying Nominatim for ${censusFailed.length} addresses Census missed`);
+          const nominatimResults = await batchGeocodeNominatim(censusFailed);
+          for (const [id, result] of nominatimResults) {
+            geocodeResults.set(id, result);
+          }
+          console.log(`[PRE-FORECLOSURE] Nominatim recovered ${nominatimResults.size}/${censusFailed.length} addresses`);
+        } catch (nomError) {
+          console.error('[PRE-FORECLOSURE] Nominatim geocoding error:', nomError);
+        }
+      }
+
+      console.log(`[PRE-FORECLOSURE] Total geocoded: ${geocodeResults.size}/${recordsToGeocode.length}`);
     }
 
     // Get all existing records with address and user-entered data for matching

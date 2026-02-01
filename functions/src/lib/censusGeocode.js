@@ -94,4 +94,60 @@ function parseCSVLine(line) {
   return result;
 }
 
-module.exports = { batchGeocodeCensus };
+/**
+ * Nominatim fallback geocoder for addresses Census couldn't match.
+ * Processes sequentially with 1-second delay between requests (Nominatim rate limit).
+ * @param {Array<{id: string, street: string, city: string, state: string, zip: string}>} addresses
+ * @returns {Promise<Map<string, {latitude: number, longitude: number, matchedAddress: string}>>}
+ */
+async function batchGeocodeNominatim(addresses) {
+  const results = new Map();
+
+  if (!addresses || addresses.length === 0) {
+    return results;
+  }
+
+  for (let i = 0; i < addresses.length; i++) {
+    const a = addresses[i];
+    try {
+      const searchQuery = [a.street, a.city, a.state || 'TX', a.zip].filter(Boolean).join(', ');
+      const url = `https://nominatim.openstreetmap.org/search?` + new URLSearchParams({
+        q: searchQuery,
+        format: 'json',
+        limit: '1',
+        countrycodes: 'us',
+      });
+
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'County-CAD-Tracker/1.0' },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          if (!isNaN(lat) && !isNaN(lon)) {
+            results.set(a.id, {
+              latitude: lat,
+              longitude: lon,
+              matchedAddress: data[0].display_name || '',
+            });
+          }
+        }
+      }
+    } catch (err) {
+      // Skip this address on error
+    }
+
+    // Rate limit: 1 request per second (Nominatim policy)
+    if (i < addresses.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  console.log(`[NOMINATIM GEOCODE] Processed ${addresses.length} addresses, matched ${results.size}`);
+  return results;
+}
+
+module.exports = { batchGeocodeCensus, batchGeocodeNominatim };
