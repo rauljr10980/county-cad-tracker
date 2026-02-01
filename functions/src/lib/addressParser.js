@@ -44,4 +44,14 @@ function parseFullAddress(fullAddress) {
   return { street, city, state, zip, raw: trimmed };
 }
 
-module.exports = { parseFullAddress };
+/**
+ * Produce a deterministic key for address matching.
+ * Uppercase, collapse whitespace, trim, combine address+city+zip.
+ * Returns key like "123 MAIN ST|SAN ANTONIO|78201"
+ */
+function normalizeAddress(address, city, zip) {
+  const norm = (s) => String(s || '').trim().toUpperCase().replace(/\s+/g, ' ');
+  return `${norm(address)}|${norm(city)}|${norm(zip)}`;
+}
+
+module.exports = { parseFullAddress, normalizeAddress };

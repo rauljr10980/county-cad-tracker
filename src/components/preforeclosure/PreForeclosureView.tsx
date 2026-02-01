@@ -1680,9 +1680,12 @@ export function PreForeclosureView() {
   const handleFileUpload = async (file: File) => {
     try {
       const result = await uploadMutation.mutateAsync(file);
+      const addressMatchInfo = result.addressMatched > 0
+        ? ` ${result.addressMatched} returning properties matched by address.`
+        : '';
       toast({
         title: 'Upload successful',
-        description: `Processed ${result.recordsProcessed} records. Total: ${result.totalRecords} (${result.activeRecords} active, ${result.inactiveRecords} inactive)`,
+        description: `Processed ${result.recordsProcessed} records. Total: ${result.totalRecords} (${result.activeRecords} active, ${result.inactiveRecords} inactive).${addressMatchInfo}`,
       });
     } catch (error) {
       toast({
@@ -2052,7 +2055,7 @@ export function PreForeclosureView() {
                 )}
                 <p className="text-xs text-muted-foreground mt-2">
                   {uploadMode === 'standard'
-                    ? 'Records are matched by Document Number. Missing records from new uploads are marked inactive.'
+                    ? 'Records are matched by Document Number or address. Returning properties keep their notes, phones, and workflow. Missing records are marked inactive.'
                     : 'Row numbers will be used as document numbers. Addresses will be automatically geocoded using the US Census API.'}
                 </p>
               </div>
@@ -2071,9 +2074,12 @@ export function PreForeclosureView() {
                     try {
                       if (uploadMode === 'standard') {
                         const result = await uploadMutation.mutateAsync(uploadFile);
+                        const addressMatchInfo = result.addressMatched > 0
+                          ? ` ${result.addressMatched} returning properties matched by address.`
+                          : '';
                         toast({
                           title: 'Upload successful',
-                          description: `Processed ${result.recordsProcessed} records. Total: ${result.totalRecords} (${result.activeRecords} active, ${result.inactiveRecords} inactive)`,
+                          description: `Processed ${result.recordsProcessed} records. Total: ${result.totalRecords} (${result.activeRecords} active, ${result.inactiveRecords} inactive).${addressMatchInfo}`,
                         });
                       } else {
                         const result = await addressOnlyUploadMutation.mutateAsync({

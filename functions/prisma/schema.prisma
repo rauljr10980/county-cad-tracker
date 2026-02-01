@@ -390,6 +390,8 @@ model PreForeclosure {
   dueTime          DateTime?
   assignedTo       String? // "Luciano" or "Raul"
   inactive         Boolean     @default(false)
+  isReturning      Boolean     @default(false) // Flagged if address matched a prior record
+  previousDocumentNumbers String[] @default([]) // Chain of prior document numbers
   visited          Boolean     @default(false) // Mark if property has been visited
   visitedAt        DateTime? // When the property was visited
   visitedBy        String? // Who visited (driver name)
@@ -410,6 +412,7 @@ model PreForeclosure {
   @@index([visited])
   @@index([visitedAt])
   @@index([workflowStage])
+  @@index([isReturning])
   @@map("foreclosed")
 }
 

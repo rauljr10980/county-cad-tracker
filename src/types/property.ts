@@ -326,6 +326,10 @@ export interface PreForeclosureRecord {
   visited_at?: string; // ISO date string
   visited_by?: 'Luciano' | 'Raul';
 
+  // Address matching / returning records
+  is_returning?: boolean;
+  previous_document_numbers?: string[];
+
   // Workflow decision tree
   workflow_stage?: WorkflowStage;
   workflow_log?: WorkflowLogEntry[];

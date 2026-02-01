@@ -9,7 +9,7 @@ const { optionalAuth, authenticateToken } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 const XLSX = require('xlsx');
 
-const { parseFullAddress } = require('../lib/addressParser');
+const { parseFullAddress, normalizeAddress } = require('../lib/addressParser');
 const { batchGeocodeCensus } = require('../lib/censusGeocode');
 
 const router = express.Router();
@@ -71,6 +71,8 @@ router.get('/', optionalAuth, async (req, res) => {
       workflow_log: record.workflowLog || [],
       first_seen_month: record.firstSeenMonth,
       last_seen_month: record.lastSeenMonth,
+      is_returning: record.isReturning || false,
+      previous_document_numbers: record.previousDocumentNumbers || [],
       created_at: record.createdAt.toISOString(),
       updated_at: record.updatedAt.toISOString(),
     }));
@@ -331,11 +333,43 @@ router.post('/upload', optionalAuth, async (req, res) => {
       }
     }
 
-    // Get all existing document numbers
+    // Get all existing records with address and user-entered data for matching
     const existingRecords = await prisma.preForeclosure.findMany({
-      select: { documentNumber: true }
+      select: {
+        id: true,
+        documentNumber: true,
+        address: true,
+        city: true,
+        zip: true,
+        previousDocumentNumbers: true,
+        notes: true,
+        phoneNumbers: true,
+        ownerPhoneIndex: true,
+        workflowStage: true,
+        workflowLog: true,
+        internalStatus: true,
+        assignedTo: true,
+        actionType: true,
+        priority: true,
+        lastActionDate: true,
+        nextFollowUpDate: true,
+        dueTime: true,
+        visited: true,
+        visitedAt: true,
+        visitedBy: true,
+        firstSeenMonth: true,
+      }
     });
     const existingDocNumbers = new Set(existingRecords.map(r => r.documentNumber));
+
+    // Build address lookup map for address-based matching
+    const addressMap = new Map();
+    for (const rec of existingRecords) {
+      const key = normalizeAddress(rec.address, rec.city, rec.zip);
+      if (key && key !== '||') {
+        addressMap.set(key, rec);
+      }
+    }
 
     // Mark missing records as inactive
     const uploadedDocNumbers = new Set(processedRecords.map(r => r.documentNumber));
@@ -356,9 +390,11 @@ router.post('/upload', optionalAuth, async (req, res) => {
     // Upsert records (create or update)
     let created = 0;
     let updated = 0;
+    let addressMatched = 0;
     const dbErrors = [];
     const newDocNumbers = [];
     const updatedDocNumbers = [];
+    const addressMatchedDocNumbers = [];
 
     for (const record of processedRecords) {
       try {
@@ -372,8 +408,8 @@ router.post('/upload', optionalAuth, async (req, res) => {
         });
 
         if (existing) {
-        // Update existing record
-        const updateData = {
+          // Case 1: Same document number exists - update filing data
+          const updateData = {
             type: record.type,
             address: record.address,
             city: record.city,
@@ -386,40 +422,86 @@ router.post('/upload', optionalAuth, async (req, res) => {
             inactive: false,
             lastSeenMonth: currentMonth,
             updatedAt: new Date()
-        };
-        if (record.recordedDate) updateData.recordedDate = record.recordedDate;
-        if (record.saleDate) updateData.saleDate = record.saleDate;
-        await prisma.preForeclosure.update({
-          where: { documentNumber: record.documentNumber },
-          data: updateData
-        });
+          };
+          if (record.recordedDate) updateData.recordedDate = record.recordedDate;
+          if (record.saleDate) updateData.saleDate = record.saleDate;
+          await prisma.preForeclosure.update({
+            where: { documentNumber: record.documentNumber },
+            data: updateData
+          });
           updated++;
           updatedDocNumbers.push(record.documentNumber);
         } else {
-        // Create new record
-        const createData = {
-            documentNumber: record.documentNumber,
-            type: record.type,
-            address: record.address,
-            city: record.city,
-            zip: record.zip,
-            filingMonth: record.filingMonth,
-            county: record.county,
-            latitude,
-            longitude,
-            schoolDistrict: record.schoolDistrict,
-            internalStatus: 'New',
-            inactive: false,
-            firstSeenMonth: currentMonth,
-            lastSeenMonth: currentMonth
-        };
-        if (record.recordedDate) createData.recordedDate = record.recordedDate;
-        if (record.saleDate) createData.saleDate = record.saleDate;
-        await prisma.preForeclosure.create({
-          data: createData
-        });
-          created++;
-          newDocNumbers.push(record.documentNumber);
+          // Case 2: New document number - check address match
+          const addrKey = normalizeAddress(record.address, record.city, record.zip);
+          const addrMatch = addrKey && addrKey !== '||' ? addressMap.get(addrKey) : null;
+
+          if (addrMatch) {
+            // Case 2a: Address matches existing record with different doc number
+            // Update existing row in-place: swap doc number, preserve user data
+            const prevDocNumbers = Array.isArray(addrMatch.previousDocumentNumbers)
+              ? [...addrMatch.previousDocumentNumbers, addrMatch.documentNumber]
+              : [addrMatch.documentNumber];
+
+            const updateData = {
+              documentNumber: record.documentNumber,
+              type: record.type,
+              address: record.address,
+              city: record.city,
+              zip: record.zip,
+              filingMonth: record.filingMonth,
+              county: record.county,
+              latitude,
+              longitude,
+              schoolDistrict: record.schoolDistrict,
+              inactive: false,
+              lastSeenMonth: currentMonth,
+              isReturning: true,
+              previousDocumentNumbers: prevDocNumbers,
+              updatedAt: new Date()
+            };
+            if (record.recordedDate) updateData.recordedDate = record.recordedDate;
+            if (record.saleDate) updateData.saleDate = record.saleDate;
+
+            await prisma.preForeclosure.update({
+              where: { id: addrMatch.id },
+              data: updateData
+            });
+
+            // Update maps so subsequent rows can't double-match
+            addressMap.set(addrKey, { ...addrMatch, documentNumber: record.documentNumber });
+            existingDocNumbers.delete(addrMatch.documentNumber);
+            existingDocNumbers.add(record.documentNumber);
+
+            addressMatched++;
+            addressMatchedDocNumbers.push(record.documentNumber);
+            console.log(`[PRE-FORECLOSURE] Address match: ${addrMatch.documentNumber} -> ${record.documentNumber} at "${record.address}, ${record.city} ${record.zip}"`);
+          } else {
+            // Case 2b: Truly new record
+            const createData = {
+              documentNumber: record.documentNumber,
+              type: record.type,
+              address: record.address,
+              city: record.city,
+              zip: record.zip,
+              filingMonth: record.filingMonth,
+              county: record.county,
+              latitude,
+              longitude,
+              schoolDistrict: record.schoolDistrict,
+              internalStatus: 'New',
+              inactive: false,
+              firstSeenMonth: currentMonth,
+              lastSeenMonth: currentMonth
+            };
+            if (record.recordedDate) createData.recordedDate = record.recordedDate;
+            if (record.saleDate) createData.saleDate = record.saleDate;
+            await prisma.preForeclosure.create({
+              data: createData
+            });
+            created++;
+            newDocNumbers.push(record.documentNumber);
+          }
         }
       } catch (dbError) {
         console.error(`[PRE-FORECLOSURE] Database error for record ${record.documentNumber}:`, dbError);
@@ -427,8 +509,8 @@ router.post('/upload', optionalAuth, async (req, res) => {
       }
     }
 
-    if (created === 0 && updated === 0 && dbErrors.length > 0) {
-      return res.status(500).json({ 
+    if (created === 0 && updated === 0 && addressMatched === 0 && dbErrors.length > 0) {
+      return res.status(500).json({
         error: 'Failed to save records to database',
         errors: dbErrors.slice(0, 10)
       });
@@ -447,22 +529,21 @@ router.post('/upload', optionalAuth, async (req, res) => {
           uploadedBy: req.user?.username || 'System',
           recordsProcessed: processedRecords.length,
           newRecords: created,
-          updatedRecords: updated,
+          updatedRecords: updated + addressMatched,
           inactiveRecords: missingDocNumbers.length,
           totalRecords,
           activeRecords,
           success: true,
           newDocumentNumbers: newDocNumbers,
-          updatedDocumentNumbers: updatedDocNumbers,
+          updatedDocumentNumbers: [...updatedDocNumbers, ...addressMatchedDocNumbers],
           inactiveDocumentNumbers: missingDocNumbers
         }
       });
     } catch (historyError) {
       console.error('[PRE-FORECLOSURE] Failed to save upload history:', historyError);
-      // Don't fail the upload if history save fails
     }
 
-    console.log(`[PRE-FORECLOSURE] Upload complete: ${created} created, ${updated} updated, ${processedRecords.length} processed`);
+    console.log(`[PRE-FORECLOSURE] Upload complete: ${created} created, ${updated} updated, ${addressMatched} address-matched, ${processedRecords.length} processed`);
 
     res.json({
       success: true,
@@ -473,6 +554,7 @@ router.post('/upload', optionalAuth, async (req, res) => {
       inactiveRecords,
       created,
       updated,
+      addressMatched,
       errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
       dbErrors: dbErrors.length > 0 ? dbErrors.slice(0, 10) : undefined
     });
