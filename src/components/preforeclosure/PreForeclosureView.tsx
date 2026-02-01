@@ -33,8 +33,8 @@ import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute, reorderRecordInRoute } from '@/lib/api';
-import { batchGeocodeWithFallback, extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
+import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, geocodePreForeclosureRecords } from '@/lib/api';
+import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
 
 // Local type alias to avoid runtime reference issues
 type RouteType = {
@@ -1723,48 +1723,29 @@ export function PreForeclosureView() {
 
     setIsGeocoding(true);
     setGeocodeOpen(true);
-    setGeocodeResults(new Map());
+    setGeocodeProgress({ current: 0, total: recordsToProcess.length, address: 'Starting...' });
 
     try {
-      const addressesToGeocode = recordsToProcess.map((r) => ({
-        id: r.document_number,
-        address: r.address,
-        city: r.city,
-        state: 'TX',
-        zip: r.zip,
-      }));
+      const docNumbers = recordsToProcess.map((r) => r.document_number);
+      setGeocodeProgress({ current: 0, total: recordsToProcess.length, address: 'Census → Nominatim → Google Maps' });
 
-      const results = await batchGeocodeWithFallback(
-        addressesToGeocode,
-        (completed, total, current) => {
-          setGeocodeProgress({ current: completed, total, address: current });
-        }
-      );
+      const result = await geocodePreForeclosureRecords(docNumbers);
 
-      setGeocodeResults(results);
+      setGeocodeProgress({ current: result.geocoded, total: result.total, address: 'Complete' });
 
-      // Update records with coordinates
-      let successCount = 0;
-      for (const [documentNumber, result] of results.entries()) {
-        try {
-          await updateMutation.mutateAsync({
-            document_number: documentNumber,
-            updates: {
-              latitude: result.latitude,
-              longitude: result.longitude,
-            },
-          });
-          successCount++;
-        } catch (error) {
-          console.error(`Failed to update ${documentNumber}:`, error);
-        }
-      }
+      // Refresh the data
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
 
-      const failedCount = recordsToProcess.length - successCount;
+      const sourceParts = [];
+      if (result.sources.census > 0) sourceParts.push(`${result.sources.census} via Census`);
+      if (result.sources.nominatim > 0) sourceParts.push(`${result.sources.nominatim} via Nominatim`);
+      if (result.sources.google_maps > 0) sourceParts.push(`${result.sources.google_maps} via Google Maps`);
+      const sourceInfo = sourceParts.length > 0 ? ` (${sourceParts.join(', ')})` : '';
+
       toast({
         title: 'Geocoding complete',
-        description: `Successfully geocoded ${successCount} of ${recordsToProcess.length} addresses` +
-          (failedCount > 0 ? `. ${failedCount} failed — use Google Maps link in record detail to fix.` : ''),
+        description: `Geocoded ${result.geocoded} of ${result.total} addresses${sourceInfo}` +
+          (result.failed > 0 ? `. ${result.failed} failed — use Google Maps link in record detail to fix.` : ''),
       });
     } catch (error) {
       toast({
@@ -2145,7 +2126,7 @@ export function PreForeclosureView() {
         <DialogHeader>
           <DialogTitle>Geocoding Addresses</DialogTitle>
           <DialogDescription>
-            Converting addresses to GPS coordinates via US Census Bureau API
+            Converting addresses to GPS coordinates via Census, Nominatim, and Google Maps
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -2174,7 +2155,7 @@ export function PreForeclosureView() {
               <div className="bg-secondary/30 rounded-lg p-4 text-sm space-y-2">
                 <p className="font-medium">Please wait...</p>
                 <p className="text-muted-foreground">
-                  Using US Census Bureau API. Don't close this window.
+                  Trying Census → Nominatim → Google Maps. Don't close this window.
                 </p>
               </div>
             </div>
@@ -2186,10 +2167,10 @@ export function PreForeclosureView() {
                   <div>
                     <p className="font-medium text-green-700">Geocoding Complete!</p>
                     <p className="text-muted-foreground mt-1">
-                      {geocodeResults.size > 0
-                        ? `Geocoded ${geocodeResults.size} of ${geocodeProgress.total} addresses via US Census Bureau API. Coordinates have been saved.`
+                      {geocodeProgress.current > 0
+                        ? `Geocoded ${geocodeProgress.current} of ${geocodeProgress.total} addresses. Coordinates have been saved.`
                         : geocodeProgress.total > 0
-                          ? `Census API could not match any of the ${geocodeProgress.total} addresses. Try the "Geocode Addresses" button again or verify the addresses.`
+                          ? `Could not match any of the ${geocodeProgress.total} addresses. Use the Google Maps link in record detail to set coordinates manually.`
                           : 'All records already have coordinates.'}
                     </p>
                   </div>

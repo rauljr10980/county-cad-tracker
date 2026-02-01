@@ -780,6 +780,32 @@ export async function updatePreForeclosure(updates: {
 }
 
 /**
+ * Geocode pre-foreclosure records via backend (Census → Nominatim → Google Maps)
+ */
+export async function geocodePreForeclosureRecords(documentNumbers: string[]): Promise<{
+  success: boolean;
+  total: number;
+  geocoded: number;
+  updated: number;
+  failed: number;
+  sources: { census: number; nominatim: number; google_maps: number };
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/preforeclosure/geocode`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ documentNumbers }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Geocoding failed');
+  }
+  return response.json();
+}
+
+/**
  * Upload pre-foreclosure file
  */
 export async function uploadPreForeclosureFile(file: File): Promise<{

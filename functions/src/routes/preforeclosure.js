@@ -10,7 +10,7 @@ const prisma = require('../lib/prisma');
 const XLSX = require('xlsx');
 
 const { parseFullAddress, normalizeAddress } = require('../lib/addressParser');
-const { batchGeocodeCensus, batchGeocodeNominatim } = require('../lib/censusGeocode');
+const { batchGeocodeCensus, batchGeocodeNominatim, batchGeocodeGoogleMaps } = require('../lib/censusGeocode');
 
 const router = express.Router();
 
@@ -852,6 +852,117 @@ router.post('/upload-address-only', optionalAuth, async (req, res) => {
       error: 'Failed to process address-only upload',
       details: error.message,
     });
+  }
+});
+
+// ============================================================================
+// GEOCODE RECORDS (Census → Nominatim → Google Maps)
+// ============================================================================
+
+router.post('/geocode', optionalAuth, async (req, res) => {
+  try {
+    const { documentNumbers } = req.body;
+
+    if (!documentNumbers || !Array.isArray(documentNumbers) || documentNumbers.length === 0) {
+      return res.status(400).json({ error: 'documentNumbers array is required' });
+    }
+
+    // Fetch the records from DB
+    const records = await prisma.preForeclosure.findMany({
+      where: { documentNumber: { in: documentNumbers } },
+      select: {
+        documentNumber: true,
+        address: true,
+        city: true,
+        zip: true,
+        latitude: true,
+        longitude: true,
+      }
+    });
+
+    if (records.length === 0) {
+      return res.status(404).json({ error: 'No matching records found' });
+    }
+
+    const geocodeInputs = records.map(r => ({
+      id: r.documentNumber,
+      street: r.address,
+      city: r.city,
+      state: 'TX',
+      zip: r.zip,
+    }));
+
+    const allResults = new Map();
+
+    // Phase 1: Census batch API
+    try {
+      const censusResults = await batchGeocodeCensus(geocodeInputs);
+      for (const [id, result] of censusResults) allResults.set(id, { ...result, source: 'census' });
+      console.log(`[GEOCODE] Census: ${censusResults.size}/${geocodeInputs.length}`);
+    } catch (err) {
+      console.error('[GEOCODE] Census error:', err);
+    }
+
+    // Phase 2: Nominatim for Census failures
+    const afterCensus = geocodeInputs.filter(a => !allResults.has(a.id));
+    if (afterCensus.length > 0) {
+      try {
+        const nomResults = await batchGeocodeNominatim(afterCensus);
+        for (const [id, result] of nomResults) allResults.set(id, { ...result, source: 'nominatim' });
+        console.log(`[GEOCODE] Nominatim: ${nomResults.size}/${afterCensus.length}`);
+      } catch (err) {
+        console.error('[GEOCODE] Nominatim error:', err);
+      }
+    }
+
+    // Phase 3: Google Maps for remaining failures
+    const afterNominatim = geocodeInputs.filter(a => !allResults.has(a.id));
+    if (afterNominatim.length > 0) {
+      try {
+        const gmResults = await batchGeocodeGoogleMaps(afterNominatim);
+        for (const [id, result] of gmResults) allResults.set(id, { ...result, source: 'google_maps' });
+        console.log(`[GEOCODE] Google Maps: ${gmResults.size}/${afterNominatim.length}`);
+      } catch (err) {
+        console.error('[GEOCODE] Google Maps error:', err);
+      }
+    }
+
+    // Update DB with results
+    let updated = 0;
+    for (const [documentNumber, result] of allResults) {
+      try {
+        await prisma.preForeclosure.update({
+          where: { documentNumber },
+          data: {
+            latitude: result.latitude,
+            longitude: result.longitude,
+            updatedAt: new Date(),
+          }
+        });
+        updated++;
+      } catch (err) {
+        console.error(`[GEOCODE] DB update error for ${documentNumber}:`, err);
+      }
+    }
+
+    const failed = records.length - allResults.size;
+    console.log(`[GEOCODE] Complete: ${updated} updated, ${failed} failed out of ${records.length}`);
+
+    res.json({
+      success: true,
+      total: records.length,
+      geocoded: allResults.size,
+      updated,
+      failed,
+      sources: {
+        census: [...allResults.values()].filter(r => r.source === 'census').length,
+        nominatim: [...allResults.values()].filter(r => r.source === 'nominatim').length,
+        google_maps: [...allResults.values()].filter(r => r.source === 'google_maps').length,
+      },
+    });
+  } catch (error) {
+    console.error('[GEOCODE] Error:', error);
+    res.status(500).json({ error: 'Geocoding failed', message: error.message });
   }
 });
 
