@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute, reorderRecordInRoute } from '@/lib/api';
-import { batchGeocodeWithFallback } from '@/lib/geocoding';
+import { batchGeocodeWithFallback, extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
 
 // Local type alias to avoid runtime reference issues
 type RouteType = {
@@ -3253,6 +3253,42 @@ export function PreForeclosureView() {
                       }}
                     />
                   </div>
+                  {(viewRecord.latitude == null || viewRecord.longitude == null) && (
+                    <div className="col-span-2">
+                      <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> Paste Google Maps Link
+                      </Label>
+                      <Input
+                        className="font-mono text-xs h-8 mt-1"
+                        placeholder="https://www.google.com/maps/@..."
+                        onPaste={(e) => {
+                          const pasted = e.clipboardData.getData('text');
+                          const coords = extractCoordsFromGoogleMapsUrl(pasted);
+                          if (coords) {
+                            updateMutation.mutateAsync({
+                              document_number: viewRecord.document_number,
+                              latitude: coords.latitude,
+                              longitude: coords.longitude,
+                            }).then(() => {
+                              toast({
+                                title: 'Coordinates updated',
+                                description: `Set to ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)} from Google Maps link`,
+                              });
+                            });
+                          } else {
+                            toast({
+                              title: 'Invalid link',
+                              description: 'Could not extract coordinates from that URL. Make sure it\'s a Google Maps link.',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Search the address on Google Maps, copy the URL, and paste it here
+                      </p>
+                    </div>
+                  )}
                   {viewRecord.school_district && (
                     <div className="col-span-2">
                       <Label className="text-muted-foreground text-xs">School District</Label>

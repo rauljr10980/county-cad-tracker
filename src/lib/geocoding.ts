@@ -317,6 +317,43 @@ export async function batchGeocodeWithFallback(
 }
 
 /**
+ * Extract latitude and longitude from a Google Maps URL.
+ * Supports patterns like:
+ *   https://www.google.com/maps/@29.3495987,-98.6319508,...
+ *   https://www.google.com/maps/place/.../@29.3495987,-98.6319508,...
+ *   https://maps.google.com/?ll=29.3495987,-98.6319508
+ */
+export function extractCoordsFromGoogleMapsUrl(
+  url: string
+): { latitude: number; longitude: number } | null {
+  try {
+    // Pattern 1: /@lat,lng in path
+    const atMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (atMatch) {
+      const lat = parseFloat(atMatch[1]);
+      const lng = parseFloat(atMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { latitude: lat, longitude: lng };
+      }
+    }
+
+    // Pattern 2: ?ll=lat,lng query param
+    const llMatch = url.match(/[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (llMatch) {
+      const lat = parseFloat(llMatch[1]);
+      const lng = parseFloat(llMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { latitude: lat, longitude: lng };
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Reverse geocode: convert coordinates to address
  */
 export async function reverseGeocode(
