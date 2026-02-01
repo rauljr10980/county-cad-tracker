@@ -2040,10 +2040,10 @@ export function PreForeclosureView() {
                 <p className="font-medium">File Requirements:</p>
                 {uploadMode === 'standard' ? (
                   <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                    <li>Document Number (required)</li>
-                    <li>Type: Mortgage or Tax</li>
-                    <li>Address, City, ZIP</li>
-                    <li>Filing Month (optional, defaults to current month)</li>
+                    <li>Doc Number (required)</li>
+                    <li>Full Address or separate Address, City, ZIP</li>
+                    <li>Recorded Date, Sale Date (optional)</li>
+                    <li>Type: Mortgage or Tax (optional, defaults to Mortgage)</li>
                   </ul>
                 ) : (
                   <ul className="list-disc list-inside space-y-1 text-muted-foreground">
