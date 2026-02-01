@@ -780,7 +780,7 @@ export async function updatePreForeclosure(updates: {
 }
 
 /**
- * Geocode pre-foreclosure records via backend (Census → Nominatim → Google Maps)
+ * Geocode pre-foreclosure records via backend (Census → Nominatim → ArcGIS)
  */
 export async function geocodePreForeclosureRecords(documentNumbers: string[]): Promise<{
   success: boolean;
@@ -788,7 +788,7 @@ export async function geocodePreForeclosureRecords(documentNumbers: string[]): P
   geocoded: number;
   updated: number;
   failed: number;
-  sources: { census: number; nominatim: number; google_maps: number };
+  sources: { census: number; nominatim: number; arcgis: number };
 }> {
   const response = await fetch(`${API_BASE_URL}/api/preforeclosure/geocode`, {
     method: 'POST',

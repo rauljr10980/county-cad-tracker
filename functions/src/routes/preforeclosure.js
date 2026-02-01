@@ -10,7 +10,7 @@ const prisma = require('../lib/prisma');
 const XLSX = require('xlsx');
 
 const { parseFullAddress, normalizeAddress } = require('../lib/addressParser');
-const { batchGeocodeCensus, batchGeocodeNominatim, batchGeocodeGoogleMaps } = require('../lib/censusGeocode');
+const { batchGeocodeCensus, batchGeocodeNominatim, batchGeocodeArcGIS } = require('../lib/censusGeocode');
 
 const router = express.Router();
 
@@ -856,7 +856,7 @@ router.post('/upload-address-only', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
-// GEOCODE RECORDS (Census → Nominatim → Google Maps)
+// GEOCODE RECORDS (Census → Nominatim → ArcGIS)
 // ============================================================================
 
 router.post('/geocode', optionalAuth, async (req, res) => {
@@ -915,15 +915,15 @@ router.post('/geocode', optionalAuth, async (req, res) => {
       }
     }
 
-    // Phase 3: Google Maps for remaining failures
+    // Phase 3: ArcGIS for remaining failures (uses TomTom/HERE data — covers new subdivisions)
     const afterNominatim = geocodeInputs.filter(a => !allResults.has(a.id));
     if (afterNominatim.length > 0) {
       try {
-        const gmResults = await batchGeocodeGoogleMaps(afterNominatim);
-        for (const [id, result] of gmResults) allResults.set(id, { ...result, source: 'google_maps' });
-        console.log(`[GEOCODE] Google Maps: ${gmResults.size}/${afterNominatim.length}`);
+        const arcResults = await batchGeocodeArcGIS(afterNominatim);
+        for (const [id, result] of arcResults) allResults.set(id, { ...result, source: 'arcgis' });
+        console.log(`[GEOCODE] ArcGIS: ${arcResults.size}/${afterNominatim.length}`);
       } catch (err) {
-        console.error('[GEOCODE] Google Maps error:', err);
+        console.error('[GEOCODE] ArcGIS error:', err);
       }
     }
 
@@ -957,7 +957,7 @@ router.post('/geocode', optionalAuth, async (req, res) => {
       sources: {
         census: [...allResults.values()].filter(r => r.source === 'census').length,
         nominatim: [...allResults.values()].filter(r => r.source === 'nominatim').length,
-        google_maps: [...allResults.values()].filter(r => r.source === 'google_maps').length,
+        arcgis: [...allResults.values()].filter(r => r.source === 'arcgis').length,
       },
     });
   } catch (error) {

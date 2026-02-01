@@ -1727,7 +1727,7 @@ export function PreForeclosureView() {
 
     try {
       const docNumbers = recordsToProcess.map((r) => r.document_number);
-      setGeocodeProgress({ current: 0, total: recordsToProcess.length, address: 'Census → Nominatim → Google Maps' });
+      setGeocodeProgress({ current: 0, total: recordsToProcess.length, address: 'Census → Nominatim → ArcGIS' });
 
       const result = await geocodePreForeclosureRecords(docNumbers);
 
@@ -1739,7 +1739,7 @@ export function PreForeclosureView() {
       const sourceParts = [];
       if (result.sources.census > 0) sourceParts.push(`${result.sources.census} via Census`);
       if (result.sources.nominatim > 0) sourceParts.push(`${result.sources.nominatim} via Nominatim`);
-      if (result.sources.google_maps > 0) sourceParts.push(`${result.sources.google_maps} via Google Maps`);
+      if (result.sources.arcgis > 0) sourceParts.push(`${result.sources.arcgis} via ArcGIS`);
       const sourceInfo = sourceParts.length > 0 ? ` (${sourceParts.join(', ')})` : '';
 
       toast({
@@ -2126,7 +2126,7 @@ export function PreForeclosureView() {
         <DialogHeader>
           <DialogTitle>Geocoding Addresses</DialogTitle>
           <DialogDescription>
-            Converting addresses to GPS coordinates via Census, Nominatim, and Google Maps
+            Converting addresses to GPS coordinates via Census, Nominatim, and ArcGIS
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -2155,7 +2155,7 @@ export function PreForeclosureView() {
               <div className="bg-secondary/30 rounded-lg p-4 text-sm space-y-2">
                 <p className="font-medium">Please wait...</p>
                 <p className="text-muted-foreground">
-                  Trying Census → Nominatim → Google Maps. Don't close this window.
+                  Trying Census → Nominatim → ArcGIS. Don't close this window.
                 </p>
               </div>
             </div>

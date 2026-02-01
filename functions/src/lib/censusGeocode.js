@@ -151,93 +151,82 @@ async function batchGeocodeNominatim(addresses) {
 }
 
 /**
- * Geocode a single address via Google Maps HTML scraping.
- * Fetches the Google Maps search page and extracts @lat,lng from the response.
- * No API key required.
+ * Geocode a single address via ArcGIS World Geocoding Service.
+ * Free, no API key required. Uses commercial data (TomTom/HERE)
+ * which covers new subdivisions much better than Census/OSM.
  */
-async function geocodeViaGoogleMaps(street, city, state, zip) {
-  const query = [street, city, state || 'TX', zip].filter(Boolean).join(', ');
-  const url = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+async function geocodeViaArcGIS(street, city, state, zip) {
+  const singleLine = [street, city, state || 'TX', zip].filter(Boolean).join(', ');
+  const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?` + new URLSearchParams({
+    SingleLine: singleLine,
+    f: 'json',
+    maxLocations: '1',
+    outFields: 'Match_addr,Addr_type',
+  });
 
   const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml',
-      'Accept-Language': 'en-US,en;q=0.9',
-    },
-    redirect: 'follow',
+    headers: { 'User-Agent': 'County-CAD-Tracker/1.0' },
   });
 
   if (!response.ok) return null;
 
-  // Check the final URL for @lat,lng pattern
-  const finalUrl = response.url || '';
-  const urlMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if (urlMatch) {
-    const lat = parseFloat(urlMatch[1]);
-    const lng = parseFloat(urlMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-      return { latitude: lat, longitude: lng };
-    }
+  const data = await response.json();
+  if (!data.candidates || data.candidates.length === 0) return null;
+
+  const best = data.candidates[0];
+  // Only accept point-level matches (not city/zip level)
+  const goodTypes = ['PointAddress', 'StreetAddress', 'StreetName', 'Subaddress'];
+  if (best.attributes && best.attributes.Addr_type && !goodTypes.includes(best.attributes.Addr_type)) {
+    return null;
   }
 
-  // Parse HTML body for coordinate patterns
-  const html = await response.text();
-
-  // Pattern: /@lat,lng, in any URL within the HTML
-  const htmlMatch = html.match(/@(-?\d+\.\d{4,}),(-?\d+\.\d{4,})/);
-  if (htmlMatch) {
-    const lat = parseFloat(htmlMatch[1]);
-    const lng = parseFloat(htmlMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-      return { latitude: lat, longitude: lng };
-    }
+  const lat = best.location?.y;
+  const lng = best.location?.x;
+  if (lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) {
+    return {
+      latitude: lat,
+      longitude: lng,
+      matchedAddress: best.attributes?.Match_addr || best.address || '',
+    };
   }
-
-  // Pattern: [null,null,lat,lng] in embedded JSON data
-  const jsonMatch = html.match(/\[null,null,(-?\d+\.\d{4,}),(-?\d+\.\d{4,})\]/);
-  if (jsonMatch) {
-    const lat = parseFloat(jsonMatch[1]);
-    const lng = parseFloat(jsonMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-      return { latitude: lat, longitude: lng };
-    }
-  }
-
   return null;
 }
 
 /**
- * Batch geocode via Google Maps HTML scraping.
- * Processes sequentially with 500ms delay to avoid rate limiting.
+ * Batch geocode via ArcGIS. Processes 5 concurrently (ArcGIS allows high throughput).
  * @param {Array<{id: string, street: string, city: string, state: string, zip: string}>} addresses
- * @returns {Promise<Map<string, {latitude: number, longitude: number}>>}
+ * @returns {Promise<Map<string, {latitude: number, longitude: number, matchedAddress: string}>>}
  */
-async function batchGeocodeGoogleMaps(addresses) {
+async function batchGeocodeArcGIS(addresses) {
   const results = new Map();
 
   if (!addresses || addresses.length === 0) {
     return results;
   }
 
-  for (let i = 0; i < addresses.length; i++) {
-    const a = addresses[i];
-    try {
-      const result = await geocodeViaGoogleMaps(a.street, a.city, a.state, a.zip);
-      if (result) {
-        results.set(a.id, result);
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+    const batch = addresses.slice(i, i + BATCH_SIZE);
+    const promises = batch.map(async (a) => {
+      try {
+        const result = await geocodeViaArcGIS(a.street, a.city, a.state, a.zip);
+        if (result) {
+          results.set(a.id, result);
+        }
+      } catch (err) {
+        // Skip on error
       }
-    } catch (err) {
-      // Skip on error
-    }
+    });
+    await Promise.all(promises);
 
-    if (i < addresses.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+    // Small delay between batches
+    if (i + BATCH_SIZE < addresses.length) {
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
   }
 
-  console.log(`[GOOGLE MAPS GEOCODE] Processed ${addresses.length} addresses, matched ${results.size}`);
+  console.log(`[ARCGIS GEOCODE] Processed ${addresses.length} addresses, matched ${results.size}`);
   return results;
 }
 
-module.exports = { batchGeocodeCensus, batchGeocodeNominatim, batchGeocodeGoogleMaps };
+module.exports = { batchGeocodeCensus, batchGeocodeNominatim, batchGeocodeArcGIS };
