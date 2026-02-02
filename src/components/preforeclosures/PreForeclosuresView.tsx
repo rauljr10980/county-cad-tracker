@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { PreForeclosureTable } from './PreForeclosureTable';
 import { PreForeclosureDetailsModal } from './PreForeclosureDetailsModal';
-import { PreForeclosure, PreForeclosureType, PreForeclosureInternalStatus } from '@/types/property';
+import { PreForeclosure, PreForeclosureType } from '@/types/property';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -70,7 +70,6 @@ export function PreForeclosuresView() {
   
   // Filters
   const [typeFilter, setTypeFilter] = useState<PreForeclosureType | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<PreForeclosureInternalStatus | 'all'>('all');
   const [cityFilter, setCityFilter] = useState<string>('all');
   const [zipFilter, setZipFilter] = useState<string>('all');
   const [showNeedsFollowUp, setShowNeedsFollowUp] = useState(false);
@@ -108,9 +107,6 @@ export function PreForeclosuresView() {
     if (typeFilter !== 'all') {
       result = result.filter(pf => pf.type === typeFilter);
     }
-    if (statusFilter !== 'all') {
-      result = result.filter(pf => pf.internal_status === statusFilter);
-    }
     if (cityFilter !== 'all') {
       result = result.filter(pf => pf.city === cityFilter);
     }
@@ -145,7 +141,7 @@ export function PreForeclosuresView() {
     });
     
     return result;
-  }, [allData, typeFilter, statusFilter, cityFilter, zipFilter, showNeedsFollowUp, debouncedSearchQuery, sortBy, sortOrder]);
+  }, [allData, typeFilter, cityFilter, zipFilter, showNeedsFollowUp, debouncedSearchQuery, sortBy, sortOrder]);
 
   // Pagination
   const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
@@ -178,7 +174,6 @@ export function PreForeclosuresView() {
 
   const clearFilters = () => {
     setTypeFilter('all');
-    setStatusFilter('all');
     setCityFilter('all');
     setZipFilter('all');
     setShowNeedsFollowUp(false);
@@ -186,7 +181,7 @@ export function PreForeclosuresView() {
     setPage(1);
   };
 
-  const hasActiveFilters = typeFilter !== 'all' || statusFilter !== 'all' || cityFilter !== 'all' || zipFilter !== 'all' || showNeedsFollowUp || searchQuery;
+  const hasActiveFilters = typeFilter !== 'all' || cityFilter !== 'all' || zipFilter !== 'all' || showNeedsFollowUp || searchQuery;
 
   return (
     <div className="p-3 md:p-6 overflow-x-hidden">
@@ -244,7 +239,7 @@ export function PreForeclosuresView() {
             <span>Filters</span>
             {hasActiveFilters && (
               <Badge variant="secondary" className="ml-1 text-xs">
-                {[typeFilter !== 'all', statusFilter !== 'all', cityFilter !== 'all', zipFilter !== 'all', showNeedsFollowUp].filter(Boolean).length}
+                {[typeFilter !== 'all', cityFilter !== 'all', zipFilter !== 'all', showNeedsFollowUp].filter(Boolean).length}
               </Badge>
             )}
           </div>
@@ -259,19 +254,6 @@ export function PreForeclosuresView() {
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="Mortgage">Mortgage</SelectItem>
                 <SelectItem value="Tax">Tax</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as PreForeclosureInternalStatus | 'all'); setPage(1); }}>
-              <SelectTrigger className="w-full mobile-input">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="New">New</SelectItem>
-                <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-                <SelectItem value="Monitoring">Monitoring</SelectItem>
-                <SelectItem value="Dead">Dead</SelectItem>
               </SelectContent>
             </Select>
 

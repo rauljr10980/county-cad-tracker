@@ -12,7 +12,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { PreForeclosureType, PreForeclosureStatus, WorkflowStage } from '@/types/property';
+import { PreForeclosureType, WorkflowStage } from '@/types/property';
 import { Filter, X } from 'lucide-react';
 
 export interface PreForeclosureAdvancedFilters {
@@ -20,7 +20,6 @@ export interface PreForeclosureAdvancedFilters {
   city: string;
   zip: string;
   month: string;
-  status: PreForeclosureStatus | 'all';
   needsFollowUp: boolean;
   hasVisited: boolean;
   hasNotes: boolean;
@@ -154,23 +153,6 @@ export function AdvancedFiltersPanel({
                 {uniqueMonths.map(month => (
                   <SelectItem key={month} value={month}>{month}</SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Status Filter */}
-          <div className="space-y-3">
-            <Label>Internal Status</Label>
-            <Select value={filters.status} onValueChange={(v) => updateFilter('status', v as PreForeclosureStatus | 'all')}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="New">New</SelectItem>
-                <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-                <SelectItem value="Monitoring">Monitoring</SelectItem>
-                <SelectItem value="Dead">Dead</SelectItem>
               </SelectContent>
             </Select>
           </div>

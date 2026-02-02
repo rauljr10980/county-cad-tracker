@@ -29,7 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useUploadAddressOnlyPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats } from '@/hooks/usePreForeclosure';
-import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus, WorkflowStage, WorkflowLogEntry, WORKFLOW_STAGES, STAGE_TASK_MAP } from '@/types/property';
+import { PreForeclosureRecord, PreForeclosureType, WorkflowStage, WorkflowLogEntry, WORKFLOW_STAGES, STAGE_TASK_MAP } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -91,7 +91,6 @@ function SortableRow({
   handleMarkVisited,
   handleViewRecordDetails,
   markingVisited,
-  handleStatusChange,
   onOpenVisitedDialog,
 }: any) {
   const {
@@ -179,53 +178,9 @@ function SortableRow({
         </Button>
       </div>
 
-      {/* Bottom row: status + visited + details */}
+      {/* Bottom row: visited + details */}
       {documentNumber && (
         <div className="flex items-center gap-2 mt-2 pl-7">
-          {/* Internal Status */}
-          {record && handleStatusChange && (
-            <div className="flex-1 min-w-0" style={{ position: 'relative', zIndex: 1 }}>
-              <Select
-                value={(record as any).internal_status || (record as any).internalStatus || 'New'}
-                onValueChange={async (value) => {
-                  if (handleStatusChange) {
-                    try {
-                      const fullRecord: PreForeclosureRecord = {
-                        document_number: documentNumber,
-                        type: (record as any).type || 'Mortgage',
-                        address: (record as any).address || '',
-                        city: (record as any).city || '',
-                        zip: (record as any).zip || '',
-                        filing_month: (record as any).filing_month || (record as any).filingMonth || '',
-                        county: (record as any).county || 'Bexar',
-                        internal_status: value as PreForeclosureStatus,
-                        inactive: (record as any).inactive || false,
-                        first_seen_month: (record as any).first_seen_month || (record as any).firstSeenMonth || '',
-                        last_seen_month: (record as any).last_seen_month || (record as any).lastSeenMonth || '',
-                        created_at: (record as any).created_at || (record as any).createdAt || new Date().toISOString(),
-                        updated_at: (record as any).updated_at || (record as any).updatedAt || new Date().toISOString(),
-                        ...(record as any),
-                      };
-                      await handleStatusChange(fullRecord, value as PreForeclosureStatus);
-                    } catch (error) {
-                      console.error('Error in onValueChange:', error);
-                    }
-                  }
-                }}
-              >
-                <SelectTrigger className="h-8 text-xs w-full cursor-pointer hover:bg-secondary/50 border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-[100]">
-                  <SelectItem value="New">New</SelectItem>
-                  <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-                  <SelectItem value="Monitoring">Monitoring</SelectItem>
-                  <SelectItem value="Dead">Dead</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           {/* Visited Button */}
           <Button
             size="sm"
@@ -280,7 +235,6 @@ export function PreForeclosureView() {
     city: 'all',
     zip: 'all',
     month: 'all',
-    status: 'all',
     needsFollowUp: false,
     hasVisited: false,
     hasNotes: false,
@@ -422,11 +376,6 @@ export function PreForeclosureView() {
       filtered = filtered.filter(r => r.filing_month === advancedFilters.month);
     }
 
-    // Status filter
-    if (advancedFilters.status !== 'all') {
-      filtered = filtered.filter(r => r.internal_status === advancedFilters.status);
-    }
-
     // Needs follow-up filter
     if (advancedFilters.needsFollowUp) {
       const today = new Date().toISOString().split('T')[0];
@@ -556,7 +505,6 @@ export function PreForeclosureView() {
     if (advancedFilters.city !== 'all') count++;
     if (advancedFilters.zip !== 'all') count++;
     if (advancedFilters.month !== 'all') count++;
-    if (advancedFilters.status !== 'all') count++;
     if (advancedFilters.needsFollowUp) count++;
     if (advancedFilters.hasVisited) count++;
     if (advancedFilters.hasNotes) count++;
@@ -582,7 +530,6 @@ export function PreForeclosureView() {
       city: 'all',
       zip: 'all',
       month: 'all',
-      status: 'all',
       needsFollowUp: false,
       hasVisited: false,
       hasNotes: false,
@@ -597,47 +544,6 @@ export function PreForeclosureView() {
       workflowStage: 'all',
     });
     setSearchQuery('');
-  };
-
-  const handleStatusChange = async (record: PreForeclosureRecord, newStatus: PreForeclosureStatus) => {
-    try {
-      await updateMutation.mutateAsync({
-        document_number: record.document_number,
-        internal_status: newStatus,
-      });
-      
-      // Update local record state
-      record.internal_status = newStatus;
-      
-      // If we're viewing a route, update the route record as well
-      if (viewRoute) {
-        const routeRecord = viewRoute.records?.find(rr => {
-          const docNum = rr.record?.document_number || rr.record?.documentNumber;
-          return docNum === record.document_number;
-        });
-        if (routeRecord && routeRecord.record) {
-          // Update the record's internal_status (handle both camelCase and snake_case)
-          (routeRecord.record as any).internal_status = newStatus;
-          // Update viewRoute to trigger re-render
-          setViewRoute({ ...viewRoute });
-        }
-      }
-      
-      toast({
-        title: 'Status Updated',
-        description: `Status changed to "${newStatus}" for document ${record.document_number}`,
-      });
-      
-      // Invalidate query to refresh the table
-      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update status',
-        variant: 'destructive',
-      });
-    }
   };
 
   const handleNotesClick = (record: PreForeclosureRecord) => {
@@ -1839,20 +1745,6 @@ export function PreForeclosureView() {
     }
   };
 
-  const getStatusColor = (status: PreForeclosureStatus) => {
-    switch (status) {
-      case 'New':
-        return 'bg-blue-500/20 text-blue-500 border-blue-500/30';
-      case 'Contact Attempted':
-        return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30';
-      case 'Monitoring':
-        return 'bg-green-500/20 text-green-500 border-green-500/30';
-      case 'Dead':
-        return 'bg-red-500/20 text-red-500 border-red-500/30';
-      default:
-        return 'bg-secondary text-muted-foreground';
-    }
-  };
 
   const getTypeColor = (type: PreForeclosureType) => {
     return type === 'Mortgage' 
@@ -2965,24 +2857,7 @@ export function PreForeclosureView() {
               )}
 
               {/* Status and Visited Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                <div className="min-w-0">
-                  <div className="text-xs text-muted-foreground mb-1">Internal Status</div>
-                      <Select
-                        value={record.internal_status}
-                        onValueChange={(v) => handleStatusChange(record, v as PreForeclosureStatus)}
-                      >
-                    <SelectTrigger className="w-full h-8 text-xs min-w-0">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="New">New</SelectItem>
-                          <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-                          <SelectItem value="Monitoring">Monitoring</SelectItem>
-                          <SelectItem value="Dead">Dead</SelectItem>
-                        </SelectContent>
-                      </Select>
-                </div>
+              <div className="mb-4">
                 <div className="min-w-0">
                   <div className="text-xs text-muted-foreground mb-1">Route Status</div>
                   <div>
@@ -4342,7 +4217,6 @@ export function PreForeclosureView() {
                                     handleMarkVisited={handleMarkVisited}
                                     handleViewRecordDetails={handleViewRecordDetails}
                                     markingVisited={markingVisited}
-                                    handleStatusChange={handleStatusChange}
                                     onOpenVisitedDialog={handleOpenVisitedDialog}
                                   />
                                 );

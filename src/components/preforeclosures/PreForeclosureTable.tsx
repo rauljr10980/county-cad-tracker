@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FileText, ChevronUp, ChevronDown } from 'lucide-react';
-import { PreForeclosure, PreForeclosureInternalStatus } from '@/types/property';
+import { PreForeclosure } from '@/types/property';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,13 +14,6 @@ interface PreForeclosureTableProps {
   sortOrder: 'asc' | 'desc';
   onSortChange: (column: string) => void;
 }
-
-const statusColors: Record<PreForeclosureInternalStatus, string> = {
-  'New': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  'Contact Attempted': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  'Monitoring': 'bg-green-500/20 text-green-400 border-green-500/30',
-  'Dead': 'bg-red-500/20 text-red-400 border-red-500/30',
-};
 
 const typeColors: Record<'Mortgage' | 'Tax', string> = {
   'Mortgage': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -81,7 +74,6 @@ export function PreForeclosureTable({
               <SortHeader column="city">City</SortHeader>
               <SortHeader column="zip">ZIP</SortHeader>
               <SortHeader column="filing_month">Filing Month</SortHeader>
-              <SortHeader column="internal_status">Internal Status</SortHeader>
               <SortHeader column="visited">Visited</SortHeader>
               <SortHeader column="last_action_date">Last Action</SortHeader>
               <SortHeader column="next_follow_up_date">Next Follow-Up</SortHeader>
@@ -110,11 +102,6 @@ export function PreForeclosureTable({
                 <TableCell>{pf.city}</TableCell>
                 <TableCell>{pf.zip}</TableCell>
                 <TableCell>{pf.filing_month}</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={statusColors[pf.internal_status]}>
-                    {pf.internal_status}
-                  </Badge>
-                </TableCell>
                 <TableCell>
                   {pf.visited ? (
                     <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">

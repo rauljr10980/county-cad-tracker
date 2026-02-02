@@ -1,5 +1,5 @@
 import { FileText, MapPin, Calendar, Eye, Navigation, ExternalLink } from 'lucide-react';
-import { PreForeclosure, PreForeclosureInternalStatus } from '@/types/property';
+import { PreForeclosure } from '@/types/property';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -8,13 +8,6 @@ interface PreForeclosureCardProps {
   preforeclosure: PreForeclosure;
   onViewDetails: (pf: PreForeclosure) => void;
 }
-
-const statusColors: Record<PreForeclosureInternalStatus, string> = {
-  'New': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  'Contact Attempted': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  'Monitoring': 'bg-green-500/20 text-green-400 border-green-500/30',
-  'Dead': 'bg-red-500/20 text-red-400 border-red-500/30',
-};
 
 const typeColors: Record<'Mortgage' | 'Tax', string> = {
   'Mortgage': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -50,9 +43,6 @@ export function PreForeclosureCard({ preforeclosure: pf, onViewDetails }: PreFor
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Badge variant="outline" className={typeColors[pf.type]}>
               {pf.type}
-            </Badge>
-            <Badge variant="outline" className={statusColors[pf.internal_status]}>
-              {pf.internal_status}
             </Badge>
             {pf.visited && (
               <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">

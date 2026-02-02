@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Save, FileText, MapPin, Calendar, AlertCircle, Eye, Send, ExternalLink, Phone, Star } from 'lucide-react';
-import { PreForeclosure, PreForeclosureInternalStatus } from '@/types/property';
+import { PreForeclosure } from '@/types/property';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,15 +19,6 @@ interface PreForeclosureDetailsModalProps {
   onUpdate: (documentNumber: string, updates: Partial<PreForeclosure>) => void;
 }
 
-const statusOptions: PreForeclosureInternalStatus[] = ['New', 'Contact Attempted', 'Monitoring', 'Dead'];
-
-const statusColors: Record<PreForeclosureInternalStatus, string> = {
-  'New': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  'Contact Attempted': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  'Monitoring': 'bg-green-500/20 text-green-400 border-green-500/30',
-  'Dead': 'bg-red-500/20 text-red-400 border-red-500/30',
-};
-
 export function PreForeclosureDetailsModal({ 
   preforeclosure, 
   isOpen, 
@@ -35,9 +26,6 @@ export function PreForeclosureDetailsModal({
   onUpdate 
 }: PreForeclosureDetailsModalProps) {
   const [notes, setNotes] = useState(preforeclosure?.notes || '');
-  const [internalStatus, setInternalStatus] = useState<PreForeclosureInternalStatus>(
-    preforeclosure?.internal_status || 'New'
-  );
   const [nextFollowUp, setNextFollowUp] = useState(preforeclosure?.next_follow_up_date || '');
   const [phoneNumbers, setPhoneNumbers] = useState<string[]>(['', '', '', '', '', '']);
   const [ownerPhoneIndex, setOwnerPhoneIndex] = useState<number | undefined>(undefined);
@@ -49,7 +37,6 @@ export function PreForeclosureDetailsModal({
   useEffect(() => {
     if (preforeclosure) {
       setNotes(preforeclosure.notes || '');
-      setInternalStatus(preforeclosure.internal_status || 'New');
       setNextFollowUp(preforeclosure.next_follow_up_date || '');
       const phones = preforeclosure.phoneNumbers || [];
       setPhoneNumbers([
@@ -71,7 +58,6 @@ export function PreForeclosureDetailsModal({
     try {
       const updates: Partial<PreForeclosure> = {
         notes,
-        internal_status: internalStatus,
         next_follow_up_date: nextFollowUp || undefined,
         last_action_date: new Date().toISOString(),
       };
@@ -313,24 +299,6 @@ export function PreForeclosureDetailsModal({
             <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
               Operator Data (Editable)
             </h3>
-
-            <div>
-              <Label htmlFor="status">Internal Status</Label>
-              <Select value={internalStatus} onValueChange={(v) => setInternalStatus(v as PreForeclosureInternalStatus)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      <Badge variant="outline" className={statusColors[status]}>
-                        {status}
-                      </Badge>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
             <div>
               <Label htmlFor="followup" className="flex items-center gap-1">
