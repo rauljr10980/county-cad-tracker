@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Phone, MessageSquare, Mail, Car, CheckSquare, Loader2, AlertCircle, Eye, Clock, Flag, Filter, CheckCircle2, X, Trash2 } from 'lucide-react';
-import { Property, PreForeclosure } from '@/types/property';
+import { Property, PreForeclosure, PreForeclosureRecord } from '@/types/property';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getTasks, updatePropertyAction, markTaskDone, deleteTask, updatePropertyPriority, updatePreForeclosure, getPreForeclosures } from '@/lib/api';
 import { format, isToday, isPast, parseISO, startOfDay, isBefore, isAfter } from 'date-fns';
@@ -66,6 +66,7 @@ export function TasksView() {
   const [sortBy, setSortBy] = useState<'urgency' | 'action' | 'overdue'>('urgency');
   const [updatingPriority, setUpdatingPriority] = useState<Set<string>>(new Set());
   const [priorityPopoverOpen, setPriorityPopoverOpen] = useState<{ [key: string]: boolean }>({});
+  const [selectedFunnelStage, setSelectedFunnelStage] = useState<WorkflowStage | null>(null);
 
   const handleDeleteTask = async (property: Property) => {
     try {
@@ -308,6 +309,14 @@ export function TasksView() {
   const maxStageCount = useMemo(() => {
     return Math.max(1, ...Object.values(stageCounts));
   }, [stageCounts]);
+
+  const stageRecords = useMemo(() => {
+    if (!selectedFunnelStage || !preForeclosureRecords) return [];
+    return (preForeclosureRecords as PreForeclosureRecord[]).filter(r => {
+      const stage = (r.workflow_stage as WorkflowStage) || 'not_started';
+      return stage === selectedFunnelStage;
+    });
+  }, [selectedFunnelStage, preForeclosureRecords]);
 
   const handleMarkDone = async (property: Property) => {
     if (!selectedOutcome) {
