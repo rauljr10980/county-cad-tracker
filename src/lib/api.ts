@@ -31,7 +31,7 @@ function getAuthToken(): string | null {
 }
 
 // Helper function to get headers with auth
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const token = getAuthToken();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',

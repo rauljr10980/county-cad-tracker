@@ -4,7 +4,7 @@
  * Now uses API instead of localStorage for cross-device sync
  */
 
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export interface SavedZone {
   id: string;
@@ -90,7 +90,9 @@ async function migrateLocalStorageZones(localZones: SavedZone[]): Promise<void> 
 export async function loadZones(): Promise<SavedZone[]> {
   try {
     console.log('[Zones] Fetching zones from API...');
-    const response = await fetch(`${API_BASE_URL}/api/zones`);
+    const response = await fetch(`${API_BASE_URL}/api/zones`, {
+      headers: getAuthHeaders(),
+    });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch zones: ${response.status} ${response.statusText}`);
@@ -133,9 +135,7 @@ export async function saveZone(zone: Omit<SavedZone, 'id' | 'createdAt' | 'updat
     console.log('[Zones] Creating zone:', zone.name);
     const response = await fetch(`${API_BASE_URL}/api/zones`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(zone),
     });
 
@@ -161,9 +161,7 @@ export async function updateZone(id: string, updates: Partial<Omit<SavedZone, 'i
     console.log('[Zones] Updating zone:', id);
     const response = await fetch(`${API_BASE_URL}/api/zones/${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(updates),
     });
 
@@ -192,6 +190,7 @@ export async function deleteZone(id: string): Promise<boolean> {
     console.log('[Zones] Deleting zone:', id);
     const response = await fetch(`${API_BASE_URL}/api/zones/${id}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -216,7 +215,9 @@ export async function deleteZone(id: string): Promise<boolean> {
 export async function getZone(id: string): Promise<SavedZone | null> {
   try {
     console.log('[Zones] Fetching zone:', id);
-    const response = await fetch(`${API_BASE_URL}/api/zones/${id}`);
+    const response = await fetch(`${API_BASE_URL}/api/zones/${id}`, {
+      headers: getAuthHeaders(),
+    });
 
     if (!response.ok) {
       if (response.status === 404) {

@@ -357,7 +357,27 @@ export function PreForeclosureView() {
   const [markingVisited, setMarkingVisited] = useState<string | null>(null);
   const [visitedDialogOpen, setVisitedDialogOpen] = useState(false);
   const [visitedDialogRecord, setVisitedDialogRecord] = useState<{ documentNumber: string; record: any; driver: 'Luciano' | 'Raul' } | null>(null);
+  // Multi-step visited wizard state
+  const [visitedWizardStep, setVisitedWizardStep] = useState(1);
+  const [visitedOwnerAnswered, setVisitedOwnerAnswered] = useState<boolean | null>(null);
+  const [visitedPhoneProvided, setVisitedPhoneProvided] = useState<boolean | null>(null);
+  const [visitedPhoneNumber, setVisitedPhoneNumber] = useState('');
+  const [visitedSolvedForeclosure, setVisitedSolvedForeclosure] = useState<boolean | null>(null);
+  const [visitedPropertyType, setVisitedPropertyType] = useState<'primary' | 'rental' | 'vacant' | null>(null);
+  const [visitedCondition, setVisitedCondition] = useState<number | null>(null);
   const [visitedStepNote, setVisitedStepNote] = useState('');
+
+  const resetVisitedWizard = () => {
+    setVisitedWizardStep(1);
+    setVisitedOwnerAnswered(null);
+    setVisitedPhoneProvided(null);
+    setVisitedPhoneNumber('');
+    setVisitedSolvedForeclosure(null);
+    setVisitedPropertyType(null);
+    setVisitedCondition(null);
+    setVisitedStepNote('');
+  };
+
   const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
   const [removingRecordId, setRemovingRecordId] = useState<string | null>(null);
   const [reorderingRecordId, setReorderingRecordId] = useState<string | null>(null);
@@ -909,16 +929,15 @@ export function PreForeclosureView() {
   // Open visited dialog with workflow questions
   const handleOpenVisitedDialog = (documentNumber: string, record: any, driver: 'Luciano' | 'Raul') => {
     setVisitedDialogRecord({ documentNumber, record, driver });
-    setVisitedStepNote('');
+    resetVisitedWizard();
     setVisitedDialogOpen(true);
   };
 
-  // Handle workflow advance from visited dialog, then mark as visited
+  // Handle workflow advance from visited dialog (for non-initial stages)
   const handleVisitedWorkflowAdvance = async (nextStage: WorkflowStage, outcomeLabel: string) => {
     if (!visitedDialogRecord) return;
     const { documentNumber, record, driver } = visitedDialogRecord;
 
-    // Get the full record from the records array for workflow data
     const fullRecord = records.find((r: PreForeclosureRecord) => r.document_number === documentNumber);
     const currentStage: WorkflowStage = fullRecord?.workflow_stage || record?.workflow_stage || 'not_started';
     const workflowLog: WorkflowLogEntry[] = fullRecord?.workflow_log || record?.workflow_log || [];
@@ -934,7 +953,6 @@ export function PreForeclosureView() {
     };
     const updatedLog = [...workflowLog, newEntry];
 
-    // Auto-task: look up task for the next stage
     const taskRule = STAGE_TASK_MAP[nextStage];
     const today = new Date();
     today.setHours(23, 59, 59, 999);
@@ -949,14 +967,12 @@ export function PreForeclosureView() {
 
     setMarkingVisited(documentNumber);
     try {
-      // Update workflow
       await updateMutation.mutateAsync({
         document_number: documentNumber,
         workflow_stage: nextStage,
         workflow_log: updatedLog,
         ...taskFields,
       });
-      // Mark as visited
       await markPreForeclosureVisited(documentNumber, driver, true);
 
       toast({
@@ -983,16 +999,134 @@ export function PreForeclosureView() {
       setMarkingVisited(null);
       setVisitedDialogOpen(false);
       setVisitedDialogRecord(null);
-      setVisitedStepNote('');
+      resetVisitedWizard();
     }
   };
 
-  // Mark visited without workflow change (skip workflow)
+  // Multi-step wizard submit: determine stage, build log, save phone, mark visited
+  const handleVisitedWizardSubmit = async () => {
+    if (!visitedDialogRecord || !visitedPropertyType || visitedCondition === null) return;
+    const { documentNumber, record, driver } = visitedDialogRecord;
+
+    // Determine workflow stage
+    let nextStage: WorkflowStage;
+    if (visitedSolvedForeclosure) {
+      nextStage = 'dead_end';
+    } else if (visitedOwnerAnswered && visitedPropertyType === 'primary') {
+      nextStage = 'negotiating';
+    } else {
+      nextStage = 'people_search';
+    }
+
+    // Build outcome string with all answers
+    const parts: string[] = [];
+    parts.push(`Owner answered: ${visitedOwnerAnswered ? 'Yes' : 'No'}`);
+    if (visitedOwnerAnswered && visitedPhoneProvided) {
+      parts.push(`Phone: ${visitedPhoneNumber.trim()}`);
+    } else if (visitedOwnerAnswered) {
+      parts.push('No phone provided');
+    }
+    parts.push(`Foreclosure solved: ${visitedSolvedForeclosure ? 'Yes' : 'No'}`);
+    parts.push(`Property: ${visitedPropertyType === 'primary' ? 'Primary Home' : visitedPropertyType === 'rental' ? 'Rental' : 'Vacant'}`);
+    parts.push(`Condition: ${visitedCondition}/10`);
+    if (visitedStepNote.trim()) {
+      parts.push(`Note: ${visitedStepNote.trim()}`);
+    }
+    const outcomeLabel = parts.join(' | ');
+
+    // Get current workflow data
+    const fullRecord = records.find((r: PreForeclosureRecord) => r.document_number === documentNumber);
+    const currentStage: WorkflowStage = fullRecord?.workflow_stage || record?.workflow_stage || 'not_started';
+    const workflowLog: WorkflowLogEntry[] = fullRecord?.workflow_log || record?.workflow_log || [];
+
+    const newEntry: WorkflowLogEntry = {
+      id: crypto.randomUUID(),
+      fromStage: currentStage,
+      toStage: nextStage,
+      outcome: outcomeLabel,
+      note: visitedStepNote.trim() || undefined,
+      actingAs: driver,
+      timestamp: new Date().toISOString(),
+    };
+    const updatedLog = [...workflowLog, newEntry];
+
+    // Auto-task
+    const taskRule = STAGE_TASK_MAP[nextStage];
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const taskFields = taskRule
+      ? {
+          actionType: taskRule.actionType as 'call' | 'text' | 'mail' | 'driveby',
+          priority: taskRule.priority as 'high' | 'med' | 'low',
+          dueTime: today.toISOString(),
+          assignedTo: driver,
+        }
+      : {};
+
+    // Phone number fields
+    let phoneFields: Record<string, any> = {};
+    if (visitedPhoneProvided && visitedPhoneNumber.trim()) {
+      const existingPhones: string[] = fullRecord?.phoneNumbers || [];
+      const newPhones = [...existingPhones];
+      const emptyIdx = newPhones.findIndex((p: string) => !p || !p.trim());
+      if (emptyIdx !== -1) {
+        newPhones[emptyIdx] = visitedPhoneNumber.trim();
+        phoneFields = { phoneNumbers: newPhones, ownerPhoneIndex: emptyIdx };
+      } else if (newPhones.length < 6) {
+        newPhones.push(visitedPhoneNumber.trim());
+        phoneFields = { phoneNumbers: newPhones, ownerPhoneIndex: newPhones.length - 1 };
+      } else {
+        newPhones[5] = visitedPhoneNumber.trim();
+        phoneFields = { phoneNumbers: newPhones, ownerPhoneIndex: 5 };
+      }
+    }
+
+    setMarkingVisited(documentNumber);
+    try {
+      await updateMutation.mutateAsync({
+        document_number: documentNumber,
+        workflow_stage: nextStage,
+        workflow_log: updatedLog,
+        ...taskFields,
+        ...phoneFields,
+      });
+      await markPreForeclosureVisited(documentNumber, driver, true);
+
+      toast({
+        title: 'Visited & Workflow Updated',
+        description: `Marked as visited. Workflow: ${WORKFLOW_STAGES[nextStage].label}`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      await loadActiveRoutes();
+      if (viewRoute) {
+        const updatedRoutes = await getActiveRoutes();
+        const updatedRoute = updatedRoutes.find((r: RouteType) => r.id === viewRoute.id);
+        if (updatedRoute) setViewRoute(updatedRoute);
+      }
+    } catch (error) {
+      console.error('Error updating visited + workflow:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update',
+        variant: 'destructive',
+      });
+    } finally {
+      setMarkingVisited(null);
+      setVisitedDialogOpen(false);
+      setVisitedDialogRecord(null);
+      resetVisitedWizard();
+    }
+  };
+
+  // Mark visited without workflow change (skip wizard)
   const handleVisitedSkipWorkflow = async () => {
     if (!visitedDialogRecord) return;
     const { documentNumber, driver } = visitedDialogRecord;
     setVisitedDialogOpen(false);
     setVisitedDialogRecord(null);
+    resetVisitedWizard();
     await handleMarkVisited(documentNumber, driver, true);
   };
 
@@ -4264,7 +4398,7 @@ export function PreForeclosureView() {
         if (!open) {
           setVisitedDialogOpen(false);
           setVisitedDialogRecord(null);
-          setVisitedStepNote('');
+          resetVisitedWizard();
         }
       }}>
         <DialogContent className="max-w-md">
@@ -4277,80 +4411,330 @@ export function PreForeclosureView() {
           {visitedDialogRecord && (() => {
             const fullRecord = records.find((r: PreForeclosureRecord) => r.document_number === visitedDialogRecord.documentNumber);
             const currentStage: WorkflowStage = fullRecord?.workflow_stage || visitedDialogRecord.record?.workflow_stage || 'not_started';
-            const stageInfo = WORKFLOW_STAGES[currentStage] || WORKFLOW_STAGES.not_started;
+            const showWizard = currentStage === 'not_started' || currentStage === 'initial_visit';
+
+            if (!showWizard) {
+              // Non-initial stages: show existing single-question behavior
+              const stageInfo = WORKFLOW_STAGES[currentStage] || WORKFLOW_STAGES.not_started;
+              return (
+                <div className="space-y-4">
+                  <div className="bg-secondary/30 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground mb-1">Current Workflow Stage</p>
+                    <p className="text-sm font-medium">{stageInfo.label}</p>
+                  </div>
+                  {!stageInfo.terminal && stageInfo.question && (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">{stageInfo.question}</p>
+                      <div className="flex flex-col gap-2">
+                        {stageInfo.outcomes?.map((outcome) => (
+                          <Button
+                            key={outcome.nextStage}
+                            size="sm"
+                            variant={outcome.nextStage === 'negotiating' ? 'default' : 'outline'}
+                            onClick={() => handleVisitedWorkflowAdvance(outcome.nextStage, outcome.label)}
+                            disabled={markingVisited === visitedDialogRecord.documentNumber}
+                            className="justify-start"
+                          >
+                            {markingVisited === visitedDialogRecord.documentNumber ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                            )}
+                            {outcome.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {stageInfo.terminal && (
+                    <p className="text-sm text-muted-foreground text-center py-2">
+                      Workflow is at <span className="font-medium">{stageInfo.label}</span>.
+                    </p>
+                  )}
+                  <div className="border-t pt-3">
+                    <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={handleVisitedSkipWorkflow} disabled={markingVisited === visitedDialogRecord.documentNumber}>
+                      Just Mark Visited (Skip Workflow)
+                    </Button>
+                  </div>
+                </div>
+              );
+            }
+
+            // --- Multi-step wizard for initial visits ---
+            // Calculate visible steps (step 2 only if owner answered)
+            const totalSteps = visitedOwnerAnswered === false ? 4 : 5;
+            // Map wizard step to display step number
+            const getDisplayStep = (step: number) => {
+              if (visitedOwnerAnswered === false && step >= 3) return step - 1;
+              return step;
+            };
 
             return (
               <div className="space-y-4">
-                {/* Current stage info */}
-                <div className="bg-secondary/30 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground mb-1">Current Workflow Stage</p>
-                  <p className="text-sm font-medium">{stageInfo.label}</p>
+                {/* Step indicator */}
+                <div className="flex items-center justify-center gap-1">
+                  {Array.from({ length: totalSteps }, (_, i) => i + 1).map((displayNum) => {
+                    const currentDisplay = getDisplayStep(visitedWizardStep);
+                    const isActive = displayNum === currentDisplay;
+                    const isDone = displayNum < currentDisplay;
+                    return (
+                      <div key={displayNum} className="flex items-center">
+                        {displayNum > 1 && (
+                          <div className={cn('w-6 h-0.5 mx-0.5', isDone ? 'bg-primary/50' : 'bg-secondary')} />
+                        )}
+                        <div className={cn(
+                          'h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-medium',
+                          isActive && 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-1 ring-offset-background',
+                          isDone && 'bg-primary/20 text-primary',
+                          !isActive && !isDone && 'bg-secondary text-muted-foreground',
+                        )}>
+                          {isDone ? <Check className="h-3 w-3" /> : displayNum}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Workflow question and outcomes */}
-                {!stageInfo.terminal && stageInfo.question && (
+                {/* Step 1: Did owner answer the door? */}
+                {visitedWizardStep === 1 && (
                   <div className="space-y-3">
-                    <p className="text-sm font-medium">{stageInfo.question}</p>
+                    <p className="text-sm font-medium">Did owner answer the door?</p>
                     <div className="flex flex-col gap-2">
-                      {stageInfo.outcomes?.map((outcome) => (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => {
+                          setVisitedOwnerAnswered(true);
+                          setVisitedWizardStep(2);
+                        }}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                        Yes
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => {
+                          setVisitedOwnerAnswered(false);
+                          setVisitedPhoneProvided(null);
+                          setVisitedPhoneNumber('');
+                          setVisitedWizardStep(3); // Skip phone step
+                        }}
+                      >
+                        <X className="h-4 w-4 mr-2 text-red-500" />
+                        No
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Phone number (only if owner answered) */}
+                {visitedWizardStep === 2 && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Did they provide a phone number?</p>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant={visitedPhoneProvided === true ? 'default' : 'outline'}
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => setVisitedPhoneProvided(true)}
+                      >
+                        <Phone className="h-4 w-4 mr-2" />
+                        Yes
+                      </Button>
+                      <Button
+                        variant={visitedPhoneProvided === false ? 'default' : 'outline'}
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => {
+                          setVisitedPhoneProvided(false);
+                          setVisitedPhoneNumber('');
+                        }}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        No
+                      </Button>
+                    </div>
+                    {visitedPhoneProvided === true && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Phone Number</Label>
+                        <Input
+                          type="tel"
+                          placeholder="Enter phone number..."
+                          value={visitedPhoneNumber}
+                          onChange={(e) => setVisitedPhoneNumber(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-2">
+                      <Button variant="ghost" size="sm" onClick={() => setVisitedWizardStep(1)}>
+                        Back
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={visitedPhoneProvided === null || (visitedPhoneProvided === true && !visitedPhoneNumber.trim())}
+                        onClick={() => setVisitedWizardStep(3)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3: Did they solve foreclosure? */}
+                {visitedWizardStep === 3 && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Did they solve the foreclosure?</p>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => {
+                          setVisitedSolvedForeclosure(true);
+                          setVisitedWizardStep(4);
+                        }}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                        Yes
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => {
+                          setVisitedSolvedForeclosure(false);
+                          setVisitedWizardStep(4);
+                        }}
+                      >
+                        <X className="h-4 w-4 mr-2 text-red-500" />
+                        No
+                      </Button>
+                    </div>
+                    <div className="flex justify-start pt-2">
+                      <Button variant="ghost" size="sm" onClick={() => setVisitedWizardStep(visitedOwnerAnswered ? 2 : 1)}>
+                        Back
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Property type */}
+                {visitedWizardStep === 4 && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">What type of property is this?</p>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => {
+                          setVisitedPropertyType('primary');
+                          setVisitedWizardStep(5);
+                        }}
+                      >
+                        Primary Home
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => {
+                          setVisitedPropertyType('rental');
+                          setVisitedWizardStep(5);
+                        }}
+                      >
+                        Rental
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => {
+                          setVisitedPropertyType('vacant');
+                          setVisitedWizardStep(5);
+                        }}
+                      >
+                        Vacant
+                      </Button>
+                    </div>
+                    <div className="flex justify-start pt-2">
+                      <Button variant="ghost" size="sm" onClick={() => setVisitedWizardStep(3)}>
+                        Back
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 5: Condition of home + note + submit */}
+                {visitedWizardStep === 5 && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Condition of Home</p>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
                         <Button
-                          key={outcome.nextStage}
+                          key={n}
                           size="sm"
-                          variant={outcome.nextStage === 'negotiating' ? 'default' : 'outline'}
-                          onClick={() => handleVisitedWorkflowAdvance(outcome.nextStage, outcome.label)}
-                          disabled={markingVisited === visitedDialogRecord.documentNumber}
-                          className="justify-start"
-                        >
-                          {markingVisited === visitedDialogRecord.documentNumber ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4 mr-2" />
+                          variant={visitedCondition === n ? 'default' : 'outline'}
+                          className={cn(
+                            'h-9 w-full font-medium',
+                            visitedCondition === n && n <= 3 && 'bg-red-600 hover:bg-red-700',
+                            visitedCondition === n && n >= 4 && n <= 6 && 'bg-amber-600 hover:bg-amber-700',
+                            visitedCondition === n && n >= 7 && 'bg-green-600 hover:bg-green-700',
                           )}
-                          {outcome.label}
+                          onClick={() => setVisitedCondition(n)}
+                        >
+                          {n}
                         </Button>
                       ))}
                     </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground px-1">
+                      <span>Poor</span>
+                      <span>Excellent</span>
+                    </div>
                     <Input
-                      placeholder="Add a note for this visit (optional)..."
+                      placeholder="Add a note (optional)..."
                       value={visitedStepNote}
                       onChange={(e) => setVisitedStepNote(e.target.value)}
                       className="text-sm"
                     />
-                  </div>
-                )}
 
-                {/* If no question (e.g. not_started with just "Begin Workflow") */}
-                {!stageInfo.terminal && !stageInfo.question && stageInfo.outcomes && (
-                  <div className="space-y-3">
-                    <div className="flex flex-col gap-2">
-                      {stageInfo.outcomes.map((outcome) => (
-                        <Button
-                          key={outcome.nextStage}
-                          size="sm"
-                          variant="default"
-                          onClick={() => handleVisitedWorkflowAdvance(outcome.nextStage, outcome.label)}
-                          disabled={markingVisited === visitedDialogRecord.documentNumber}
-                        >
-                          {markingVisited === visitedDialogRecord.documentNumber ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : null}
-                          {outcome.label}
-                        </Button>
-                      ))}
+                    {/* Summary */}
+                    <div className="bg-secondary/30 rounded-lg p-3 text-xs space-y-1">
+                      <p><span className="text-muted-foreground">Owner answered:</span> {visitedOwnerAnswered ? 'Yes' : 'No'}</p>
+                      {visitedOwnerAnswered && visitedPhoneProvided && (
+                        <p><span className="text-muted-foreground">Phone:</span> {visitedPhoneNumber}</p>
+                      )}
+                      <p><span className="text-muted-foreground">Foreclosure solved:</span> {visitedSolvedForeclosure ? 'Yes' : 'No'}</p>
+                      <p><span className="text-muted-foreground">Property:</span> {visitedPropertyType === 'primary' ? 'Primary Home' : visitedPropertyType === 'rental' ? 'Rental' : 'Vacant'}</p>
+                      {visitedCondition !== null && (
+                        <p><span className="text-muted-foreground">Condition:</span> {visitedCondition}/10</p>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between pt-2">
+                      <Button variant="ghost" size="sm" onClick={() => setVisitedWizardStep(4)}>
+                        Back
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={visitedCondition === null || markingVisited === visitedDialogRecord.documentNumber}
+                        onClick={handleVisitedWizardSubmit}
+                      >
+                        {markingVisited === visitedDialogRecord.documentNumber ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                        )}
+                        Complete Visit
+                      </Button>
                     </div>
                   </div>
                 )}
 
-                {/* Terminal stage - just mark visited */}
-                {stageInfo.terminal && (
-                  <div className="text-center py-2">
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Workflow is at <span className="font-medium">{stageInfo.label}</span>.
-                    </p>
-                  </div>
-                )}
-
-                {/* Skip workflow option */}
+                {/* Skip wizard option */}
                 <div className="border-t pt-3">
                   <Button
                     variant="ghost"
@@ -4359,10 +4743,7 @@ export function PreForeclosureView() {
                     onClick={handleVisitedSkipWorkflow}
                     disabled={markingVisited === visitedDialogRecord.documentNumber}
                   >
-                    {markingVisited === visitedDialogRecord.documentNumber ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : null}
-                    Just Mark Visited (Skip Workflow)
+                    Just Mark Visited (Skip Questions)
                   </Button>
                 </div>
               </div>
