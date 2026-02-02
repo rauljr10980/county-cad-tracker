@@ -497,8 +497,16 @@ export function TasksView() {
             {FUNNEL_STAGES.filter(s => s.key !== 'dead_end').map((stage) => {
               const count = stageCounts[stage.key];
               const width = Math.max(count > 0 ? 5 : 0, (count / maxStageCount) * 100);
+              const isSelected = selectedFunnelStage === stage.key;
               return (
-                <div key={stage.key}>
+                <div
+                  key={stage.key}
+                  className={cn(
+                    "cursor-pointer rounded-lg p-2 -mx-2 transition-all",
+                    isSelected ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-secondary/50"
+                  )}
+                  onClick={() => setSelectedFunnelStage(isSelected ? null : stage.key)}
+                >
                   <div className="flex items-center justify-between text-sm mb-1">
                     <span className="font-medium">{stage.label}</span>
                     <span className="text-muted-foreground">{count} {count === 1 ? 'deal' : 'deals'}</span>
@@ -519,13 +527,66 @@ export function TasksView() {
           </div>
           {/* Dead End - separated */}
           {stageCounts.dead_end > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
+            <div
+              className={cn(
+                "mt-4 pt-4 border-t border-border cursor-pointer rounded-lg p-2 -mx-2 transition-all",
+                selectedFunnelStage === 'dead_end' ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-secondary/50"
+              )}
+              onClick={() => setSelectedFunnelStage(selectedFunnelStage === 'dead_end' ? null : 'dead_end')}
+            >
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
                   Dead End
                 </span>
                 <span className="text-muted-foreground">{stageCounts.dead_end} deals</span>
+              </div>
+            </div>
+          )}
+
+          {/* Selected Stage Property List */}
+          {selectedFunnelStage && stageRecords.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold">
+                  {FUNNEL_STAGES.find(s => s.key === selectedFunnelStage)?.label || selectedFunnelStage} — {stageRecords.length} {stageRecords.length === 1 ? 'property' : 'properties'}
+                </h4>
+                <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSelectedFunnelStage(null)}>
+                  <X className="h-3 w-3 mr-1" /> Close
+                </Button>
+              </div>
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {stageRecords.map((record) => (
+                  <div
+                    key={record.document_number}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary/30 p-3 cursor-pointer hover:border-primary/50 transition-all"
+                    onClick={async () => {
+                      setSelectedPreForeclosure(record as PreForeclosure);
+                    }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{record.address || 'No address'}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[record.city, record.zip].filter(Boolean).join(', ')}
+                        {record.type && <span className="ml-2">{record.type}</span>}
+                      </p>
+                      {record.notes && (
+                        <p className="text-xs text-muted-foreground mt-1 truncate italic">{record.notes}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {record.assignedTo && (
+                        <span className={cn(
+                          'text-xs font-medium px-1.5 py-0.5 rounded',
+                          record.assignedTo === 'Luciano' ? 'bg-green-600/20 text-green-400' : 'bg-orange-600/20 text-orange-400',
+                        )}>
+                          {record.assignedTo}
+                        </span>
+                      )}
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
