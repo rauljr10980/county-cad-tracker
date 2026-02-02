@@ -29,7 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useUploadAddressOnlyPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats } from '@/hooks/usePreForeclosure';
-import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus } from '@/types/property';
+import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus, WorkflowStage, WorkflowLogEntry, WORKFLOW_STAGES, STAGE_TASK_MAP } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -70,6 +70,7 @@ type RouteType = {
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { AdvancedFiltersPanel, PreForeclosureAdvancedFilters } from './AdvancedFilters';
+import { useAuth } from '@/contexts/AuthContext';
 import { WorkflowStageBadge } from './WorkflowStageBadge';
 import { WorkflowTracker } from './WorkflowTracker';
 import { UploadStatsCard } from './UploadStatsCard';
@@ -78,19 +79,20 @@ import { UploadHistoryCard } from './UploadHistoryCard';
 
 
 // Sortable Row Component
-function SortableRow({ 
-  routeRecord, 
-  index, 
-  viewRoute, 
-  documentNumber, 
-  record, 
-  removingRecordId, 
+function SortableRow({
+  routeRecord,
+  index,
+  viewRoute,
+  documentNumber,
+  record,
+  removingRecordId,
   reorderingRecordId,
   handleRemoveRecordFromRoute,
   handleMarkVisited,
   handleViewRecordDetails,
   markingVisited,
   handleStatusChange,
+  onOpenVisitedDialog,
 }: any) {
   const {
     attributes,
@@ -232,13 +234,18 @@ function SortableRow({
               if (record.visited) {
                 handleMarkVisited(documentNumber, viewRoute.driver, false);
               } else {
-                handleMarkVisited(documentNumber, viewRoute.driver, true);
+                // Open visited dialog with workflow questions
+                if (onOpenVisitedDialog) {
+                  onOpenVisitedDialog(documentNumber, record, viewRoute.driver);
+                } else {
+                  handleMarkVisited(documentNumber, viewRoute.driver, true);
+                }
               }
             }}
             disabled={markingVisited === documentNumber}
             className={`h-7 text-xs w-full ${
-              record.visited 
-                ? 'bg-green-500/20 text-green-600 border-green-500 hover:bg-green-500/30' 
+              record.visited
+                ? 'bg-green-500/20 text-green-600 border-green-500 hover:bg-green-500/30'
                 : ''
             }`}
           >
@@ -348,6 +355,9 @@ export function PreForeclosureView() {
   const [viewRoute, setViewRoute] = useState<RouteType | null>(null);
   const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
   const [markingVisited, setMarkingVisited] = useState<string | null>(null);
+  const [visitedDialogOpen, setVisitedDialogOpen] = useState(false);
+  const [visitedDialogRecord, setVisitedDialogRecord] = useState<{ documentNumber: string; record: any; driver: 'Luciano' | 'Raul' } | null>(null);
+  const [visitedStepNote, setVisitedStepNote] = useState('');
   const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
   const [removingRecordId, setRemovingRecordId] = useState<string | null>(null);
   const [reorderingRecordId, setReorderingRecordId] = useState<string | null>(null);
@@ -894,6 +904,96 @@ export function PreForeclosureView() {
     } finally {
       setMarkingVisited(null);
     }
+  };
+
+  // Open visited dialog with workflow questions
+  const handleOpenVisitedDialog = (documentNumber: string, record: any, driver: 'Luciano' | 'Raul') => {
+    setVisitedDialogRecord({ documentNumber, record, driver });
+    setVisitedStepNote('');
+    setVisitedDialogOpen(true);
+  };
+
+  // Handle workflow advance from visited dialog, then mark as visited
+  const handleVisitedWorkflowAdvance = async (nextStage: WorkflowStage, outcomeLabel: string) => {
+    if (!visitedDialogRecord) return;
+    const { documentNumber, record, driver } = visitedDialogRecord;
+
+    // Get the full record from the records array for workflow data
+    const fullRecord = records.find((r: PreForeclosureRecord) => r.document_number === documentNumber);
+    const currentStage: WorkflowStage = fullRecord?.workflow_stage || record?.workflow_stage || 'not_started';
+    const workflowLog: WorkflowLogEntry[] = fullRecord?.workflow_log || record?.workflow_log || [];
+
+    const newEntry: WorkflowLogEntry = {
+      id: crypto.randomUUID(),
+      fromStage: currentStage,
+      toStage: nextStage,
+      outcome: outcomeLabel,
+      note: visitedStepNote.trim() || undefined,
+      actingAs: driver,
+      timestamp: new Date().toISOString(),
+    };
+    const updatedLog = [...workflowLog, newEntry];
+
+    // Auto-task: look up task for the next stage
+    const taskRule = STAGE_TASK_MAP[nextStage];
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const taskFields = taskRule
+      ? {
+          actionType: taskRule.actionType as 'call' | 'text' | 'mail' | 'driveby',
+          priority: taskRule.priority as 'high' | 'med' | 'low',
+          dueTime: today.toISOString(),
+          assignedTo: driver,
+        }
+      : {};
+
+    setMarkingVisited(documentNumber);
+    try {
+      // Update workflow
+      await updateMutation.mutateAsync({
+        document_number: documentNumber,
+        workflow_stage: nextStage,
+        workflow_log: updatedLog,
+        ...taskFields,
+      });
+      // Mark as visited
+      await markPreForeclosureVisited(documentNumber, driver, true);
+
+      toast({
+        title: 'Visited & Workflow Updated',
+        description: `Marked as visited. Workflow: ${WORKFLOW_STAGES[nextStage].label}`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      await loadActiveRoutes();
+      if (viewRoute) {
+        const updatedRoutes = await getActiveRoutes();
+        const updatedRoute = updatedRoutes.find((r: RouteType) => r.id === viewRoute.id);
+        if (updatedRoute) setViewRoute(updatedRoute);
+      }
+    } catch (error) {
+      console.error('Error updating visited + workflow:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update',
+        variant: 'destructive',
+      });
+    } finally {
+      setMarkingVisited(null);
+      setVisitedDialogOpen(false);
+      setVisitedDialogRecord(null);
+      setVisitedStepNote('');
+    }
+  };
+
+  // Mark visited without workflow change (skip workflow)
+  const handleVisitedSkipWorkflow = async () => {
+    if (!visitedDialogRecord) return;
+    const { documentNumber, driver } = visitedDialogRecord;
+    setVisitedDialogOpen(false);
+    setVisitedDialogRecord(null);
+    await handleMarkVisited(documentNumber, driver, true);
   };
 
   const handleViewRecordDetails = async (documentNumber: string) => {
@@ -4139,6 +4239,7 @@ export function PreForeclosureView() {
                                           handleViewRecordDetails={handleViewRecordDetails}
                                           markingVisited={markingVisited}
                                           handleStatusChange={handleStatusChange}
+                                          onOpenVisitedDialog={handleOpenVisitedDialog}
                                         />
                                       );
                                     })
@@ -4155,6 +4256,118 @@ export function PreForeclosureView() {
               )}
             </SortableContext>
           </DndContext>
+        </DialogContent>
+      </Dialog>
+
+      {/* Visited Workflow Dialog */}
+      <Dialog open={visitedDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setVisitedDialogOpen(false);
+          setVisitedDialogRecord(null);
+          setVisitedStepNote('');
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark as Visited</DialogTitle>
+            <DialogDescription>
+              {visitedDialogRecord?.record?.address || 'Property'}
+            </DialogDescription>
+          </DialogHeader>
+          {visitedDialogRecord && (() => {
+            const fullRecord = records.find((r: PreForeclosureRecord) => r.document_number === visitedDialogRecord.documentNumber);
+            const currentStage: WorkflowStage = fullRecord?.workflow_stage || visitedDialogRecord.record?.workflow_stage || 'not_started';
+            const stageInfo = WORKFLOW_STAGES[currentStage] || WORKFLOW_STAGES.not_started;
+
+            return (
+              <div className="space-y-4">
+                {/* Current stage info */}
+                <div className="bg-secondary/30 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Current Workflow Stage</p>
+                  <p className="text-sm font-medium">{stageInfo.label}</p>
+                </div>
+
+                {/* Workflow question and outcomes */}
+                {!stageInfo.terminal && stageInfo.question && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">{stageInfo.question}</p>
+                    <div className="flex flex-col gap-2">
+                      {stageInfo.outcomes?.map((outcome) => (
+                        <Button
+                          key={outcome.nextStage}
+                          size="sm"
+                          variant={outcome.nextStage === 'negotiating' ? 'default' : 'outline'}
+                          onClick={() => handleVisitedWorkflowAdvance(outcome.nextStage, outcome.label)}
+                          disabled={markingVisited === visitedDialogRecord.documentNumber}
+                          className="justify-start"
+                        >
+                          {markingVisited === visitedDialogRecord.documentNumber ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                          )}
+                          {outcome.label}
+                        </Button>
+                      ))}
+                    </div>
+                    <Input
+                      placeholder="Add a note for this visit (optional)..."
+                      value={visitedStepNote}
+                      onChange={(e) => setVisitedStepNote(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                )}
+
+                {/* If no question (e.g. not_started with just "Begin Workflow") */}
+                {!stageInfo.terminal && !stageInfo.question && stageInfo.outcomes && (
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2">
+                      {stageInfo.outcomes.map((outcome) => (
+                        <Button
+                          key={outcome.nextStage}
+                          size="sm"
+                          variant="default"
+                          onClick={() => handleVisitedWorkflowAdvance(outcome.nextStage, outcome.label)}
+                          disabled={markingVisited === visitedDialogRecord.documentNumber}
+                        >
+                          {markingVisited === visitedDialogRecord.documentNumber ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : null}
+                          {outcome.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Terminal stage - just mark visited */}
+                {stageInfo.terminal && (
+                  <div className="text-center py-2">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Workflow is at <span className="font-medium">{stageInfo.label}</span>.
+                    </p>
+                  </div>
+                )}
+
+                {/* Skip workflow option */}
+                <div className="border-t pt-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-muted-foreground"
+                    onClick={handleVisitedSkipWorkflow}
+                    disabled={markingVisited === visitedDialogRecord.documentNumber}
+                  >
+                    {markingVisited === visitedDialogRecord.documentNumber ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : null}
+                    Just Mark Visited (Skip Workflow)
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
