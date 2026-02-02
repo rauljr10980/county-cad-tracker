@@ -3347,7 +3347,18 @@ export function PreForeclosureView() {
       </Dialog>
 
       {/* View Details Modal */}
-      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+      <Dialog open={viewOpen} onOpenChange={(open) => {
+        if (!open && viewRecord) {
+          // Save notes on dialog close (onBlur doesn't fire when dialog unmounts)
+          updateMutation.mutateAsync({
+            document_number: viewRecord.document_number,
+            notes: viewRecord.notes || '',
+          }).then(() => {
+            queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+          }).catch(() => {});
+        }
+        setViewOpen(open);
+      }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
