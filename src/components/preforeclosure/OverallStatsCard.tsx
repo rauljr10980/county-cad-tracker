@@ -1,14 +1,16 @@
-import { usePreForeclosures } from '@/hooks/usePreForeclosure';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle2, ListChecks } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import type { PreForeclosureRecord } from '@/types/property';
 
-export function OverallStatsCard() {
-  const { data: records = [] } = usePreForeclosures();
+interface OverallStatsCardProps {
+  records: PreForeclosureRecord[];
+}
 
-  // Calculate visited properties
+export function OverallStatsCard({ records }: OverallStatsCardProps) {
+  // Calculate visited properties from the filtered records shown on screen
   const visitedCount = records.filter(r => r.visited === true).length;
-  const totalCount = records.filter(r => r.inactive === false).length; // Only count active records
+  const totalCount = records.length;
 
   const visitedPercentage = totalCount > 0 ? ((visitedCount / totalCount) * 100).toFixed(1) : '0.0';
 

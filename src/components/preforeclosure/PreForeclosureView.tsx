@@ -2330,7 +2330,7 @@ export function PreForeclosureView() {
       {/* Stats Dashboard Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <UploadStatsCard />
-        <OverallStatsCard />
+        <OverallStatsCard records={filteredRecords} />
       </div>
 
       {/* Active Routes Dashboard */}
@@ -3224,7 +3224,7 @@ export function PreForeclosureView() {
           {viewRecord && (
             <div className="space-y-6">
               {/* Actions Panel */}
-              <div className="bg-secondary/30 rounded-lg p-4">
+              <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-sm font-medium">Actions</span>
                 </div>
@@ -3272,16 +3272,16 @@ export function PreForeclosureView() {
               </div>
 
               {/* Property Information */}
-              <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+              <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 space-y-3">
                 <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                   Property Information
                 </h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <Label className="text-muted-foreground text-xs">Document Number</Label>
                     <p className="font-mono text-sm">{viewRecord.document_number}</p>
                   </div>
-                  <div className="col-span-2">
+                  <div>
                     <Label className="text-muted-foreground text-xs">Type</Label>
                     <Badge
                       variant="outline"
@@ -3290,7 +3290,7 @@ export function PreForeclosureView() {
                       {viewRecord.type}
                     </Badge>
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <Label className="text-muted-foreground text-xs flex items-center gap-1">
                       <MapPin className="h-3 w-3" /> Address
                     </Label>
@@ -3339,7 +3339,7 @@ export function PreForeclosureView() {
                       }}
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <Label className="text-muted-foreground text-xs flex items-center gap-1">
                       <MapPin className="h-3 w-3" /> Paste Google Maps Link
                     </Label>
@@ -3374,7 +3374,7 @@ export function PreForeclosureView() {
                     </p>
                   </div>
                   {viewRecord.school_district && (
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                       <Label className="text-muted-foreground text-xs">School District</Label>
                       <p className="text-sm">{viewRecord.school_district}</p>
                     </div>
@@ -3413,7 +3413,7 @@ export function PreForeclosureView() {
               />
 
               {/* Phone Numbers Section - Always Visible */}
-              <div className="bg-secondary/30 rounded-lg p-4" style={{ display: 'block' }}>
+              <div className="bg-secondary/30 rounded-lg p-3 sm:p-4" style={{ display: 'block' }}>
                 <div className="flex items-center gap-2 mb-3">
                   <Phone className="h-4 w-4 text-primary" />
                   <span className="text-sm font-medium">Phone Numbers</span>
@@ -3425,9 +3425,9 @@ export function PreForeclosureView() {
                     const phoneValue = phoneNumbersArray[index] || '';
                     const isOwnerPhone = viewRecord.ownerPhoneIndex === index;
                     return (
-                      <div key={index} className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground w-16 shrink-0">
-                          Phone {index + 1}:
+                      <div key={index} className="flex items-center gap-1.5 sm:gap-2">
+                        <span className="text-xs text-muted-foreground w-8 sm:w-16 shrink-0">
+                          <span className="hidden sm:inline">Phone </span>{index + 1}:
                         </span>
                         <Input
                           type="tel"
@@ -3522,7 +3522,7 @@ export function PreForeclosureView() {
               {/* Tasks Section */}
               <div className="space-y-4">
                   {/* Notes Section */}
-                  <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                  <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 space-y-3">
                     <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                       Notes
                     </h3>
@@ -3567,7 +3567,7 @@ export function PreForeclosureView() {
                   </div>
 
                   {/* Route Status Section in Tasks Tab */}
-                  <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                  <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 space-y-3">
                     <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                       Route Status
                     </h3>
@@ -3600,7 +3600,7 @@ export function PreForeclosureView() {
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         {viewRecord.visited === true ? (
                           <Button
                             variant="outline"
@@ -3635,6 +3635,7 @@ export function PreForeclosureView() {
                             <Button
                               variant="outline"
                               size="sm"
+                              className="flex-1"
                               onClick={async () => {
                                 await handleMarkVisited(viewRecord.document_number, 'Luciano', true);
                                 // Update local state
@@ -3662,6 +3663,7 @@ export function PreForeclosureView() {
                             <Button
                               variant="outline"
                               size="sm"
+                              className="flex-1"
                               onClick={async () => {
                                 await handleMarkVisited(viewRecord.document_number, 'Raul', true);
                                 // Update local state
@@ -3698,13 +3700,13 @@ export function PreForeclosureView() {
               </div>
 
               {/* Actions & Tasks Section */}
-              <div className="bg-secondary/30 rounded-lg p-4">
+              <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle className="h-4 w-4 text-primary" />
                   <span className="text-sm font-medium">Actions & Tasks</span>
                 </div>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
                       <label className="text-xs text-muted-foreground">Action Type</label>
                       <Select value={actionType} onValueChange={(value) => setActionType(value as any)}>
@@ -3749,7 +3751,7 @@ export function PreForeclosureView() {
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
                       <label className="text-xs text-muted-foreground">Due Date & Time</label>
                       <Popover>
@@ -3816,7 +3818,7 @@ export function PreForeclosureView() {
 
               {/* Current Status */}
               {viewRecord.actionType && (
-                <div className="bg-secondary/30 rounded-lg p-4">
+                <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <Target className="h-4 w-4 text-primary" />
