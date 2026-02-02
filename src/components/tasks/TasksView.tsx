@@ -490,7 +490,7 @@ export function TasksView() {
 
       {/* Sales Funnel - Workflow Stages */}
       {preForeclosureRecords && preForeclosureRecords.length > 0 && (
-        <div className="mb-6 rounded-xl border border-border bg-card p-6">
+        <div className="mb-6 rounded-xl border border-border bg-card p-4 sm:p-6 overflow-hidden">
           <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
           <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
           <div className="mt-5 space-y-3">
@@ -555,11 +555,11 @@ export function TasksView() {
                   <X className="h-3 w-3 mr-1" /> Close
                 </Button>
               </div>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              <div className="space-y-2 max-h-[400px] overflow-y-auto overflow-x-hidden">
                 {stageRecords.map((record) => (
                   <div
                     key={record.document_number}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary/30 p-3 cursor-pointer hover:border-primary/50 transition-all"
+                    className="flex items-center justify-between gap-2 sm:gap-3 rounded-lg border border-border bg-secondary/30 p-2.5 sm:p-3 cursor-pointer hover:border-primary/50 transition-all"
                     onClick={async () => {
                       setSelectedPreForeclosure(record as PreForeclosure);
                     }}
@@ -594,17 +594,17 @@ export function TasksView() {
       )}
 
       {/* Header Controls */}
-      <div className="mb-8 flex items-center justify-between flex-wrap gap-6 pb-4 border-b border-border">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 pb-4 border-b border-border">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Action Queue</h2>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Action Queue</h2>
           <p className="text-sm text-muted-foreground mt-2 font-medium">
             {filteredAndSortedTasks.length} task{filteredAndSortedTasks.length !== 1 ? 's' : ''} ready for action
           </p>
         </div>
         
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <Select value={filterMode} onValueChange={(v) => setFilterMode(v as FilterMode)}>
-            <SelectTrigger className="w-[160px] h-10 font-medium">
+            <SelectTrigger className="w-[140px] sm:w-[160px] h-10 font-medium">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
@@ -620,7 +620,7 @@ export function TasksView() {
           </Select>
 
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-            <SelectTrigger className="w-[160px] h-10 font-medium">
+            <SelectTrigger className="w-[140px] sm:w-[160px] h-10 font-medium">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

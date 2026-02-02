@@ -329,7 +329,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-card border-border">
+      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-5xl max-h-[85vh] overflow-y-auto bg-card border-border">
         <DialogHeader className="border-b border-border pb-4">
           <div className="flex items-start justify-between">
             <div>

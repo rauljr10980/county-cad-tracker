@@ -2960,7 +2960,7 @@ export function PropertiesView() {
 
       {/* Route Details Modal - Matching pre-foreclosure design */}
       <Dialog open={routeDetailsOpen} onOpenChange={setRouteDetailsOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-auto">
+        <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <RouteIcon className="h-5 w-5" />

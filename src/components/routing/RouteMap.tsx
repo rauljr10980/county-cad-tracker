@@ -382,7 +382,7 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose, 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col">
+      <DialogContent className="w-[95vw] sm:max-w-3xl md:max-w-4xl lg:max-w-6xl max-h-[90vh] h-[85vh] flex flex-col">
         {mapContent}
       </DialogContent>
     </Dialog>

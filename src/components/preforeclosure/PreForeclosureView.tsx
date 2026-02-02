@@ -115,117 +115,118 @@ function SortableRow({
   };
 
   return (
-    <tr
+    <div
       ref={setNodeRef}
       style={style}
-      className={`border-t border-border hover:bg-secondary/30 ${
-        routeRecord.isDepot ? 'bg-primary/10' : ''
-      } ${isDragging ? 'bg-secondary/50' : ''}`}
-      // Don't attach drag listeners to the entire row - only to the drag handle
+      className={cn(
+        "border border-border rounded-lg p-3 transition-all",
+        routeRecord.isDepot ? 'bg-primary/10 border-primary/30' : 'bg-card',
+        isDragging ? 'bg-secondary/50 shadow-lg' : 'hover:border-primary/30',
+      )}
     >
-      <td className="px-4 py-2 text-sm">
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* Top row: order/depot + address + drag handle */}
+      <div className="flex items-start gap-2">
+        {/* Drag Handle */}
+        <div
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded flex-shrink-0 mt-0.5"
+          title="Drag to reorder"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+
+        {/* Order badge */}
+        <div className="flex-shrink-0 mt-0.5">
           {routeRecord.isDepot ? (
-            <>
-              <Badge variant="default" className="bg-primary">Depot</Badge>
-              <Button
-                size="sm"
-                variant="default"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
-                }}
-                disabled={removingRecordId === routeRecord.id}
-                className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Remove from route"
-              >
-                {removingRecordId === routeRecord.id ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <X className="h-5 w-5" />
-                )}
-              </Button>
-            </>
+            <Badge variant="default" className="bg-primary text-xs">Depot</Badge>
           ) : (
-            <>
-              <span className="font-medium">{routeRecord.orderIndex}</span>
-              <Button
-                size="sm"
-                variant="default"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
-                }}
-                disabled={removingRecordId === routeRecord.id}
-                className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700 text-white border-2 border-red-500 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Remove from route"
-              >
-                {removingRecordId === routeRecord.id ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <X className="h-5 w-5" />
-                )}
-              </Button>
-            </>
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-xs font-bold">
+              {routeRecord.orderIndex}
+            </span>
           )}
         </div>
-      </td>
-      <td className="px-4 py-2 text-sm font-mono hidden">{documentNumber}</td>
-      <td className="px-4 py-2 text-sm">{record.address}</td>
-      <td className="px-4 py-2 text-sm hidden">{record.city}</td>
-      <td className="px-4 py-2 text-sm hidden">{record.zip}</td>
-      <td className="px-4 py-2 text-sm" style={{ position: 'relative', zIndex: 1 }}>
-        {documentNumber && record && handleStatusChange && (
-          <Select
-            value={(record as any).internal_status || (record as any).internalStatus || 'New'}
-            onValueChange={async (value) => {
-              console.log('Select onValueChange called with:', value, 'for document:', documentNumber);
-              if (handleStatusChange) {
-                try {
-                  // Create a proper PreForeclosureRecord object for handleStatusChange
-                  const fullRecord: PreForeclosureRecord = {
-                    document_number: documentNumber,
-                    type: (record as any).type || 'Mortgage',
-                    address: (record as any).address || '',
-                    city: (record as any).city || '',
-                    zip: (record as any).zip || '',
-                    filing_month: (record as any).filing_month || (record as any).filingMonth || '',
-                    county: (record as any).county || 'Bexar',
-                    internal_status: value as PreForeclosureStatus,
-                    inactive: (record as any).inactive || false,
-                    first_seen_month: (record as any).first_seen_month || (record as any).firstSeenMonth || '',
-                    last_seen_month: (record as any).last_seen_month || (record as any).lastSeenMonth || '',
-                    created_at: (record as any).created_at || (record as any).createdAt || new Date().toISOString(),
-                    updated_at: (record as any).updated_at || (record as any).updatedAt || new Date().toISOString(),
-                    ...(record as any),
-                  };
-                  console.log('Calling handleStatusChange with:', fullRecord, value);
-                  await handleStatusChange(fullRecord, value as PreForeclosureStatus);
-                  console.log('handleStatusChange completed successfully');
-                } catch (error) {
-                  console.error('Error in onValueChange:', error);
-                }
-              } else {
-                console.error('handleStatusChange is not available');
-              }
-            }}
-          >
-            <SelectTrigger 
-              className="h-8 text-xs w-full cursor-pointer hover:bg-secondary/50 border-border"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="z-[100]">
-              <SelectItem value="New">New</SelectItem>
-              <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
-              <SelectItem value="Monitoring">Monitoring</SelectItem>
-              <SelectItem value="Dead">Dead</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-      </td>
-      <td className="px-4 py-2 text-sm">
-        {documentNumber && (
+
+        {/* Address */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{record.address}</p>
+          {(record.city || record.zip) && (
+            <p className="text-xs text-muted-foreground truncate">
+              {[record.city, record.zip].filter(Boolean).join(', ')}
+            </p>
+          )}
+        </div>
+
+        {/* Remove button */}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleRemoveRecordFromRoute(viewRoute.id, routeRecord.id, documentNumber);
+          }}
+          disabled={removingRecordId === routeRecord.id}
+          className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10 flex-shrink-0"
+          title="Remove from route"
+        >
+          {removingRecordId === routeRecord.id ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <X className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+
+      {/* Bottom row: status + visited + details */}
+      {documentNumber && (
+        <div className="flex items-center gap-2 mt-2 pl-7">
+          {/* Internal Status */}
+          {record && handleStatusChange && (
+            <div className="flex-1 min-w-0" style={{ position: 'relative', zIndex: 1 }}>
+              <Select
+                value={(record as any).internal_status || (record as any).internalStatus || 'New'}
+                onValueChange={async (value) => {
+                  if (handleStatusChange) {
+                    try {
+                      const fullRecord: PreForeclosureRecord = {
+                        document_number: documentNumber,
+                        type: (record as any).type || 'Mortgage',
+                        address: (record as any).address || '',
+                        city: (record as any).city || '',
+                        zip: (record as any).zip || '',
+                        filing_month: (record as any).filing_month || (record as any).filingMonth || '',
+                        county: (record as any).county || 'Bexar',
+                        internal_status: value as PreForeclosureStatus,
+                        inactive: (record as any).inactive || false,
+                        first_seen_month: (record as any).first_seen_month || (record as any).firstSeenMonth || '',
+                        last_seen_month: (record as any).last_seen_month || (record as any).lastSeenMonth || '',
+                        created_at: (record as any).created_at || (record as any).createdAt || new Date().toISOString(),
+                        updated_at: (record as any).updated_at || (record as any).updatedAt || new Date().toISOString(),
+                        ...(record as any),
+                      };
+                      await handleStatusChange(fullRecord, value as PreForeclosureStatus);
+                    } catch (error) {
+                      console.error('Error in onValueChange:', error);
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs w-full cursor-pointer hover:bg-secondary/50 border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-[100]">
+                  <SelectItem value="New">New</SelectItem>
+                  <SelectItem value="Contact Attempted">Contact Attempted</SelectItem>
+                  <SelectItem value="Monitoring">Monitoring</SelectItem>
+                  <SelectItem value="Dead">Dead</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Visited Button */}
           <Button
             size="sm"
             variant="outline"
@@ -234,7 +235,6 @@ function SortableRow({
               if (record.visited) {
                 handleMarkVisited(documentNumber, viewRoute.driver, false);
               } else {
-                // Open visited dialog with workflow questions
                 if (onOpenVisitedDialog) {
                   onOpenVisitedDialog(documentNumber, record, viewRoute.driver);
                 } else {
@@ -243,25 +243,19 @@ function SortableRow({
               }
             }}
             disabled={markingVisited === documentNumber}
-            className={`h-7 text-xs w-full ${
-              record.visited
-                ? 'bg-green-500/20 text-green-600 border-green-500 hover:bg-green-500/30'
-                : ''
-            }`}
+            className={cn(
+              "h-8 text-xs flex-shrink-0",
+              record.visited && 'bg-green-500/20 text-green-600 border-green-500 hover:bg-green-500/30'
+            )}
           >
             {markingVisited === documentNumber ? (
-              <>
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                {record.visited ? 'Updating...' : 'Marking...'}
-              </>
+              <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
               record.visited ? 'Visited' : 'Pending'
             )}
           </Button>
-        )}
-      </td>
-      <td className="px-4 py-2 text-sm">
-        {documentNumber && (
+
+          {/* Details Button */}
           <Button
             size="sm"
             variant="outline"
@@ -269,30 +263,13 @@ function SortableRow({
               e.stopPropagation();
               handleViewRecordDetails(documentNumber);
             }}
-            className="h-7 text-xs"
+            className="h-8 text-xs flex-shrink-0"
           >
-            <Eye className="h-3 w-3 mr-1" />
-            Details
+            <Eye className="h-3 w-3" />
           </Button>
-        )}
-      </td>
-      <td className="px-4 py-2 text-sm">
-        {/* Drag Handle - Far Right */}
-        <div
-          ref={setActivatorNodeRef}
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing p-1 hover:bg-secondary/50 rounded flex items-center justify-center"
-          title="Drag to reorder"
-          onPointerDown={(e) => {
-            // Only allow dragging from this handle
-            e.stopPropagation();
-          }}
-        >
-          <GripVertical className="h-5 w-5 text-muted-foreground" />
         </div>
-      </td>
-    </tr>
+      )}
+    </div>
   );
 }
 
@@ -2459,7 +2436,7 @@ export function PreForeclosureView() {
       {headerSection}
 
       {/* Stats Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <UploadStatsCard />
         <OverallStatsCard />
       </div>
@@ -3358,7 +3335,7 @@ export function PreForeclosureView() {
         }
         setViewOpen(open);
       }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
@@ -4160,7 +4137,7 @@ export function PreForeclosureView() {
 
       {/* Route Details Modal */}
       <Dialog open={routeDetailsOpen} onOpenChange={setRouteDetailsOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <RouteIcon className="h-5 w-5" />
@@ -4198,7 +4175,7 @@ export function PreForeclosureView() {
               ) : (
                 <div className="space-y-4">
                   {/* Route Summary */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-secondary/30 rounded-lg">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 bg-secondary/30 rounded-lg">
                     <div>
                       <div className="text-xs text-muted-foreground mb-1">Driver</div>
                       <div className="flex items-center gap-2">
@@ -4225,10 +4202,11 @@ export function PreForeclosureView() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex justify-end gap-2">
+                  <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full sm:w-auto"
                       onClick={() => {
                         if (viewRoute?.routeData) {
                           // Extract record IDs from the route (current records in the route)
@@ -4312,6 +4290,7 @@ export function PreForeclosureView() {
                     <Button
                       variant="destructive"
                       size="sm"
+                      className="w-full sm:w-auto"
                       onClick={() => handleDeleteRoute(viewRoute.id)}
                       disabled={deletingRoute === viewRoute.id}
                     >
@@ -4337,60 +4316,38 @@ export function PreForeclosureView() {
                       
                       return (
                         <>
-                          <h3 className="text-lg font-semibold mb-3">Route Stops ({validRecords.length})</h3>
-                          <div className="border border-border rounded-lg overflow-hidden">
-                            <div className="overflow-x-auto">
-                              <table className="w-full">
-                                <thead className="bg-secondary/50">
-                                  <tr>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">Document #</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">City</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden">ZIP</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Internal Status</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
-                                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {sortedRecords.length === 0 ? (
-                                    <tr>
-                                      <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
-                                        No records in this route.
-                                      </td>
-                                    </tr>
-                                  ) : (
-                                    sortedRecords.map((routeRecord, index) => {
-                                      const record = routeRecord.record;
-                                      if (!record) return null; // Safety check
-                                      // Handle both camelCase (from backend) and snake_case (from interface)
-                                      const documentNumber = record.document_number || record.documentNumber || '';
-                                      if (!documentNumber) return null; // Skip if no document number
-                                      return (
-                                        <SortableRow
-                                          key={routeRecord.id}
-                                          routeRecord={routeRecord}
-                                          index={index}
-                                          viewRoute={viewRoute}
-                                          documentNumber={documentNumber}
-                                          record={record}
-                                          removingRecordId={removingRecordId}
-                                          reorderingRecordId={reorderingRecordId}
-                                          handleRemoveRecordFromRoute={handleRemoveRecordFromRoute}
-                                          handleMarkVisited={handleMarkVisited}
-                                          handleViewRecordDetails={handleViewRecordDetails}
-                                          markingVisited={markingVisited}
-                                          handleStatusChange={handleStatusChange}
-                                          onOpenVisitedDialog={handleOpenVisitedDialog}
-                                        />
-                                      );
-                                    })
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
+                          <h3 className="text-base sm:text-lg font-semibold mb-3">Route Stops ({validRecords.length})</h3>
+                          <div className="space-y-2">
+                            {sortedRecords.length === 0 ? (
+                              <div className="px-4 py-8 text-center text-muted-foreground border border-border rounded-lg">
+                                No records in this route.
+                              </div>
+                            ) : (
+                              sortedRecords.map((routeRecord, index) => {
+                                const record = routeRecord.record;
+                                if (!record) return null;
+                                const documentNumber = record.document_number || record.documentNumber || '';
+                                if (!documentNumber) return null;
+                                return (
+                                  <SortableRow
+                                    key={routeRecord.id}
+                                    routeRecord={routeRecord}
+                                    index={index}
+                                    viewRoute={viewRoute}
+                                    documentNumber={documentNumber}
+                                    record={record}
+                                    removingRecordId={removingRecordId}
+                                    reorderingRecordId={reorderingRecordId}
+                                    handleRemoveRecordFromRoute={handleRemoveRecordFromRoute}
+                                    handleMarkVisited={handleMarkVisited}
+                                    handleViewRecordDetails={handleViewRecordDetails}
+                                    markingVisited={markingVisited}
+                                    handleStatusChange={handleStatusChange}
+                                    onOpenVisitedDialog={handleOpenVisitedDialog}
+                                  />
+                                );
+                              })
+                            )}
                           </div>
                         </>
                       );

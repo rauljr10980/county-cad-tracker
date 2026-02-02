@@ -200,7 +200,7 @@ export function ZoneManager({ isOpen, onClose, onSelectZone, onEditZone, propert
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl h-[85vh]">
+      <DialogContent className="w-[95vw] sm:max-w-3xl md:max-w-5xl lg:max-w-7xl max-h-[85vh] h-[80vh]">
         <DialogHeader>
           <DialogTitle>Saved Service Zones</DialogTitle>
           <DialogDescription>
