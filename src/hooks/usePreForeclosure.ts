@@ -11,12 +11,22 @@ import {
 import type { PreForeclosureRecord } from '@/types/property';
 
 export function usePreForeclosures() {
-  return useQuery<PreForeclosureRecord[]>({
+  return useQuery<PreForeclosureRecord[], Error, PreForeclosureRecord[]>({
     queryKey: ['preforeclosure'],
     queryFn: getPreForeclosures,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchInterval: false,
+    select: (data) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return data.filter(r => {
+        if (!r.sale_date) return true;
+        const saleDate = new Date(r.sale_date);
+        saleDate.setHours(0, 0, 0, 0);
+        return saleDate >= today;
+      });
+    },
   });
 }
 
