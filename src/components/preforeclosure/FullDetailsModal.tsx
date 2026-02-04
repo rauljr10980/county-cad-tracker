@@ -45,11 +45,11 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [dueDateTime, setDueDateTime] = useState<Date | undefined>(undefined);
   const [assignedTo, setAssignedTo] = useState<'Luciano' | 'Raul' | ''>('');
   const [savingAction, setSavingAction] = useState(false);
-  const [propertyInfoExpanded, setPropertyInfoExpanded] = useState(true);
-  const [actionsExpanded, setActionsExpanded] = useState(true);
-  const [routeStatusExpanded, setRouteStatusExpanded] = useState(true);
-  const [actionsTasksExpanded, setActionsTasksExpanded] = useState(true);
-  const [currentTaskExpanded, setCurrentTaskExpanded] = useState(true);
+  const [propertyInfoExpanded, setPropertyInfoExpanded] = useState(false);
+  const [actionsExpanded, setActionsExpanded] = useState(false);
+  const [routeStatusExpanded, setRouteStatusExpanded] = useState(false);
+  const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
+  const [currentTaskExpanded, setCurrentTaskExpanded] = useState(false);
 
   // Parse visit details from workflow log
   const visitDetails = useMemo(() => {
