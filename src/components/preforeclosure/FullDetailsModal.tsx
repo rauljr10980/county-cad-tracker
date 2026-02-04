@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, ChevronDown, Home, Building, AlertTriangle } from 'lucide-react';
+import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, ChevronDown, Home, Building, AlertTriangle, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -318,10 +318,25 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 <Label className="text-muted-foreground text-xs flex items-center gap-1">
                   <MapPin className="h-3 w-3" /> Address
                 </Label>
-                <p className="text-sm">{viewRecord.address}</p>
-                <p className="text-sm text-muted-foreground">
-                  {viewRecord.city}, TX {viewRecord.zip}
-                </p>
+                <div className="flex items-start gap-2">
+                  <div className="flex-1">
+                    <p className="text-sm">{viewRecord.address}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {viewRecord.city}, TX {viewRecord.zip}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 flex-shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(viewRecord.address || '');
+                      toast({ title: 'Address copied' });
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label className="text-muted-foreground text-xs">Latitude</Label>
