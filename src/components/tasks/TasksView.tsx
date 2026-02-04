@@ -475,95 +475,143 @@ export function TasksView() {
               const width = Math.max(count > 0 ? 5 : 0, (count / maxStageCount) * 100);
               const isSelected = selectedFunnelStage === stage.key;
               return (
-                <div
-                  key={stage.key}
-                  className={cn(
-                    "cursor-pointer rounded-lg p-2 -mx-2 transition-all",
-                    isSelected ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-secondary/50"
-                  )}
-                  onClick={() => setSelectedFunnelStage(isSelected ? null : stage.key)}
-                >
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">{stage.label}</span>
-                    <span className="text-muted-foreground">{count} {count === 1 ? 'deal' : 'deals'}</span>
-                  </div>
-                  <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden">
-                    {count > 0 && (
-                      <div
-                        className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
-                        style={{ backgroundColor: stage.color, width: `${width}%` }}
-                      >
-                        {width > 15 ? count : ''}
-                      </div>
+                <div key={stage.key}>
+                  <div
+                    className={cn(
+                      "cursor-pointer rounded-lg p-2 -mx-2 transition-all",
+                      isSelected ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-secondary/50"
                     )}
+                    onClick={() => setSelectedFunnelStage(isSelected ? null : stage.key)}
+                  >
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium">{stage.label}</span>
+                      <span className="text-muted-foreground">{count} {count === 1 ? 'deal' : 'deals'}</span>
+                    </div>
+                    <div className="relative w-full h-8 bg-secondary/50 rounded-lg overflow-hidden">
+                      {count > 0 && (
+                        <div
+                          className="h-full flex items-center justify-center text-white font-semibold text-sm rounded-lg transition-all duration-300"
+                          style={{ backgroundColor: stage.color, width: `${width}%` }}
+                        >
+                          {width > 15 ? count : ''}
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  {isSelected && stageRecords.length > 0 && (
+                    <div className="ml-2 mt-2 mb-1 pl-3 border-l-2" style={{ borderColor: stage.color }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold">
+                          {stage.label} — {stageRecords.length} {stageRecords.length === 1 ? 'property' : 'properties'}
+                        </h4>
+                        <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={(e) => { e.stopPropagation(); setSelectedFunnelStage(null); }}>
+                          <X className="h-3 w-3 mr-1" /> Close
+                        </Button>
+                      </div>
+                      <div className="space-y-2 max-h-[400px] overflow-y-auto overflow-x-hidden">
+                        {stageRecords.map((record) => (
+                          <div
+                            key={record.document_number}
+                            className="flex items-center justify-between gap-2 sm:gap-3 rounded-lg border border-border bg-secondary/30 p-2.5 sm:p-3 cursor-pointer hover:border-primary/50 transition-all"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPreForeclosure(record as PreForeclosure);
+                            }}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{record.address || 'No address'}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {[record.city, record.zip].filter(Boolean).join(', ')}
+                                {record.type && <span className="ml-2">{record.type}</span>}
+                              </p>
+                              {record.notes && (
+                                <p className="text-xs text-muted-foreground mt-1 truncate italic">{record.notes}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {record.assignedTo && (
+                                <span className={cn(
+                                  'text-xs font-medium px-1.5 py-0.5 rounded',
+                                  record.assignedTo === 'Luciano' ? 'bg-green-600/20 text-green-400' : 'bg-orange-600/20 text-orange-400',
+                                )}>
+                                  {record.assignedTo}
+                                </span>
+                              )}
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
           {/* Dead End - separated */}
           {stageCounts.dead_end > 0 && (
-            <div
-              className={cn(
-                "mt-4 pt-4 border-t border-border cursor-pointer rounded-lg p-2 -mx-2 transition-all",
-                selectedFunnelStage === 'dead_end' ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-secondary/50"
-              )}
-              onClick={() => setSelectedFunnelStage(selectedFunnelStage === 'dead_end' ? null : 'dead_end')}
-            >
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
-                  Dead End
-                </span>
-                <span className="text-muted-foreground">{stageCounts.dead_end} deals</span>
+            <div>
+              <div
+                className={cn(
+                  "mt-4 pt-4 border-t border-border cursor-pointer rounded-lg p-2 -mx-2 transition-all",
+                  selectedFunnelStage === 'dead_end' ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-secondary/50"
+                )}
+                onClick={() => setSelectedFunnelStage(selectedFunnelStage === 'dead_end' ? null : 'dead_end')}
+              >
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
+                    Dead End
+                  </span>
+                  <span className="text-muted-foreground">{stageCounts.dead_end} deals</span>
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Selected Stage Property List */}
-          {selectedFunnelStage && stageRecords.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-semibold">
-                  {FUNNEL_STAGES.find(s => s.key === selectedFunnelStage)?.label || selectedFunnelStage} — {stageRecords.length} {stageRecords.length === 1 ? 'property' : 'properties'}
-                </h4>
-                <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSelectedFunnelStage(null)}>
-                  <X className="h-3 w-3 mr-1" /> Close
-                </Button>
-              </div>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto overflow-x-hidden">
-                {stageRecords.map((record) => (
-                  <div
-                    key={record.document_number}
-                    className="flex items-center justify-between gap-2 sm:gap-3 rounded-lg border border-border bg-secondary/30 p-2.5 sm:p-3 cursor-pointer hover:border-primary/50 transition-all"
-                    onClick={async () => {
-                      setSelectedPreForeclosure(record as PreForeclosure);
-                    }}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{record.address || 'No address'}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {[record.city, record.zip].filter(Boolean).join(', ')}
-                        {record.type && <span className="ml-2">{record.type}</span>}
-                      </p>
-                      {record.notes && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate italic">{record.notes}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {record.assignedTo && (
-                        <span className={cn(
-                          'text-xs font-medium px-1.5 py-0.5 rounded',
-                          record.assignedTo === 'Luciano' ? 'bg-green-600/20 text-green-400' : 'bg-orange-600/20 text-orange-400',
-                        )}>
-                          {record.assignedTo}
-                        </span>
-                      )}
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    </div>
+              {selectedFunnelStage === 'dead_end' && stageRecords.length > 0 && (
+                <div className="ml-2 mt-2 mb-1 pl-3 border-l-2 border-gray-500">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold">
+                      Dead End — {stageRecords.length} {stageRecords.length === 1 ? 'property' : 'properties'}
+                    </h4>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={(e) => { e.stopPropagation(); setSelectedFunnelStage(null); }}>
+                      <X className="h-3 w-3 mr-1" /> Close
+                    </Button>
                   </div>
-                ))}
-              </div>
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto overflow-x-hidden">
+                    {stageRecords.map((record) => (
+                      <div
+                        key={record.document_number}
+                        className="flex items-center justify-between gap-2 sm:gap-3 rounded-lg border border-border bg-secondary/30 p-2.5 sm:p-3 cursor-pointer hover:border-primary/50 transition-all"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPreForeclosure(record as PreForeclosure);
+                        }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{record.address || 'No address'}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {[record.city, record.zip].filter(Boolean).join(', ')}
+                            {record.type && <span className="ml-2">{record.type}</span>}
+                          </p>
+                          {record.notes && (
+                            <p className="text-xs text-muted-foreground mt-1 truncate italic">{record.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {record.assignedTo && (
+                            <span className={cn(
+                              'text-xs font-medium px-1.5 py-0.5 rounded',
+                              record.assignedTo === 'Luciano' ? 'bg-green-600/20 text-green-400' : 'bg-orange-600/20 text-orange-400',
+                            )}>
+                              {record.assignedTo}
+                            </span>
+                          )}
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
