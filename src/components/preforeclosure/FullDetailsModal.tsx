@@ -510,9 +510,20 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
 
           {/* Phone Numbers Section */}
           <div className="bg-secondary/30 rounded-lg p-3 sm:p-4" style={{ display: 'block' }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Phone className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Phone Numbers</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Phone Numbers</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => window.open('https://www.truepeoplesearch.com', '_blank')}
+              >
+                <ExternalLink className="h-3 w-3 mr-1.5" />
+                TruePeopleSearch
+              </Button>
             </div>
             <div className="space-y-2">
               {[0, 1, 2, 3, 4, 5].map((index) => {
