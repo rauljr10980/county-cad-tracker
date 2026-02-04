@@ -964,6 +964,16 @@ export function PreForeclosureView() {
       }
     }
 
+    // Append visited note to the record's notes field so it shows in details
+    let notesFields: Record<string, any> = {};
+    if (visitedStepNote.trim()) {
+      const existingNotes = fullRecord?.notes || '';
+      const timestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const visitNote = `[Visit ${timestamp} - ${driver}] ${visitedStepNote.trim()}`;
+      const updatedNotes = existingNotes ? `${existingNotes}\n${visitNote}` : visitNote;
+      notesFields = { notes: updatedNotes };
+    }
+
     setMarkingVisited(documentNumber);
     try {
       await updateMutation.mutateAsync({
@@ -972,6 +982,7 @@ export function PreForeclosureView() {
         workflow_log: updatedLog,
         ...taskFields,
         ...phoneFields,
+        ...notesFields,
       });
       await markPreForeclosureVisited(documentNumber, driver, true);
 
