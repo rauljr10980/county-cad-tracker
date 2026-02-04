@@ -46,6 +46,10 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [assignedTo, setAssignedTo] = useState<'Luciano' | 'Raul' | ''>('');
   const [savingAction, setSavingAction] = useState(false);
   const [propertyInfoExpanded, setPropertyInfoExpanded] = useState(true);
+  const [actionsExpanded, setActionsExpanded] = useState(true);
+  const [routeStatusExpanded, setRouteStatusExpanded] = useState(true);
+  const [actionsTasksExpanded, setActionsTasksExpanded] = useState(true);
+  const [currentTaskExpanded, setCurrentTaskExpanded] = useState(true);
 
   // Sync local state from record prop
   useEffect(() => {
@@ -203,10 +207,17 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
         <div className="space-y-6">
           {/* Actions Panel */}
           <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-3">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setActionsExpanded(prev => !prev)}
+            >
               <span className="text-sm font-medium">Actions</span>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !actionsExpanded && "-rotate-90"
+              )} />
             </div>
-            <div className="flex gap-2">
+            {actionsExpanded && <div className="flex gap-2 mt-3">
               <Button
                 variant="default"
                 size="sm"
@@ -246,7 +257,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               >
                 <ExternalLink className="h-4 w-4" />
               </Button>
-            </div>
+            </div>}
           </div>
 
           {/* Property Information */}
@@ -573,10 +584,19 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
 
             {/* Route Status Section */}
             <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 space-y-3">
-              <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                Route Status
-              </h3>
-              <div className="space-y-3">
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setRouteStatusExpanded(prev => !prev)}
+              >
+                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                  Route Status
+                </h3>
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  !routeStatusExpanded && "-rotate-90"
+                )} />
+              </div>
+              {routeStatusExpanded && <div className="space-y-3">
                 <div>
                   <Label className="text-muted-foreground text-xs mb-2 block">Current Status</Label>
                   <div className="flex items-center gap-2">
@@ -698,16 +718,25 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                     This property is currently in an active route
                   </div>
                 )}
-              </div>
+              </div>}
             </div>
 
             {/* Actions & Tasks Section */}
             <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Actions & Tasks</span>
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setActionsTasksExpanded(prev => !prev)}
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Actions & Tasks</span>
+                </div>
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  !actionsTasksExpanded && "-rotate-90"
+                )} />
               </div>
-              <div className="space-y-4">
+              {actionsTasksExpanded && <div className="space-y-4 mt-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-2">
                     <label className="text-xs text-muted-foreground">Action Type</label>
@@ -815,29 +844,38 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                     {savingAction ? 'Scheduling...' : 'Schedule Action'}
                   </Button>
                 </div>
-              </div>
+              </div>}
             </div>
 
             {/* Current Task */}
             {viewRecord.actionType && (
               <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
-                <div className="flex items-center justify-between mb-2">
+                <div
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => setCurrentTaskExpanded(prev => !prev)}
+                >
                   <div className="flex items-center gap-2">
                     <Target className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium">Current Task</span>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleClearTask}
-                    disabled={savingAction}
-                    className="h-8 text-xs bg-red-500/10 hover:bg-red-500/20 text-red-500 border-red-500/30"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1.5" />
-                    Clear Task
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); handleClearTask(); }}
+                      disabled={savingAction}
+                      className="h-8 text-xs bg-red-500/10 hover:bg-red-500/20 text-red-500 border-red-500/30"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1.5" />
+                      Clear Task
+                    </Button>
+                    <ChevronDown className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                      !currentTaskExpanded && "-rotate-90"
+                    )} />
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                {currentTaskExpanded && <div className="grid grid-cols-2 gap-2 text-xs mt-2">
                   <div>
                     <span className="text-muted-foreground">Action:</span>
                     <div className="font-medium capitalize">{viewRecord.actionType}</div>
@@ -858,7 +896,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                       <div className="font-medium">{viewRecord.assignedTo}</div>
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
             )}
           </div>
