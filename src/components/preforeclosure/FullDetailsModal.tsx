@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar } from 'lucide-react';
+import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -45,6 +45,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [dueDateTime, setDueDateTime] = useState<Date | undefined>(undefined);
   const [assignedTo, setAssignedTo] = useState<'Luciano' | 'Raul' | ''>('');
   const [savingAction, setSavingAction] = useState(false);
+  const [propertyInfoExpanded, setPropertyInfoExpanded] = useState(true);
 
   // Sync local state from record prop
   useEffect(() => {
@@ -250,10 +251,19 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
 
           {/* Property Information */}
           <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 space-y-3">
-            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-              Property Information
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setPropertyInfoExpanded(prev => !prev)}
+            >
+              <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                Property Information
+              </h3>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !propertyInfoExpanded && "-rotate-90"
+              )} />
+            </div>
+            {propertyInfoExpanded && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <Label className="text-muted-foreground text-xs">Document Number</Label>
                 <p className="font-mono text-sm">{viewRecord.document_number}</p>
@@ -383,7 +393,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   return `${month}/${day}/${year}`;
                 })() : 'N/A'}</p>
               </div>
-            </div>
+            </div>}
           </div>
 
           {/* Workflow Tracker */}
