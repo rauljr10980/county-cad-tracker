@@ -7,7 +7,7 @@ import { format, isToday, isPast, parseISO, startOfDay, isBefore, isAfter } from
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
-import { PreForeclosureDetailsModal } from '@/components/preforeclosures/PreForeclosureDetailsModal';
+import { FullDetailsModal } from '@/components/preforeclosure/FullDetailsModal';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -400,30 +400,6 @@ export function TasksView() {
         const newSet = new Set(prev);
         newSet.delete(property.id);
         return newSet;
-      });
-    }
-  };
-
-  // Handle pre-foreclosure updates
-  const handlePreForeclosureUpdate = async (documentNumber: string, updates: Partial<PreForeclosure>) => {
-    try {
-      await updatePreForeclosure({
-        document_number: documentNumber,
-        ...updates,
-      });
-      
-      // Refetch tasks to get updated data
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      
-      toast({
-        title: "Record Updated",
-        description: "Pre-foreclosure record updated successfully",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update pre-foreclosure record",
-        variant: "destructive",
       });
     }
   };
@@ -1001,11 +977,10 @@ export function TasksView() {
         onClose={() => setSelectedProperty(null)}
       />
 
-      <PreForeclosureDetailsModal
-        preforeclosure={selectedPreForeclosure}
+      <FullDetailsModal
+        record={selectedPreForeclosure}
         isOpen={!!selectedPreForeclosure}
         onClose={() => setSelectedPreForeclosure(null)}
-        onUpdate={handlePreForeclosureUpdate}
       />
     </div>
   );
