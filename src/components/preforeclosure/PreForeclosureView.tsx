@@ -3575,6 +3575,26 @@ export function PreForeclosureView() {
                         Notes are automatically saved when you click away from the text area.
                       </p>
                     </div>
+
+                    {/* Visit Notes from Workflow Log */}
+                    {viewRecord.workflow_log && viewRecord.workflow_log.filter(e => e.note).length > 0 && (
+                      <div className="space-y-2 pt-3 border-t border-border/50">
+                        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Visit History Notes</h4>
+                        {viewRecord.workflow_log.filter(e => e.note).map((entry) => (
+                          <div key={entry.id} className="bg-muted/30 rounded p-2.5 space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-medium text-primary">
+                                {entry.actingAs || 'Unknown'} — {new Date(entry.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {WORKFLOW_STAGES[entry.toStage]?.label || entry.toStage}
+                              </span>
+                            </div>
+                            <p className="text-sm">{entry.note}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Route Status Section in Tasks Tab */}
