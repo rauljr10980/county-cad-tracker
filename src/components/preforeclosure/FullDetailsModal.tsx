@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, ChevronDown } from 'lucide-react';
+import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, ChevronDown, Home, Building, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -50,6 +50,32 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [routeStatusExpanded, setRouteStatusExpanded] = useState(true);
   const [actionsTasksExpanded, setActionsTasksExpanded] = useState(true);
   const [currentTaskExpanded, setCurrentTaskExpanded] = useState(true);
+
+  // Parse visit details from workflow log
+  const visitDetails = useMemo(() => {
+    if (!viewRecord?.workflow_log?.length) return null;
+    const visitEntry = viewRecord.workflow_log.find(
+      (entry) => entry.outcome && entry.outcome.includes('Owner answered:')
+    );
+    if (!visitEntry) return null;
+
+    const parts = visitEntry.outcome.split(' | ');
+    const get = (prefix: string) => {
+      const part = parts.find((p) => p.startsWith(prefix));
+      return part ? part.slice(prefix.length).trim() : null;
+    };
+
+    return {
+      ownerAnswered: get('Owner answered:') === 'Yes',
+      phone: get('Phone:'),
+      noPhoneProvided: parts.includes('No phone provided'),
+      foreclosureSolved: get('Foreclosure solved:') === 'Yes',
+      propertyType: get('Property:'),
+      condition: get('Condition:'),
+      visitedBy: visitEntry.actingAs,
+      visitedAt: visitEntry.timestamp,
+    };
+  }, [viewRecord?.workflow_log]);
 
   // Sync local state from record prop
   useEffect(() => {
@@ -404,6 +430,75 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   return `${month}/${day}/${year}`;
                 })() : 'N/A'}</p>
               </div>
+
+              {/* Visit Details */}
+              {visitDetails && (
+                <div className="sm:col-span-2 pt-3 mt-3 border-t border-border/50">
+                  <Label className="text-muted-foreground text-xs uppercase tracking-wide mb-2 block">Visit Details</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Property Type</Label>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {visitDetails.propertyType === 'Primary Home' ? (
+                          <Home className="h-3.5 w-3.5 text-blue-400" />
+                        ) : visitDetails.propertyType === 'Rental' ? (
+                          <Building className="h-3.5 w-3.5 text-purple-400" />
+                        ) : (
+                          <AlertTriangle className="h-3.5 w-3.5 text-yellow-400" />
+                        )}
+                        <Badge variant="outline" className={cn(
+                          "text-xs",
+                          visitDetails.propertyType === 'Primary Home' && "bg-blue-500/20 text-blue-400 border-blue-500/30",
+                          visitDetails.propertyType === 'Rental' && "bg-purple-500/20 text-purple-400 border-purple-500/30",
+                          visitDetails.propertyType === 'Vacant' && "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+                        )}>
+                          {visitDetails.propertyType}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Condition</Label>
+                      <p className="text-sm font-medium mt-0.5">{visitDetails.condition}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Owner Answered</Label>
+                      <Badge variant="outline" className={cn(
+                        "text-xs mt-0.5",
+                        visitDetails.ownerAnswered
+                          ? "bg-green-500/20 text-green-400 border-green-500/30"
+                          : "bg-red-500/20 text-red-400 border-red-500/30"
+                      )}>
+                        {visitDetails.ownerAnswered ? 'Yes' : 'No'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Foreclosure Solved</Label>
+                      <Badge variant="outline" className={cn(
+                        "text-xs mt-0.5",
+                        visitDetails.foreclosureSolved
+                          ? "bg-green-500/20 text-green-400 border-green-500/30"
+                          : "bg-muted text-muted-foreground"
+                      )}>
+                        {visitDetails.foreclosureSolved ? 'Yes' : 'No'}
+                      </Badge>
+                    </div>
+                    {visitDetails.ownerAnswered && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Phone Provided</Label>
+                        <p className="text-sm mt-0.5">
+                          {visitDetails.phone ? visitDetails.phone : 'No'}
+                        </p>
+                      </div>
+                    )}
+                    {visitDetails.visitedBy && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Visited By</Label>
+                        <p className="text-sm mt-0.5">{visitDetails.visitedBy}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>}
           </div>
 
