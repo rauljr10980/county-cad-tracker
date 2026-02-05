@@ -1,7 +1,7 @@
 /**
  * Bexar County Public Search Scraper
  * Scrapes foreclosure records from https://bexar.tx.publicsearch.us
- * Uses fetch + cheerio (no browser needed)
+ * Uses fetch + cheerio to extract embedded JSON data
  */
 
 const cheerio = require('cheerio');
@@ -53,6 +53,32 @@ async function scrapeBexarForeclosures(options = {}) {
   console.log(`[BEXAR-SCRAPER] Fetching: ${url}`);
 
   try {
+    // First, try to get JSON directly (some APIs respond with JSON if requested)
+    console.log(`[BEXAR-SCRAPER] Trying JSON API request...`);
+    const jsonResponse = await fetch(url, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+
+    if (jsonResponse.ok) {
+      const contentType = jsonResponse.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const jsonData = await jsonResponse.json();
+        console.log(`[BEXAR-SCRAPER] Got JSON response!`);
+        const records = extractRecordsFromData(jsonData);
+        if (records.length > 0) {
+          console.log(`[BEXAR-SCRAPER] Extracted ${records.length} records from JSON`);
+          return { success: true, records, count: records.length };
+        }
+      }
+    }
+
+    // Fallback to HTML parsing
+    console.log(`[BEXAR-SCRAPER] Fetching HTML page...`);
     const response = await fetch(url, {
       headers: {
         'User-Agent': USER_AGENT,
@@ -70,43 +96,115 @@ async function scrapeBexarForeclosures(options = {}) {
 
     // Parse the HTML
     const $ = cheerio.load(html);
-    const records = [];
+    let records = [];
 
-    // Find the results table - based on screenshots, it's the main table with foreclosure data
-    // Each row is a <tr> with cells for each column
-    // col-0: checkbox, col-1: doc type dropdown, col-2: dropdown, col-3: recorded date,
-    // col-4: sale date, col-5: ?, col-6: doc number, col-7: remarks time, col-8: property address
+    // Method 1: Look for embedded JSON data in script tags
+    // React apps often embed initial state as window.__data, __PRELOADED_STATE__, etc.
+    $('script').each((i, script) => {
+      const scriptContent = $(script).html() || '';
 
-    $('tbody tr').each((index, row) => {
-      const $row = $(row);
+      // Look for window.__data or similar patterns
+      const patterns = [
+        /window\.__data\s*=\s*(\{[\s\S]*?\});/,
+        /window\.__PRELOADED_STATE__\s*=\s*(\{[\s\S]*?\});/,
+        /window\.___INITIAL_STATE___\s*=\s*(\{[\s\S]*?\});/,
+        /__NEXT_DATA__.*?(\{[\s\S]*?\})<\/script>/,
+      ];
 
-      // Extract data from each column
-      const recordedDate = $row.find('td.col-3').text().trim();
-      const saleDate = $row.find('td.col-4').text().trim();
-      const docNumber = $row.find('td.col-6').text().trim();
-      const propertyAddress = $row.find('td.col-8').text().trim();
-      const docType = $row.find('td.col-0').text().trim();
+      for (const pattern of patterns) {
+        const match = scriptContent.match(pattern);
+        if (match) {
+          try {
+            const data = JSON.parse(match[1]);
+            console.log(`[BEXAR-SCRAPER] Found embedded JSON data`);
 
-      // Skip if no doc number (header row or empty)
-      if (!docNumber || docNumber.length < 5) {
-        return;
+            // Try to find records in the data structure
+            const foundRecords = extractRecordsFromData(data);
+            if (foundRecords.length > 0) {
+              records = foundRecords;
+              return false; // break cheerio loop
+            }
+          } catch (e) {
+            console.log(`[BEXAR-SCRAPER] Failed to parse embedded JSON: ${e.message}`);
+          }
+        }
       }
 
-      // Parse the property address to extract street, city, state, zip
-      const addressParts = parseAddress(propertyAddress);
-
-      records.push({
-        documentNumber: docNumber,
-        recordedDate: parseDate(recordedDate),
-        saleDate: parseDate(saleDate),
-        rawAddress: propertyAddress,
-        address: addressParts.street,
-        city: addressParts.city,
-        state: addressParts.state,
-        zip: addressParts.zip,
-        docType,
-      });
+      // Also look for JSON arrays that might contain records
+      const jsonArrayMatch = scriptContent.match(/\[\s*\{[^[\]]*"documentNumber"[^[\]]*\}[\s\S]*?\]/);
+      if (jsonArrayMatch) {
+        try {
+          const arr = JSON.parse(jsonArrayMatch[0]);
+          if (Array.isArray(arr) && arr.length > 0) {
+            console.log(`[BEXAR-SCRAPER] Found JSON array with ${arr.length} items`);
+            records = arr.map(item => normalizeRecord(item));
+            return false;
+          }
+        } catch (e) {
+          // Not valid JSON
+        }
+      }
     });
+
+    // Method 2: If no embedded data found, try DOM parsing (fallback)
+    if (records.length === 0) {
+      console.log(`[BEXAR-SCRAPER] No embedded JSON found, trying DOM parsing...`);
+
+      $('tbody tr').each((index, row) => {
+        const $row = $(row);
+        const recordedDate = $row.find('td.col-3').text().trim();
+        const saleDate = $row.find('td.col-4').text().trim();
+        const docNumber = $row.find('td.col-6').text().trim();
+        const propertyAddress = $row.find('td.col-8').text().trim();
+        const docType = $row.find('td.col-0').text().trim();
+
+        if (!docNumber || docNumber.length < 5) {
+          return;
+        }
+
+        const addressParts = parseAddress(propertyAddress);
+        records.push({
+          documentNumber: docNumber,
+          recordedDate: parseDate(recordedDate),
+          saleDate: parseDate(saleDate),
+          rawAddress: propertyAddress,
+          address: addressParts.street,
+          city: addressParts.city,
+          state: addressParts.state,
+          zip: addressParts.zip,
+          docType,
+        });
+      });
+    }
+
+    // Method 3: Log what we found for debugging
+    if (records.length === 0) {
+      // Log some diagnostic info
+      const scriptCount = $('script').length;
+      const tbodyRows = $('tbody tr').length;
+      console.log(`[BEXAR-SCRAPER] Debug: ${scriptCount} script tags, ${tbodyRows} tbody rows`);
+
+      // Log first 500 chars of each script to help debug
+      $('script').each((i, script) => {
+        const content = $(script).html() || '';
+        if (content.length > 0 && !content.includes('gtag') && !content.includes('analytics')) {
+          console.log(`[BEXAR-SCRAPER] Script ${i} (${content.length} chars): ${content.substring(0, 300)}...`);
+        }
+      });
+
+      // Check if page requires authentication or has error
+      const pageText = $.text().toLowerCase();
+      if (pageText.includes('sign in') || pageText.includes('login')) {
+        console.log(`[BEXAR-SCRAPER] Page may require authentication`);
+      }
+      if (pageText.includes('error') || pageText.includes('no results')) {
+        console.log(`[BEXAR-SCRAPER] Page may have error or no results`);
+      }
+
+      // Log the title and any obvious page state
+      const title = $('title').text();
+      console.log(`[BEXAR-SCRAPER] Page title: ${title}`);
+    }
 
     console.log(`[BEXAR-SCRAPER] Parsed ${records.length} records`);
     return { success: true, records, count: records.length };
@@ -115,6 +213,97 @@ async function scrapeBexarForeclosures(options = {}) {
     console.error('[BEXAR-SCRAPER] Error:', error.message);
     return { success: false, error: error.message, records: [] };
   }
+}
+
+/**
+ * Try to extract records from embedded JSON data structure
+ */
+function extractRecordsFromData(data) {
+  const records = [];
+
+  // Try common data structure patterns
+  const possibleArrays = [
+    data.results,
+    data.records,
+    data.documents,
+    data.searchResults,
+    data.data?.results,
+    data.data?.records,
+    data.state?.results,
+    data.initialState?.results,
+  ];
+
+  for (const arr of possibleArrays) {
+    if (Array.isArray(arr) && arr.length > 0) {
+      for (const item of arr) {
+        const record = normalizeRecord(item);
+        if (record && record.documentNumber) {
+          records.push(record);
+        }
+      }
+      if (records.length > 0) break;
+    }
+  }
+
+  // Recursive search if nothing found yet
+  if (records.length === 0) {
+    const found = findRecordsRecursive(data);
+    records.push(...found);
+  }
+
+  return records;
+}
+
+/**
+ * Recursively search for record arrays in nested data
+ */
+function findRecordsRecursive(obj, depth = 0) {
+  if (depth > 5 || !obj || typeof obj !== 'object') return [];
+
+  // Check if this is an array of records
+  if (Array.isArray(obj)) {
+    const firstItem = obj[0];
+    if (firstItem && (firstItem.documentNumber || firstItem.docNumber || firstItem.recordedDate)) {
+      return obj.map(item => normalizeRecord(item)).filter(r => r && r.documentNumber);
+    }
+  }
+
+  // Search nested objects
+  const results = [];
+  for (const key of Object.keys(obj)) {
+    const found = findRecordsRecursive(obj[key], depth + 1);
+    if (found.length > 0) {
+      results.push(...found);
+      break;
+    }
+  }
+  return results;
+}
+
+/**
+ * Normalize a record object from various possible formats
+ */
+function normalizeRecord(item) {
+  if (!item) return null;
+
+  const docNumber = item.documentNumber || item.docNumber || item.doc_number || item.instrumentNumber || '';
+  const recordedDate = item.recordedDate || item.recorded_date || item.filedDate || '';
+  const saleDate = item.saleDate || item.sale_date || '';
+  const rawAddress = item.propertyAddress || item.property_address || item.address || item.rawAddress || '';
+
+  const addressParts = parseAddress(rawAddress);
+
+  return {
+    documentNumber: String(docNumber),
+    recordedDate: parseDate(recordedDate),
+    saleDate: parseDate(saleDate),
+    rawAddress,
+    address: addressParts.street,
+    city: addressParts.city,
+    state: addressParts.state,
+    zip: addressParts.zip,
+    docType: item.docType || item.documentType || item.type || 'NOTICE OF FORECLOSURE',
+  };
 }
 
 /**
