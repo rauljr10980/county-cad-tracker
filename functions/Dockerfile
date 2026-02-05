@@ -17,9 +17,7 @@ RUN apt-get update && apt-get install -y \
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Set Playwright to skip browser download (use system Chromium)
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+# Playwright will install its own browsers
 
 # Set working directory
 WORKDIR /app
@@ -32,6 +30,9 @@ COPY prisma ./prisma
 
 # Install dependencies (including dev dependencies for Prisma)
 RUN npm ci
+
+# Install Playwright browser (chromium only)
+RUN npx playwright install chromium --with-deps
 
 # Generate Prisma Client (after schema is copied)
 RUN npx prisma generate

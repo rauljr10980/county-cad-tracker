@@ -5,26 +5,8 @@
  */
 
 const { chromium } = require('playwright');
-const fs = require('fs');
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-
-// Get system Chromium path for Docker/Railway
-function getChromiumPath() {
-  const systemPaths = [
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome',
-  ];
-  for (const p of systemPaths) {
-    if (fs.existsSync(p)) {
-      console.log(`[BEXAR-SCRAPER] Using system browser at: ${p}`);
-      return p;
-    }
-  }
-  console.log('[BEXAR-SCRAPER] No system browser found, using Playwright default');
-  return undefined;
-}
 
 /**
  * Scrape foreclosure records from Bexar County Public Search
@@ -72,16 +54,13 @@ async function scrapeBexarForeclosures(options = {}) {
   let browser;
   try {
     console.log('[BEXAR-SCRAPER] Launching Playwright browser...');
-    const executablePath = getChromiumPath();
     browser = await chromium.launch({
       headless: true,
-      executablePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--single-process',
       ],
     });
 
