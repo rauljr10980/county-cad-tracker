@@ -19,6 +19,26 @@ const BROWSER_ARGS = [
   '--single-process',
 ];
 
+// Use system Chromium in Docker, fallback to Puppeteer's bundled Chrome locally
+function getChromiumPath() {
+  const fs = require('fs');
+  // Check common system Chromium paths
+  const systemPaths = [
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome',
+  ];
+  for (const p of systemPaths) {
+    if (fs.existsSync(p)) {
+      console.log(`[OWNER-LOOKUP] Using system browser at: ${p}`);
+      return p;
+    }
+  }
+  // Fall back to env var or let Puppeteer use its bundled version
+  console.log('[OWNER-LOOKUP] No system browser found, using Puppeteer default');
+  return process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+}
+
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 function delay(ms) {
@@ -35,7 +55,7 @@ async function lookupBexarTaxAssessor(address, city, zip) {
     browser = await puppeteer.launch({
       headless: 'new',
       args: BROWSER_ARGS,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      executablePath: getChromiumPath(),
     });
     const page = await browser.newPage();
     await page.setUserAgent(USER_AGENT);
@@ -239,7 +259,7 @@ async function lookupTruePeopleSearch(ownerName, address, city, state, zip) {
     browser = await puppeteer.launch({
       headless: 'new',
       args: BROWSER_ARGS,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      executablePath: getChromiumPath(),
     });
     const page = await browser.newPage();
     await page.setUserAgent(USER_AGENT);
