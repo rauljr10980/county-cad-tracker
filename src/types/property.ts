@@ -333,6 +333,13 @@ export interface PreForeclosureRecord {
   // Workflow decision tree
   workflow_stage?: WorkflowStage;
   workflow_log?: WorkflowLogEntry[];
+
+  // Owner Lookup (auto-populated from tax assessor + people search)
+  ownerName?: string;
+  ownerAddress?: string;
+  emails?: string[];
+  ownerLookupAt?: string;
+  ownerLookupStatus?: 'success' | 'partial' | 'failed' | 'pending';
 }
 
 // Type alias for backward compatibility

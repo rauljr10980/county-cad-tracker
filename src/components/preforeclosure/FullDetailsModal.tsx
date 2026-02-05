@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, ChevronDown, Home, Building, AlertTriangle, Copy } from 'lucide-react';
+import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, ChevronDown, Home, Building, AlertTriangle, Copy, Search, User, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { useUpdatePreForeclosure } from '@/hooks/usePreForeclosure';
+import { useUpdatePreForeclosure, useOwnerLookup } from '@/hooks/usePreForeclosure';
 import { PreForeclosureRecord, PreForeclosureType, WORKFLOW_STAGES } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -50,6 +50,8 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [routeStatusExpanded, setRouteStatusExpanded] = useState(false);
   const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
   const [currentTaskExpanded, setCurrentTaskExpanded] = useState(false);
+  const [ownerInfoExpanded, setOwnerInfoExpanded] = useState(false);
+  const lookupMutation = useOwnerLookup();
 
   // Parse visit details from workflow log
   const visitDetails = useMemo(() => {
@@ -197,6 +199,40 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
       });
     } finally {
       setSavingAction(false);
+    }
+  };
+
+  const handleOwnerLookup = async () => {
+    if (!viewRecord) return;
+    try {
+      const result = await lookupMutation.mutateAsync(viewRecord.document_number);
+      setViewRecord(prev => prev ? {
+        ...prev,
+        ownerName: result.ownerName || prev.ownerName,
+        ownerAddress: result.ownerAddress || prev.ownerAddress,
+        emails: result.emails || prev.emails,
+        phoneNumbers: result.phoneNumbers || prev.phoneNumbers,
+        ownerPhoneIndex: result.ownerPhoneIndex ?? prev.ownerPhoneIndex,
+        ownerLookupAt: new Date().toISOString(),
+        ownerLookupStatus: result.partial ? 'partial' : 'success',
+      } : prev);
+      toast({
+        title: result.partial ? 'Partial Results' : 'Owner Found',
+        description: result.partial
+          ? `Found owner info but people search failed: ${result.peopleSearchError || 'unknown error'}`
+          : `Found ${result.ownerName}${result.phoneNumbers?.length ? ` with ${result.phoneNumbers.length} phone number(s)` : ''}`,
+      });
+    } catch (error) {
+      setViewRecord(prev => prev ? {
+        ...prev,
+        ownerLookupStatus: 'failed',
+        ownerLookupAt: new Date().toISOString(),
+      } : prev);
+      toast({
+        title: 'Lookup Failed',
+        description: error instanceof Error ? error.message : 'Owner lookup failed',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -522,6 +558,107 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
             record={viewRecord}
             onRecordUpdate={(updates) => setViewRecord(prev => prev ? { ...prev, ...updates } : prev)}
           />
+
+          {/* Owner Information Section */}
+          <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setOwnerInfoExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Owner Information</span>
+                {viewRecord.ownerLookupStatus && (
+                  <Badge variant="outline" className={cn(
+                    "text-xs",
+                    viewRecord.ownerLookupStatus === 'success' && "bg-green-500/20 text-green-400 border-green-500/30",
+                    viewRecord.ownerLookupStatus === 'partial' && "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+                    viewRecord.ownerLookupStatus === 'failed' && "bg-red-500/20 text-red-400 border-red-500/30",
+                    viewRecord.ownerLookupStatus === 'pending' && "bg-blue-500/20 text-blue-400 border-blue-500/30",
+                  )}>
+                    {viewRecord.ownerLookupStatus === 'success' ? 'Found' :
+                     viewRecord.ownerLookupStatus === 'partial' ? 'Partial' :
+                     viewRecord.ownerLookupStatus === 'failed' ? 'Failed' : 'Pending'}
+                  </Badge>
+                )}
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !ownerInfoExpanded && "-rotate-90"
+              )} />
+            </div>
+            {ownerInfoExpanded && (
+              <div className="space-y-3 mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOwnerLookup}
+                  disabled={lookupMutation.isPending}
+                  className="w-full"
+                >
+                  {lookupMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Looking up owner...
+                    </>
+                  ) : viewRecord.ownerLookupStatus ? (
+                    <>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Re-run Owner Lookup
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Look Up Owner
+                    </>
+                  )}
+                </Button>
+
+                {viewRecord.ownerName && (
+                  <div>
+                    <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                      <User className="h-3 w-3" /> Owner Name
+                    </Label>
+                    <p className="text-sm font-medium">{viewRecord.ownerName}</p>
+                  </div>
+                )}
+
+                {viewRecord.ownerAddress && (
+                  <div>
+                    <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> Mailing Address
+                    </Label>
+                    <p className="text-sm">{viewRecord.ownerAddress}</p>
+                  </div>
+                )}
+
+                {viewRecord.emails && viewRecord.emails.length > 0 && (
+                  <div>
+                    <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                      <Mail className="h-3 w-3" /> Emails
+                    </Label>
+                    <div className="space-y-1 mt-1">
+                      {viewRecord.emails.map((email, i) => (
+                        <a
+                          key={i}
+                          href={`mailto:${email}`}
+                          className="block text-sm text-blue-400 hover:underline"
+                        >
+                          {email}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {viewRecord.ownerLookupAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Last lookup: {format(new Date(viewRecord.ownerLookupAt), 'MMM d, yyyy h:mm a')}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Phone Numbers Section */}
           <div className="bg-secondary/30 rounded-lg p-3 sm:p-4" style={{ display: 'block' }}>

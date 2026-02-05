@@ -399,6 +399,14 @@ model PreForeclosure {
   lastSeenMonth    String
   workflowStage    String      @default("not_started")
   workflowLog      Json        @default("[]")
+
+  // Owner Lookup (auto-populated from tax assessor + people search)
+  ownerName         String?
+  ownerAddress      String?
+  emails            String[]    @default([])
+  ownerLookupAt     DateTime?
+  ownerLookupStatus String?     // "success", "partial", "failed", "pending"
+
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 

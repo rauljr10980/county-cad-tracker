@@ -780,6 +780,36 @@ export async function updatePreForeclosure(updates: {
 }
 
 /**
+ * Trigger owner lookup for a pre-foreclosure record.
+ * Scrapes bexar.acttax.com for owner info, then TruePeopleSearch for contact details.
+ */
+export async function lookupPreForeclosureOwner(documentNumber: string): Promise<{
+  success: boolean;
+  partial?: boolean;
+  ownerName?: string;
+  ownerAddress?: string;
+  emails?: string[];
+  phoneNumbers?: string[];
+  ownerPhoneIndex?: number;
+  phase?: string;
+  error?: string;
+  peopleSearchError?: string;
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/preforeclosure/${encodeURIComponent(documentNumber)}/owner-lookup`,
+    {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    }
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Owner lookup failed');
+  }
+  return response.json();
+}
+
+/**
  * Geocode pre-foreclosure records via backend (Census → Nominatim → ArcGIS)
  */
 export async function geocodePreForeclosureRecords(documentNumbers: string[]): Promise<{

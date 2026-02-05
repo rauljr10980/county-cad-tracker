@@ -11,6 +11,7 @@ const XLSX = require('xlsx');
 
 const { parseFullAddress, normalizeAddress } = require('../lib/addressParser');
 const { batchGeocodeCensus, batchGeocodeNominatim, batchGeocodeArcGIS } = require('../lib/censusGeocode');
+const { lookupBexarTaxAssessor, lookupTruePeopleSearch } = require('../lib/ownerLookup');
 
 const router = express.Router();
 
@@ -73,6 +74,11 @@ router.get('/', optionalAuth, async (req, res) => {
       last_seen_month: record.lastSeenMonth,
       is_returning: record.isReturning || false,
       previous_document_numbers: record.previousDocumentNumbers || [],
+      ownerName: record.ownerName,
+      ownerAddress: record.ownerAddress,
+      emails: record.emails || [],
+      ownerLookupAt: record.ownerLookupAt ? record.ownerLookupAt.toISOString() : null,
+      ownerLookupStatus: record.ownerLookupStatus,
       created_at: record.createdAt.toISOString(),
       updated_at: record.updatedAt.toISOString(),
     }));
@@ -967,6 +973,123 @@ router.post('/geocode', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
+// OWNER LOOKUP (Tax Assessor + TruePeopleSearch Pipeline)
+// ============================================================================
+
+router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
+  try {
+    const { documentNumber } = req.params;
+
+    // 1. Fetch the record from DB
+    const record = await prisma.preForeclosure.findUnique({
+      where: { documentNumber },
+    });
+
+    if (!record) {
+      return res.status(404).json({ error: 'Pre-foreclosure record not found' });
+    }
+
+    // 2. Mark as pending
+    await prisma.preForeclosure.update({
+      where: { documentNumber },
+      data: { ownerLookupStatus: 'pending', ownerLookupAt: new Date() },
+    });
+
+    console.log(`[OWNER-LOOKUP] Starting pipeline for ${documentNumber} at "${record.address}, ${record.city}"`);
+
+    // 3. Phase 1: Tax assessor lookup
+    const taxResult = await lookupBexarTaxAssessor(record.address, record.city, record.zip);
+
+    if (!taxResult.success) {
+      await prisma.preForeclosure.update({
+        where: { documentNumber },
+        data: { ownerLookupStatus: 'failed', ownerLookupAt: new Date() },
+      });
+      return res.json({
+        success: false,
+        phase: 'tax_assessor',
+        error: taxResult.error,
+      });
+    }
+
+    // 4. Save tax assessor results immediately (partial success)
+    await prisma.preForeclosure.update({
+      where: { documentNumber },
+      data: {
+        ownerName: taxResult.ownerName,
+        ownerAddress: taxResult.ownerAddress,
+        ownerLookupStatus: 'partial',
+        ownerLookupAt: new Date(),
+      },
+    });
+
+    console.log(`[OWNER-LOOKUP] Tax assessor found: ${taxResult.ownerName}`);
+
+    // 5. Phase 2: TruePeopleSearch lookup using address + owner name for matching
+    const peopleResult = await lookupTruePeopleSearch(
+      taxResult.ownerName,
+      record.address,
+      record.city,
+      'TX',
+      record.zip
+    );
+
+    if (!peopleResult.success) {
+      // Tax data saved, people search failed -- still partial success
+      console.log(`[OWNER-LOOKUP] TruePeopleSearch failed: ${peopleResult.error}`);
+      return res.json({
+        success: true,
+        partial: true,
+        ownerName: taxResult.ownerName,
+        ownerAddress: taxResult.ownerAddress,
+        peopleSearchError: peopleResult.error,
+        phoneNumbers: record.phoneNumbers || [],
+        emails: [],
+      });
+    }
+
+    // 6. Merge phone numbers: existing + new (deduplicated)
+    const normalizePhone = (p) => p.replace(/\D/g, '').slice(-10);
+    const existingPhones = (record.phoneNumbers || []).filter(Boolean).map(normalizePhone);
+    const newPhones = (peopleResult.phoneNumbers || []).map(normalizePhone);
+    const allPhones = [...new Set([...existingPhones, ...newPhones])].filter(p => p.length === 10);
+    const mergedPhones = allPhones.slice(0, 6);
+
+    // 7. Save everything
+    const updated = await prisma.preForeclosure.update({
+      where: { documentNumber },
+      data: {
+        ownerName: taxResult.ownerName,
+        ownerAddress: taxResult.ownerAddress,
+        emails: peopleResult.emails || [],
+        phoneNumbers: mergedPhones,
+        ownerLookupStatus: 'success',
+        ownerLookupAt: new Date(),
+      },
+    });
+
+    console.log(`[OWNER-LOOKUP] Pipeline complete for ${documentNumber}: ${mergedPhones.length} phones, ${(peopleResult.emails || []).length} emails`);
+
+    // 8. Return full result
+    res.json({
+      success: true,
+      partial: false,
+      ownerName: updated.ownerName,
+      ownerAddress: updated.ownerAddress,
+      emails: updated.emails || [],
+      phoneNumbers: updated.phoneNumbers || [],
+      ownerPhoneIndex: updated.ownerPhoneIndex,
+    });
+  } catch (error) {
+    console.error('[OWNER-LOOKUP] Pipeline error:', error);
+    res.status(500).json({
+      error: 'Owner lookup failed',
+      details: error.message,
+    });
+  }
+});
+
+// ============================================================================
 // UPDATE PRE-FORECLOSURE RECORD
 // ============================================================================
 
@@ -1118,6 +1241,11 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
       workflow_log: record.workflowLog || [],
       first_seen_month: record.firstSeenMonth,
       last_seen_month: record.lastSeenMonth,
+      ownerName: record.ownerName,
+      ownerAddress: record.ownerAddress,
+      emails: record.emails || [],
+      ownerLookupAt: record.ownerLookupAt ? record.ownerLookupAt.toISOString() : null,
+      ownerLookupStatus: record.ownerLookupStatus,
       created_at: record.createdAt.toISOString(),
       updated_at: record.updatedAt.toISOString(),
     });

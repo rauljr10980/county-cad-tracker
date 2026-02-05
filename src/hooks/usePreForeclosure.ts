@@ -6,7 +6,8 @@ import {
   uploadAddressOnlyPreForeclosureFile,
   deletePreForeclosures,
   getPreForeclosureUploadHistory,
-  getLatestPreForeclosureUploadStats
+  getLatestPreForeclosureUploadStats,
+  lookupPreForeclosureOwner
 } from '@/lib/api';
 import type { PreForeclosureRecord } from '@/types/property';
 
@@ -77,6 +78,17 @@ export function useUploadAddressOnlyPreForeclosureFile() {
   return useMutation({
     mutationFn: ({ file, type }: { file: File; type: 'Mortgage' | 'Tax' }) =>
       uploadAddressOnlyPreForeclosureFile(file, type),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+    },
+  });
+}
+
+export function useOwnerLookup() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (documentNumber: string) => lookupPreForeclosureOwner(documentNumber),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
     },
