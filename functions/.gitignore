@@ -6,4 +6,5 @@ service-account-key.json
 *-key.json
 *.json
 !package.json
+!package-lock.json
 
