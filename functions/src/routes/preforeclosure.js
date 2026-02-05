@@ -1000,7 +1000,12 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
     // 3. Phase 1: Tax assessor lookup
     const taxResult = await lookupBexarTaxAssessor(record.address, record.city, record.zip);
 
-    if (!taxResult.success || !taxResult.ownerName) {
+    console.log('[OWNER-LOOKUP] Tax assessor raw result:', JSON.stringify(taxResult));
+
+    // Validate we actually got owner data
+    const ownerName = taxResult.ownerName?.trim();
+    if (!taxResult.success || !ownerName || ownerName.length < 3) {
+      console.log('[OWNER-LOOKUP] Tax assessor failed - success:', taxResult.success, 'ownerName:', ownerName);
       await prisma.preForeclosure.update({
         where: { documentNumber },
         data: { ownerLookupStatus: 'failed', ownerLookupAt: new Date() },
@@ -1009,25 +1014,27 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
         success: false,
         phase: 'tax_assessor',
         error: taxResult.error || 'No owner name found',
+        debug: taxResult.debug || null,
       });
     }
 
     // 4. Save tax assessor results immediately (partial success)
+    const ownerAddress = taxResult.ownerAddress?.trim() || null;
     await prisma.preForeclosure.update({
       where: { documentNumber },
       data: {
-        ownerName: taxResult.ownerName,
-        ownerAddress: taxResult.ownerAddress,
+        ownerName,
+        ownerAddress,
         ownerLookupStatus: 'partial',
         ownerLookupAt: new Date(),
       },
     });
 
-    console.log(`[OWNER-LOOKUP] Tax assessor found: ${taxResult.ownerName}`);
+    console.log(`[OWNER-LOOKUP] Tax assessor found: "${ownerName}" at "${ownerAddress}"`);
 
     // 5. Phase 2: TruePeopleSearch lookup using address + owner name for matching
     const peopleResult = await lookupTruePeopleSearch(
-      taxResult.ownerName,
+      ownerName,
       record.address,
       record.city,
       'TX',
@@ -1040,8 +1047,8 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
       return res.json({
         success: true,
         partial: true,
-        ownerName: taxResult.ownerName,
-        ownerAddress: taxResult.ownerAddress,
+        ownerName,
+        ownerAddress,
         peopleSearchError: peopleResult.error,
         phoneNumbers: record.phoneNumbers || [],
         emails: [],
@@ -1059,8 +1066,8 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
     const updated = await prisma.preForeclosure.update({
       where: { documentNumber },
       data: {
-        ownerName: taxResult.ownerName,
-        ownerAddress: taxResult.ownerAddress,
+        ownerName,
+        ownerAddress,
         emails: peopleResult.emails || [],
         phoneNumbers: mergedPhones,
         ownerLookupStatus: 'success',

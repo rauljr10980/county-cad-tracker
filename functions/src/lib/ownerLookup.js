@@ -86,7 +86,7 @@ async function lookupBexarTaxAssessor(address, city, zip) {
       const ownerCell = document.querySelector('td.owner-responsive');
       if (ownerCell) {
         const lines = ownerCell.innerText.split('\n').map(l => l.trim()).filter(Boolean);
-        if (lines.length >= 1) {
+        if (lines.length >= 1 && lines[0].length > 2) {
           return { success: true, ownerName: lines[0], ownerAddress: lines.slice(1).join(', '), strategy: 'owner-responsive' };
         }
       }
@@ -95,7 +95,7 @@ async function lookupBexarTaxAssessor(address, city, zip) {
       const ownerDataCell = document.querySelector('td[data-label="Owner"]');
       if (ownerDataCell) {
         const lines = ownerDataCell.innerText.split('\n').map(l => l.trim()).filter(Boolean);
-        if (lines.length >= 1) {
+        if (lines.length >= 1 && lines[0].length > 2) {
           return { success: true, ownerName: lines[0], ownerAddress: lines.slice(1).join(', '), strategy: 'data-label' };
         }
       }
@@ -116,7 +116,7 @@ async function lookupBexarTaxAssessor(address, city, zip) {
             const cells = dataRows[0].querySelectorAll('td');
             if (cells[ownerIndex]) {
               const lines = cells[ownerIndex].innerText.split('\n').map(l => l.trim()).filter(Boolean);
-              if (lines.length >= 1) {
+              if (lines.length >= 1 && lines[0].length > 2) {
                 return { success: true, ownerName: lines[0], ownerAddress: lines.slice(1).join(', '), strategy: 'table-header' };
               }
             }
@@ -178,7 +178,7 @@ async function lookupBexarTaxAssessor(address, city, zip) {
         const ownerCell = document.querySelector('td.owner-responsive');
         if (ownerCell) {
           const lines = ownerCell.innerText.split('\n').map(l => l.trim()).filter(Boolean);
-          if (lines.length >= 1) {
+          if (lines.length >= 1 && lines[0].length > 2) {
             return { success: true, ownerName: lines[0], ownerAddress: lines.slice(1).join(', '), strategy: 'detail-owner-responsive' };
           }
         }

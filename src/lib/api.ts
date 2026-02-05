@@ -806,7 +806,12 @@ export async function lookupPreForeclosureOwner(documentNumber: string): Promise
     const error = await response.json();
     throw new Error(error.error || 'Owner lookup failed');
   }
-  return response.json();
+  const result = await response.json();
+  // Throw if lookup actually failed (API returns success: false with error details)
+  if (!result.success) {
+    throw new Error(result.error || 'Owner lookup failed');
+  }
+  return result;
 }
 
 /**
