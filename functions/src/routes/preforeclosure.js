@@ -1000,7 +1000,7 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
     // 3. Phase 1: Tax assessor lookup
     const taxResult = await lookupBexarTaxAssessor(record.address, record.city, record.zip);
 
-    if (!taxResult.success) {
+    if (!taxResult.success || !taxResult.ownerName) {
       await prisma.preForeclosure.update({
         where: { documentNumber },
         data: { ownerLookupStatus: 'failed', ownerLookupAt: new Date() },
@@ -1008,7 +1008,7 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
       return res.json({
         success: false,
         phase: 'tax_assessor',
-        error: taxResult.error,
+        error: taxResult.error || 'No owner name found',
       });
     }
 

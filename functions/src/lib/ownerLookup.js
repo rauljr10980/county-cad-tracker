@@ -83,6 +83,17 @@ async function lookupBexarTaxAssessor(address, city, zip) {
         }
       }
 
+      // Alternative: Look for cells with data-label="Owner"
+      const ownerDataCell = document.querySelector('td[data-label="Owner"]');
+      if (ownerDataCell) {
+        const lines = ownerDataCell.innerText.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length >= 1) {
+          const ownerName = lines[0];
+          const ownerAddress = lines.slice(1).join(', ');
+          return { success: true, ownerName, ownerAddress };
+        }
+      }
+
       // Fallback: Check if there's an account link to click for more details
       const accountLink = document.querySelector('a[href*="showdetail"]');
       if (accountLink) {
@@ -95,8 +106,13 @@ async function lookupBexarTaxAssessor(address, city, zip) {
         return { success: false, error: 'No property found' };
       }
 
-      return { success: false, error: 'Could not parse tax assessor results' };
+      // Debug: return what we can see
+      const allTds = document.querySelectorAll('td');
+      const tdClasses = Array.from(allTds).slice(0, 10).map(td => td.className);
+      return { success: false, error: 'Could not parse tax assessor results', debug: { tdClasses, pageTitle: document.title } };
     }, searchAddress);
+
+    console.log('[OWNER-LOOKUP] Tax assessor parse result:', JSON.stringify(ownerData));
 
     // If we need to navigate to a detail page
     if (ownerData.needsNavigation && ownerData.detailUrl) {
