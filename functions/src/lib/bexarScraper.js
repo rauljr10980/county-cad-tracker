@@ -1,23 +1,16 @@
 /**
  * Bexar County Public Search Scraper
  * Scrapes foreclosure records from https://bexar.tx.publicsearch.us
- * Uses Puppeteer to render JavaScript and extract table data
+ * Uses Playwright to render JavaScript and extract table data
  */
 
-const puppeteer = require('puppeteer');
+const { chromium } = require('playwright');
+const fs = require('fs');
 
-const BROWSER_ARGS = [
-  '--no-sandbox',
-  '--disable-setuid-sandbox',
-  '--disable-dev-shm-usage',
-  '--disable-gpu',
-  '--disable-extensions',
-  '--single-process',
-];
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-// Use system Chromium in Docker, fallback to Puppeteer's bundled Chrome locally
+// Get system Chromium path for Docker/Railway
 function getChromiumPath() {
-  const fs = require('fs');
   const systemPaths = [
     '/usr/bin/chromium',
     '/usr/bin/chromium-browser',
@@ -29,11 +22,9 @@ function getChromiumPath() {
       return p;
     }
   }
-  console.log('[BEXAR-SCRAPER] No system browser found, using Puppeteer default');
-  return process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+  console.log('[BEXAR-SCRAPER] No system browser found, using Playwright default');
+  return undefined;
 }
-
-const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 /**
  * Scrape foreclosure records from Bexar County Public Search
@@ -80,31 +71,40 @@ async function scrapeBexarForeclosures(options = {}) {
 
   let browser;
   try {
-    console.log('[BEXAR-SCRAPER] Launching browser...');
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: BROWSER_ARGS,
-      executablePath: getChromiumPath(),
+    console.log('[BEXAR-SCRAPER] Launching Playwright browser...');
+    const executablePath = getChromiumPath();
+    browser = await chromium.launch({
+      headless: true,
+      executablePath,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--single-process',
+      ],
     });
 
-    const page = await browser.newPage();
-    await page.setUserAgent(USER_AGENT);
-    await page.setViewport({ width: 1280, height: 800 });
+    const context = await browser.newContext({
+      userAgent: USER_AGENT,
+      viewport: { width: 1280, height: 800 },
+    });
+    const page = await context.newPage();
 
     console.log('[BEXAR-SCRAPER] Navigating to page...');
     await page.goto(url, {
-      waitUntil: 'networkidle2',
+      waitUntil: 'networkidle',
       timeout: 30000,
     });
 
-    // Wait for the table to load (the a11y-table with results)
+    // Wait for the table to load
     console.log('[BEXAR-SCRAPER] Waiting for table to load...');
     await page.waitForSelector('tbody tr', { timeout: 15000 }).catch(() => {
       console.log('[BEXAR-SCRAPER] No table rows found after waiting');
     });
 
     // Give a bit more time for all rows to render
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await page.waitForTimeout(2000);
 
     // Extract data from the table
     // Based on user's screenshots:
@@ -128,7 +128,7 @@ async function scrapeBexarForeclosures(options = {}) {
         };
 
         const recordedDate = getColText('col-3');
-        const saleDate = getColText('col-4') || getColText('col-5'); // col-5 also has sale date sometimes
+        const saleDate = getColText('col-4') || getColText('col-5');
         const docNumber = getColText('col-6');
         const propertyAddress = getColText('col-8');
 
@@ -203,28 +203,21 @@ function parseAddress(rawAddress) {
     return { street: '', city: '', state: '', zip: '' };
   }
 
-  // Common patterns:
-  // "6122 VALLEY TREE, SAN ANTONIO, TEXAS 78250"
-  // "711 W NORWOOD CT, SAN ANTONIO, TX 78212"
-
   const parts = rawAddress.split(',').map(p => p.trim());
 
   if (parts.length >= 2) {
     const street = parts[0];
     const city = parts[1];
 
-    // Last part might be "TEXAS 78250" or "TX 78212"
     let state = 'TX';
     let zip = '';
 
     if (parts.length >= 3) {
       const lastPart = parts[parts.length - 1];
-      // Extract zip code (5 digits)
       const zipMatch = lastPart.match(/\b(\d{5})(-\d{4})?\b/);
       if (zipMatch) {
         zip = zipMatch[1];
       }
-      // Extract state
       const stateMatch = lastPart.match(/\b(TX|TEXAS)\b/i);
       if (stateMatch) {
         state = 'TX';
@@ -234,7 +227,6 @@ function parseAddress(rawAddress) {
     return { street, city, state, zip };
   }
 
-  // Fallback: just use the whole thing as street
   return { street: rawAddress, city: 'SAN ANTONIO', state: 'TX', zip: '' };
 }
 
