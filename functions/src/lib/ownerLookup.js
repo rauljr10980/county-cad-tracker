@@ -70,46 +70,94 @@ async function lookupBexarTaxAssessor(address, city, zip) {
 
     // Parse the results table for owner info
     const ownerData = await page.evaluate((targetAddress) => {
-      // Look for the results table with owner-responsive cells
+      const debug = {
+        pageTitle: document.title,
+        url: window.location.href,
+        bodyText: document.body.innerText.substring(0, 500),
+      };
+
+      // Check for "no results" message first
+      const pageText = document.body.innerText.toLowerCase();
+      if (pageText.includes('no match') || pageText.includes('0 match') || pageText.includes('no records')) {
+        return { success: false, error: 'No property found', debug };
+      }
+
+      // Strategy 1: Look for td.owner-responsive
       const ownerCell = document.querySelector('td.owner-responsive');
       if (ownerCell) {
-        // The owner cell contains: OWNER NAME\nADDRESS\nCITY, STATE ZIP
         const lines = ownerCell.innerText.split('\n').map(l => l.trim()).filter(Boolean);
         if (lines.length >= 1) {
-          const ownerName = lines[0];
-          // The mailing address is the rest of the lines joined
-          const ownerAddress = lines.slice(1).join(', ');
-          return { success: true, ownerName, ownerAddress };
+          return { success: true, ownerName: lines[0], ownerAddress: lines.slice(1).join(', '), strategy: 'owner-responsive' };
         }
       }
 
-      // Alternative: Look for cells with data-label="Owner"
+      // Strategy 2: Look for td[data-label="Owner"]
       const ownerDataCell = document.querySelector('td[data-label="Owner"]');
       if (ownerDataCell) {
         const lines = ownerDataCell.innerText.split('\n').map(l => l.trim()).filter(Boolean);
         if (lines.length >= 1) {
-          const ownerName = lines[0];
-          const ownerAddress = lines.slice(1).join(', ');
-          return { success: true, ownerName, ownerAddress };
+          return { success: true, ownerName: lines[0], ownerAddress: lines.slice(1).join(', '), strategy: 'data-label' };
         }
       }
 
-      // Fallback: Check if there's an account link to click for more details
+      // Strategy 3: Look for table rows and find "Owner" header column
+      const tables = document.querySelectorAll('table');
+      for (const table of tables) {
+        const headerRow = table.querySelector('tr');
+        if (!headerRow) continue;
+
+        const headers = Array.from(headerRow.querySelectorAll('th, td')).map(cell => cell.innerText.trim().toLowerCase());
+        const ownerIndex = headers.findIndex(h => h.includes('owner'));
+
+        if (ownerIndex >= 0) {
+          // Found owner column, get the first data row
+          const dataRows = Array.from(table.querySelectorAll('tr')).slice(1);
+          if (dataRows.length > 0) {
+            const cells = dataRows[0].querySelectorAll('td');
+            if (cells[ownerIndex]) {
+              const lines = cells[ownerIndex].innerText.split('\n').map(l => l.trim()).filter(Boolean);
+              if (lines.length >= 1) {
+                return { success: true, ownerName: lines[0], ownerAddress: lines.slice(1).join(', '), strategy: 'table-header' };
+              }
+            }
+          }
+        }
+      }
+
+      // Strategy 4: Look for any cell that looks like it contains an owner (multiple lines with address pattern)
+      const allCells = document.querySelectorAll('td');
+      for (const cell of allCells) {
+        const text = cell.innerText.trim();
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        // Owner cells typically have: NAME, then address lines (look for city/state/zip pattern)
+        if (lines.length >= 2) {
+          const lastLine = lines[lines.length - 1];
+          // Check if last line looks like "CITY, ST ZIPCODE" or contains a zip
+          if (/\b\d{5}(-\d{4})?\b/.test(lastLine) || /,\s*[A-Z]{2}\s+\d{5}/.test(lastLine)) {
+            // First line is likely the name
+            const ownerName = lines[0];
+            // Skip if it looks like a property address (contains the search address)
+            if (!ownerName.toLowerCase().includes(targetAddress.toLowerCase().split(' ')[0])) {
+              return { success: true, ownerName, ownerAddress: lines.slice(1).join(', '), strategy: 'zip-pattern' };
+            }
+          }
+        }
+      }
+
+      // Strategy 5: Check if there's an account link to click for more details
       const accountLink = document.querySelector('a[href*="showdetail"]');
       if (accountLink) {
-        return { needsNavigation: true, detailUrl: accountLink.href };
+        return { needsNavigation: true, detailUrl: accountLink.href, debug };
       }
 
-      // Check for "no results" message
-      const pageText = document.body.innerText.toLowerCase();
-      if (pageText.includes('no match') || pageText.includes('0 match')) {
-        return { success: false, error: 'No property found' };
-      }
+      // Debug: capture table structure
+      const tableInfo = Array.from(document.querySelectorAll('table')).map(t => ({
+        rows: t.querySelectorAll('tr').length,
+        firstRowText: t.querySelector('tr')?.innerText?.substring(0, 200)
+      }));
+      debug.tables = tableInfo;
 
-      // Debug: return what we can see
-      const allTds = document.querySelectorAll('td');
-      const tdClasses = Array.from(allTds).slice(0, 10).map(td => td.className);
-      return { success: false, error: 'Could not parse tax assessor results', debug: { tdClasses, pageTitle: document.title } };
+      return { success: false, error: 'Could not parse tax assessor results', debug };
     }, searchAddress);
 
     console.log('[OWNER-LOOKUP] Tax assessor parse result:', JSON.stringify(ownerData));
@@ -124,33 +172,51 @@ async function lookupBexarTaxAssessor(address, city, zip) {
 
       // Extract owner info from detail page
       const detailData = await page.evaluate(() => {
+        const debug = { pageTitle: document.title, url: window.location.href };
+
+        // Strategy 1: td.owner-responsive
         const ownerCell = document.querySelector('td.owner-responsive');
         if (ownerCell) {
           const lines = ownerCell.innerText.split('\n').map(l => l.trim()).filter(Boolean);
           if (lines.length >= 1) {
-            const ownerName = lines[0];
-            const ownerAddress = lines.slice(1).join(', ');
-            return { success: true, ownerName, ownerAddress };
+            return { success: true, ownerName: lines[0], ownerAddress: lines.slice(1).join(', '), strategy: 'detail-owner-responsive' };
           }
         }
 
-        // Fallback: look for any table rows with Owner label
+        // Strategy 2: Look for "Owner" label in table rows
         const rows = document.querySelectorAll('tr');
         for (const row of rows) {
-          const cells = row.querySelectorAll('td');
+          const cells = row.querySelectorAll('td, th');
           for (let i = 0; i < cells.length - 1; i++) {
-            if (cells[i].innerText.toLowerCase().includes('owner')) {
-              const ownerName = cells[i + 1]?.innerText?.trim();
-              if (ownerName) {
-                return { success: true, ownerName, ownerAddress: null };
+            const labelText = cells[i].innerText.toLowerCase().trim();
+            if (labelText === 'owner' || labelText === 'owner name' || labelText.includes('owner:')) {
+              const valueCell = cells[i + 1];
+              if (valueCell) {
+                const lines = valueCell.innerText.split('\n').map(l => l.trim()).filter(Boolean);
+                if (lines.length >= 1) {
+                  return { success: true, ownerName: lines[0], ownerAddress: lines.slice(1).join(', '), strategy: 'detail-label-match' };
+                }
               }
             }
           }
         }
 
-        return { success: false, error: 'Could not find owner on detail page' };
+        // Strategy 3: Look for cells with address pattern
+        const allCells = document.querySelectorAll('td');
+        for (const cell of allCells) {
+          const lines = cell.innerText.split('\n').map(l => l.trim()).filter(Boolean);
+          if (lines.length >= 2) {
+            const lastLine = lines[lines.length - 1];
+            if (/\b\d{5}(-\d{4})?\b/.test(lastLine)) {
+              return { success: true, ownerName: lines[0], ownerAddress: lines.slice(1).join(', '), strategy: 'detail-zip-pattern' };
+            }
+          }
+        }
+
+        return { success: false, error: 'Could not find owner on detail page', debug };
       });
 
+      console.log('[OWNER-LOOKUP] Tax assessor detail page result:', JSON.stringify(detailData));
       return detailData;
     }
 
