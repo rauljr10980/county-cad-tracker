@@ -12,6 +12,7 @@ const XLSX = require('xlsx');
 const { parseFullAddress, normalizeAddress } = require('../lib/addressParser');
 const { batchGeocodeCensus, batchGeocodeNominatim, batchGeocodeArcGIS } = require('../lib/censusGeocode');
 const { lookupBexarTaxAssessor, lookupTruePeopleSearch } = require('../lib/ownerLookup');
+const { scrapeBexarForeclosures } = require('../lib/bexarScraper');
 
 const router = express.Router();
 
@@ -1540,6 +1541,81 @@ router.delete('/', optionalAuth, async (req, res) => {
   } catch (error) {
     console.error('[PRE-FORECLOSURE] Delete error:', error);
     res.status(500).json({ error: 'Failed to delete pre-foreclosure records' });
+  }
+});
+
+// ============================================================================
+// SCRAPE BEXAR COUNTY PUBLIC SEARCH
+// ============================================================================
+
+router.post('/scrape', optionalAuth, async (req, res) => {
+  try {
+    const { startDate, endDate, importRecords = false } = req.body;
+
+    console.log('[SCRAPE] Starting Bexar County foreclosure scrape...');
+
+    // Scrape the website
+    const result = await scrapeBexarForeclosures({ startDate, endDate });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      });
+    }
+
+    // If importRecords is true, save new records to the database
+    if (importRecords && result.records.length > 0) {
+      const existingDocs = await prisma.preForeclosure.findMany({
+        select: { documentNumber: true },
+      });
+      const existingSet = new Set(existingDocs.map(r => r.documentNumber));
+
+      // Filter to only new records
+      const newRecords = result.records.filter(r => !existingSet.has(r.documentNumber));
+
+      if (newRecords.length > 0) {
+        // Insert new records
+        const created = await prisma.preForeclosure.createMany({
+          data: newRecords.map(r => ({
+            documentNumber: r.documentNumber,
+            address: r.address,
+            city: r.city || 'SAN ANTONIO',
+            state: r.state || 'TX',
+            zip: r.zip || '',
+            saleDate: r.saleDate ? new Date(r.saleDate) : null,
+            type: 'NOTICE_OF_FORECLOSURE',
+            workflowStage: 'not_started',
+          })),
+          skipDuplicates: true,
+        });
+
+        console.log(`[SCRAPE] Imported ${created.count} new records`);
+
+        return res.json({
+          success: true,
+          scraped: result.records.length,
+          imported: created.count,
+          skippedDuplicates: result.records.length - newRecords.length,
+          records: result.records,
+        });
+      }
+    }
+
+    // Just return scraped data without importing
+    res.json({
+      success: true,
+      scraped: result.records.length,
+      imported: 0,
+      records: result.records,
+    });
+
+  } catch (error) {
+    console.error('[SCRAPE] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 });
 

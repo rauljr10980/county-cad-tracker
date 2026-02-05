@@ -7,7 +7,8 @@ import {
   deletePreForeclosures,
   getPreForeclosureUploadHistory,
   getLatestPreForeclosureUploadStats,
-  lookupPreForeclosureOwner
+  lookupPreForeclosureOwner,
+  scrapeBexarForeclosures
 } from '@/lib/api';
 import type { PreForeclosureRecord } from '@/types/property';
 
@@ -103,6 +104,20 @@ export function useDeletePreForeclosures() {
     onSuccess: () => {
       queryClient.setQueryData(['preforeclosure'], []);
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+    },
+  });
+}
+
+export function useScrapeForeclosures() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (options: { startDate?: string; endDate?: string; importRecords?: boolean }) =>
+      scrapeBexarForeclosures(options),
+    onSuccess: (data) => {
+      if (data.imported > 0) {
+        queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+      }
     },
   });
 }

@@ -1361,11 +1361,53 @@ export async function removeRecordFromRoute(routeId: string, recordId: string): 
       ...getAuthHeaders(),
     },
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error || 'Failed to remove record from route');
   }
-  
+
+  return response.json();
+}
+
+/**
+ * Scrape Bexar County foreclosure records from public search
+ */
+export async function scrapeBexarForeclosures(options: {
+  startDate?: string;
+  endDate?: string;
+  importRecords?: boolean;
+}): Promise<{
+  success: boolean;
+  scraped: number;
+  imported: number;
+  skippedDuplicates?: number;
+  records: Array<{
+    documentNumber: string;
+    recordedDate: string | null;
+    saleDate: string | null;
+    rawAddress: string;
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    docType: string;
+  }>;
+  error?: string;
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/preforeclosure/scrape`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(options),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Scraping failed');
+  }
+
   return response.json();
 }

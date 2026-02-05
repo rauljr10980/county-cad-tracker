@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, MapPin, CheckCircle, Route as RouteIcon, Check, GripVertical, Phone, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, MapPin, CheckCircle, Route as RouteIcon, Check, GripVertical, Phone, ChevronUp, ChevronDown, ChevronsUpDown, Globe } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useUploadAddressOnlyPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats } from '@/hooks/usePreForeclosure';
+import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useUploadAddressOnlyPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats, useScrapeForeclosures } from '@/hooks/usePreForeclosure';
 import { PreForeclosureRecord, PreForeclosureType, WorkflowStage, WorkflowLogEntry, WORKFLOW_STAGES, STAGE_TASK_MAP } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -261,7 +261,9 @@ export function PreForeclosureView() {
   const uploadMutation = useUploadPreForeclosureFile();
   const addressOnlyUploadMutation = useUploadAddressOnlyPreForeclosureFile();
   const deleteMutation = useDeletePreForeclosures();
+  const scrapeMutation = useScrapeForeclosures();
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [isScraping, setIsScraping] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadMode, setUploadMode] = useState<'standard' | 'address-only'>('standard');
   const [uploadType, setUploadType] = useState<'Mortgage' | 'Tax'>('Mortgage');
@@ -1918,6 +1920,42 @@ export function PreForeclosureView() {
               </>
             )}
         </Button>
+          <Button
+            onClick={async () => {
+              setIsScraping(true);
+              try {
+                const result = await scrapeMutation.mutateAsync({ importRecords: true });
+                toast({
+                  title: 'Scrape Complete',
+                  description: `Found ${result.scraped} records, imported ${result.imported} new records${result.skippedDuplicates ? `, skipped ${result.skippedDuplicates} duplicates` : ''}`,
+                });
+              } catch (error) {
+                toast({
+                  title: 'Scrape Failed',
+                  description: error instanceof Error ? error.message : 'Failed to scrape records',
+                  variant: 'destructive',
+                });
+              } finally {
+                setIsScraping(false);
+              }
+            }}
+            size="default"
+            variant="outline"
+            disabled={isScraping}
+            className="shadow-sm"
+          >
+            {isScraping ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Scraping...
+              </>
+            ) : (
+              <>
+                <Globe className="h-4 w-4 mr-2" />
+                Scrape
+              </>
+            )}
+          </Button>
           <Button
             onClick={() => setUploadOpen(true)}
             size="default"
