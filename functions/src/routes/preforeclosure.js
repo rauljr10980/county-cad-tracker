@@ -1048,12 +1048,12 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
       });
     }
 
-    // 6. Merge phone numbers: existing + new (deduplicated)
+    // 6. Merge phone numbers: existing + new (deduplicated, no cap)
     const normalizePhone = (p) => p.replace(/\D/g, '').slice(-10);
     const existingPhones = (record.phoneNumbers || []).filter(Boolean).map(normalizePhone);
     const newPhones = (peopleResult.phoneNumbers || []).map(normalizePhone);
     const allPhones = [...new Set([...existingPhones, ...newPhones])].filter(p => p.length === 10);
-    const mergedPhones = allPhones.slice(0, 6);
+    const mergedPhones = allPhones; // No limit - UI will show as many fields as needed
 
     // 7. Save everything
     const updated = await prisma.preForeclosure.update({

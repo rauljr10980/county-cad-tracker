@@ -678,63 +678,66 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               </Button>
             </div>
             <div className="space-y-2">
-              {[0, 1, 2, 3, 4, 5].map((index) => {
+              {(() => {
                 const phoneNumbersArray = Array.isArray(viewRecord.phoneNumbers) ? viewRecord.phoneNumbers : [];
-                const phoneValue = phoneNumbersArray[index] || '';
-                const isOwnerPhone = viewRecord.ownerPhoneIndex === index;
-                return (
-                  <div key={index} className="flex items-center gap-1.5 sm:gap-2">
-                    <span className="text-xs text-muted-foreground w-8 sm:w-16 shrink-0">
-                      <span className="hidden sm:inline">Phone </span>{index + 1}:
-                    </span>
-                    <Input
-                      type="tel"
-                      value={phoneValue}
-                      onChange={(e) => {
-                        const currentPhones = viewRecord.phoneNumbers || [];
-                        const newPhoneNumbers = [...currentPhones];
-                        newPhoneNumbers[index] = e.target.value;
-                        const trimmed = newPhoneNumbers.slice(0, 6);
-                        setViewRecord({
-                          ...viewRecord,
-                          phoneNumbers: trimmed,
-                        });
-                      }}
-                      placeholder="Enter phone number"
-                      className="flex-1"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "h-8 w-8 shrink-0",
-                        isOwnerPhone && "text-yellow-500"
-                      )}
-                      onClick={() => {
-                        const newOwnerPhoneIndex = isOwnerPhone ? undefined : index;
-                        setViewRecord({
-                          ...viewRecord,
-                          ownerPhoneIndex: newOwnerPhoneIndex,
-                        });
-                        const currentPhones = Array.isArray(viewRecord.phoneNumbers) ? viewRecord.phoneNumbers : [];
-                        updateMutation.mutateAsync({
-                          document_number: viewRecord.document_number,
-                          phoneNumbers: currentPhones,
-                          ownerPhoneIndex: newOwnerPhoneIndex,
-                        }).catch((error) => {
-                          console.error('Error saving owner phone index:', error);
-                        });
-                      }}
-                      title={isOwnerPhone ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
-                    >
-                      <Star className={cn(
-                        "h-4 w-4",
-                        isOwnerPhone ? "fill-yellow-500" : "fill-none"
-                      )} />
-                    </Button>
-                  </div>
-                );
-              })}
+                // Show at least 6 fields, or more if we have more numbers
+                const fieldCount = Math.max(6, phoneNumbersArray.length);
+                return Array.from({ length: fieldCount }, (_, index) => {
+                  const phoneValue = phoneNumbersArray[index] || '';
+                  const isOwnerPhone = viewRecord.ownerPhoneIndex === index;
+                  return (
+                    <div key={index} className="flex items-center gap-1.5 sm:gap-2">
+                      <span className="text-xs text-muted-foreground w-8 sm:w-16 shrink-0">
+                        <span className="hidden sm:inline">Phone </span>{index + 1}:
+                      </span>
+                      <Input
+                        type="tel"
+                        value={phoneValue}
+                        onChange={(e) => {
+                          const currentPhones = viewRecord.phoneNumbers || [];
+                          const newPhoneNumbers = [...currentPhones];
+                          newPhoneNumbers[index] = e.target.value;
+                          setViewRecord({
+                            ...viewRecord,
+                            phoneNumbers: newPhoneNumbers,
+                          });
+                        }}
+                        placeholder="Enter phone number"
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-8 w-8 shrink-0",
+                          isOwnerPhone && "text-yellow-500"
+                        )}
+                        onClick={() => {
+                          const newOwnerPhoneIndex = isOwnerPhone ? undefined : index;
+                          setViewRecord({
+                            ...viewRecord,
+                            ownerPhoneIndex: newOwnerPhoneIndex,
+                          });
+                          const currentPhones = Array.isArray(viewRecord.phoneNumbers) ? viewRecord.phoneNumbers : [];
+                          updateMutation.mutateAsync({
+                            document_number: viewRecord.document_number,
+                            phoneNumbers: currentPhones,
+                            ownerPhoneIndex: newOwnerPhoneIndex,
+                          }).catch((error) => {
+                            console.error('Error saving owner phone index:', error);
+                          });
+                        }}
+                        title={isOwnerPhone ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                      >
+                        <Star className={cn(
+                          "h-4 w-4",
+                          isOwnerPhone ? "fill-yellow-500" : "fill-none"
+                        )} />
+                      </Button>
+                    </div>
+                  );
+                });
+              })()}
               <div className="flex justify-end gap-2 pt-2">
                 <Button
                   size="sm"
