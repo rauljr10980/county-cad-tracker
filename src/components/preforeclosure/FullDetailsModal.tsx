@@ -690,7 +690,14 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 variant="outline"
                 size="sm"
                 className="h-7 text-xs"
-                onClick={() => window.open('https://www.truepeoplesearch.com', '_blank')}
+                onClick={() => {
+                  const name = viewRecord.ownerName || viewRecord.grantor || '';
+                  if (name) {
+                    window.open(`https://www.truepeoplesearch.com/results?name=${encodeURIComponent(name)}&citystatezip=${encodeURIComponent(viewRecord.city + ' TX')}`, '_blank');
+                  } else {
+                    window.open('https://www.truepeoplesearch.com', '_blank');
+                  }
+                }}
               >
                 <ExternalLink className="h-3 w-3 mr-1.5" />
                 TruePeopleSearch
