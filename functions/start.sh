@@ -36,13 +36,6 @@ fi
 
 echo "✅ Prisma Client generated"
 
-# Install Playwright browser (if not already installed)
-echo "🌐 Installing Playwright browser..."
-if ! npx playwright install chromium; then
-  echo "⚠️  Playwright install failed, scraping may not work"
-fi
-echo "✅ Playwright browser ready"
-
 # Create database tables
 echo "⏳ Creating database tables..."
 echo "📋 Running: npx prisma db push --accept-data-loss"

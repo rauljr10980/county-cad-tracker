@@ -1,19 +1,17 @@
 /**
  * Bexar County Public Search Scraper
  * Scrapes foreclosure records from https://bexar.tx.publicsearch.us
- * Uses Playwright to render JavaScript and extract table data
+ * Uses Playwright to intercept WebSocket data (site loads via WS, not HTTP)
  */
 
 const { chromium } = require('playwright');
 
-const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-
 /**
  * Scrape foreclosure records from Bexar County Public Search
  * @param {Object} options - Scraping options
- * @param {string} options.startDate - Start date for recorded date range (YYYYMMDD)
- * @param {string} options.endDate - End date for recorded date range (YYYYMMDD)
- * @param {number} options.limit - Max results per page (default 250)
+ * @param {string} options.startDate - Start date (YYYYMMDD)
+ * @param {string} options.endDate - End date (YYYYMMDD)
+ * @param {number} options.limit - Max results (default 250)
  * @returns {Promise<Object>} Object with success flag and records array
  */
 async function scrapeBexarForeclosures(options = {}) {
@@ -23,8 +21,6 @@ async function scrapeBexarForeclosures(options = {}) {
     limit = 250,
   } = options;
 
-  // Build the URL with date range
-  // Default: last 30 days if no dates provided
   const today = new Date();
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -39,114 +35,68 @@ async function scrapeBexarForeclosures(options = {}) {
   const recordedStart = startDate || formatDate(thirtyDaysAgo);
   const recordedEnd = endDate || formatDate(today);
 
-  const baseUrl = 'https://bexar.tx.publicsearch.us/results';
-  const params = new URLSearchParams({
-    department: 'FC', // Foreclosures
-    instrumentDateRange: '20000404,20260707',
-    limit: String(limit),
-    recordedDateRange: `${recordedStart},${recordedEnd}`,
-    searchType: 'advancedSearch',
-  });
-
-  const url = `${baseUrl}?${params.toString()}`;
+  const url = `https://bexar.tx.publicsearch.us/results?department=FC&limit=${limit}&recordedDateRange=${recordedStart},${recordedEnd}&searchType=advancedSearch`;
   console.log(`[BEXAR-SCRAPER] Fetching: ${url}`);
 
   let browser;
   try {
-    console.log('[BEXAR-SCRAPER] Launching Playwright browser...');
+    console.log('[BEXAR-SCRAPER] Launching browser...');
     browser = await chromium.launch({
       headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
     });
 
-    const context = await browser.newContext({
-      userAgent: USER_AGENT,
-      viewport: { width: 1280, height: 800 },
-    });
-    const page = await context.newPage();
+    const page = await browser.newPage();
 
-    console.log('[BEXAR-SCRAPER] Navigating to page...');
-    await page.goto(url, {
-      waitUntil: 'networkidle',
-      timeout: 30000,
-    });
-
-    // Wait for the table to load
-    console.log('[BEXAR-SCRAPER] Waiting for table to load...');
-    await page.waitForSelector('tbody tr', { timeout: 15000 }).catch(() => {
-      console.log('[BEXAR-SCRAPER] No table rows found after waiting');
-    });
-
-    // Give a bit more time for all rows to render
-    await page.waitForTimeout(2000);
-
-    // Extract data from the table
-    // Based on user's screenshots:
-    // td.col-3 = recorded date
-    // td.col-4 = sale date (may have span inside)
-    // td.col-6 = doc number (has span inside)
-    // td.col-8 = property address (has span inside)
-    console.log('[BEXAR-SCRAPER] Extracting records from table...');
-    const records = await page.evaluate(() => {
-      const results = [];
-      const rows = document.querySelectorAll('tbody tr');
-
-      rows.forEach((row) => {
-        // Get text content from each column, handling nested spans
-        const getColText = (colClass) => {
-          const cell = row.querySelector(`td.${colClass}`);
-          if (!cell) return '';
-          // Check for span first
-          const span = cell.querySelector('span');
-          return (span ? span.textContent : cell.textContent)?.trim() || '';
-        };
-
-        const recordedDate = getColText('col-3');
-        const saleDate = getColText('col-4') || getColText('col-5');
-        const docNumber = getColText('col-6');
-        const propertyAddress = getColText('col-8');
-
-        // Skip if no doc number (header row or empty)
-        if (!docNumber || docNumber.length < 5) {
-          return;
+    // Intercept WebSocket data - the site loads records via WebSocket
+    let documentData = null;
+    page.on('websocket', ws => {
+      ws.on('framereceived', e => {
+        const str = e.payload.toString();
+        if (str.includes('FETCH_DOCUMENTS_FULFILLED')) {
+          try { documentData = JSON.parse(str); } catch (_) {}
         }
-
-        results.push({
-          documentNumber: docNumber,
-          recordedDate,
-          saleDate,
-          rawAddress: propertyAddress,
-        });
       });
-
-      return results;
     });
 
-    console.log(`[BEXAR-SCRAPER] Found ${records.length} rows in table`);
+    console.log('[BEXAR-SCRAPER] Navigating...');
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Process records - parse dates and addresses
-    const processedRecords = records.map(record => {
-      const addressParts = parseAddress(record.rawAddress);
+    // Wait for WebSocket data (up to 30 seconds)
+    console.log('[BEXAR-SCRAPER] Waiting for WebSocket data...');
+    for (let i = 0; i < 30; i++) {
+      if (documentData) break;
+      await page.waitForTimeout(1000);
+    }
+
+    if (!documentData) {
+      throw new Error('No data received from WebSocket after 30 seconds');
+    }
+
+    const docs = documentData.payload.data.byHash || {};
+    console.log(`[BEXAR-SCRAPER] Got ${Object.keys(docs).length} documents from WebSocket`);
+
+    const records = Object.values(docs).map(doc => {
+      const addr = doc.propAddress?.[0] || {};
+      const fullAddress = doc.propertyAddress?.[0] || '';
+
       return {
-        documentNumber: record.documentNumber,
-        recordedDate: parseDate(record.recordedDate),
-        saleDate: parseDate(record.saleDate),
-        rawAddress: record.rawAddress,
-        address: addressParts.street,
-        city: addressParts.city,
-        state: addressParts.state,
-        zip: addressParts.zip,
-        docType: 'NOTICE OF FORECLOSURE',
+        documentNumber: doc.instrumentNumber || doc.docNumber || String(doc.id),
+        recordedDate: parseDate(doc.recordedDate),
+        saleDate: parseDate(doc.instrumentDate),
+        rawAddress: fullAddress,
+        address: addr.address1 || '',
+        city: addr.city || '',
+        state: 'TX',
+        zip: addr.zip || '',
+        docType: doc.docType || 'NOTICE OF FORECLOSURE',
+        grantor: (doc.grantor || []).filter(g => g && g !== '.').join(', '),
+        grantee: (doc.grantee || []).filter(g => g && g !== '.').join(', '),
       };
     });
 
-    console.log(`[BEXAR-SCRAPER] Processed ${processedRecords.length} records`);
-    return { success: true, records: processedRecords, count: processedRecords.length };
+    console.log(`[BEXAR-SCRAPER] Processed ${records.length} records`);
+    return { success: true, records, count: records.length };
 
   } catch (error) {
     console.error('[BEXAR-SCRAPER] Error:', error.message);
@@ -159,54 +109,16 @@ async function scrapeBexarForeclosures(options = {}) {
 }
 
 /**
- * Parse a date string like "2/3/2026" into ISO format
+ * Parse a date string like "1/5/2026" or "01/05/2026" into ISO format
  */
 function parseDate(dateStr) {
   if (!dateStr) return null;
-
-  // Handle MM/DD/YYYY format
   const parts = dateStr.split('/');
   if (parts.length === 3) {
     const [month, day, year] = parts;
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
-
   return dateStr;
-}
-
-/**
- * Parse an address string like "6122 VALLEY TREE, SAN ANTONIO, TEXAS 78250"
- */
-function parseAddress(rawAddress) {
-  if (!rawAddress) {
-    return { street: '', city: '', state: '', zip: '' };
-  }
-
-  const parts = rawAddress.split(',').map(p => p.trim());
-
-  if (parts.length >= 2) {
-    const street = parts[0];
-    const city = parts[1];
-
-    let state = 'TX';
-    let zip = '';
-
-    if (parts.length >= 3) {
-      const lastPart = parts[parts.length - 1];
-      const zipMatch = lastPart.match(/\b(\d{5})(-\d{4})?\b/);
-      if (zipMatch) {
-        zip = zipMatch[1];
-      }
-      const stateMatch = lastPart.match(/\b(TX|TEXAS)\b/i);
-      if (stateMatch) {
-        state = 'TX';
-      }
-    }
-
-    return { street, city, state, zip };
-  }
-
-  return { street: rawAddress, city: 'SAN ANTONIO', state: 'TX', zip: '' };
 }
 
 module.exports = { scrapeBexarForeclosures };
