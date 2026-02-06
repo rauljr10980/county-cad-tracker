@@ -76,19 +76,43 @@ async function scrapeBexarForeclosures(options = {}) {
     const docs = documentData.payload.data.byHash || {};
     console.log(`[BEXAR-SCRAPER] Got ${Object.keys(docs).length} documents from WebSocket`);
 
+    // Log a sample record for debugging
+    const sampleDoc = Object.values(docs)[0];
+    if (sampleDoc) {
+      console.log('[BEXAR-SCRAPER] Sample record keys:', Object.keys(sampleDoc));
+      console.log('[BEXAR-SCRAPER] Sample propAddress:', JSON.stringify(sampleDoc.propAddress));
+      console.log('[BEXAR-SCRAPER] Sample propertyAddress:', JSON.stringify(sampleDoc.propertyAddress));
+      console.log('[BEXAR-SCRAPER] Sample legalDescription:', sampleDoc.legalDescription);
+      console.log('[BEXAR-SCRAPER] Sample instrumentDate:', sampleDoc.instrumentDate);
+      console.log('[BEXAR-SCRAPER] Sample recordedDate:', sampleDoc.recordedDate);
+    }
+
     const records = Object.values(docs).map(doc => {
       const addr = doc.propAddress?.[0] || {};
       const fullAddress = doc.propertyAddress?.[0] || '';
 
+      // Use structured address first, fall back to parsing the full address string
+      let street = addr.address1 || '';
+      let city = addr.city || '';
+      let zip = addr.zip || '';
+
+      if (!street && fullAddress) {
+        // Parse full address like "1300 PATRICIA, SAN ANTONIO, TX 78213"
+        const parsed = parseFullAddress(fullAddress);
+        street = parsed.street;
+        city = city || parsed.city;
+        zip = zip || parsed.zip;
+      }
+
       return {
         documentNumber: doc.instrumentNumber || doc.docNumber || String(doc.id),
         recordedDate: parseDate(doc.recordedDate),
-        saleDate: parseDate(doc.instrumentDate),
+        saleDate: parseDate(doc.instrumentDate) || parseDate(doc.saleDate),
         rawAddress: fullAddress,
-        address: addr.address1 || '',
-        city: addr.city || '',
+        address: street,
+        city: city,
         state: 'TX',
-        zip: addr.zip || '',
+        zip: zip,
         docType: doc.docType || 'NOTICE OF FORECLOSURE',
         grantor: (doc.grantor || []).filter(g => g && g !== '.').join(', '),
         grantee: (doc.grantee || []).filter(g => g && g !== '.').join(', '),
@@ -119,6 +143,33 @@ function parseDate(dateStr) {
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
   return dateStr;
+}
+
+/**
+ * Parse a full address string like "1300 PATRICIA, SAN ANTONIO, TX 78213"
+ */
+function parseFullAddress(fullAddress) {
+  const result = { street: '', city: '', zip: '' };
+  if (!fullAddress) return result;
+
+  // Try "STREET, CITY, STATE ZIP" format
+  const parts = fullAddress.split(',').map(s => s.trim());
+  if (parts.length >= 2) {
+    result.street = parts[0];
+    // Last part might be "TX 78213" or just "SAN ANTONIO"
+    const lastPart = parts[parts.length - 1];
+    const zipMatch = lastPart.match(/(\d{5})/);
+    if (zipMatch) result.zip = zipMatch[1];
+    const stateMatch = lastPart.match(/^([A-Z]{2})\s/);
+    if (stateMatch && parts.length >= 3) {
+      result.city = parts[parts.length - 2];
+    } else if (parts.length === 2) {
+      result.city = lastPart.replace(/\s*TX\s*\d{5}/, '').trim();
+    }
+  } else {
+    result.street = fullAddress;
+  }
+  return result;
 }
 
 module.exports = { scrapeBexarForeclosures };
