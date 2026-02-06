@@ -11,8 +11,7 @@ const XLSX = require('xlsx');
 
 const { parseFullAddress, normalizeAddress } = require('../lib/addressParser');
 const { batchGeocodeCensus, batchGeocodeNominatim, batchGeocodeArcGIS } = require('../lib/censusGeocode');
-// Owner lookup now uses n8n webhook (no Puppeteer needed)
-// const { lookupBexarTaxAssessor, lookupTruePeopleSearch } = require('../lib/ownerLookup');
+// Owner lookup uses direct HTTP POST to bexar.acttax.com (no Puppeteer/n8n needed)
 const { scrapeBexarForeclosures } = require('../lib/bexarScraper');
 
 const router = express.Router();
@@ -975,31 +974,38 @@ router.post('/geocode', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
-// OWNER LOOKUP via n8n (Tax Assessor HTTP scraping)
+// OWNER LOOKUP via Bexar County Tax Assessor (direct HTTP POST)
 // ============================================================================
 
-// Helper: call n8n webhook for a single address lookup
-async function callN8nOwnerLookup(address, city, zip) {
-  const webhookUrl = process.env.N8N_OWNER_LOOKUP_WEBHOOK_URL;
-  if (!webhookUrl) {
-    throw new Error('N8N_OWNER_LOOKUP_WEBHOOK_URL is not configured');
-  }
+// Helper: look up owner from bexar.acttax.com
+async function lookupOwnerFromTaxAssessor(address) {
+  const searchAddress = address.toUpperCase().trim();
+  console.log(`[OWNER-LOOKUP] Searching tax assessor for "${searchAddress}"`);
 
-  console.log(`[N8N-LOOKUP] Calling n8n for "${address}, ${city} ${zip}"`);
-
-  const response = await fetch(webhookUrl, {
+  const response = await fetch('https://bexar.acttax.com/act_webdev/bexar/showlist.jsp', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ address, city, zip }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `searchby=6&criteria=${encodeURIComponent(searchAddress)}&subcriteria=`,
   });
 
   if (!response.ok) {
-    throw new Error(`n8n webhook returned ${response.status}: ${response.statusText}`);
+    throw new Error(`Tax assessor returned ${response.status}: ${response.statusText}`);
   }
 
-  const result = await response.json();
-  console.log(`[N8N-LOOKUP] n8n result:`, JSON.stringify(result));
-  return result;
+  const html = await response.text();
+
+  // Parse owner from HTML: <td class="owner-responsive">OWNER NAME<br>STREET<br>CITY, STATE  ZIP</td>
+  const ownerMatch = html.match(/<td class="owner-responsive"[^>]*>(?:<!--[^>]*-->\s*)?([\s\S]*?)\s*<\/td>/);
+  if (!ownerMatch) {
+    return { ownerName: null, ownerAddress: null, error: 'No results found' };
+  }
+
+  const parts = ownerMatch[1].split(/<br\s*\/?>/).map(s => s.trim()).filter(Boolean);
+  const ownerName = parts[0] || null;
+  const ownerAddress = parts.slice(1).join(', ') || null;
+
+  console.log(`[OWNER-LOOKUP] Found: "${ownerName}" at "${ownerAddress}"`);
+  return { ownerName, ownerAddress };
 }
 
 router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
@@ -1020,10 +1026,10 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
       data: { ownerLookupStatus: 'pending', ownerLookupAt: new Date() },
     });
 
-    console.log(`[OWNER-LOOKUP] Starting n8n lookup for ${documentNumber} at "${record.address}, ${record.city}"`);
+    console.log(`[OWNER-LOOKUP] Starting lookup for ${documentNumber} at "${record.address}"`);
 
-    // Call n8n webhook
-    const result = await callN8nOwnerLookup(record.address, record.city, record.zip);
+    // Call tax assessor directly
+    const result = await lookupOwnerFromTaxAssessor(record.address);
 
     const ownerName = result.ownerName?.trim();
     if (!ownerName || ownerName.length < 3) {
@@ -1033,7 +1039,7 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
       });
       return res.json({
         success: false,
-        error: result.error || 'No owner name found from n8n',
+        error: result.error || 'No owner found',
       });
     }
 
@@ -1070,7 +1076,7 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
-// BATCH OWNER LOOKUP via n8n (runs sequentially for all records without owner)
+// BATCH OWNER LOOKUP (runs sequentially for all records without owner)
 // ============================================================================
 
 router.post('/batch-owner-lookup', optionalAuth, async (req, res) => {
@@ -1101,7 +1107,7 @@ router.post('/batch-owner-lookup', optionalAuth, async (req, res) => {
       });
     }
 
-    console.log(`[BATCH-OWNER] Starting n8n batch lookup for ${records.length} records`);
+    console.log(`[BATCH-OWNER] Starting batch lookup for ${records.length} records`);
 
     let found = 0;
     let failed = 0;
@@ -1111,15 +1117,15 @@ router.post('/batch-owner-lookup', optionalAuth, async (req, res) => {
       try {
         console.log(`[BATCH-OWNER] Looking up: ${record.documentNumber} - "${record.address}"`);
 
-        const n8nResult = await callN8nOwnerLookup(record.address, record.city, record.zip);
+        const lookupResult = await lookupOwnerFromTaxAssessor(record.address);
 
-        const ownerName = n8nResult.ownerName?.trim();
+        const ownerName = lookupResult.ownerName?.trim();
         if (ownerName && ownerName.length >= 3) {
           await prisma.preForeclosure.update({
             where: { documentNumber: record.documentNumber },
             data: {
               ownerName,
-              ownerAddress: n8nResult.ownerAddress?.trim() || null,
+              ownerAddress: lookupResult.ownerAddress?.trim() || null,
               ownerLookupStatus: 'success',
               ownerLookupAt: new Date(),
             },
@@ -1136,8 +1142,8 @@ router.post('/batch-owner-lookup', optionalAuth, async (req, res) => {
             },
           });
           failed++;
-          results.push({ documentNumber: record.documentNumber, status: 'failed', error: n8nResult.error });
-          console.log(`[BATCH-OWNER] Failed: ${record.documentNumber} - ${n8nResult.error || 'no owner found'}`);
+          results.push({ documentNumber: record.documentNumber, status: 'failed', error: lookupResult.error });
+          console.log(`[BATCH-OWNER] Failed: ${record.documentNumber} - ${lookupResult.error || 'no owner found'}`);
         }
 
         // 2 second delay between lookups
