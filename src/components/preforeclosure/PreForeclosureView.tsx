@@ -3269,7 +3269,10 @@ export function PreForeclosureView() {
           // Create route with depot, passing the limited records from area selector
           await handleCreateRouteWithDepot(depotRecord, startingPoint.pinLocation, selectedRecords);
         }}
-        properties={filteredRecords.filter(r => r.latitude != null && r.longitude != null).map(r => ({
+        properties={(selectedRecordIds.size > 0
+          ? filteredRecords.filter(r => selectedRecordIds.has(r.document_number))
+          : filteredRecords
+        ).filter(r => r.latitude != null && r.longitude != null).map(r => ({
           id: r.document_number,
           latitude: r.latitude!,
           longitude: r.longitude!,
