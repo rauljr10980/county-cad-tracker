@@ -1925,12 +1925,9 @@ export function PreForeclosureView() {
         </Button>
           <Button
             onClick={() => {
-              // Default to last 30 days
-              const today = new Date();
-              const thirtyDaysAgo = new Date(today);
-              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-              setScrapeStartDate(thirtyDaysAgo.toISOString().split('T')[0]);
-              setScrapeEndDate(today.toISOString().split('T')[0]);
+              const today = new Date().toISOString().split('T')[0];
+              setScrapeStartDate(today);
+              setScrapeEndDate(today);
               setScrapeDialogOpen(true);
             }}
             size="default"
