@@ -1926,10 +1926,11 @@ export function PreForeclosureView() {
           <Button
             onClick={() => {
               const today = new Date();
-              const sixtyDaysOut = new Date(today);
-              sixtyDaysOut.setDate(sixtyDaysOut.getDate() + 90);
-              setScrapeStartDate(today.toISOString().split('T')[0]);
-              setScrapeEndDate(sixtyDaysOut.toISOString().split('T')[0]);
+              const toLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              const ninetyDaysOut = new Date(today);
+              ninetyDaysOut.setDate(ninetyDaysOut.getDate() + 90);
+              setScrapeStartDate(toLocal(today));
+              setScrapeEndDate(toLocal(ninetyDaysOut));
               setScrapeDialogOpen(true);
             }}
             size="default"
@@ -3294,9 +3295,9 @@ export function PreForeclosureView() {
                 value={scrapeStartDate}
                 onChange={(e) => {
                   setScrapeStartDate(e.target.value);
-                  const d = new Date(e.target.value);
+                  const d = new Date(e.target.value + 'T12:00:00');
                   d.setDate(d.getDate() + 90);
-                  setScrapeEndDate(d.toISOString().split('T')[0]);
+                  setScrapeEndDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
                 }}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
