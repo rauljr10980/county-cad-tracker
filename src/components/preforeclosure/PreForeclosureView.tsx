@@ -1951,39 +1951,7 @@ export function PreForeclosureView() {
               </>
             )}
           </Button>
-          <Button
-            onClick={async () => {
-              try {
-                const result = await batchOwnerMutation.mutateAsync();
-                toast({
-                  title: 'Owner Lookup Complete',
-                  description: result.message || `Found ${result.found} owners out of ${result.total} records (${result.failed} failed)`,
-                });
-              } catch (error) {
-                toast({
-                  title: 'Owner Lookup Failed',
-                  description: error instanceof Error ? error.message : 'Batch owner lookup failed',
-                  variant: 'destructive',
-                });
-              }
-            }}
-            size="default"
-            variant="outline"
-            disabled={batchOwnerMutation.isPending}
-            className="shadow-sm"
-          >
-            {batchOwnerMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Looking up...
-              </>
-            ) : (
-              <>
-                <User className="h-4 w-4 mr-2" />
-                Look Up Owners
-              </>
-            )}
-          </Button>
+          {/* Look Up Owners button - hidden */}
           <Button
             onClick={() => setUploadOpen(true)}
             size="default"
