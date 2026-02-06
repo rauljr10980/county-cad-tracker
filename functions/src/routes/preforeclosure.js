@@ -1587,7 +1587,7 @@ router.post('/scrape', optionalAuth, async (req, res) => {
               zip: r.zip || '',
               recordedDate: r.recordedDate ? new Date(r.recordedDate) : null,
               saleDate: r.saleDate ? new Date(r.saleDate) : null,
-              type: 'NOTICE_OF_FORECLOSURE',
+              type: 'Mortgage',
               filingMonth: monthStr,
               firstSeenMonth: monthStr,
               lastSeenMonth: monthStr,
