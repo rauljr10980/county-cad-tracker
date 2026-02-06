@@ -12,6 +12,8 @@ const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
+const cron = require('node-cron');
+
 // Use shared Prisma instance to prevent connection pool exhaustion
 const prisma = require('./lib/prisma');
 
@@ -204,17 +206,21 @@ async function startServer() {
     await prisma.$connect();
     console.log('✅ Database connected successfully');
 
-    // One-time migration: fix record types
+    // Startup migrations
     try {
-      const updated = await prisma.preForeclosure.updateMany({
+      const typeFixed = await prisma.preForeclosure.updateMany({
         where: { type: 'NOTICE_OF_FORECLOSURE' },
         data: { type: 'Mortgage' },
       });
-      if (updated.count > 0) {
-        console.log(`🔄 Migrated ${updated.count} records from NOTICE_OF_FORECLOSURE to Mortgage`);
-      }
+      if (typeFixed.count > 0) console.log(`🔄 Fixed ${typeFixed.count} record types`);
+
+      // Delete records with no address (bad scrape data)
+      const deleted = await prisma.preForeclosure.deleteMany({
+        where: { address: '' },
+      });
+      if (deleted.count > 0) console.log(`🧹 Cleaned up ${deleted.count} records with no address`);
     } catch (e) {
-      console.log('⚠️ Type migration skipped:', e.message);
+      console.log('⚠️ Migration skipped:', e.message);
     }
 
     // Start Express server
@@ -227,9 +233,113 @@ async function startServer() {
 ║   Server: http://0.0.0.0:${PORT}                          ║
 ║   Environment: ${process.env.NODE_ENV || 'development'}                              ║
 ║   Database: PostgreSQL (Prisma) - Connected               ║
+║   Auto-Scrape: Mon-Fri 8am,11am,2pm,5pm CT               ║
 ╚═══════════════════════════════════════════════════════════╝
       `);
     });
+
+    // Auto-scrape: Mon-Fri at 8am, 11am, 2pm, 5pm Central Time
+    // Cron runs in UTC, CT = UTC-6, so 8am CT = 14:00 UTC, etc.
+    const { scrapeBexarForeclosures } = require('./lib/bexarScraper');
+
+    async function runAutoScrape() {
+      const now = new Date();
+      console.log(`[AUTO-SCRAPE] Starting scheduled scrape at ${now.toISOString()}`);
+      try {
+        // Use today's date as start, +90 days as end
+        const formatDate = (d) => {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${year}${month}${day}`;
+        };
+
+        const today = new Date();
+        const endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 90);
+
+        const result = await scrapeBexarForeclosures({
+          startDate: formatDate(today),
+          endDate: formatDate(endDate),
+        });
+
+        if (!result.success) {
+          console.error('[AUTO-SCRAPE] Scrape failed:', result.error);
+          return;
+        }
+
+        // Import records (same logic as the API route)
+        const recordsWithAddress = result.records.filter(r => r.address && r.address.trim().length > 0);
+        const skippedNoAddress = result.records.length - recordsWithAddress.length;
+
+        const existingDocs = await prisma.preForeclosure.findMany({
+          select: { documentNumber: true, address: true, saleDate: true },
+        });
+        const existingMap = new Map(existingDocs.map(r => [r.documentNumber, r]));
+
+        const newRecords = [];
+        const updateRecords = [];
+        for (const r of recordsWithAddress) {
+          const existing = existingMap.get(r.documentNumber);
+          if (!existing) {
+            newRecords.push(r);
+          } else if (!existing.address || existing.address.trim() === '') {
+            updateRecords.push(r);
+          } else if (!existing.saleDate && r.saleDate) {
+            updateRecords.push(r);
+          }
+        }
+
+        let importedCount = 0;
+        if (newRecords.length > 0) {
+          const monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+          const created = await prisma.preForeclosure.createMany({
+            data: newRecords.map(r => ({
+              documentNumber: r.documentNumber,
+              address: r.address,
+              city: r.city || 'SAN ANTONIO',
+              zip: r.zip || '',
+              recordedDate: r.recordedDate ? new Date(r.recordedDate) : null,
+              saleDate: r.saleDate ? new Date(r.saleDate) : null,
+              type: 'Mortgage',
+              filingMonth: monthStr,
+              firstSeenMonth: monthStr,
+              lastSeenMonth: monthStr,
+              workflowStage: 'not_started',
+            })),
+            skipDuplicates: true,
+          });
+          importedCount = created.count;
+        }
+
+        let updatedCount = 0;
+        if (updateRecords.length > 0) {
+          for (const r of updateRecords) {
+            await prisma.preForeclosure.update({
+              where: { documentNumber: r.documentNumber },
+              data: {
+                address: r.address,
+                city: r.city || 'SAN ANTONIO',
+                zip: r.zip || '',
+                saleDate: r.saleDate ? new Date(r.saleDate) : undefined,
+                recordedDate: r.recordedDate ? new Date(r.recordedDate) : undefined,
+              },
+            });
+          }
+          updatedCount = updateRecords.length;
+        }
+
+        console.log(`[AUTO-SCRAPE] Done: scraped=${result.records.length}, imported=${importedCount}, updated=${updatedCount}, noAddress=${skippedNoAddress}`);
+      } catch (error) {
+        console.error('[AUTO-SCRAPE] Error:', error.message);
+      }
+    }
+
+    // Schedule: Mon-Fri at 8am, 11am, 2pm, 5pm Central Time
+    cron.schedule('0 8,11,14,17 * * 1-5', () => {
+      runAutoScrape();
+    }, { timezone: 'America/Chicago' });
+    console.log('⏰ Auto-scrape scheduled: Mon-Fri at 8am, 11am, 2pm, 5pm CT');
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     console.error('Database URL exists:', !!process.env.DATABASE_URL);
