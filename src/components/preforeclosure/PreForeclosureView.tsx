@@ -1927,7 +1927,7 @@ export function PreForeclosureView() {
             onClick={() => {
               const today = new Date();
               const sixtyDaysOut = new Date(today);
-              sixtyDaysOut.setDate(sixtyDaysOut.getDate() + 60);
+              sixtyDaysOut.setDate(sixtyDaysOut.getDate() + 90);
               setScrapeStartDate(today.toISOString().split('T')[0]);
               setScrapeEndDate(sixtyDaysOut.toISOString().split('T')[0]);
               setScrapeDialogOpen(true);
@@ -3295,14 +3295,14 @@ export function PreForeclosureView() {
                 onChange={(e) => {
                   setScrapeStartDate(e.target.value);
                   const d = new Date(e.target.value);
-                  d.setDate(d.getDate() + 60);
+                  d.setDate(d.getDate() + 90);
                   setScrapeEndDate(d.toISOString().split('T')[0]);
                 }}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">End Date <span className="text-xs text-muted-foreground">(auto: start + 60 days)</span></label>
+              <label className="text-sm font-medium">End Date <span className="text-xs text-muted-foreground">(auto: start + 90 days)</span></label>
               <input
                 type="date"
                 value={scrapeEndDate}
