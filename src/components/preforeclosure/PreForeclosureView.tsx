@@ -1925,9 +1925,11 @@ export function PreForeclosureView() {
         </Button>
           <Button
             onClick={() => {
-              const today = new Date().toISOString().split('T')[0];
-              setScrapeStartDate(today);
-              setScrapeEndDate(today);
+              const today = new Date();
+              const sixtyDaysOut = new Date(today);
+              sixtyDaysOut.setDate(sixtyDaysOut.getDate() + 60);
+              setScrapeStartDate(today.toISOString().split('T')[0]);
+              setScrapeEndDate(sixtyDaysOut.toISOString().split('T')[0]);
               setScrapeDialogOpen(true);
             }}
             size="default"
@@ -3290,17 +3292,22 @@ export function PreForeclosureView() {
               <input
                 type="date"
                 value={scrapeStartDate}
-                onChange={(e) => setScrapeStartDate(e.target.value)}
+                onChange={(e) => {
+                  setScrapeStartDate(e.target.value);
+                  const d = new Date(e.target.value);
+                  d.setDate(d.getDate() + 60);
+                  setScrapeEndDate(d.toISOString().split('T')[0]);
+                }}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">End Date</label>
+              <label className="text-sm font-medium">End Date <span className="text-xs text-muted-foreground">(auto: start + 60 days)</span></label>
               <input
                 type="date"
                 value={scrapeEndDate}
-                onChange={(e) => setScrapeEndDate(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                readOnly
+                className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm cursor-not-allowed"
               />
             </div>
           </div>
