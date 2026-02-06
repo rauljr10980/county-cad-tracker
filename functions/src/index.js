@@ -204,6 +204,19 @@ async function startServer() {
     await prisma.$connect();
     console.log('✅ Database connected successfully');
 
+    // One-time migration: fix record types
+    try {
+      const updated = await prisma.preForeclosure.updateMany({
+        where: { type: 'NOTICE_OF_FORECLOSURE' },
+        data: { type: 'Mortgage' },
+      });
+      if (updated.count > 0) {
+        console.log(`🔄 Migrated ${updated.count} records from NOTICE_OF_FORECLOSURE to Mortgage`);
+      }
+    } catch (e) {
+      console.log('⚠️ Type migration skipped:', e.message);
+    }
+
     // Start Express server
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`
