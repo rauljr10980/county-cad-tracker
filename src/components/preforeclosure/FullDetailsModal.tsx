@@ -316,8 +316,37 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 onClick={() => {
                   window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
                 }}
+                title="Tax Assessor"
               >
                 <ExternalLink className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  const name = viewRecord.ownerName || viewRecord.grantor || '';
+                  if (name) {
+                    const url = `https://www.truepeoplesearch.com/results?name=${encodeURIComponent(name)}&citystatezip=${encodeURIComponent(viewRecord.city + ' TX')}`;
+                    window.open(url, '_blank');
+                  } else {
+                    toast({ title: 'No owner name', description: 'Run owner lookup first to get a name to search', variant: 'destructive' });
+                  }
+                }}
+                title="TruePeopleSearch"
+              >
+                <User className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  window.open('https://bexar.tx.publicsearch.us/', '_blank');
+                }}
+                title="Land Records"
+              >
+                <Building className="h-4 w-4" />
               </Button>
             </div>}
           </div>
