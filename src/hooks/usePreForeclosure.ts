@@ -8,6 +8,7 @@ import {
   getPreForeclosureUploadHistory,
   getLatestPreForeclosureUploadStats,
   lookupPreForeclosureOwner,
+  batchOwnerLookup,
   scrapeBexarForeclosures
 } from '@/lib/api';
 import type { PreForeclosureRecord } from '@/types/property';
@@ -90,6 +91,17 @@ export function useOwnerLookup() {
 
   return useMutation({
     mutationFn: (documentNumber: string) => lookupPreForeclosureOwner(documentNumber),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+    },
+  });
+}
+
+export function useBatchOwnerLookup() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => batchOwnerLookup(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
     },

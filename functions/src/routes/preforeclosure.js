@@ -11,7 +11,8 @@ const XLSX = require('xlsx');
 
 const { parseFullAddress, normalizeAddress } = require('../lib/addressParser');
 const { batchGeocodeCensus, batchGeocodeNominatim, batchGeocodeArcGIS } = require('../lib/censusGeocode');
-const { lookupBexarTaxAssessor, lookupTruePeopleSearch } = require('../lib/ownerLookup');
+// Owner lookup now uses n8n webhook (no Puppeteer needed)
+// const { lookupBexarTaxAssessor, lookupTruePeopleSearch } = require('../lib/ownerLookup');
 const { scrapeBexarForeclosures } = require('../lib/bexarScraper');
 
 const router = express.Router();
@@ -974,14 +975,37 @@ router.post('/geocode', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
-// OWNER LOOKUP (Tax Assessor + TruePeopleSearch Pipeline)
+// OWNER LOOKUP via n8n (Tax Assessor HTTP scraping)
 // ============================================================================
+
+// Helper: call n8n webhook for a single address lookup
+async function callN8nOwnerLookup(address, city, zip) {
+  const webhookUrl = process.env.N8N_OWNER_LOOKUP_WEBHOOK_URL;
+  if (!webhookUrl) {
+    throw new Error('N8N_OWNER_LOOKUP_WEBHOOK_URL is not configured');
+  }
+
+  console.log(`[N8N-LOOKUP] Calling n8n for "${address}, ${city} ${zip}"`);
+
+  const response = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address, city, zip }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`n8n webhook returned ${response.status}: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  console.log(`[N8N-LOOKUP] n8n result:`, JSON.stringify(result));
+  return result;
+}
 
 router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
   try {
     const { documentNumber } = req.params;
 
-    // 1. Fetch the record from DB
     const record = await prisma.preForeclosure.findUnique({
       where: { documentNumber },
     });
@@ -990,95 +1014,43 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Pre-foreclosure record not found' });
     }
 
-    // 2. Mark as pending
+    // Mark as pending
     await prisma.preForeclosure.update({
       where: { documentNumber },
       data: { ownerLookupStatus: 'pending', ownerLookupAt: new Date() },
     });
 
-    console.log(`[OWNER-LOOKUP] Starting pipeline for ${documentNumber} at "${record.address}, ${record.city}"`);
+    console.log(`[OWNER-LOOKUP] Starting n8n lookup for ${documentNumber} at "${record.address}, ${record.city}"`);
 
-    // 3. Phase 1: Tax assessor lookup
-    const taxResult = await lookupBexarTaxAssessor(record.address, record.city, record.zip);
+    // Call n8n webhook
+    const result = await callN8nOwnerLookup(record.address, record.city, record.zip);
 
-    console.log('[OWNER-LOOKUP] Tax assessor raw result:', JSON.stringify(taxResult));
-
-    // Validate we actually got owner data
-    const ownerName = taxResult.ownerName?.trim();
-    if (!taxResult.success || !ownerName || ownerName.length < 3) {
-      console.log('[OWNER-LOOKUP] Tax assessor failed - success:', taxResult.success, 'ownerName:', ownerName);
+    const ownerName = result.ownerName?.trim();
+    if (!ownerName || ownerName.length < 3) {
       await prisma.preForeclosure.update({
         where: { documentNumber },
         data: { ownerLookupStatus: 'failed', ownerLookupAt: new Date() },
       });
       return res.json({
         success: false,
-        phase: 'tax_assessor',
-        error: taxResult.error || 'No owner name found',
-        debug: taxResult.debug || null,
+        error: result.error || 'No owner name found from n8n',
       });
     }
 
-    // 4. Save tax assessor results immediately (partial success)
-    const ownerAddress = taxResult.ownerAddress?.trim() || null;
-    await prisma.preForeclosure.update({
-      where: { documentNumber },
-      data: {
-        ownerName,
-        ownerAddress,
-        ownerLookupStatus: 'partial',
-        ownerLookupAt: new Date(),
-      },
-    });
-
-    console.log(`[OWNER-LOOKUP] Tax assessor found: "${ownerName}" at "${ownerAddress}"`);
-
-    // 5. Phase 2: TruePeopleSearch lookup using address + owner name for matching
-    const peopleResult = await lookupTruePeopleSearch(
-      ownerName,
-      record.address,
-      record.city,
-      'TX',
-      record.zip
-    );
-
-    if (!peopleResult.success) {
-      // Tax data saved, people search failed -- still partial success
-      console.log(`[OWNER-LOOKUP] TruePeopleSearch failed: ${peopleResult.error}`);
-      return res.json({
-        success: true,
-        partial: true,
-        ownerName,
-        ownerAddress,
-        peopleSearchError: peopleResult.error,
-        phoneNumbers: record.phoneNumbers || [],
-        emails: [],
-      });
-    }
-
-    // 6. Merge phone numbers: existing + new (deduplicated, no cap)
-    const normalizePhone = (p) => p.replace(/\D/g, '').slice(-10);
-    const existingPhones = (record.phoneNumbers || []).filter(Boolean).map(normalizePhone);
-    const newPhones = (peopleResult.phoneNumbers || []).map(normalizePhone);
-    const allPhones = [...new Set([...existingPhones, ...newPhones])].filter(p => p.length === 10);
-    const mergedPhones = allPhones; // No limit - UI will show as many fields as needed
-
-    // 7. Save everything
+    // Save owner data
+    const ownerAddress = result.ownerAddress?.trim() || null;
     const updated = await prisma.preForeclosure.update({
       where: { documentNumber },
       data: {
         ownerName,
         ownerAddress,
-        emails: peopleResult.emails || [],
-        phoneNumbers: mergedPhones,
         ownerLookupStatus: 'success',
         ownerLookupAt: new Date(),
       },
     });
 
-    console.log(`[OWNER-LOOKUP] Pipeline complete for ${documentNumber}: ${mergedPhones.length} phones, ${(peopleResult.emails || []).length} emails`);
+    console.log(`[OWNER-LOOKUP] Found: "${ownerName}" at "${ownerAddress}"`);
 
-    // 8. Return full result
     res.json({
       success: true,
       partial: false,
@@ -1089,9 +1061,107 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
       ownerPhoneIndex: updated.ownerPhoneIndex,
     });
   } catch (error) {
-    console.error('[OWNER-LOOKUP] Pipeline error:', error);
+    console.error('[OWNER-LOOKUP] Error:', error);
     res.status(500).json({
       error: 'Owner lookup failed',
+      details: error.message,
+    });
+  }
+});
+
+// ============================================================================
+// BATCH OWNER LOOKUP via n8n (runs sequentially for all records without owner)
+// ============================================================================
+
+router.post('/batch-owner-lookup', optionalAuth, async (req, res) => {
+  try {
+    // Find all active records that have an address but no ownerName
+    const records = await prisma.preForeclosure.findMany({
+      where: {
+        address: { not: '' },
+        ownerName: null,
+        inactive: { not: true },
+      },
+      select: {
+        documentNumber: true,
+        address: true,
+        city: true,
+        zip: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (records.length === 0) {
+      return res.json({
+        success: true,
+        message: 'All records already have owner names',
+        total: 0,
+        found: 0,
+        failed: 0,
+      });
+    }
+
+    console.log(`[BATCH-OWNER] Starting n8n batch lookup for ${records.length} records`);
+
+    let found = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const record of records) {
+      try {
+        console.log(`[BATCH-OWNER] Looking up: ${record.documentNumber} - "${record.address}"`);
+
+        const n8nResult = await callN8nOwnerLookup(record.address, record.city, record.zip);
+
+        const ownerName = n8nResult.ownerName?.trim();
+        if (ownerName && ownerName.length >= 3) {
+          await prisma.preForeclosure.update({
+            where: { documentNumber: record.documentNumber },
+            data: {
+              ownerName,
+              ownerAddress: n8nResult.ownerAddress?.trim() || null,
+              ownerLookupStatus: 'success',
+              ownerLookupAt: new Date(),
+            },
+          });
+          found++;
+          results.push({ documentNumber: record.documentNumber, ownerName, status: 'found' });
+          console.log(`[BATCH-OWNER] Found: ${record.documentNumber} -> "${ownerName}"`);
+        } else {
+          await prisma.preForeclosure.update({
+            where: { documentNumber: record.documentNumber },
+            data: {
+              ownerLookupStatus: 'failed',
+              ownerLookupAt: new Date(),
+            },
+          });
+          failed++;
+          results.push({ documentNumber: record.documentNumber, status: 'failed', error: n8nResult.error });
+          console.log(`[BATCH-OWNER] Failed: ${record.documentNumber} - ${n8nResult.error || 'no owner found'}`);
+        }
+
+        // 2 second delay between lookups
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (err) {
+        failed++;
+        results.push({ documentNumber: record.documentNumber, status: 'error', error: err.message });
+        console.error(`[BATCH-OWNER] Error for ${record.documentNumber}:`, err.message);
+      }
+    }
+
+    console.log(`[BATCH-OWNER] Complete: ${found} found, ${failed} failed out of ${records.length}`);
+
+    res.json({
+      success: true,
+      total: records.length,
+      found,
+      failed,
+      results,
+    });
+  } catch (error) {
+    console.error('[BATCH-OWNER] Error:', error);
+    res.status(500).json({
+      error: 'Batch owner lookup failed',
       details: error.message,
     });
   }

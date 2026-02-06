@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, MapPin, CheckCircle, Route as RouteIcon, Check, GripVertical, Phone, ChevronUp, ChevronDown, ChevronsUpDown, Globe } from 'lucide-react';
+import { FileSpreadsheet, Loader2, AlertCircle, Upload, Filter, Search, X, FileText, Calendar, Trash2, Eye, Send, MapPin, CheckCircle, Route as RouteIcon, Check, GripVertical, Phone, ChevronUp, ChevronDown, ChevronsUpDown, Globe, User } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useUploadAddressOnlyPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats, useScrapeForeclosures } from '@/hooks/usePreForeclosure';
+import { usePreForeclosures, useUpdatePreForeclosure, useUploadPreForeclosureFile, useUploadAddressOnlyPreForeclosureFile, useDeletePreForeclosures, useLatestPreForeclosureUploadStats, useScrapeForeclosures, useBatchOwnerLookup } from '@/hooks/usePreForeclosure';
 import { PreForeclosureRecord, PreForeclosureType, WorkflowStage, WorkflowLogEntry, WORKFLOW_STAGES, STAGE_TASK_MAP } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -262,6 +262,7 @@ export function PreForeclosureView() {
   const addressOnlyUploadMutation = useUploadAddressOnlyPreForeclosureFile();
   const deleteMutation = useDeletePreForeclosures();
   const scrapeMutation = useScrapeForeclosures();
+  const batchOwnerMutation = useBatchOwnerLookup();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [isScraping, setIsScraping] = useState(false);
   const [scrapeDialogOpen, setScrapeDialogOpen] = useState(false);
@@ -1947,6 +1948,39 @@ export function PreForeclosureView() {
               <>
                 <Globe className="h-4 w-4 mr-2" />
                 Scrape
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={async () => {
+              try {
+                const result = await batchOwnerMutation.mutateAsync();
+                toast({
+                  title: 'Owner Lookup Complete',
+                  description: result.message || `Found ${result.found} owners out of ${result.total} records (${result.failed} failed)`,
+                });
+              } catch (error) {
+                toast({
+                  title: 'Owner Lookup Failed',
+                  description: error instanceof Error ? error.message : 'Batch owner lookup failed',
+                  variant: 'destructive',
+                });
+              }
+            }}
+            size="default"
+            variant="outline"
+            disabled={batchOwnerMutation.isPending}
+            className="shadow-sm"
+          >
+            {batchOwnerMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Looking up...
+              </>
+            ) : (
+              <>
+                <User className="h-4 w-4 mr-2" />
+                Look Up Owners
               </>
             )}
           </Button>

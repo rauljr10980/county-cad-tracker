@@ -559,7 +559,96 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
             onRecordUpdate={(updates) => setViewRecord(prev => prev ? { ...prev, ...updates } : prev)}
           />
 
-          {/* Owner Information Section - Hidden until Puppeteer/Chromium is working on Railway */}
+          {/* Owner Information */}
+          <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setOwnerInfoExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Owner Information</span>
+                {viewRecord.ownerLookupStatus === 'success' && (
+                  <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px]">Found</Badge>
+                )}
+                {viewRecord.ownerLookupStatus === 'partial' && (
+                  <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[10px]">Partial</Badge>
+                )}
+                {viewRecord.ownerLookupStatus === 'failed' && (
+                  <Badge variant="outline" className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px]">Failed</Badge>
+                )}
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !ownerInfoExpanded && "-rotate-90"
+              )} />
+            </div>
+            {ownerInfoExpanded && (
+              <div className="space-y-3 mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOwnerLookup}
+                  disabled={lookupMutation.isPending}
+                  className="w-full"
+                >
+                  {lookupMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Looking up owner...
+                    </>
+                  ) : viewRecord.ownerName ? (
+                    <>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Re-run Owner Lookup
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Look Up Owner
+                    </>
+                  )}
+                </Button>
+                {viewRecord.ownerName && (
+                  <div className="space-y-2">
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Owner Name</Label>
+                      <p className="text-sm font-medium">{viewRecord.ownerName}</p>
+                    </div>
+                    {viewRecord.ownerAddress && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Mailing Address</Label>
+                        <p className="text-sm">{viewRecord.ownerAddress}</p>
+                      </div>
+                    )}
+                    {viewRecord.emails && viewRecord.emails.length > 0 && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                          <Mail className="h-3 w-3" /> Emails
+                        </Label>
+                        <div className="space-y-1">
+                          {viewRecord.emails.map((email, i) => (
+                            <a
+                              key={i}
+                              href={`mailto:${email}`}
+                              className="text-sm text-blue-400 hover:underline block"
+                            >
+                              {email}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {viewRecord.ownerLookupAt && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Last lookup: {new Date(viewRecord.ownerLookupAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Phone Numbers Section */}
           <div className="bg-secondary/30 rounded-lg p-3 sm:p-4" style={{ display: 'block' }}>

@@ -815,6 +815,30 @@ export async function lookupPreForeclosureOwner(documentNumber: string): Promise
 }
 
 /**
+ * Batch owner lookup via n8n for all records missing owner names
+ */
+export async function batchOwnerLookup(): Promise<{
+  success: boolean;
+  total: number;
+  found: number;
+  failed: number;
+  message?: string;
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/preforeclosure/batch-owner-lookup`,
+    {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    }
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Batch owner lookup failed');
+  }
+  return response.json();
+}
+
+/**
  * Geocode pre-foreclosure records via backend (Census → Nominatim → ArcGIS)
  */
 export async function geocodePreForeclosureRecords(documentNumbers: string[]): Promise<{

@@ -69,8 +69,8 @@ async function lookupBexarTaxAssessor(address, city, zip) {
       timeout: 15000,
     });
 
-    // Select "Property Address" from the dropdown (value="3")
-    await page.select('select#searchby', '3');
+    // Select "Property Address" from the dropdown (value="6")
+    await page.select('select#searchby', '6');
     await delay(300);
 
     // Type the street address in the criteria input
