@@ -56,9 +56,10 @@ else
   echo "✅ Database connection verified"
 fi
 
-# One-time data migration: fix record types
+# One-time data migrations
 echo "🔄 Running data migrations..."
-echo "UPDATE \"PreForeclosure\" SET type = 'Mortgage' WHERE type = 'NOTICE_OF_FORECLOSURE';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Migrations complete" || echo "⚠️  Migration skipped"
+echo "UPDATE \"PreForeclosure\" SET type = 'Mortgage' WHERE type = 'NOTICE_OF_FORECLOSURE';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Type migration complete" || echo "⚠️  Type migration skipped"
+echo "UPDATE \"PreForeclosure\" SET \"ownerLookupStatus\" = NULL WHERE \"ownerLookupStatus\" = 'failed' AND \"ownerName\" IS NULL;" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Reset failed owner lookups" || echo "⚠️  Owner lookup reset skipped"
 
 # Start the application
 echo "✅ Starting application..."
