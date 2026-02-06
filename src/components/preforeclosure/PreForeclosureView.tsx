@@ -3329,9 +3329,14 @@ export function PreForeclosureView() {
                     startDate,
                     endDate,
                   });
+                  const parts = [`Found ${result.scraped} records`];
+                  if (result.imported > 0) parts.push(`imported ${result.imported} new`);
+                  if (result.updated > 0) parts.push(`updated ${result.updated} existing`);
+                  if (result.skippedNoAddress > 0) parts.push(`${result.skippedNoAddress} pending address`);
+                  if (result.skippedDuplicates > 0) parts.push(`${result.skippedDuplicates} duplicates skipped`);
                   toast({
                     title: 'Scrape Complete',
-                    description: `Found ${result.scraped} records, imported ${result.imported} new records${result.skippedDuplicates ? `, skipped ${result.skippedDuplicates} duplicates` : ''}`,
+                    description: parts.join(', '),
                   });
                 } catch (error) {
                   toast({

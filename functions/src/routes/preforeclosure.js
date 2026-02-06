@@ -1566,16 +1566,39 @@ router.post('/scrape', optionalAuth, async (req, res) => {
 
     // If importRecords is true, save new records to the database
     if (importRecords && result.records.length > 0) {
+      // Only import records that have an actual street address
+      const recordsWithAddress = result.records.filter(r => r.address && r.address.trim().length > 0);
+      const skippedNoAddress = result.records.length - recordsWithAddress.length;
+      if (skippedNoAddress > 0) {
+        console.log(`[SCRAPE] Skipped ${skippedNoAddress} records with no address (not yet indexed by county)`);
+      }
+
       const existingDocs = await prisma.preForeclosure.findMany({
-        select: { documentNumber: true },
+        select: { documentNumber: true, address: true, saleDate: true },
       });
-      const existingSet = new Set(existingDocs.map(r => r.documentNumber));
+      const existingMap = new Map(existingDocs.map(r => [r.documentNumber, r]));
 
-      // Filter to only new records
-      const newRecords = result.records.filter(r => !existingSet.has(r.documentNumber));
+      // Split into new records and existing records that need updating
+      const newRecords = [];
+      const updateRecords = [];
+      for (const r of recordsWithAddress) {
+        const existing = existingMap.get(r.documentNumber);
+        if (!existing) {
+          newRecords.push(r);
+        } else if (!existing.address || existing.address.trim() === '') {
+          // Existing record has no address - update it
+          updateRecords.push(r);
+        } else if (!existing.saleDate && r.saleDate) {
+          // Existing record missing sale date - update it
+          updateRecords.push(r);
+        }
+      }
 
+      let importedCount = 0;
+      let updatedCount = 0;
+
+      // Insert new records
       if (newRecords.length > 0) {
-        // Insert new records
         const created = await prisma.preForeclosure.createMany({
           data: newRecords.map(r => {
             const now = new Date();
@@ -1596,17 +1619,37 @@ router.post('/scrape', optionalAuth, async (req, res) => {
           }),
           skipDuplicates: true,
         });
-
+        importedCount = created.count;
         console.log(`[SCRAPE] Imported ${created.count} new records`);
-
-        return res.json({
-          success: true,
-          scraped: result.records.length,
-          imported: created.count,
-          skippedDuplicates: result.records.length - newRecords.length,
-          records: result.records,
-        });
       }
+
+      // Update existing records that now have address/sale date data
+      if (updateRecords.length > 0) {
+        for (const r of updateRecords) {
+          await prisma.preForeclosure.update({
+            where: { documentNumber: r.documentNumber },
+            data: {
+              address: r.address,
+              city: r.city || 'SAN ANTONIO',
+              zip: r.zip || '',
+              saleDate: r.saleDate ? new Date(r.saleDate) : undefined,
+              recordedDate: r.recordedDate ? new Date(r.recordedDate) : undefined,
+            },
+          });
+        }
+        updatedCount = updateRecords.length;
+        console.log(`[SCRAPE] Updated ${updatedCount} existing records with new address/date data`);
+      }
+
+      return res.json({
+        success: true,
+        scraped: result.records.length,
+        imported: importedCount,
+        updated: updatedCount,
+        skippedDuplicates: recordsWithAddress.length - newRecords.length - updateRecords.length,
+        skippedNoAddress,
+        records: result.records,
+      });
     }
 
     // Just return scraped data without importing
