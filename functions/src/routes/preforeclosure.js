@@ -1577,16 +1577,23 @@ router.post('/scrape', optionalAuth, async (req, res) => {
       if (newRecords.length > 0) {
         // Insert new records
         const created = await prisma.preForeclosure.createMany({
-          data: newRecords.map(r => ({
-            documentNumber: r.documentNumber,
-            address: r.address,
-            city: r.city || 'SAN ANTONIO',
-            state: r.state || 'TX',
-            zip: r.zip || '',
-            saleDate: r.saleDate ? new Date(r.saleDate) : null,
-            type: 'NOTICE_OF_FORECLOSURE',
-            workflowStage: 'not_started',
-          })),
+          data: newRecords.map(r => {
+            const now = new Date();
+            const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            return {
+              documentNumber: r.documentNumber,
+              address: r.address,
+              city: r.city || 'SAN ANTONIO',
+              zip: r.zip || '',
+              recordedDate: r.recordedDate ? new Date(r.recordedDate) : null,
+              saleDate: r.saleDate ? new Date(r.saleDate) : null,
+              type: 'NOTICE_OF_FORECLOSURE',
+              filingMonth: monthStr,
+              firstSeenMonth: monthStr,
+              lastSeenMonth: monthStr,
+              workflowStage: 'not_started',
+            };
+          }),
           skipDuplicates: true,
         });
 
