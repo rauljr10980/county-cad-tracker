@@ -264,6 +264,9 @@ export function PreForeclosureView() {
   const scrapeMutation = useScrapeForeclosures();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [isScraping, setIsScraping] = useState(false);
+  const [scrapeDialogOpen, setScrapeDialogOpen] = useState(false);
+  const [scrapeStartDate, setScrapeStartDate] = useState('');
+  const [scrapeEndDate, setScrapeEndDate] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadMode, setUploadMode] = useState<'standard' | 'address-only'>('standard');
   const [uploadType, setUploadType] = useState<'Mortgage' | 'Tax'>('Mortgage');
@@ -1921,23 +1924,14 @@ export function PreForeclosureView() {
             )}
         </Button>
           <Button
-            onClick={async () => {
-              setIsScraping(true);
-              try {
-                const result = await scrapeMutation.mutateAsync({ importRecords: true });
-                toast({
-                  title: 'Scrape Complete',
-                  description: `Found ${result.scraped} records, imported ${result.imported} new records${result.skippedDuplicates ? `, skipped ${result.skippedDuplicates} duplicates` : ''}`,
-                });
-              } catch (error) {
-                toast({
-                  title: 'Scrape Failed',
-                  description: error instanceof Error ? error.message : 'Failed to scrape records',
-                  variant: 'destructive',
-                });
-              } finally {
-                setIsScraping(false);
-              }
+            onClick={() => {
+              // Default to last 30 days
+              const today = new Date();
+              const thirtyDaysAgo = new Date(today);
+              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+              setScrapeStartDate(thirtyDaysAgo.toISOString().split('T')[0]);
+              setScrapeEndDate(today.toISOString().split('T')[0]);
+              setScrapeDialogOpen(true);
             }}
             size="default"
             variant="outline"
@@ -3283,6 +3277,80 @@ export function PreForeclosureView() {
         }))}
         numVehicles={numVehicles}
       />
+
+      {/* Scrape Dialog */}
+      <Dialog open={scrapeDialogOpen} onOpenChange={setScrapeDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scrape Bexar County Records</DialogTitle>
+            <DialogDescription>
+              Select the date range to scrape foreclosure records from Bexar County Public Search.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Start Date</label>
+              <input
+                type="date"
+                value={scrapeStartDate}
+                onChange={(e) => setScrapeStartDate(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">End Date</label>
+              <input
+                type="date"
+                value={scrapeEndDate}
+                onChange={(e) => setScrapeEndDate(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setScrapeDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={isScraping || !scrapeStartDate || !scrapeEndDate}
+              onClick={async () => {
+                setIsScraping(true);
+                setScrapeDialogOpen(false);
+                try {
+                  const startDate = scrapeStartDate.replace(/-/g, '');
+                  const endDate = scrapeEndDate.replace(/-/g, '');
+                  const result = await scrapeMutation.mutateAsync({
+                    importRecords: true,
+                    startDate,
+                    endDate,
+                  });
+                  toast({
+                    title: 'Scrape Complete',
+                    description: `Found ${result.scraped} records, imported ${result.imported} new records${result.skippedDuplicates ? `, skipped ${result.skippedDuplicates} duplicates` : ''}`,
+                  });
+                } catch (error) {
+                  toast({
+                    title: 'Scrape Failed',
+                    description: error instanceof Error ? error.message : 'Failed to scrape records',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setIsScraping(false);
+                }
+              }}
+            >
+              {isScraping ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Scraping...
+                </>
+              ) : (
+                'Execute Scrape'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Route Details Modal */}
       <Dialog open={routeDetailsOpen} onOpenChange={setRouteDetailsOpen}>
