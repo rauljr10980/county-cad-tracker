@@ -56,6 +56,10 @@ else
   echo "✅ Database connection verified"
 fi
 
+# One-time data migration: fix record types
+echo "🔄 Running data migrations..."
+echo "UPDATE \"PreForeclosure\" SET type = 'Mortgage' WHERE type = 'NOTICE_OF_FORECLOSURE';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Migrations complete" || echo "⚠️  Migration skipped"
+
 # Start the application
 echo "✅ Starting application..."
 exec node src/index.js
