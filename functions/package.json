@@ -34,6 +34,9 @@
     "pg": "^8.16.3",
     "playwright": "^1.58.1",
     "prisma": "^5.22.0",
+    "puppeteer": "^24.8.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

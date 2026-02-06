@@ -9,9 +9,6 @@ RUN echo "Cache bust: $CACHE_BUST"
 # Install OpenSSL for Prisma
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
-# Skip automatic Playwright browser download during npm install (we install manually below)
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-
 # Set working directory
 WORKDIR /app
 
