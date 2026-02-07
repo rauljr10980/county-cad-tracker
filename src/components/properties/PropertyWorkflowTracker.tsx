@@ -65,10 +65,11 @@ export function PropertyWorkflowTracker({ property, onPropertyUpdate }: Property
     const taskRule = STAGE_TASK_MAP[nextStage];
     const today = new Date();
     today.setHours(23, 59, 59, 999);
+    const priorityMap: Record<string, string> = { high: 'HIGH', med: 'MEDIUM', low: 'LOW' };
     const taskFields = taskRule
       ? {
-          actionType: taskRule.actionType as string,
-          priority: taskRule.priority as string,
+          actionType: taskRule.actionType.toUpperCase(),
+          priority: priorityMap[taskRule.priority] || taskRule.priority.toUpperCase(),
           dueTime: today.toISOString(),
           assignedTo: actingAs as string | null,
         }
