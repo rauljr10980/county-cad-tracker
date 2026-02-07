@@ -980,7 +980,7 @@ export function PropertiesView() {
     // All properties are now fetched and paginated on frontend
     // Use sorted properties if filters or sorting are active, otherwise use raw properties
     // sortedProperties already contains filtered properties when filters are active
-    const hasAnyFilterOrSort = selectedStatuses.length > 0 || hasActiveAdvancedFilters || isSortingActive;
+    const hasAnyFilterOrSort = selectedStatuses.length > 0 || hasActiveAdvancedFilters || isSortingActive || !!workflowStageFilter;
     const propertiesToPaginate = hasAnyFilterOrSort ? sortedProperties : rawProperties;
     finalTotal = propertiesToPaginate.length || totalUnfiltered;
     finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
@@ -1035,7 +1035,7 @@ export function PropertiesView() {
         allFilteredPropertyIds: [],
       };
     }
-  }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data, isSortingActive]);
+  }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data, isSortingActive, workflowStageFilter]);
   
   // Helper function to generate page numbers for pagination
   const getPageNumbers = (currentPage: number, totalPages: number): (number | string)[] => {
