@@ -548,8 +548,7 @@ export async function updatePropertyDealStage(
 export async function updatePropertyWorkflowStage(
   propertyId: string,
   workflow_stage: string,
-  workflow_log?: any[],
-  taskFields?: { actionType?: string | null; priority?: string | null; dueTime?: string | null; assignedTo?: string | null }
+  workflow_log?: any[]
 ) {
   const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/workflow-stage`, {
     method: 'PUT',
@@ -557,7 +556,7 @@ export async function updatePropertyWorkflowStage(
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
-    body: JSON.stringify({ workflow_stage, workflow_log, ...taskFields }),
+    body: JSON.stringify({ workflow_stage, workflow_log }),
   });
   if (!response.ok) {
     throw new Error('Failed to update workflow stage');

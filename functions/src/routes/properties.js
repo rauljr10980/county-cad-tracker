@@ -1322,7 +1322,7 @@ router.put('/:id/deal-stage', optionalAuth, async (req, res) => {
 router.put('/:id/workflow-stage', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { workflow_stage, workflow_log, actionType, priority, dueTime, assignedTo } = req.body;
+    const { workflow_stage, workflow_log } = req.body;
 
     const validStages = [
       'not_started', 'initial_visit', 'people_search', 'call_owner',
@@ -1336,16 +1336,6 @@ router.put('/:id/workflow-stage', optionalAuth, async (req, res) => {
     const updateData = { workflowStage: workflow_stage };
     if (workflow_log !== undefined) {
       updateData.workflowLog = workflow_log;
-    }
-
-    // Auto-task fields from workflow advancement
-    if (actionType !== undefined) {
-      const actionTypeMap = { call: 'CALL', text: 'TEXT', mail: 'MAIL', driveby: 'DRIVEBY' };
-      const priorityMap = { high: 'HIGH', med: 'MEDIUM', medium: 'MEDIUM', low: 'LOW' };
-      updateData.actionType = actionType ? (actionTypeMap[actionType] || actionType.toUpperCase()) : null;
-      updateData.priority = priority ? (priorityMap[priority] || priority.toUpperCase()) : null;
-      updateData.dueTime = dueTime ? new Date(dueTime) : null;
-      updateData.assignedTo = assignedTo || null;
     }
 
     const property = await prisma.property.update({
