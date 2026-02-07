@@ -891,7 +891,7 @@ export function PropertiesView() {
   const sortedProperties = useMemo(() => {
     let propertiesToSort: Property[] = [];
 
-    if (selectedStatuses.length > 0 || hasActiveAdvancedFilters) {
+    if (selectedStatuses.length > 0 || hasActiveAdvancedFilters || workflowStageFilter) {
       // Any filters applied (status or advanced) - use filtered results
       propertiesToSort = filteredProperties;
       console.log('[SORT] Using filteredProperties for sorting:', {
@@ -957,7 +957,7 @@ export function PropertiesView() {
     });
     
     return sorted;
-  }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, rawProperties, sortField, sortDirection, isSortingActive]);
+  }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, rawProperties, sortField, sortDirection, isSortingActive, workflowStageFilter]);
   
   // Calculate totals and pagination
   const { properties, total, totalPages, allFilteredPropertyIds } = useMemo(() => {
