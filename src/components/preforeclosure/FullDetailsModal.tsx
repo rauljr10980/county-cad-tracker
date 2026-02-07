@@ -325,13 +325,9 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 size="sm"
                 className="flex-1"
                 onClick={() => {
-                  const name = viewRecord.ownerName || viewRecord.grantor || '';
-                  if (name) {
-                    const url = `https://www.truepeoplesearch.com/results?name=${encodeURIComponent(name)}&citystatezip=${encodeURIComponent(viewRecord.city + ' TX')}`;
-                    window.open(url, '_blank');
-                  } else {
-                    toast({ title: 'No owner name', description: 'Run owner lookup first to get a name to search', variant: 'destructive' });
-                  }
+                  const address = viewRecord.address || '';
+                  const cityStateZip = `${viewRecord.city || 'San Antonio'}, TX ${viewRecord.zip || ''}`.trim();
+                  window.open(`https://www.truepeoplesearch.com/results?name=${encodeURIComponent(address)}&citystatezip=${encodeURIComponent(cityStateZip)}`, '_blank');
                 }}
                 title="TruePeopleSearch"
               >

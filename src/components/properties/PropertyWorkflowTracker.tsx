@@ -61,10 +61,28 @@ export function PropertyWorkflowTracker({ property, onPropertyUpdate }: Property
     };
     const updatedLog = [...workflowLog, newEntry];
 
+    // Auto-task: look up task for the next stage
+    const taskRule = STAGE_TASK_MAP[nextStage];
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const taskFields = taskRule
+      ? {
+          actionType: taskRule.actionType as string,
+          priority: taskRule.priority as string,
+          dueTime: today.toISOString(),
+          assignedTo: actingAs as string | null,
+        }
+      : {
+          actionType: null as null,
+          priority: null as null,
+          dueTime: null as null,
+          assignedTo: null as null,
+        };
+
     setIsPending(true);
     try {
-      await updatePropertyWorkflowStage(property.id, nextStage, updatedLog);
-      onPropertyUpdate({ workflow_stage: nextStage, workflow_log: updatedLog });
+      await updatePropertyWorkflowStage(property.id, nextStage, updatedLog, taskFields);
+      onPropertyUpdate({ workflow_stage: nextStage, workflow_log: updatedLog, ...taskFields });
       setStepNote('');
       queryClient.invalidateQueries({ queryKey: ['properties'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });

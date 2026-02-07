@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon } from 'lucide-react';
+import { ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -41,6 +41,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [assignedTo, setAssignedTo] = useState<'Luciano' | 'Raul' | ''>('');
   const [savingAction, setSavingAction] = useState(false);
 
+
+  // Actions panel state
+  const [actionsExpanded, setActionsExpanded] = useState(true);
 
   // Visited status state
   const [visited, setVisited] = useState(false);
@@ -350,6 +353,76 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
 
         <div className="space-y-4 pt-2">
+          {/* Actions Panel */}
+          <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setActionsExpanded(prev => !prev)}
+            >
+              <span className="text-sm font-medium">Actions</span>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !actionsExpanded && "-rotate-90"
+              )} />
+            </div>
+            {actionsExpanded && <div className="flex gap-2 mt-3">
+              <Button
+                variant="default"
+                size="sm"
+                className="flex-1 bg-primary text-primary-foreground"
+                disabled
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  const address = parsedAddress || property.propertyAddress;
+                  window.open(`https://www.google.com/maps/search/${encodeURIComponent(address + ', San Antonio, TX')}`, '_blank');
+                }}
+                title="Open in Google Maps"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+                }}
+                title="Tax Assessor"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  const address = parsedAddress || property.propertyAddress;
+                  window.open(`https://www.truepeoplesearch.com/results?name=${encodeURIComponent(address)}&citystatezip=${encodeURIComponent('San Antonio, TX')}`, '_blank');
+                }}
+                title="TruePeopleSearch"
+              >
+                <User className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  window.open('https://bexar.tx.publicsearch.us/', '_blank');
+                }}
+                title="Land Records"
+              >
+                <Building className="h-4 w-4" />
+              </Button>
+            </div>}
+          </div>
+
           {/* Property Info */}
           <div className="space-y-3">
             <div className="flex items-start gap-3">
