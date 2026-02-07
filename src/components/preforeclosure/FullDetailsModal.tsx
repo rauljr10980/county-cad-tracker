@@ -18,6 +18,7 @@ import { toast } from '@/hooks/use-toast';
 import { markPreForeclosureVisited } from '@/lib/api';
 import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
 import { WorkflowTracker } from './WorkflowTracker';
+import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
 
 interface FullDetailsModalProps {
   record: PreForeclosureRecord | null;
@@ -51,6 +52,8 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
   const [currentTaskExpanded, setCurrentTaskExpanded] = useState(false);
   const [ownerInfoExpanded, setOwnerInfoExpanded] = useState(false);
+  const [showVisitedWizard, setShowVisitedWizard] = useState(false);
+  const [wizardPending, setWizardPending] = useState(false);
   const lookupMutation = useOwnerLookup();
 
   // Parse visit details from workflow log
@@ -816,7 +819,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-col gap-2">
                   {viewRecord.visited === true ? (
                     <Button
                       variant="outline"
@@ -845,63 +848,104 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                         </>
                       )}
                     </Button>
+                  ) : !showVisitedWizard ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowVisitedWizard(true)}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Mark as Visited
+                    </Button>
                   ) : (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={async () => {
-                          await handleMarkVisited(viewRecord.document_number, 'Luciano', true);
-                          setViewRecord({
-                            ...viewRecord,
+                    <VisitedWizard
+                      address={viewRecord.address || ''}
+                      onComplete={async (result: VisitedWizardResult) => {
+                        setWizardPending(true);
+                        try {
+                          // Build workflow log entry
+                          const logEntry = {
+                            id: crypto.randomUUID(),
+                            timestamp: new Date().toISOString(),
+                            fromStage: viewRecord.workflow_stage || 'new',
+                            toStage: result.nextWorkflowStage,
+                            outcome: result.outcomeLabel,
+                            note: result.note || undefined,
+                          };
+                          const currentLog = viewRecord.workflow_log || [];
+                          const newLog = [...currentLog, logEntry];
+
+                          // Update workflow stage, log, phone, notes
+                          const updates: any = {
+                            document_number: viewRecord.document_number,
+                            workflow_stage: result.nextWorkflowStage,
+                            workflow_log: newLog,
+                          };
+                          if (result.phoneProvided && result.phoneNumber) {
+                            const currentPhones = Array.isArray(viewRecord.phoneNumbers) ? [...viewRecord.phoneNumbers] : [];
+                            if (!currentPhones.includes(result.phoneNumber)) {
+                              currentPhones.push(result.phoneNumber);
+                            }
+                            updates.phoneNumbers = currentPhones;
+                          }
+                          if (result.note) {
+                            updates.notes = viewRecord.notes
+                              ? `${viewRecord.notes}\n[Visit] ${result.note}`
+                              : `[Visit] ${result.note}`;
+                          }
+
+                          await updateMutation.mutateAsync(updates);
+
+                          // Mark as visited
+                          await markPreForeclosureVisited(viewRecord.document_number, undefined, true);
+
+                          setViewRecord(prev => prev ? {
+                            ...prev,
+                            workflow_stage: result.nextWorkflowStage,
+                            workflow_log: newLog,
+                            phoneNumbers: updates.phoneNumbers || prev.phoneNumbers,
+                            notes: updates.notes || prev.notes,
                             visited: true,
                             visited_at: new Date().toISOString(),
-                            visited_by: 'Luciano',
+                          } : prev);
+
+                          queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                          setShowVisitedWizard(false);
+                          toast({ title: 'Visit recorded', description: result.outcomeLabel });
+                        } catch (error) {
+                          toast({
+                            title: 'Error',
+                            description: error instanceof Error ? error.message : 'Failed to save visit',
+                            variant: 'destructive',
                           });
-                        }}
-                        disabled={markingVisited === viewRecord.document_number}
-                      >
-                        {markingVisited === viewRecord.document_number ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Updating...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Mark Visited (Luciano)
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={async () => {
-                          await handleMarkVisited(viewRecord.document_number, 'Raul', true);
-                          setViewRecord({
-                            ...viewRecord,
+                        } finally {
+                          setWizardPending(false);
+                        }
+                      }}
+                      onSkip={async () => {
+                        setWizardPending(true);
+                        try {
+                          await markPreForeclosureVisited(viewRecord.document_number, undefined, true);
+                          setViewRecord(prev => prev ? {
+                            ...prev,
                             visited: true,
                             visited_at: new Date().toISOString(),
-                            visited_by: 'Raul',
+                          } : prev);
+                          queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                          setShowVisitedWizard(false);
+                          toast({ title: 'Marked as visited' });
+                        } catch (error) {
+                          toast({
+                            title: 'Error',
+                            description: error instanceof Error ? error.message : 'Failed to mark visited',
+                            variant: 'destructive',
                           });
-                        }}
-                        disabled={markingVisited === viewRecord.document_number}
-                      >
-                        {markingVisited === viewRecord.document_number ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Updating...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Mark Visited (Raul)
-                          </>
-                        )}
-                      </Button>
-                    </>
+                        } finally {
+                          setWizardPending(false);
+                        }
+                      }}
+                      isPending={wizardPending}
+                    />
                   )}
                 </div>
                 {recordsInRoutes && recordsInRoutes.has(viewRecord.document_number) && (

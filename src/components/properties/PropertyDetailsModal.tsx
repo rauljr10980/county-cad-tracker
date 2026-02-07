@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { PreForeclosureRecord } from '@/types/property';
 import { PropertyWorkflowTracker } from './PropertyWorkflowTracker';
+import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
+import { updatePropertyWorkflowStage } from '@/lib/api';
 
 interface PropertyDetailsModalProps {
   property: Property | null;
@@ -49,6 +51,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [visited, setVisited] = useState(false);
   const [visitedBy, setVisitedBy] = useState<'Luciano' | 'Raul' | ''>('');
   const [savingVisited, setSavingVisited] = useState(false);
+  const [showVisitedWizard, setShowVisitedWizard] = useState(false);
+  const [wizardPending, setWizardPending] = useState(false);
 
   // Pre-foreclosure state
   const [preForeclosureRecords, setPreForeclosureRecords] = useState<PreForeclosureRecord[]>([]);
@@ -725,47 +729,138 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               <span className="text-sm font-medium">Visited Status</span>
             </div>
             <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="visited-checkbox"
-                  checked={visited}
-                  onChange={(e) => setVisited(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                />
-                <label htmlFor="visited-checkbox" className="text-sm cursor-pointer">
-                  Mark as visited
-                </label>
-              </div>
-              {visited && (
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Visited By</label>
-                  <Select value={visitedBy} onValueChange={(value) => setVisitedBy(value as 'Luciano' | 'Raul')}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select who visited" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Luciano">Luciano</SelectItem>
-                      <SelectItem value="Raul">Raul</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {property.visitedAt && (
-                <div className="text-xs text-muted-foreground">
-                  Last visited: {format(new Date(property.visitedAt), 'PPP p')}
-                  {property.visitedBy && ` by ${property.visitedBy}`}
-                </div>
-              )}
-              <div className="flex justify-end">
+              {property.visited ? (
+                <>
+                  <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
+                    Visited
+                  </Badge>
+                  {property.visitedAt && (
+                    <div className="text-xs text-muted-foreground">
+                      Last visited: {format(new Date(property.visitedAt), 'PPP p')}
+                      {property.visitedBy && ` by ${property.visitedBy}`}
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      setSavingVisited(true);
+                      try {
+                        await updatePropertyVisited(property.id, false);
+                        property.visited = false;
+                        property.visitedAt = undefined;
+                        property.visitedBy = undefined;
+                        setVisited(false);
+                        queryClient.invalidateQueries({ queryKey: ['properties'] });
+                        toast({ title: 'Set to not visited' });
+                      } catch (error) {
+                        toast({ title: 'Error', description: 'Failed to update', variant: 'destructive' });
+                      } finally {
+                        setSavingVisited(false);
+                      }
+                    }}
+                    disabled={savingVisited}
+                  >
+                    Set Not Visited
+                  </Button>
+                </>
+              ) : !showVisitedWizard ? (
                 <Button
+                  variant="outline"
                   size="sm"
-                  onClick={handleSaveVisited}
-                  disabled={savingVisited || (visited && !visitedBy)}
+                  onClick={() => setShowVisitedWizard(true)}
                 >
-                  {savingVisited ? 'Saving...' : 'Save Visited Status'}
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Mark as Visited
                 </Button>
-              </div>
+              ) : (
+                <VisitedWizard
+                  address={parsedAddress || property.propertyAddress}
+                  onComplete={async (result: VisitedWizardResult) => {
+                    setWizardPending(true);
+                    try {
+                      // Build workflow log entry
+                      const logEntry = {
+                        id: crypto.randomUUID(),
+                        timestamp: new Date().toISOString(),
+                        fromStage: property.workflow_stage || 'new',
+                        toStage: result.nextWorkflowStage,
+                        outcome: result.outcomeLabel,
+                        note: result.note || undefined,
+                      };
+                      const currentLog = property.workflow_log || [];
+                      const newLog = [...currentLog, logEntry];
+
+                      // Update workflow stage + log
+                      await updatePropertyWorkflowStage(property.id, result.nextWorkflowStage, newLog);
+
+                      // Save phone if provided
+                      if (result.phoneProvided && result.phoneNumber) {
+                        const currentPhones = property.phoneNumbers || [];
+                        if (!currentPhones.includes(result.phoneNumber)) {
+                          const newPhones = [...currentPhones, result.phoneNumber];
+                          await updatePropertyPhoneNumbers(property.id, newPhones, property.ownerPhoneIndex);
+                          property.phoneNumbers = newPhones;
+                          setPhoneNumbers([...newPhones, ...Array(Math.max(0, 6 - newPhones.length)).fill('')]);
+                        }
+                      }
+
+                      // Save notes if provided
+                      if (result.note) {
+                        const newNotes = property.notes
+                          ? `${property.notes}\n[Visit] ${result.note}`
+                          : `[Visit] ${result.note}`;
+                        await updatePropertyNotes(property.id, newNotes);
+                        property.notes = newNotes;
+                        setNotes(newNotes);
+                      }
+
+                      // Mark as visited
+                      await updatePropertyVisited(property.id, true);
+
+                      // Update local state
+                      property.workflow_stage = result.nextWorkflowStage;
+                      property.workflow_log = newLog;
+                      property.visited = true;
+                      property.visitedAt = new Date().toISOString();
+                      setVisited(true);
+
+                      queryClient.invalidateQueries({ queryKey: ['properties'] });
+                      setShowVisitedWizard(false);
+                      toast({ title: 'Visit recorded', description: result.outcomeLabel });
+                    } catch (error) {
+                      toast({
+                        title: 'Error',
+                        description: error instanceof Error ? error.message : 'Failed to save visit',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setWizardPending(false);
+                    }
+                  }}
+                  onSkip={async () => {
+                    setWizardPending(true);
+                    try {
+                      await updatePropertyVisited(property.id, true);
+                      property.visited = true;
+                      property.visitedAt = new Date().toISOString();
+                      setVisited(true);
+                      queryClient.invalidateQueries({ queryKey: ['properties'] });
+                      setShowVisitedWizard(false);
+                      toast({ title: 'Marked as visited' });
+                    } catch (error) {
+                      toast({
+                        title: 'Error',
+                        description: error instanceof Error ? error.message : 'Failed to mark visited',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setWizardPending(false);
+                    }
+                  }}
+                  isPending={wizardPending}
+                />
+              )}
             </div>
           </div>
 
