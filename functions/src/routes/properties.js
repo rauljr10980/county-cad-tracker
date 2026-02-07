@@ -1340,8 +1340,10 @@ router.put('/:id/workflow-stage', optionalAuth, async (req, res) => {
 
     // Auto-task fields from workflow advancement
     if (actionType !== undefined) {
-      updateData.actionType = actionType;
-      updateData.priority = priority || null;
+      const actionTypeMap = { call: 'CALL', text: 'TEXT', mail: 'MAIL', driveby: 'DRIVEBY' };
+      const priorityMap = { high: 'HIGH', med: 'MEDIUM', medium: 'MEDIUM', low: 'LOW' };
+      updateData.actionType = actionType ? (actionTypeMap[actionType] || actionType.toUpperCase()) : null;
+      updateData.priority = priority ? (priorityMap[priority] || priority.toUpperCase()) : null;
       updateData.dueTime = dueTime ? new Date(dueTime) : null;
       updateData.assignedTo = assignedTo || null;
     }
