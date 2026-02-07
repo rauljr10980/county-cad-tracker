@@ -348,6 +348,7 @@ export function PropertiesView() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [workflowStageFilter, setWorkflowStageFilter] = useState<WorkflowStage | null>(null);
   const [sortField, setSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
@@ -609,13 +610,18 @@ export function PropertiesView() {
     }
     
     // If no filters at all, return raw properties
-    if (!hasActiveFilters && !needsFrontendStatusFilter) {
+    if (!hasActiveFilters && !needsFrontendStatusFilter && !workflowStageFilter) {
       return rawProperties;
     }
 
     // Single pass filtering for better performance
     // Match exactly how StatusBadge displays statuses - simple direct comparison
     const filtered = rawProperties.filter(p => {
+      // Workflow stage filter (from clicking Sales Funnel bars)
+      if (workflowStageFilter) {
+        const stage = (p.workflow_stage as WorkflowStage) || 'not_started';
+        if (stage !== workflowStageFilter) return false;
+      }
       // Status filter - ALWAYS apply when statuses are selected (database uses PENDING/ACTIVE/JUDGMENT, filter uses P/A/J)
       if (needsFrontendStatusFilter) {
         // Normalize property status from database format (PENDING, ACTIVE, JUDGMENT) to single letter (J, A, P, U)
@@ -879,7 +885,7 @@ export function PropertiesView() {
     }
     
     return filtered;
-  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery, propertiesInRoutes]);
+  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery, propertiesInRoutes, workflowStageFilter]);
   
   // Apply sorting to all properties before pagination (only for filtered cases)
   const sortedProperties = useMemo(() => {
@@ -2228,11 +2234,27 @@ export function PropertiesView() {
           <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
           <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
           <div className="mt-5 space-y-3">
+            {workflowStageFilter && (
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-primary">Filtering by: {WORKFLOW_FUNNEL_STAGES.find(s => s.key === workflowStageFilter)?.label || workflowStageFilter}</span>
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                  onClick={() => setWorkflowStageFilter(null)}
+                >
+                  Clear filter
+                </button>
+              </div>
+            )}
             {WORKFLOW_FUNNEL_STAGES.map((stage) => {
               const count = workflowStageCounts[stage.key];
               const width = Math.max(count > 0 ? 5 : 0, (count / maxWorkflowStageCount) * 100);
+              const isActive = workflowStageFilter === stage.key;
               return (
-                <div key={stage.key}>
+                <div
+                  key={stage.key}
+                  className={cn("cursor-pointer rounded-lg p-1.5 -mx-1.5 transition-colors", isActive ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-secondary/30")}
+                  onClick={() => setWorkflowStageFilter(prev => prev === stage.key ? null : stage.key)}
+                >
                   <div className="flex items-center justify-between text-sm mb-1">
                     <span className="font-medium">{stage.label}</span>
                     <span className="text-muted-foreground">{count} {count === 1 ? 'deal' : 'deals'}</span>
@@ -2252,7 +2274,10 @@ export function PropertiesView() {
             })}
           </div>
           {workflowStageCounts.dead_end > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
+            <div
+              className={cn("mt-4 pt-4 border-t border-border cursor-pointer rounded-lg p-1.5 -mx-1.5 transition-colors", workflowStageFilter === 'dead_end' ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-secondary/30")}
+              onClick={() => setWorkflowStageFilter(prev => prev === 'dead_end' ? null : 'dead_end')}
+            >
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block" />
