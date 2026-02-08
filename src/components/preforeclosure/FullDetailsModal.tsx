@@ -915,6 +915,97 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               </div>}
             </div>
 
+            {/* Visit Questions Section */}
+            {viewRecord.visited !== true && (
+              <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 space-y-3">
+                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                  Visit Questions
+                </h3>
+                <VisitedWizard
+                  address={viewRecord.address || ''}
+                  onComplete={async (result: VisitedWizardResult) => {
+                    setWizardPending(true);
+                    try {
+                      const logEntry = {
+                        id: crypto.randomUUID(),
+                        timestamp: new Date().toISOString(),
+                        fromStage: viewRecord.workflow_stage || 'new',
+                        toStage: result.nextWorkflowStage,
+                        outcome: result.outcomeLabel,
+                        note: result.note || undefined,
+                      };
+                      const currentLog = viewRecord.workflow_log || [];
+                      const newLog = [...currentLog, logEntry];
+
+                      const updates: any = {
+                        document_number: viewRecord.document_number,
+                        workflow_stage: result.nextWorkflowStage,
+                        workflow_log: newLog,
+                      };
+                      if (result.phoneProvided && result.phoneNumber) {
+                        const currentPhones = Array.isArray(viewRecord.phoneNumbers) ? [...viewRecord.phoneNumbers] : [];
+                        if (!currentPhones.includes(result.phoneNumber)) {
+                          currentPhones.push(result.phoneNumber);
+                        }
+                        updates.phoneNumbers = currentPhones;
+                      }
+                      if (result.note) {
+                        updates.notes = viewRecord.notes
+                          ? `${viewRecord.notes}\n[Visit] ${result.note}`
+                          : `[Visit] ${result.note}`;
+                      }
+
+                      await updateMutation.mutateAsync(updates);
+                      await markPreForeclosureVisited(viewRecord.document_number, undefined, true);
+
+                      setViewRecord(prev => prev ? {
+                        ...prev,
+                        workflow_stage: result.nextWorkflowStage,
+                        workflow_log: newLog,
+                        phoneNumbers: updates.phoneNumbers || prev.phoneNumbers,
+                        notes: updates.notes || prev.notes,
+                        visited: true,
+                        visited_at: new Date().toISOString(),
+                      } : prev);
+
+                      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                      toast({ title: 'Visit recorded', description: result.outcomeLabel });
+                    } catch (error) {
+                      toast({
+                        title: 'Error',
+                        description: error instanceof Error ? error.message : 'Failed to save visit',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setWizardPending(false);
+                    }
+                  }}
+                  onSkip={async () => {
+                    setWizardPending(true);
+                    try {
+                      await markPreForeclosureVisited(viewRecord.document_number, undefined, true);
+                      setViewRecord(prev => prev ? {
+                        ...prev,
+                        visited: true,
+                        visited_at: new Date().toISOString(),
+                      } : prev);
+                      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                      toast({ title: 'Marked as visited' });
+                    } catch (error) {
+                      toast({
+                        title: 'Error',
+                        description: error instanceof Error ? error.message : 'Failed to mark visited',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setWizardPending(false);
+                    }
+                  }}
+                  isPending={wizardPending}
+                />
+              </div>
+            )}
+
             {/* Actions & Tasks Section */}
             <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
               <div

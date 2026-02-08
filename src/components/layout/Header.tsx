@@ -77,8 +77,8 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                      <User className="h-4 w-4 mr-2" />
-                      {user?.username}
+                      <Menu className="h-4 w-4 mr-2" />
+                      Menu
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
