@@ -2785,7 +2785,18 @@ export function PropertiesView() {
                 setRouteMapOpen(false);
                 setOptimizedRoutes(null);
               }}
-              recordIds={Array.from(selectedPropertyIds)}
+              recordIds={(() => {
+                // Extract IDs in optimized route order from waypoints
+                const orderedIds: string[] = [];
+                optimizedRoutes.routes.forEach((route: any) => {
+                  route.waypoints.forEach((wp: any) => {
+                    if (wp.id && wp.id !== 'depot' && !orderedIds.includes(wp.id)) {
+                      orderedIds.push(wp.id);
+                    }
+                  });
+                });
+                return orderedIds.length > 0 ? orderedIds : Array.from(selectedPropertyIds);
+              })()}
               routeType="PROPERTY"
               onRouteSaved={() => {
                 // Reload active routes after route is saved
