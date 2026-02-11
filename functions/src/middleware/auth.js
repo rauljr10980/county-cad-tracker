@@ -6,11 +6,14 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 
-const JWT_SECRET = process.env.JWT_SECRET;
+let JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
-  console.error('FATAL: JWT_SECRET environment variable is not set');
-  process.exit(1);
+  // Generate a random secret so the app doesn't crash on startup
+  // Tokens will be invalidated on restart — set JWT_SECRET env var for persistence
+  const crypto = require('crypto');
+  JWT_SECRET = crypto.randomBytes(32).toString('hex');
+  console.warn('⚠️  WARNING: JWT_SECRET not set — generated a temporary secret. Set JWT_SECRET in Railway variables for persistent sessions.');
 }
 
 /**
