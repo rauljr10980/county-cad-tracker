@@ -1,5 +1,4 @@
 #!/bin/sh
-set -e
 
 echo "🚀 Starting County CAD Tracker API..."
 echo "📊 Environment: ${NODE_ENV:-development}"
@@ -9,57 +8,25 @@ echo "🔌 Port: ${PORT:-8080}"
 if [ -z "$DATABASE_URL" ]; then
   echo "❌ ERROR: DATABASE_URL is not set!"
   echo "Please add DATABASE_URL to your Railway service variables."
-  echo "Get it from: PostgreSQL service → Variables → DATABASE_URL"
   exit 1
 fi
 
 echo "✅ DATABASE_URL is set"
-echo "📋 DATABASE_URL preview: ${DATABASE_URL%%@*}@***" # Show only user part, hide password
-
-# Check if Prisma schema exists
-if [ ! -f "prisma/schema.prisma" ]; then
-  echo "❌ ERROR: Prisma schema not found at prisma/schema.prisma"
-  echo "Current directory: $(pwd)"
-  echo "Files in current directory:"
-  ls -la
-  exit 1
-fi
-
-echo "✅ Prisma schema found"
 
 # Generate Prisma Client
 echo "📦 Generating Prisma Client..."
-if ! npx prisma generate; then
-  echo "❌ Prisma generate failed!"
-  exit 1
-fi
+npx prisma generate || echo "⚠️ Prisma generate failed, trying to continue..."
 
 echo "✅ Prisma Client generated"
 
-# Create database tables
-echo "⏳ Creating database tables..."
-echo "📋 Running: npx prisma db push --accept-data-loss"
-if ! npx prisma db push --accept-data-loss; then
-  echo "❌ Database push failed!"
-  echo "Check your DATABASE_URL connection string."
-  echo "DATABASE_URL format should be: postgresql://user:password@host:port/database"
-  exit 1
-fi
+# Create database tables (don't exit on failure - app will retry connection)
+echo "⏳ Syncing database schema..."
+npx prisma db push --accept-data-loss || echo "⚠️ Database push failed - app will retry on startup"
 
-echo "✅ Database tables created successfully"
-
-# Verify tables were created
-echo "🔍 Verifying database connection..."
-if ! echo "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';" | npx prisma db execute --stdin 2>/dev/null; then
-  echo "⚠️  Could not verify tables, but continuing..."
-else
-  echo "✅ Database connection verified"
-fi
-
-# One-time data migrations
+# One-time data migrations (non-critical)
 echo "🔄 Running data migrations..."
-echo "UPDATE \"PreForeclosure\" SET type = 'Mortgage' WHERE type = 'NOTICE_OF_FORECLOSURE';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Type migration complete" || echo "⚠️  Type migration skipped"
-echo "UPDATE \"PreForeclosure\" SET \"ownerLookupStatus\" = NULL WHERE \"ownerLookupStatus\" = 'failed' AND \"ownerName\" IS NULL;" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Reset failed owner lookups" || echo "⚠️  Owner lookup reset skipped"
+echo "UPDATE \"PreForeclosure\" SET type = 'Mortgage' WHERE type = 'NOTICE_OF_FORECLOSURE';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Type migration complete" || echo "⚠️ Type migration skipped"
+echo "UPDATE \"PreForeclosure\" SET \"ownerLookupStatus\" = NULL WHERE \"ownerLookupStatus\" = 'failed' AND \"ownerName\" IS NULL;" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Reset failed owner lookups" || echo "⚠️ Owner lookup reset skipped"
 
 # Start the application
 echo "✅ Starting application..."

@@ -6,14 +6,10 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 
-let JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'county-cad-tracker-jwt-secret-2026-production-key';
 
-if (!JWT_SECRET) {
-  // Generate a random secret so the app doesn't crash on startup
-  // Tokens will be invalidated on restart — set JWT_SECRET env var for persistence
-  const crypto = require('crypto');
-  JWT_SECRET = crypto.randomBytes(32).toString('hex');
-  console.warn('⚠️  WARNING: JWT_SECRET not set — generated a temporary secret. Set JWT_SECRET in Railway variables for persistent sessions.');
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️  WARNING: JWT_SECRET not set — using default. Set JWT_SECRET in Railway variables for better security.');
 }
 
 /**
