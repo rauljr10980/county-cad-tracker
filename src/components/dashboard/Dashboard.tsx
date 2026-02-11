@@ -30,6 +30,8 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
     { key: 'visit_heirs', label: 'Visit Heirs', color: '#F97316' },
     { key: 'call_heirs', label: 'Call Heirs', color: '#EF4444' },
     { key: 'negotiating', label: 'Negotiating', color: '#10B981' },
+    { key: 'comps', label: 'Comps', color: '#14B8A6' },
+    { key: 'sent_offer', label: 'Sent Offer', color: '#22C55E' },
   ];
 
   // Calculate workflow stage counts from pre-foreclosure records
@@ -38,7 +40,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
     const records = (preForeclosureRecords ?? []) as PreForeclosureRecord[];
     const counts: Record<WorkflowStage, number> = {
       not_started: 0, initial_visit: 0, people_search: 0, call_owner: 0,
-      land_records: 0, visit_heirs: 0, call_heirs: 0, negotiating: 0, dead_end: 0,
+      land_records: 0, visit_heirs: 0, call_heirs: 0, negotiating: 0, comps: 0, sent_offer: 0, dead_end: 0,
     };
     for (const r of records) {
       const stage = (r.workflow_stage as WorkflowStage) || 'not_started';
