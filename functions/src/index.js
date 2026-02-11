@@ -197,14 +197,26 @@ async function startServer() {
     if (!process.env.DATABASE_URL) {
       console.error('❌ ERROR: DATABASE_URL is not set!');
       console.error('Please add DATABASE_URL to your Railway service variables.');
-      console.error('Get it from: PostgreSQL service → Variables → DATABASE_URL');
       process.exit(1);
     }
 
-    // Test database connection
+    // Test database connection with retries
     console.log('🔌 Testing database connection...');
-    await prisma.$connect();
-    console.log('✅ Database connected successfully');
+    for (let attempt = 1; attempt <= 10; attempt++) {
+      try {
+        await prisma.$connect();
+        console.log('✅ Database connected successfully');
+        break;
+      } catch (dbError) {
+        console.error(`❌ Database connection attempt ${attempt}/10 failed: ${dbError.message}`);
+        if (attempt === 10) {
+          console.error('❌ All database connection attempts failed. Exiting.');
+          process.exit(1);
+        }
+        console.log(`⏳ Retrying in ${attempt * 3} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+      }
+    }
 
     // Startup migrations
     try {
