@@ -179,6 +179,8 @@ export type WorkflowStage =
   | 'visit_heirs'
   | 'call_heirs'
   | 'negotiating'
+  | 'comps'
+  | 'sent_offer'
   | 'dead_end';
 
 export interface WorkflowLogEntry {
@@ -201,6 +203,8 @@ export const STAGE_TASK_MAP: Record<WorkflowStage, { actionType: 'call' | 'drive
   visit_heirs: { actionType: 'driveby', priority: 'high' },
   call_heirs: { actionType: 'call', priority: 'high' },
   negotiating: { actionType: 'call', priority: 'high' },
+  comps: null,
+  sent_offer: null,
   dead_end: null,
 };
 
@@ -273,7 +277,25 @@ export const WORKFLOW_STAGES: Record<WorkflowStage, {
   },
   negotiating: {
     label: 'Negotiating',
-    shortLabel: 'Negotiating',
+    shortLabel: 'Negotiate',
+    question: 'Comps completed?',
+    outcomes: [
+      { label: 'Yes - Comps done', nextStage: 'comps' },
+      { label: 'Deal fell through', nextStage: 'dead_end' },
+    ],
+  },
+  comps: {
+    label: 'Comps',
+    shortLabel: 'Comps',
+    question: 'Offer sent?',
+    outcomes: [
+      { label: 'Yes - Offer sent', nextStage: 'sent_offer' },
+      { label: 'Deal fell through', nextStage: 'dead_end' },
+    ],
+  },
+  sent_offer: {
+    label: 'Sent Offer',
+    shortLabel: 'Offer',
     terminal: true,
     terminalType: 'success',
   },

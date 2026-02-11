@@ -14,7 +14,7 @@ export function WorkflowStageBadge({ stage, className }: WorkflowStageBadgeProps
   const colorClass =
     stage === 'not_started'
       ? 'bg-muted text-muted-foreground'
-      : stage === 'negotiating'
+      : stage === 'sent_offer'
         ? 'bg-green-500/20 text-green-400 border-green-500/30'
         : stage === 'dead_end'
           ? 'bg-red-500/20 text-red-400 border-red-500/30'

@@ -1225,7 +1225,7 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
     if (updates.workflow_stage !== undefined) {
       const validStages = [
         'not_started', 'initial_visit', 'people_search', 'call_owner',
-        'land_records', 'visit_heirs', 'call_heirs', 'negotiating', 'dead_end'
+        'land_records', 'visit_heirs', 'call_heirs', 'negotiating', 'comps', 'sent_offer', 'dead_end'
       ];
       if (validStages.includes(updates.workflow_stage)) {
         dbUpdates.workflowStage = updates.workflow_stage;

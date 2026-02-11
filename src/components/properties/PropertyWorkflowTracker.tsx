@@ -13,7 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const STAGE_ORDER: WorkflowStage[] = [
   'not_started', 'initial_visit', 'people_search', 'call_owner',
-  'land_records', 'visit_heirs', 'call_heirs', 'negotiating',
+  'land_records', 'visit_heirs', 'call_heirs', 'negotiating', 'comps', 'sent_offer',
 ];
 
 interface PropertyWorkflowTrackerProps {
@@ -202,7 +202,7 @@ export function PropertyWorkflowTracker({ property, onPropertyUpdate }: Property
                 <Button
                   key={outcome.nextStage}
                   size="sm"
-                  variant={outcome.nextStage === 'negotiating' ? 'default' : 'outline'}
+                  variant={outcome.nextStage !== 'dead_end' ? 'default' : 'outline'}
                   onClick={() => handleAdvance(outcome.nextStage, outcome.label)}
                   disabled={isPending}
                 >

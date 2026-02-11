@@ -3625,7 +3625,7 @@ export function PreForeclosureView() {
                           <Button
                             key={outcome.nextStage}
                             size="sm"
-                            variant={outcome.nextStage === 'negotiating' ? 'default' : 'outline'}
+                            variant={outcome.nextStage !== 'dead_end' ? 'default' : 'outline'}
                             onClick={() => handleVisitedWorkflowAdvance(outcome.nextStage, outcome.label)}
                             disabled={markingVisited === visitedDialogRecord.documentNumber}
                             className="justify-start"
