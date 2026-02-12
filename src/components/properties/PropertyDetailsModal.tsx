@@ -44,8 +44,18 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [savingAction, setSavingAction] = useState(false);
 
 
-  // Actions panel state
+  // Collapsible section states
   const [actionsExpanded, setActionsExpanded] = useState(true);
+  const [financialExpanded, setFinancialExpanded] = useState(false);
+  const [taxPercentExpanded, setTaxPercentExpanded] = useState(false);
+  const [paymentTaxExpanded, setPaymentTaxExpanded] = useState(false);
+  const [additionalExpanded, setAdditionalExpanded] = useState(false);
+  const [paymentHistoryExpanded, setPaymentHistoryExpanded] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [visitedExpanded, setVisitedExpanded] = useState(true);
+  const [visitQuestionsExpanded, setVisitQuestionsExpanded] = useState(true);
+  const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
+  const [phoneExpanded, setPhoneExpanded] = useState(false);
 
   // Visited status state
   const [visited, setVisited] = useState(false);
@@ -457,12 +467,20 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
           {/* Financial Summary */}
           <div className="bg-secondary/50 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-3">
-              <DollarSign className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Financial Summary</span>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setFinancialExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Financial Summary</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !financialExpanded && "-rotate-90"
+              )} />
             </div>
-            {(() => {
-              // Collect all financial fields that should be displayed
+            {financialExpanded && (() => {
               const financialFields = [
                 { label: 'Amount Due', value: property.totalAmountDue, isJudgment: true, isLarge: true },
                 property.marketValue && property.marketValue > 0 ? { label: 'Market Value', value: property.marketValue, isLarge: true } : null,
@@ -474,10 +492,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 property.yearAmountDue && property.yearAmountDue > 0 ? { label: 'Year Amount Due', value: property.yearAmountDue } : null,
                 property.yearTaxLevy && property.yearTaxLevy > 0 ? { label: 'Year Tax Levy', value: property.yearTaxLevy } : null,
                 property.halfPaymentOptionAmount && property.halfPaymentOptionAmount > 0 ? { label: 'Half Payment Option', value: property.halfPaymentOptionAmount } : null,
-              ].filter(Boolean);
-
+              ].filter(Boolean) as Array<{label: string; value: number; isJudgment?: boolean; isLarge?: boolean}>;
               return (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 mt-3">
                   {financialFields.map((field, index) => (
                     <div key={index}>
                       <p className="text-xs text-muted-foreground">{field.label}</p>
@@ -493,13 +510,22 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
           {/* Tax Percentage Section */}
           <div className="bg-secondary/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Tax Percentage</span>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setTaxPercentExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Tax Percentage</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !taxPercentExpanded && "-rotate-90"
+              )} />
             </div>
-            <div className="flex items-center gap-3">
+            {taxPercentExpanded && <div className="flex items-center gap-3 mt-3">
               <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-primary rounded-full transition-all"
                   style={{ width: `${Math.min(property.totalPercentage || 0, 100)}%` }}
                 />
@@ -507,17 +533,27 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               <span className="font-mono text-base font-semibold min-w-[50px] text-right">
                 {property.totalPercentage || 0}%
               </span>
-            </div>
+            </div>}
           </div>
               
-          {/* Payment & Tax Information and Exemptions & Jurisdictions - Side by Side */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Payment & Tax Information and Exemptions & Jurisdictions */}
+          <div className="bg-secondary/30 rounded-lg p-3">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setPaymentTaxExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Payment & Tax Information</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !paymentTaxExpanded && "-rotate-90"
+              )} />
+            </div>
+            {paymentTaxExpanded && <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 {/* Payment & Tax Information */}
-                <div className="bg-secondary/30 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="h-3 w-3 text-primary" />
-                    <p className="text-xs font-medium text-muted-foreground">Payment & Tax Information</p>
-                  </div>
+                <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex justify-between">
                       <span className="text-xs text-muted-foreground">Tax Year:</span>
@@ -545,7 +581,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 </div>
                 
                 {/* Exemptions & Jurisdictions */}
-                <div className="bg-secondary/30 rounded-lg p-3 space-y-2">
+                <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground mb-2">Exemptions & Jurisdictions</p>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Exemptions:</p>
@@ -564,12 +600,23 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     </p>
                   </div>
                 </div>
-              </div>
+              </div>}
+          </div>
 
           {/* Additional Details Section */}
           {(property.link || property.ownerAddress) && (
-            <div className="bg-secondary/30 rounded-lg p-3 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Additional Details</p>
+            <div className="bg-secondary/30 rounded-lg p-3">
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setAdditionalExpanded(prev => !prev)}
+              >
+                <span className="text-sm font-medium">Additional Details</span>
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  !additionalExpanded && "-rotate-90"
+                )} />
+              </div>
+              {additionalExpanded && <div className="space-y-2 mt-3">
               {property.link && (
                 <div className="flex items-start gap-2">
                   <ExternalLink className="h-3 w-3 text-primary mt-1 shrink-0" />
@@ -595,48 +642,62 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   </div>
                 </div>
               )}
+              </div>}
             </div>
           )}
 
           {/* Payment History Chart */}
           {paymentChartData.length > 0 && (
             <div className="bg-secondary/30 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Payment History</span>
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setPaymentHistoryExpanded(prev => !prev)}
+              >
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Payment History</span>
+                </div>
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  !paymentHistoryExpanded && "-rotate-90"
+                )} />
               </div>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={paymentChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <YAxis 
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                      }}
-                      formatter={(value: number) => [formatCurrency(value), 'Amount']}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="amount" 
-                      stroke="hsl(var(--primary))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {paymentHistoryExpanded && (
+                <div className="mt-3">
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={paymentChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis
+                          dataKey="date"
+                          stroke="hsl(var(--muted-foreground))"
+                          fontSize={12}
+                        />
+                        <YAxis
+                          stroke="hsl(var(--muted-foreground))"
+                          fontSize={12}
+                          tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                          }}
+                          formatter={(value: number) => [formatCurrency(value), 'Amount']}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="amount"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth={2}
+                          dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -669,25 +730,34 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
           {/* Notes Section */}
           <div className="bg-secondary/30 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setNotesExpanded(prev => !prev)}
+            >
               <div className="flex items-center gap-2">
                 <StickyNote className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">Notes</span>
               </div>
-              {!isEditingNotes && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditingNotes(true)}
-                  className="h-7"
-                >
-                  <Edit2 className="h-3 w-3 mr-1" />
-                  {notes ? 'Edit' : 'Add Notes'}
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {!isEditingNotes && notesExpanded && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); setIsEditingNotes(true); }}
+                    className="h-7"
+                  >
+                    <Edit2 className="h-3 w-3 mr-1" />
+                    {notes ? 'Edit' : 'Add Notes'}
+                  </Button>
+                )}
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  !notesExpanded && "-rotate-90"
+                )} />
+              </div>
             </div>
-            {isEditingNotes ? (
-              <div className="space-y-2">
+            {notesExpanded && (isEditingNotes ? (
+              <div className="space-y-2 mt-3">
                 <Textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -716,70 +786,90 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 </div>
               </div>
             ) : (
-              <div className="text-sm text-muted-foreground min-h-[60px] whitespace-pre-wrap">
+              <div className="text-sm text-muted-foreground min-h-[60px] whitespace-pre-wrap mt-3">
                 {notes || 'No notes added yet. Click "Add Notes" to add notes for this property.'}
               </div>
-            )}
+            ))}
           </div>
 
           {/* Visited Status Section */}
           <div className="bg-secondary/30 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-3">
-              <MapPinIcon className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Visited Status</span>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setVisitedExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <MapPinIcon className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Visited Status</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !visitedExpanded && "-rotate-90"
+              )} />
             </div>
-            <div className="space-y-3">
-              {property.visited ? (
-                <>
-                  <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
-                    Visited
+            {visitedExpanded && (
+              <div className="space-y-3 mt-3">
+                {property.visited ? (
+                  <>
+                    <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">
+                      Visited
+                    </Badge>
+                    {property.visitedAt && (
+                      <div className="text-xs text-muted-foreground">
+                        Last visited: {format(new Date(property.visitedAt), 'PPP p')}
+                        {property.visitedBy && ` by ${property.visitedBy}`}
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        setSavingVisited(true);
+                        try {
+                          await updatePropertyVisited(property.id, false);
+                          property.visited = false;
+                          property.visitedAt = undefined;
+                          property.visitedBy = undefined;
+                          setVisited(false);
+                          queryClient.invalidateQueries({ queryKey: ['properties'] });
+                          toast({ title: 'Set to not visited' });
+                        } catch (error) {
+                          toast({ title: 'Error', description: 'Failed to update', variant: 'destructive' });
+                        } finally {
+                          setSavingVisited(false);
+                        }
+                      }}
+                      disabled={savingVisited}
+                    >
+                      Set Not Visited
+                    </Button>
+                  </>
+                ) : (
+                  <Badge variant="outline" className="bg-muted text-muted-foreground">
+                    Not Visited
                   </Badge>
-                  {property.visitedAt && (
-                    <div className="text-xs text-muted-foreground">
-                      Last visited: {format(new Date(property.visitedAt), 'PPP p')}
-                      {property.visitedBy && ` by ${property.visitedBy}`}
-                    </div>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      setSavingVisited(true);
-                      try {
-                        await updatePropertyVisited(property.id, false);
-                        property.visited = false;
-                        property.visitedAt = undefined;
-                        property.visitedBy = undefined;
-                        setVisited(false);
-                        queryClient.invalidateQueries({ queryKey: ['properties'] });
-                        toast({ title: 'Set to not visited' });
-                      } catch (error) {
-                        toast({ title: 'Error', description: 'Failed to update', variant: 'destructive' });
-                      } finally {
-                        setSavingVisited(false);
-                      }
-                    }}
-                    disabled={savingVisited}
-                  >
-                    Set Not Visited
-                  </Button>
-                </>
-              ) : (
-                <Badge variant="outline" className="bg-muted text-muted-foreground">
-                  Not Visited
-                </Badge>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Visit Questions Section */}
           {!property.visited && (
             <div className="bg-secondary/30 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Visit Questions</span>
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setVisitQuestionsExpanded(prev => !prev)}
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Visit Questions</span>
+                </div>
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  !visitQuestionsExpanded && "-rotate-90"
+                )} />
               </div>
-              <VisitedWizard
+              {visitQuestionsExpanded && <VisitedWizard
                 address={parsedAddress || property.propertyAddress}
                 onComplete={async (result: VisitedWizardResult) => {
                   setWizardPending(true);
@@ -856,17 +946,26 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   }
                 }}
                 isPending={wizardPending}
-              />
+              />}
             </div>
           )}
 
           {/* Actions & Tasks Section */}
           <div className="bg-secondary/30 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-3">
-              <CheckCircle className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Actions & Tasks</span>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setActionsTasksExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Actions & Tasks</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !actionsTasksExpanded && "-rotate-90"
+              )} />
             </div>
-            <div className="space-y-4">
+            {actionsTasksExpanded && <div className="space-y-4 mt-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground">Action Type</label>
@@ -966,7 +1065,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   {savingAction ? 'Scheduling...' : 'Schedule Action'}
                 </Button>
               </div>
-            </div>
+            </div>}
           </div>
 
           {/* Deal Workflow Section */}
@@ -979,54 +1078,65 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
           {/* Phone Numbers Section */}
           <div className="bg-secondary/30 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-3">
-              <Phone className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Phone Numbers</span>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setPhoneExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Phone Numbers</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !phoneExpanded && "-rotate-90"
+              )} />
             </div>
-            <div className="space-y-2">
-              {phoneNumbers.map((phone, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">
-                    Phone {index + 1}:
-                  </span>
-                  <Input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => {
-                      const newPhones = [...phoneNumbers];
-                      newPhones[index] = e.target.value;
-                      setPhoneNumbers(newPhones);
-                    }}
-                    placeholder="Enter phone number"
-                    className="flex-1"
-                  />
+            {phoneExpanded && (
+              <div className="space-y-2 mt-3">
+                {phoneNumbers.map((phone, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-16 shrink-0">
+                      Phone {index + 1}:
+                    </span>
+                    <Input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => {
+                        const newPhones = [...phoneNumbers];
+                        newPhones[index] = e.target.value;
+                        setPhoneNumbers(newPhones);
+                      }}
+                      placeholder="Enter phone number"
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "h-8 w-8 shrink-0",
+                        ownerPhoneIndex === index && "text-yellow-500"
+                      )}
+                      onClick={() => handleToggleOwnerPhone(index)}
+                      title={ownerPhoneIndex === index ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                    >
+                      <Star className={cn(
+                        "h-4 w-4",
+                        ownerPhoneIndex === index ? "fill-yellow-500" : "fill-none"
+                      )} />
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex justify-end gap-2 pt-2">
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                      "h-8 w-8 shrink-0",
-                      ownerPhoneIndex === index && "text-yellow-500"
-                    )}
-                    onClick={() => handleToggleOwnerPhone(index)}
-                    title={ownerPhoneIndex === index ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                    size="sm"
+                    onClick={handleSavePhoneNumbers}
+                    disabled={savingPhones}
                   >
-                    <Star className={cn(
-                      "h-4 w-4",
-                      ownerPhoneIndex === index ? "fill-yellow-500" : "fill-none"
-                    )} />
+                    {savingPhones ? 'Saving...' : 'Save Phone Numbers'}
                   </Button>
                 </div>
-              ))}
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  size="sm"
-                  onClick={handleSavePhoneNumbers}
-                  disabled={savingPhones}
-                >
-                  {savingPhones ? 'Saving...' : 'Save Phone Numbers'}
-                </Button>
               </div>
-            </div>
+            )}
           </div>
 
 
