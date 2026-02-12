@@ -30,7 +30,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus, markPropertyVisitedInRoute, updatePropertyDealStage } from '@/lib/api';
+import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus, markPropertyVisitedInRoute, updatePropertyDealStage, updatePropertyWorkflowStage, updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyVisited } from '@/lib/api';
+import { VisitedWizard, VisitedWizardResult } from '@/components/shared/VisitedWizard';
 import { batchGeocodeAddresses } from '@/lib/geocoding';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
@@ -91,6 +92,7 @@ function SortableRouteRow({
   handleViewRecordDetails,
   markingVisited,
   handleDealStageChange,
+  handleOpenVisitWizard,
 }: any) {
   const {
     attributes,
@@ -167,7 +169,13 @@ function SortableRouteRow({
       variant="outline"
       onClick={(e) => {
         e.stopPropagation();
-        handleMarkVisited(propertyId, viewRoute.driver, !visited);
+        if (visited) {
+          handleMarkVisited(propertyId, viewRoute.driver, false);
+        } else {
+          // Open wizard popup
+          const addr = record?.propertyAddress || record?.address || '';
+          handleOpenVisitWizard(propertyId, addr);
+        }
       }}
       disabled={markingVisited === propertyId}
       className={`h-7 text-xs ${
@@ -315,6 +323,10 @@ export function PropertiesView() {
   const [removingRecordId, setRemovingRecordId] = useState<string | null>(null);
   const [reorderingRecordId, setReorderingRecordId] = useState<string | null>(null);
   const [markingVisited, setMarkingVisited] = useState<string | null>(null);
+  const [visitWizardOpen, setVisitWizardOpen] = useState(false);
+  const [visitWizardPropertyId, setVisitWizardPropertyId] = useState<string | null>(null);
+  const [visitWizardAddress, setVisitWizardAddress] = useState('');
+  const [visitWizardPending, setVisitWizardPending] = useState(false);
 
   // Drag and drop sensors for route reordering
   const sensors = useSensors(
@@ -2187,6 +2199,63 @@ export function PropertiesView() {
     }
   };
 
+  const handleOpenVisitWizard = (propertyId: string, address: string) => {
+    setVisitWizardPropertyId(propertyId);
+    setVisitWizardAddress(address);
+    setVisitWizardOpen(true);
+  };
+
+  const handleVisitWizardComplete = async (result: VisitedWizardResult) => {
+    if (!visitWizardPropertyId || !viewRoute) return;
+    setVisitWizardPending(true);
+    try {
+      // Save workflow stage
+      const logEntry = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        fromStage: 'new' as const,
+        toStage: result.nextWorkflowStage,
+        outcome: result.outcomeLabel,
+        note: result.note || undefined,
+      };
+      await updatePropertyWorkflowStage(visitWizardPropertyId, result.nextWorkflowStage, [logEntry]);
+
+      // Save phone number if provided
+      if (result.phoneProvided && result.phoneNumber) {
+        await updatePropertyPhoneNumbers(visitWizardPropertyId, [result.phoneNumber], undefined);
+      }
+
+      // Save note if provided
+      if (result.note) {
+        await updatePropertyNotes(visitWizardPropertyId, `[Visit] ${result.note}`);
+      }
+
+      // Mark as visited
+      await handleMarkVisited(visitWizardPropertyId, viewRoute.driver, true);
+
+      setVisitWizardOpen(false);
+      toast({ title: 'Visit recorded', description: result.outcomeLabel });
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to save visit', variant: 'destructive' });
+    } finally {
+      setVisitWizardPending(false);
+    }
+  };
+
+  const handleVisitWizardSkip = async () => {
+    if (!visitWizardPropertyId || !viewRoute) return;
+    setVisitWizardPending(true);
+    try {
+      await handleMarkVisited(visitWizardPropertyId, viewRoute.driver, true);
+      setVisitWizardOpen(false);
+      toast({ title: 'Marked as visited' });
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to mark visited', variant: 'destructive' });
+    } finally {
+      setVisitWizardPending(false);
+    }
+  };
+
   const handleDealStageChange = async (propertyId: string, dealStage: 'new_lead' | 'contacted' | 'interested' | 'offer_sent' | 'negotiating' | 'under_contract' | 'closed' | 'dead') => {
     try {
       await updatePropertyDealStage(propertyId, dealStage);
@@ -2786,7 +2855,23 @@ export function PropertiesView() {
         isOpen={!!selectedProperty}
         onClose={() => setSelectedProperty(null)}
       />
-      
+
+      {/* Visit Wizard Popup */}
+      <Dialog open={visitWizardOpen} onOpenChange={(open) => { if (!open) setVisitWizardOpen(false); }}>
+        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Visit Questions</DialogTitle>
+            <DialogDescription className="text-xs truncate">{visitWizardAddress}</DialogDescription>
+          </DialogHeader>
+          <VisitedWizard
+            address={visitWizardAddress}
+            onComplete={handleVisitWizardComplete}
+            onSkip={handleVisitWizardSkip}
+            isPending={visitWizardPending}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Route Map Modal */}
           {optimizedRoutes && (
             <RouteMap
@@ -3216,6 +3301,7 @@ export function PropertiesView() {
                                       handleViewRecordDetails={handleViewRecordDetails}
                                       markingVisited={markingVisited}
                                       handleDealStageChange={handleDealStageChange}
+                                      handleOpenVisitWizard={handleOpenVisitWizard}
                                     />
                                   );
                                 })}
