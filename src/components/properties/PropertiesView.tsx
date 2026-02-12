@@ -244,7 +244,6 @@ function SortableRouteRow({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex-1 min-w-[120px]">{dealStageSelect}</div>
           {visitedButton}
           {detailsButton}
         </div>
@@ -271,7 +270,6 @@ function SortableRouteRow({
           </div>
         </td>
         <td className="px-4 py-2 text-sm">{record?.propertyAddress || record?.address || 'N/A'}</td>
-        <td className="px-4 py-2 text-sm" style={{ position: 'relative', zIndex: 1 }}>{dealStageSelect}</td>
         <td className="px-4 py-2 text-sm">{visitedButton}</td>
         <td className="px-4 py-2 text-sm">{detailsButton}</td>
         <td className="px-4 py-2 text-sm">{dragHandle}</td>
@@ -3231,7 +3229,6 @@ export function PropertiesView() {
                                       <tr>
                                         <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Order</th>
                                         <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Address</th>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40">Deal Stage</th>
                                         <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-32">Status</th>
                                         <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-24">Details</th>
                                         <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-12"></th>
