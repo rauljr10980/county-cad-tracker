@@ -2858,7 +2858,7 @@ export function PropertiesView() {
 
       {/* Visit Wizard Popup */}
       <Dialog open={visitWizardOpen} onOpenChange={(open) => { if (!open) setVisitWizardOpen(false); }}>
-        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden bg-card border-border">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden bg-card border-border p-4 sm:p-6 mx-auto">
           <DialogHeader>
             <DialogTitle>Visit Questions</DialogTitle>
             <DialogDescription className="text-xs truncate">{visitWizardAddress}</DialogDescription>

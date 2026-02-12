@@ -258,7 +258,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) handleClose();
     }}>
-      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5" />
@@ -269,7 +269,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 overflow-x-hidden break-words">
           {/* Actions Panel */}
           <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
             <div
