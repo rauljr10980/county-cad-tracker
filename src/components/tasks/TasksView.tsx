@@ -433,39 +433,7 @@ export function TasksView() {
 
   return (
     <div className="p-6">
-      {/* Person Selector Cards */}
-      <div className="mb-6 grid grid-cols-2 gap-4">
-        <button
-          onClick={() => setSelectedPerson(selectedPerson === 'luciano' ? null : 'luciano')}
-          className={cn(
-            "rounded-xl border-2 p-6 text-center transition-all cursor-pointer",
-            selectedPerson === 'luciano'
-              ? "border-green-500 bg-green-500/10"
-              : selectedPerson === null
-                ? "border-border bg-card hover:border-green-500/50"
-                : "border-border bg-card/50 opacity-50 hover:opacity-75"
-          )}
-        >
-          <p className="text-4xl font-bold text-green-500">{taskStats.luciano}</p>
-          <p className="text-lg font-semibold mt-2">Luciano</p>
-          <p className="text-xs text-muted-foreground mt-1">tasks</p>
-        </button>
-        <button
-          onClick={() => setSelectedPerson(selectedPerson === 'raul' ? null : 'raul')}
-          className={cn(
-            "rounded-xl border-2 p-6 text-center transition-all cursor-pointer",
-            selectedPerson === 'raul'
-              ? "border-orange-500 bg-orange-500/10"
-              : selectedPerson === null
-                ? "border-border bg-card hover:border-orange-500/50"
-                : "border-border bg-card/50 opacity-50 hover:opacity-75"
-          )}
-        >
-          <p className="text-4xl font-bold text-orange-500">{taskStats.raul}</p>
-          <p className="text-lg font-semibold mt-2">Raul</p>
-          <p className="text-xs text-muted-foreground mt-1">tasks</p>
-        </button>
-      </div>
+      {/* Sales Funnel heading area */}
 
       {/* Sales Funnel - Workflow Stages */}
       {preForeclosureRecords && preForeclosureRecords.length > 0 && (
@@ -620,8 +588,8 @@ export function TasksView() {
         </div>
       )}
 
-      {/* Header Controls */}
-      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 pb-4 border-b border-border">
+      {/* Header Controls - hidden */}
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 pb-4 border-b border-border" style={{ display: 'none' }}>
         <div>
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Action Queue</h2>
           <p className="text-sm text-muted-foreground mt-2 font-medium">
@@ -672,8 +640,8 @@ export function TasksView() {
         </div>
       </div>
 
-      {/* Tasks List */}
-      <div className="space-y-3">
+      {/* Tasks List - hidden */}
+      <div className="space-y-3" style={{ display: 'none' }}>
         {filteredAndSortedTasks.map((property) => {
           const { ownerName, address } = parsePropertyAddress(property.propertyAddress);
           const status = getTaskStatus(property);
@@ -982,8 +950,8 @@ export function TasksView() {
         })}
       </div>
 
-      {/* Outcome Dialog */}
-      <Dialog open={!!selectedForOutcome} onOpenChange={(open) => !open && setSelectedForOutcome(null)}>
+      {/* Outcome Dialog - hidden */}
+      <Dialog open={false} onOpenChange={(open) => !open && setSelectedForOutcome(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Mark Task as Done</DialogTitle>
