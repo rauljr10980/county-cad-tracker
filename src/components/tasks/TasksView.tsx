@@ -282,8 +282,7 @@ export function TasksView() {
   const { data: preForeclosureRecords } = usePreForeclosures();
 
   const FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
-    { key: 'not_started', label: 'Not Started', color: '#6B7280' },
-    { key: 'initial_visit', label: 'Initial Visit', color: '#3B82F6' },
+    { key: 'not_started', label: 'Potential Deals', color: '#6B7280' },
     { key: 'waiting_to_be_contacted', label: 'Waiting to be Contacted', color: '#06B6D4' },
     { key: 'people_search', label: 'People Search', color: '#8B5CF6' },
     { key: 'call_owner', label: 'Call Owner', color: '#EC4899' },
@@ -438,7 +437,7 @@ export function TasksView() {
       {/* Sales Funnel - Workflow Stages */}
       {preForeclosureRecords && preForeclosureRecords.length > 0 && (
         <div className="mb-6 rounded-xl border border-border bg-card p-4 sm:p-6 overflow-hidden">
-          <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
+          <h3 className="text-xl font-bold tracking-tight">Active Pipeline</h3>
           <p className="text-sm text-muted-foreground mt-1">Current pipeline snapshot</p>
           <div className="mt-5 space-y-3">
             {FUNNEL_STAGES.filter(s => s.key !== 'dead_end').map((stage) => {

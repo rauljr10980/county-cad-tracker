@@ -524,8 +524,7 @@ export function PropertiesView() {
   
   // Workflow stage funnel data (same system as pre-foreclosure)
   const WORKFLOW_FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
-    { key: 'not_started', label: 'Not Started', color: '#6B7280' },
-    { key: 'initial_visit', label: 'Initial Visit', color: '#3B82F6' },
+    { key: 'not_started', label: 'Potential Deals', color: '#6B7280' },
     { key: 'waiting_to_be_contacted', label: 'Waiting to be Contacted', color: '#06B6D4' },
     { key: 'people_search', label: 'People Search', color: '#8B5CF6' },
     { key: 'call_owner', label: 'Call Owner', color: '#EC4899' },
