@@ -361,14 +361,20 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                 </span>
               </div>
 
-              {/* Per-user breakdown */}
-              {(safeStats.weeklyVisits.byUser.length > 0
-                ? safeStats.weeklyVisits.byUser
-                : [
-                    { user: 'Luciano', properties: 0, preForeclosures: 0, total: 0 },
-                    { user: 'Raul', properties: 0, preForeclosures: 0, total: 0 },
-                  ]
-              ).map((userVisit, index) => {
+              {/* Per-user breakdown - always show all known users */}
+              {(() => {
+                const knownUsers = ['Luciano', 'Raul'];
+                const byUser = safeStats.weeklyVisits.byUser;
+                const merged = knownUsers.map(name => {
+                  const found = byUser.find(u => u.user === name);
+                  return found || { user: name, properties: 0, preForeclosures: 0, total: 0 };
+                });
+                // Also include any users from backend not in knownUsers
+                byUser.forEach(u => {
+                  if (!knownUsers.includes(u.user)) merged.push(u);
+                });
+                return merged;
+              })().map((userVisit, index) => {
                 const maxTotal = Math.max(safeStats.weeklyVisits.total, 1);
                 const colors = ['#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
                 const color = colors[index % colors.length];
