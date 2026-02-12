@@ -2259,8 +2259,7 @@ export function PreForeclosureView() {
       {headerSection}
 
       {/* Stats Dashboard Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-        <UploadStatsCard />
+      <div className="grid grid-cols-1 gap-4 sm:gap-6">
         <OverallStatsCard records={filteredRecords} />
       </div>
 
