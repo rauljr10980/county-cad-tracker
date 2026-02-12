@@ -712,6 +712,11 @@ router.get('/stats/dashboard', optionalAuth, async (req, res) => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
+    // Start of current week (Sunday 00:00)
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
     // Run all queries in parallel for better performance
     // Only use fields that exist in the Property model
     const [
@@ -722,7 +727,9 @@ router.get('/stats/dashboard', optionalAuth, async (req, res) => {
       removedThisMonthCount,
       deadLeadsCount,
       amountDueRanges,
-      tasksByUser
+      tasksByUser,
+      propertyVisitsThisWeek,
+      preForeclosureVisitsThisWeek
     ] = await Promise.all([
       // Get property counts by status (status field exists)
       prisma.property.groupBy({
@@ -794,6 +801,18 @@ router.get('/stats/dashboard', optionalAuth, async (req, res) => {
             }
           }
         }
+      }),
+      // Property visits this week (grouped by user)
+      prisma.property.groupBy({
+        by: ['visitedBy'],
+        where: { visited: true, visitedAt: { gte: startOfWeek }, visitedBy: { not: null } },
+        _count: { visitedBy: true }
+      }),
+      // PreForeclosure visits this week (grouped by user)
+      prisma.preForeclosure.groupBy({
+        by: ['visitedBy'],
+        where: { visited: true, visitedAt: { gte: startOfWeek }, visitedBy: { not: null } },
+        _count: { visitedBy: true }
       })
     ]);
 
@@ -836,6 +855,31 @@ router.get('/stats/dashboard', optionalAuth, async (req, res) => {
       mailCampaignActive: 0,
       drivebyPlanned: 0
     };
+
+    // Aggregate weekly visits by user (combine Property + PreForeclosure)
+    const weeklyVisitsMap = {};
+    if (Array.isArray(propertyVisitsThisWeek)) {
+      for (const item of propertyVisitsThisWeek) {
+        if (item.visitedBy) {
+          if (!weeklyVisitsMap[item.visitedBy]) weeklyVisitsMap[item.visitedBy] = { properties: 0, preForeclosures: 0 };
+          weeklyVisitsMap[item.visitedBy].properties = item._count.visitedBy;
+        }
+      }
+    }
+    if (Array.isArray(preForeclosureVisitsThisWeek)) {
+      for (const item of preForeclosureVisitsThisWeek) {
+        if (item.visitedBy) {
+          if (!weeklyVisitsMap[item.visitedBy]) weeklyVisitsMap[item.visitedBy] = { properties: 0, preForeclosures: 0 };
+          weeklyVisitsMap[item.visitedBy].preForeclosures = item._count.visitedBy;
+        }
+      }
+    }
+    const weeklyVisits = Object.entries(weeklyVisitsMap).map(([user, counts]) => ({
+      user,
+      properties: counts.properties,
+      preForeclosures: counts.preForeclosures,
+      total: counts.properties + counts.preForeclosures
+    })).sort((a, b) => b.total - a.total);
 
     // Format amount due ranges - ensure array exists and has values
     const amountDueDistribution = Array.isArray(amountDueRanges) && amountDueRanges.length >= 5
@@ -890,6 +934,11 @@ router.get('/stats/dashboard', optionalAuth, async (req, res) => {
         textsScheduled: 0,
         mailCampaignActive: 0,
         drivebyPlanned: 0
+      },
+      weeklyVisits: {
+        weekStartDate: startOfWeek.toISOString(),
+        total: weeklyVisits.reduce((sum, v) => sum + v.total, 0),
+        byUser: weeklyVisits
       }
     });
   } catch (error) {
@@ -927,6 +976,11 @@ router.get('/stats/dashboard', optionalAuth, async (req, res) => {
         textsScheduled: 0,
         mailCampaignActive: 0,
         drivebyPlanned: 0
+      },
+      weeklyVisits: {
+        weekStartDate: new Date().toISOString(),
+        total: 0,
+        byUser: []
       }
     });
   }

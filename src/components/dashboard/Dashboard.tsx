@@ -89,6 +89,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
     amountDueDistribution: stats?.amountDueDistribution || [],
     pipeline: stats?.pipeline,
     tasks: stats?.tasks,
+    weeklyVisits: stats?.weeklyVisits || { weekStartDate: '', total: 0, byUser: [] },
   };
 
   // Status distribution data (from PostgreSQL)
@@ -326,6 +327,77 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Weekly Visits Tracker */}
+      <div className="grid grid-cols-1 gap-4 md:gap-6 mt-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Weekly Visits</CardTitle>
+                <p className="text-sm text-muted-foreground">Properties visited this week</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Resets Sunday</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Grand Total */}
+              <div className="flex items-center justify-between text-sm pb-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🏠</span>
+                  <span className="font-medium">Total Visits</span>
+                </div>
+                <span className="text-2xl font-bold text-primary">
+                  {safeStats.weeklyVisits.total}
+                </span>
+              </div>
+
+              {/* Per-user breakdown */}
+              {(safeStats.weeklyVisits.byUser.length > 0
+                ? safeStats.weeklyVisits.byUser
+                : [
+                    { user: 'Luciano', properties: 0, preForeclosures: 0, total: 0 },
+                    { user: 'Raul', properties: 0, preForeclosures: 0, total: 0 },
+                  ]
+              ).map((userVisit, index) => {
+                const maxTotal = Math.max(safeStats.weeklyVisits.total, 1);
+                const colors = ['#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+                const color = colors[index % colors.length];
+                return (
+                  <div key={userVisit.user} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">👤</span>
+                        <span className="text-muted-foreground">{userVisit.user}</span>
+                      </div>
+                      <span className="font-bold" style={{ color }}>
+                        {userVisit.total}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 pl-8 text-xs text-muted-foreground">
+                      <span>{userVisit.properties} Properties</span>
+                      <span>{userVisit.preForeclosures} Pre-Foreclosures</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className="h-1.5 rounded-full transition-all"
+                        style={{
+                          backgroundColor: color,
+                          width: `${Math.min((userVisit.total / maxTotal) * 100, 100)}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

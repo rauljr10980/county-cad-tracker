@@ -154,6 +154,16 @@ export interface DashboardStats {
     mailCampaignActive: number;
     drivebyPlanned: number;
   };
+  weeklyVisits?: {
+    weekStartDate: string;
+    total: number;
+    byUser: Array<{
+      user: string;
+      properties: number;
+      preForeclosures: number;
+      total: number;
+    }>;
+  };
 }
 
 export interface ProcessingStatus {
