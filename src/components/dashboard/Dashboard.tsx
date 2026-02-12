@@ -390,7 +390,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                       </span>
                     </div>
                     <div className="flex items-center gap-4 pl-8 text-xs text-muted-foreground">
-                      <span>{userVisit.properties} Properties</span>
+                      <span>{userVisit.properties} Tax Delinquent</span>
                       <span>{userVisit.preForeclosures} Pre-Foreclosures</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-1.5">
