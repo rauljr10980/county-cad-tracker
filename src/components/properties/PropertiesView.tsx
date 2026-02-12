@@ -1337,6 +1337,12 @@ export function PropertiesView() {
         }
         // Allow depot property even if it's visited (it's the starting point)
         if (depotPropertyId && p.id === depotPropertyId) return true;
+        // Exclude properties with ratio >= 75%
+        const ratio = (p.marketValue && p.marketValue !== 0) ? (p.totalAmountDue / p.marketValue) * 100 : null;
+        if (ratio !== null && ratio >= 75) {
+          console.log('[handleCreateRouteWithDepot] Property ratio >= 75%, excluding:', p.id, ratio.toFixed(1) + '%');
+          return false;
+        }
         // Filter out properties that are explicitly marked as visited (not just in routes)
         // This matches pre-foreclosure behavior - only exclude if visited
         const isVisited = propertiesInRoutes.has(p.id);
@@ -1364,6 +1370,12 @@ export function PropertiesView() {
         }
         // Allow depot property even if it's visited (it's the starting point)
         if (depotPropertyId && p.id === depotPropertyId) return true;
+        // Exclude properties with ratio >= 75%
+        const ratio = (p.marketValue && p.marketValue !== 0) ? (p.totalAmountDue / p.marketValue) * 100 : null;
+        if (ratio !== null && ratio >= 75) {
+          console.log('[handleCreateRouteWithDepot] Property ratio >= 75%, excluding:', p.id, ratio.toFixed(1) + '%');
+          return false;
+        }
         // Filter out properties that are explicitly marked as visited (not just in routes)
         // Check both: properties in routes marked as visited AND properties with visited: true on the Property model
         const isVisitedInRoute = propertiesInRoutes.has(p.id);
