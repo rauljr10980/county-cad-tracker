@@ -190,37 +190,8 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         </Card>
       </div>
 
-      {/* Monthly Trends Chart */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Monthly Delinquency Trends</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">Track new delinquencies and resolutions over time</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-[#EF4444]" />
-                <span className="text-sm text-muted-foreground">New Delinquencies</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-[#10B981]" />
-                <span className="text-sm text-muted-foreground">Resolved</span>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-          <CardContent>
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Monthly trends chart will be available when historical data is tracked.</p>
-              <p className="text-sm mt-2">New this month: {safeStats.newThisMonth || 0} | Removed this month: {safeStats.removedThisMonth || 0}</p>
-            </div>
-          </CardContent>
-      </Card>
-
-      {/* Bottom Row - Status Distribution, Amount Ranges, and Tasks */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        {/* Property Status Distribution */}
+      {/* Property Status Distribution */}
+      <div className="grid grid-cols-1 gap-4 md:gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Property Status Distribution</CardTitle>
@@ -258,76 +229,6 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                   </div>
                 ))}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Amount Due Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Amount Due Distribution</CardTitle>
-            <p className="text-sm text-muted-foreground">Properties grouped by tax debt amount</p>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {amountRanges.map((range, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: range.color }} />
-                      <span className="text-muted-foreground">{range.range}</span>
-                    </div>
-                    <span className="font-medium">{range.count.toLocaleString()} properties</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full transition-all"
-                      style={{
-                        backgroundColor: range.color,
-                        width: `${safeStats.totalProperties > 0 ? (range.count / safeStats.totalProperties) * 100 : 0}%`
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tasks & Actions Overview */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tasks & Actions</CardTitle>
-            <p className="text-sm text-muted-foreground">Active follow-ups and pending actions</p>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                { action: 'Total Tasks', count: safeStats.tasks?.total || 0, color: '#3B82F6', icon: '📋' },
-                { action: 'Luciano', count: safeStats.tasks?.luciano || 0, color: '#10B981', icon: '👤' },
-                { action: 'Raul', count: safeStats.tasks?.raul || 0, color: '#F59E0B', icon: '👤' },
-              ].map((task, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{task.icon}</span>
-                      <span className="text-muted-foreground">{task.action}</span>
-                    </div>
-                    <span className="font-bold" style={{ color: task.color }}>
-                      {task.count}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
-                    <div
-                      className="h-1.5 rounded-full transition-all"
-                      style={{
-                        backgroundColor: task.color,
-                        width: `${Math.min((task.count / Math.max(safeStats.tasks?.total || 1, 1)) * 100, 100)}%`
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
             </div>
           </CardContent>
         </Card>

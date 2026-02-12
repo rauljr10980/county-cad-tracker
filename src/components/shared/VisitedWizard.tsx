@@ -94,46 +94,46 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
   };
 
   return (
-    <div className="space-y-4 overflow-x-hidden">
+    <div className="space-y-3 overflow-x-hidden">
       {/* Q1: Did owner answer the door? */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">1. Did owner answer the door?</Label>
-        <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">1. Did owner answer the door?</Label>
+        <div className="grid grid-cols-2 gap-1.5">
           <Button
             variant={ownerAnswered === true ? 'default' : 'outline'}
-            className={cn('h-10 text-sm', ownerAnswered === true && 'bg-green-600 hover:bg-green-700')}
+            className={cn('h-8 text-xs', ownerAnswered === true && 'bg-green-600 hover:bg-green-700')}
             onClick={() => { setOwnerAnswered(true); setDroppedFlyer(null); }}
           >
-            <CheckCircle className="h-4 w-4 mr-1.5 shrink-0" /> Yes
+            <CheckCircle className="h-3.5 w-3.5 mr-1 shrink-0" /> Yes
           </Button>
           <Button
             variant={ownerAnswered === false ? 'default' : 'outline'}
-            className={cn('h-10 text-sm', ownerAnswered === false && 'bg-red-600 hover:bg-red-700')}
+            className={cn('h-8 text-xs', ownerAnswered === false && 'bg-red-600 hover:bg-red-700')}
             onClick={() => { setOwnerAnswered(false); setDroppedFlyer(null); setPhoneProvided(null); setPhoneNumber(''); }}
           >
-            <X className="h-4 w-4 mr-1.5 shrink-0" /> No
+            <X className="h-3.5 w-3.5 mr-1 shrink-0" /> No
           </Button>
         </div>
       </div>
 
       {/* Q: Dropped flyer? (only if owner didn't answer) */}
       {ownerAnswered === false && (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">2. Drop off a flyer?</Label>
-          <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">2. Drop off a flyer?</Label>
+          <div className="grid grid-cols-2 gap-1.5">
             <Button
               variant={droppedFlyer === true ? 'default' : 'outline'}
-              className={cn('h-10 text-sm', droppedFlyer === true && 'bg-green-600 hover:bg-green-700')}
+              className={cn('h-8 text-xs', droppedFlyer === true && 'bg-green-600 hover:bg-green-700')}
               onClick={() => setDroppedFlyer(true)}
             >
-              <FileText className="h-4 w-4 mr-1.5 shrink-0" /> Yes
+              <FileText className="h-3.5 w-3.5 mr-1 shrink-0" /> Yes
             </Button>
             <Button
               variant={droppedFlyer === false ? 'default' : 'outline'}
-              className={cn('h-10 text-sm', droppedFlyer === false && 'bg-red-600 hover:bg-red-700')}
+              className={cn('h-8 text-xs', droppedFlyer === false && 'bg-red-600 hover:bg-red-700')}
               onClick={() => setDroppedFlyer(false)}
             >
-              <X className="h-4 w-4 mr-1.5 shrink-0" /> No
+              <X className="h-3.5 w-3.5 mr-1 shrink-0" /> No
             </Button>
           </div>
         </div>
@@ -141,22 +141,22 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
 
       {/* Q: Phone number (only if owner answered yes) */}
       {ownerAnswered === true && (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">2. Did they provide a phone number?</Label>
-          <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">2. Did they provide a phone number?</Label>
+          <div className="grid grid-cols-2 gap-1.5">
             <Button
               variant={phoneProvided === true ? 'default' : 'outline'}
-              className="h-10 text-sm"
+              className="h-8 text-xs"
               onClick={() => { setPhoneProvided(true); setGaveMyNumber(null); }}
             >
-              <Phone className="h-4 w-4 mr-1.5 shrink-0" /> Yes
+              <Phone className="h-3.5 w-3.5 mr-1 shrink-0" /> Yes
             </Button>
             <Button
               variant={phoneProvided === false ? 'default' : 'outline'}
-              className="h-10 text-sm"
+              className="h-8 text-xs"
               onClick={() => { setPhoneProvided(false); setPhoneNumber(''); setGaveMyNumber(null); }}
             >
-              <X className="h-4 w-4 mr-1.5 shrink-0" /> No
+              <X className="h-3.5 w-3.5 mr-1 shrink-0" /> No
             </Button>
           </div>
           {phoneProvided === true && (
@@ -165,26 +165,26 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
               placeholder="Enter phone number..."
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              className="h-10"
+              className="h-8 text-xs"
             />
           )}
           {phoneProvided === false && (
-            <div className="space-y-2 mt-2 pl-3 border-l-2 border-primary/30">
-              <Label className="text-xs font-medium text-muted-foreground">Gave them your number?</Label>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5 mt-1.5 pl-2.5 border-l-2 border-primary/30">
+              <Label className="text-[11px] font-medium text-muted-foreground">Gave them your number?</Label>
+              <div className="grid grid-cols-2 gap-1.5">
                 <Button
                   variant={gaveMyNumber === true ? 'default' : 'outline'}
-                  className={cn('h-10 text-xs', gaveMyNumber === true && 'bg-green-600 hover:bg-green-700')}
+                  className={cn('h-8 text-xs', gaveMyNumber === true && 'bg-green-600 hover:bg-green-700')}
                   onClick={() => setGaveMyNumber(true)}
                 >
-                  <Phone className="h-4 w-4 mr-1 shrink-0" /> Yes
+                  <Phone className="h-3.5 w-3.5 mr-1 shrink-0" /> Yes
                 </Button>
                 <Button
                   variant={gaveMyNumber === false ? 'default' : 'outline'}
-                  className={cn('h-10 text-xs', gaveMyNumber === false && 'bg-red-600 hover:bg-red-700')}
+                  className={cn('h-8 text-xs', gaveMyNumber === false && 'bg-red-600 hover:bg-red-700')}
                   onClick={() => setGaveMyNumber(false)}
                 >
-                  <X className="h-4 w-4 mr-1 shrink-0" /> No
+                  <X className="h-3.5 w-3.5 mr-1 shrink-0" /> No
                 </Button>
               </div>
             </div>
@@ -193,64 +193,64 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
       )}
 
       {/* Q3: Did they solve foreclosure? */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">3. Did they solve the foreclosure?</Label>
-        <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">3. Did they solve the foreclosure?</Label>
+        <div className="grid grid-cols-2 gap-1.5">
           <Button
             variant={solvedForeclosure === true ? 'default' : 'outline'}
-            className={cn('h-10 text-sm', solvedForeclosure === true && 'bg-green-600 hover:bg-green-700')}
+            className={cn('h-8 text-xs', solvedForeclosure === true && 'bg-green-600 hover:bg-green-700')}
             onClick={() => setSolvedForeclosure(true)}
           >
-            <CheckCircle className="h-4 w-4 mr-1.5 shrink-0" /> Yes
+            <CheckCircle className="h-3.5 w-3.5 mr-1 shrink-0" /> Yes
           </Button>
           <Button
             variant={solvedForeclosure === false ? 'default' : 'outline'}
-            className={cn('h-10 text-sm', solvedForeclosure === false && 'bg-red-600 hover:bg-red-700')}
+            className={cn('h-8 text-xs', solvedForeclosure === false && 'bg-red-600 hover:bg-red-700')}
             onClick={() => setSolvedForeclosure(false)}
           >
-            <X className="h-4 w-4 mr-1.5 shrink-0" /> No
+            <X className="h-3.5 w-3.5 mr-1 shrink-0" /> No
           </Button>
         </div>
       </div>
 
       {/* Q4: Property type */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">4. What type of property?</Label>
-        <div className="grid grid-cols-3 gap-2">
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">4. What type of property?</Label>
+        <div className="grid grid-cols-3 gap-1.5">
           <Button
             variant={propertyType === 'primary' ? 'default' : 'outline'}
-            className="h-10 text-xs sm:text-sm"
+            className="h-8 text-[11px]"
             onClick={() => setPropertyType('primary')}
           >
-            <Home className="h-4 w-4 mr-1 shrink-0" /> Primary
+            <Home className="h-3.5 w-3.5 mr-0.5 shrink-0" /> Primary
           </Button>
           <Button
             variant={propertyType === 'rental' ? 'default' : 'outline'}
-            className="h-10 text-xs sm:text-sm"
+            className="h-8 text-[11px]"
             onClick={() => setPropertyType('rental')}
           >
-            <Building className="h-4 w-4 mr-1 shrink-0" /> Rental
+            <Building className="h-3.5 w-3.5 mr-0.5 shrink-0" /> Rental
           </Button>
           <Button
             variant={propertyType === 'vacant' ? 'default' : 'outline'}
-            className="h-10 text-xs sm:text-sm"
+            className="h-8 text-[11px]"
             onClick={() => setPropertyType('vacant')}
           >
-            <AlertTriangle className="h-4 w-4 mr-1 shrink-0" /> Vacant
+            <AlertTriangle className="h-3.5 w-3.5 mr-0.5 shrink-0" /> Vacant
           </Button>
         </div>
       </div>
 
       {/* Q5: Condition */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">5. Condition of Home</Label>
-        <div className="grid grid-cols-5 gap-1.5">
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">5. Condition of Home</Label>
+        <div className="grid grid-cols-5 gap-1">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
             <Button
               key={n}
               variant={condition === n ? 'default' : 'outline'}
               className={cn(
-                'h-10 w-full font-medium text-sm',
+                'h-8 w-full font-medium text-xs',
                 condition === n && n <= 3 && 'bg-red-600 hover:bg-red-700',
                 condition === n && n >= 4 && n <= 6 && 'bg-amber-600 hover:bg-amber-700',
                 condition === n && n >= 7 && 'bg-green-600 hover:bg-green-700',
@@ -272,25 +272,25 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
         placeholder="Add a note (optional)..."
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        className="h-10 text-sm"
+        className="h-8 text-xs"
       />
 
       {/* Submit */}
-      <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
+      <div className="flex flex-col sm:flex-row gap-1.5 pt-2 border-t">
         <Button
           variant="ghost"
-          className="h-10 text-sm text-muted-foreground sm:flex-1"
+          className="h-8 text-xs text-muted-foreground sm:flex-1"
           onClick={onSkip}
           disabled={isPending}
         >
           Just Mark Visited (Skip)
         </Button>
         <Button
-          className="h-10 text-sm sm:flex-1"
+          className="h-8 text-xs sm:flex-1"
           disabled={!canSubmit || isPending}
           onClick={handleSubmit}
         >
-          {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+          {isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5 mr-1.5" />}
           Complete Visit
         </Button>
       </div>
