@@ -24,6 +24,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   const SALES_FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
     { key: 'not_started', label: 'Not Started', color: '#6B7280' },
     { key: 'initial_visit', label: 'Visit', color: '#3B82F6' },
+    { key: 'waiting_to_be_contacted', label: 'Waiting', color: '#06B6D4' },
     { key: 'people_search', label: 'Search', color: '#8B5CF6' },
     { key: 'call_owner', label: 'Call', color: '#EC4899' },
     { key: 'land_records', label: 'Records', color: '#F59E0B' },
@@ -39,7 +40,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   const workflowStageCounts = useMemo(() => {
     const records = (preForeclosureRecords ?? []) as PreForeclosureRecord[];
     const counts: Record<WorkflowStage, number> = {
-      not_started: 0, initial_visit: 0, people_search: 0, call_owner: 0,
+      not_started: 0, initial_visit: 0, waiting_to_be_contacted: 0, people_search: 0, call_owner: 0,
       land_records: 0, visit_heirs: 0, call_heirs: 0, negotiating: 0, comps: 0, sent_offer: 0, dead_end: 0,
     };
     for (const r of records) {

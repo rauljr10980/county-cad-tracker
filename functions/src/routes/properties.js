@@ -1379,7 +1379,7 @@ router.put('/:id/workflow-stage', optionalAuth, async (req, res) => {
     const { workflow_stage, workflow_log } = req.body;
 
     const validStages = [
-      'not_started', 'initial_visit', 'people_search', 'call_owner',
+      'not_started', 'initial_visit', 'waiting_to_be_contacted', 'people_search', 'call_owner',
       'land_records', 'visit_heirs', 'call_heirs', 'negotiating', 'comps', 'sent_offer', 'dead_end'
     ];
 

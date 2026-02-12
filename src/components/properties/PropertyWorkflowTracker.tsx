@@ -12,7 +12,7 @@ import { updatePropertyWorkflowStage } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 const STAGE_ORDER: WorkflowStage[] = [
-  'not_started', 'initial_visit', 'people_search', 'call_owner',
+  'not_started', 'initial_visit', 'waiting_to_be_contacted', 'people_search', 'call_owner',
   'land_records', 'visit_heirs', 'call_heirs', 'negotiating', 'comps', 'sent_offer',
 ];
 

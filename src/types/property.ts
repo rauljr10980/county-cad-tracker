@@ -183,6 +183,7 @@ export type PreForeclosureStatus = 'New' | 'Contact Attempted' | 'Monitoring' | 
 export type WorkflowStage =
   | 'not_started'
   | 'initial_visit'
+  | 'waiting_to_be_contacted'
   | 'people_search'
   | 'call_owner'
   | 'land_records'
@@ -207,6 +208,7 @@ export interface WorkflowLogEntry {
 export const STAGE_TASK_MAP: Record<WorkflowStage, { actionType: 'call' | 'driveby'; priority: 'high' | 'med' } | null> = {
   not_started: null,
   initial_visit: { actionType: 'driveby', priority: 'high' },
+  waiting_to_be_contacted: null,
   people_search: { actionType: 'call', priority: 'med' },
   call_owner: { actionType: 'call', priority: 'high' },
   land_records: { actionType: 'driveby', priority: 'med' },
@@ -237,7 +239,17 @@ export const WORKFLOW_STAGES: Record<WorkflowStage, {
     question: 'Did the owner answer the door?',
     outcomes: [
       { label: 'Yes - Owner answered', nextStage: 'negotiating' },
+      { label: 'Dropped flyer - waiting', nextStage: 'waiting_to_be_contacted' },
       { label: 'No - Not home', nextStage: 'people_search' },
+    ],
+  },
+  waiting_to_be_contacted: {
+    label: 'Waiting to be Contacted',
+    shortLabel: 'Waiting',
+    question: 'Has the owner reached out?',
+    outcomes: [
+      { label: 'Yes - Owner called back', nextStage: 'negotiating' },
+      { label: 'No response - search', nextStage: 'people_search' },
     ],
   },
   people_search: {

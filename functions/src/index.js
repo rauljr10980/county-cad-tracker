@@ -352,6 +352,49 @@ async function startServer() {
       runAutoScrape();
     }, { timezone: 'America/Chicago' });
     console.log('⏰ Auto-scrape scheduled: Mon-Fri at 8am, 11am, 2pm, 5pm CT');
+
+    // Auto-unvisit: Reset visited status for properties stuck in
+    // "waiting_to_be_contacted" for 30+ days so they appear in routes again
+    async function runAutoUnvisit() {
+      console.log('[AUTO-UNVISIT] Checking for stale waiting_to_be_contacted records...');
+      try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const propertyResult = await prisma.property.updateMany({
+          where: {
+            workflowStage: 'waiting_to_be_contacted',
+            visited: true,
+            visitedAt: { lt: thirtyDaysAgo },
+          },
+          data: { visited: false },
+        });
+
+        const preForeclosureResult = await prisma.preForeclosure.updateMany({
+          where: {
+            workflowStage: 'waiting_to_be_contacted',
+            visited: true,
+            visitedAt: { lt: thirtyDaysAgo },
+          },
+          data: { visited: false },
+        });
+
+        const total = propertyResult.count + preForeclosureResult.count;
+        if (total > 0) {
+          console.log(`[AUTO-UNVISIT] Reset ${total} records (${propertyResult.count} properties, ${preForeclosureResult.count} pre-foreclosures)`);
+        } else {
+          console.log('[AUTO-UNVISIT] No stale records found');
+        }
+      } catch (error) {
+        console.error('[AUTO-UNVISIT] Error:', error.message);
+      }
+    }
+
+    // Run daily at 6am Central Time
+    cron.schedule('0 6 * * *', () => {
+      runAutoUnvisit();
+    }, { timezone: 'America/Chicago' });
+    console.log('⏰ Auto-unvisit scheduled: Daily at 6am CT (resets visited after 30 days in waiting)');
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     console.error('Database URL exists:', !!process.env.DATABASE_URL);
