@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { CheckCircle, X, Phone, Loader2, Home, Building, AlertTriangle } from 'lucide-react';
+import { CheckCircle, X, Phone, Loader2, Home, Building, AlertTriangle, FileText } from 'lucide-react';
 import type { WorkflowStage } from '@/types/property';
 
 export interface VisitedWizardResult {
@@ -27,8 +27,10 @@ interface VisitedWizardProps {
 
 export function VisitedWizard({ address, onComplete, onSkip, isPending }: VisitedWizardProps) {
   const [ownerAnswered, setOwnerAnswered] = useState<boolean | null>(null);
+  const [droppedFlyer, setDroppedFlyer] = useState<boolean | null>(null);
   const [phoneProvided, setPhoneProvided] = useState<boolean | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [gaveMyNumber, setGaveMyNumber] = useState<boolean | null>(null);
   const [solvedForeclosure, setSolvedForeclosure] = useState<boolean | null>(null);
   const [propertyType, setPropertyType] = useState<'primary' | 'rental' | 'vacant' | null>(null);
   const [condition, setCondition] = useState<number | null>(null);
@@ -39,6 +41,7 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
     solvedForeclosure !== null &&
     propertyType !== null &&
     condition !== null &&
+    (ownerAnswered === true || droppedFlyer !== null) &&
     (ownerAnswered === false || phoneProvided !== null) &&
     (!(ownerAnswered && phoneProvided) || phoneNumber.trim());
 
@@ -48,6 +51,10 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
     let nextStage: WorkflowStage;
     if (solvedForeclosure) {
       nextStage = 'dead_end';
+    } else if (!ownerAnswered && droppedFlyer) {
+      nextStage = 'waiting_to_be_contacted';
+    } else if (ownerAnswered && !phoneProvided && gaveMyNumber) {
+      nextStage = 'waiting_to_be_contacted';
     } else if (ownerAnswered && propertyType === 'primary') {
       nextStage = 'negotiating';
     } else {
@@ -56,8 +63,13 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
 
     const parts: string[] = [];
     parts.push(`Owner answered: ${ownerAnswered ? 'Yes' : 'No'}`);
+    if (!ownerAnswered && droppedFlyer) {
+      parts.push('Dropped flyer');
+    }
     if (ownerAnswered && phoneProvided) {
       parts.push(`Phone: ${phoneNumber.trim()}`);
+    } else if (ownerAnswered && gaveMyNumber) {
+      parts.push('Gave them my number - waiting');
     } else if (ownerAnswered) {
       parts.push('No phone provided');
     }
@@ -91,7 +103,7 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
             variant={ownerAnswered === true ? 'default' : 'outline'}
             size="sm"
             className={cn('flex-1', ownerAnswered === true && 'bg-green-600 hover:bg-green-700')}
-            onClick={() => setOwnerAnswered(true)}
+            onClick={() => { setOwnerAnswered(true); setDroppedFlyer(null); }}
           >
             <CheckCircle className="h-4 w-4 mr-1.5" /> Yes
           </Button>
@@ -99,14 +111,39 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
             variant={ownerAnswered === false ? 'default' : 'outline'}
             size="sm"
             className={cn('flex-1', ownerAnswered === false && 'bg-red-600 hover:bg-red-700')}
-            onClick={() => { setOwnerAnswered(false); setPhoneProvided(null); setPhoneNumber(''); }}
+            onClick={() => { setOwnerAnswered(false); setDroppedFlyer(null); setPhoneProvided(null); setPhoneNumber(''); }}
           >
             <X className="h-4 w-4 mr-1.5" /> No
           </Button>
         </div>
       </div>
 
-      {/* Q2: Phone number (only if owner answered yes) */}
+      {/* Q: Dropped flyer? (only if owner didn't answer) */}
+      {ownerAnswered === false && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">2. Did you drop off a flyer?</Label>
+          <div className="flex gap-2">
+            <Button
+              variant={droppedFlyer === true ? 'default' : 'outline'}
+              size="sm"
+              className={cn('flex-1', droppedFlyer === true && 'bg-green-600 hover:bg-green-700')}
+              onClick={() => setDroppedFlyer(true)}
+            >
+              <FileText className="h-4 w-4 mr-1.5" /> Yes
+            </Button>
+            <Button
+              variant={droppedFlyer === false ? 'default' : 'outline'}
+              size="sm"
+              className={cn('flex-1', droppedFlyer === false && 'bg-red-600 hover:bg-red-700')}
+              onClick={() => setDroppedFlyer(false)}
+            >
+              <X className="h-4 w-4 mr-1.5" /> No
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Q: Phone number (only if owner answered yes) */}
       {ownerAnswered === true && (
         <div className="space-y-2">
           <Label className="text-sm font-medium">2. Did they provide a phone number?</Label>
@@ -115,7 +152,7 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
               variant={phoneProvided === true ? 'default' : 'outline'}
               size="sm"
               className="flex-1"
-              onClick={() => setPhoneProvided(true)}
+              onClick={() => { setPhoneProvided(true); setGaveMyNumber(null); }}
             >
               <Phone className="h-4 w-4 mr-1.5" /> Yes
             </Button>
@@ -123,7 +160,7 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
               variant={phoneProvided === false ? 'default' : 'outline'}
               size="sm"
               className="flex-1"
-              onClick={() => { setPhoneProvided(false); setPhoneNumber(''); }}
+              onClick={() => { setPhoneProvided(false); setPhoneNumber(''); setGaveMyNumber(null); }}
             >
               <X className="h-4 w-4 mr-1.5" /> No
             </Button>
@@ -136,13 +173,36 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
               onChange={(e) => setPhoneNumber(e.target.value)}
             />
           )}
+          {phoneProvided === false && (
+            <div className="space-y-2 mt-2 pl-4 border-l-2 border-primary/30">
+              <Label className="text-xs font-medium text-muted-foreground">Did you give them your number?</Label>
+              <div className="flex gap-2">
+                <Button
+                  variant={gaveMyNumber === true ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn('flex-1', gaveMyNumber === true && 'bg-green-600 hover:bg-green-700')}
+                  onClick={() => setGaveMyNumber(true)}
+                >
+                  <Phone className="h-4 w-4 mr-1.5" /> Yes - Waiting for call
+                </Button>
+                <Button
+                  variant={gaveMyNumber === false ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn('flex-1', gaveMyNumber === false && 'bg-red-600 hover:bg-red-700')}
+                  onClick={() => setGaveMyNumber(false)}
+                >
+                  <X className="h-4 w-4 mr-1.5" /> No
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Q3: Did they solve foreclosure? */}
       <div className="space-y-2">
         <Label className="text-sm font-medium">
-          {ownerAnswered === true ? '3' : '2'}. Did they solve the foreclosure?
+          3. Did they solve the foreclosure?
         </Label>
         <div className="flex gap-2">
           <Button
@@ -167,7 +227,7 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
       {/* Q4: Property type */}
       <div className="space-y-2">
         <Label className="text-sm font-medium">
-          {ownerAnswered === true ? '4' : '3'}. What type of property?
+          4. What type of property?
         </Label>
         <div className="flex gap-2">
           <Button
@@ -200,7 +260,7 @@ export function VisitedWizard({ address, onComplete, onSkip, isPending }: Visite
       {/* Q5: Condition */}
       <div className="space-y-2">
         <Label className="text-sm font-medium">
-          {ownerAnswered === true ? '5' : '4'}. Condition of Home
+          5. Condition of Home
         </Label>
         <div className="grid grid-cols-5 gap-1.5">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
