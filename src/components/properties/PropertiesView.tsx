@@ -2232,6 +2232,67 @@ export function PropertiesView() {
           </p> */}
         </div>
 
+        {/* Active Routes Dashboard */}
+        <div className="mb-4 bg-card border border-border rounded-lg p-4">
+          <h3 className="text-lg font-semibold mb-4">Active Routes</h3>
+          {isLoadingActiveRoutes ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+              <span className="text-sm text-muted-foreground">Loading routes...</span>
+            </div>
+          ) : Array.isArray(activeRoutes) && activeRoutes.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeRoutes.map((route: RouteType) => {
+                const stopCount = route.records?.length || 0;
+                const driverColor = route.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500';
+                return (
+                  <div
+                    key={route.id}
+                    className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors relative group cursor-pointer"
+                    onClick={() => handleViewRoute(route)}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={cn('w-3 h-3 rounded-full', driverColor)} />
+                          <h4 className="font-semibold text-sm">{route.driver}</h4>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {stopCount} {stopCount === 1 ? 'stop' : 'stops'}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteRoute(route.id);
+                        }}
+                        disabled={deletingRoute === route.id}
+                      >
+                        {deletingRoute === route.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Created {new Date(route.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No active routes</p>
+              <p className="text-xs mt-1">Create a route to get started</p>
+            </div>
+          )}
+        </div>
+
         {/* Sales Funnel - Workflow Stages */}
         <div className="mb-4 rounded-xl border border-border bg-card p-6">
           <h3 className="text-xl font-bold tracking-tight">Sales Funnel</h3>
@@ -2709,67 +2770,6 @@ export function PropertiesView() {
           )}
         </>
       )}
-
-      {/* Active Routes Dashboard */}
-      <div className="mt-6 bg-card border border-border rounded-lg p-4">
-        <h3 className="text-lg font-semibold mb-4">Active Routes</h3>
-        {isLoadingActiveRoutes ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-            <span className="text-sm text-muted-foreground">Loading routes...</span>
-          </div>
-        ) : Array.isArray(activeRoutes) && activeRoutes.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeRoutes.map((route: RouteType) => {
-              const stopCount = route.records?.length || 0;
-              const driverColor = route.driver === 'Luciano' ? 'bg-blue-500' : 'bg-green-500';
-              return (
-                <div
-                  key={route.id}
-                  className="p-4 border border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors relative group cursor-pointer"
-                  onClick={() => handleViewRoute(route)}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className={cn('w-3 h-3 rounded-full', driverColor)} />
-                        <h4 className="font-semibold text-sm">{route.driver}</h4>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {stopCount} {stopCount === 1 ? 'stop' : 'stops'}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteRoute(route.id);
-                      }}
-                      disabled={deletingRoute === route.id}
-                    >
-                      {deletingRoute === route.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Created {new Date(route.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>No active routes</p>
-            <p className="text-xs mt-1">Create a route to get started</p>
-          </div>
-        )}
-      </div>
 
       <PropertyDetailsModal
         property={selectedProperty}
