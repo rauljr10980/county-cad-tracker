@@ -346,7 +346,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-5xl max-h-[85vh] overflow-y-auto bg-card border-border">
+      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-5xl max-h-[85vh] overflow-y-auto overflow-x-hidden bg-card border-border">
         <DialogHeader className="border-b border-border pb-4">
           <div className="flex items-start justify-between">
             <div>
@@ -366,7 +366,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
         </DialogHeader>
 
 
-        <div className="space-y-4 pt-2">
+        <div className="space-y-4 pt-2 overflow-x-hidden">
           {/* Actions Panel */}
           <div className="bg-secondary/30 rounded-lg p-3 sm:p-4">
             <div
@@ -786,7 +786,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 </div>
               </div>
             ) : (
-              <div className="text-sm text-muted-foreground min-h-[60px] whitespace-pre-wrap mt-3">
+              <div className="text-sm text-muted-foreground min-h-[60px] whitespace-pre-wrap break-words mt-3">
                 {notes || 'No notes added yet. Click "Add Notes" to add notes for this property.'}
               </div>
             ))}
