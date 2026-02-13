@@ -802,10 +802,10 @@ router.get('/stats/dashboard', optionalAuth, async (req, res) => {
           }
         }
       }),
-      // Property visits this week (from RouteRecord where visited status is stored)
-      prisma.routeRecord.groupBy({
+      // Property visits this week (grouped by user)
+      prisma.property.groupBy({
         by: ['visitedBy'],
-        where: { visited: true, visitedAt: { gte: startOfWeek }, visitedBy: { not: null }, propertyId: { not: null } },
+        where: { visited: true, visitedAt: { gte: startOfWeek }, visitedBy: { not: null } },
         _count: { visitedBy: true }
       }),
       // PreForeclosure visits this week (grouped by user)

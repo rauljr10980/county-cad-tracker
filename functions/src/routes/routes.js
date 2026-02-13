@@ -737,7 +737,7 @@ router.put('/:routeId/records/:recordId/visit', optionalAuth, async (req, res) =
       return res.status(400).json({ error: 'This endpoint is only for PROPERTY routes. Use pre-foreclosure endpoint for pre-foreclosure routes.' });
     }
 
-    // Update visited status on RouteRecord (stored separately for properties)
+    // Update visited status on RouteRecord AND Property (consolidated)
     const visitedStatus = visited !== undefined ? visited : true;
     const updateData = {
       visited: visitedStatus,
@@ -758,6 +758,14 @@ router.put('/:routeId/records/:recordId/visit', optionalAuth, async (req, res) =
         }
       }
     });
+
+    // Also update the Property model so dashboard weekly visits can query it
+    if (updated.propertyId) {
+      await prisma.property.update({
+        where: { id: updated.propertyId },
+        data: updateData
+      });
+    }
 
     // Map to frontend format
     res.json({
