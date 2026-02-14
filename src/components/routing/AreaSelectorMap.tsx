@@ -1013,10 +1013,14 @@ export function AreaSelectorMap({
                     </div>
                   )}
                   {/* Map Legend */}
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
                     <div className="flex items-center gap-1.5">
                       <span className="inline-block w-3 h-3 rounded-full bg-[#10B981]" />
                       Available
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded-full bg-[#F59E0B]" />
+                      Visited
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="inline-block w-3 h-3 rounded-full bg-[#EF4444]" />
@@ -1167,15 +1171,18 @@ export function AreaSelectorMap({
                 {/* Display all properties as small dots on Step 1 */}
                 {step === 1 && properties.map((p) => {
                   if (!p.latitude || !p.longitude) return null;
-                  const isUnavailable = p.id ? unavailablePropertyIds.has(p.id) : false;
+                  const isVisited = p.visited === true;
+                  const isInRoute = p.id ? unavailablePropertyIds.has(p.id) && !isVisited : false;
+                  const color = isVisited ? '#F59E0B' : isInRoute ? '#EF4444' : '#10B981';
+                  const label = isVisited ? 'Visited' : isInRoute ? 'In Route' : 'Available';
                   return (
                     <CircleMarker
                       key={`prop-${p.id}`}
                       center={[p.latitude, p.longitude]}
                       radius={5}
                       pathOptions={{
-                        color: isUnavailable ? '#EF4444' : '#10B981',
-                        fillColor: isUnavailable ? '#EF4444' : '#10B981',
+                        color,
+                        fillColor: color,
                         fillOpacity: 0.7,
                         weight: 1,
                       }}
@@ -1183,7 +1190,7 @@ export function AreaSelectorMap({
                       <Popup>
                         <div style={{ padding: '2px', fontSize: '12px' }}>
                           <strong>{p.propertyAddress || p.address || 'N/A'}</strong>
-                          {isUnavailable && <div style={{ color: '#EF4444' }}>Already in route</div>}
+                          <div style={{ color }}>{label}</div>
                         </div>
                       </Popup>
                     </CircleMarker>
