@@ -1012,6 +1012,17 @@ export function AreaSelectorMap({
                       Area drawn successfully!
                     </div>
                   )}
+                  {/* Map Legend */}
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded-full bg-[#10B981]" />
+                      Available
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded-full bg-[#EF4444]" />
+                      In Route
+                    </div>
+                  </div>
                 </div>
               )}
 
