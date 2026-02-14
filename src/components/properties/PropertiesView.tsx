@@ -3073,12 +3073,7 @@ export function PropertiesView() {
           await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation, propertiesToOptimize);
         }}
         properties={filteredProperties.filter(p => {
-          // Must have coordinates
-          if (p.latitude == null || p.longitude == null) return false;
-          // Exclude properties that are in routes OR marked as visited
-          const isVisitedInRoute = propertiesInRoutes.has(p.id);
-          const isVisitedOnProperty = p.visited === true;
-          return !isVisitedInRoute && !isVisitedOnProperty;
+          return p.latitude != null && p.longitude != null;
         }).map(p => ({
           id: p.id,
           latitude: p.latitude!,
@@ -3086,8 +3081,13 @@ export function PropertiesView() {
           propertyAddress: p.propertyAddress || '',
           address: p.propertyAddress || '',
           ownerName: p.ownerName || '',
-          accountNumber: p.accountNumber || ''
+          accountNumber: p.accountNumber || '',
+          visited: p.visited
         }))}
+        unavailablePropertyIds={new Set([
+          ...Array.from(propertiesInRoutes),
+          ...filteredProperties.filter(r => r.visited === true).map(r => r.id)
+        ])}
         numVehicles={numVehicles}
       />
 
