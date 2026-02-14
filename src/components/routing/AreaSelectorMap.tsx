@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useMemo } from 'react';
-import { MapContainer, TileLayer, useMap, Rectangle, Circle, Polygon, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Rectangle, Circle, Polygon, CircleMarker, useMapEvents } from 'react-leaflet';
 import { LatLngBounds, LatLng, DivIcon } from 'leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -1152,6 +1152,32 @@ export function AreaSelectorMap({
                 {drawnPolygon && drawnPolygon.length >= 3 && (
                   <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
                 )}
+
+                {/* Display all properties as small dots on Step 1 */}
+                {step === 1 && properties.map((p) => {
+                  if (!p.latitude || !p.longitude) return null;
+                  const isUnavailable = p.id ? unavailablePropertyIds.has(p.id) : false;
+                  return (
+                    <CircleMarker
+                      key={`prop-${p.id}`}
+                      center={[p.latitude, p.longitude]}
+                      radius={5}
+                      pathOptions={{
+                        color: isUnavailable ? '#EF4444' : '#10B981',
+                        fillColor: isUnavailable ? '#EF4444' : '#10B981',
+                        fillOpacity: 0.7,
+                        weight: 1,
+                      }}
+                    >
+                      <Popup>
+                        <div style={{ padding: '2px', fontSize: '12px' }}>
+                          <strong>{p.propertyAddress || p.address || 'N/A'}</strong>
+                          {isUnavailable && <div style={{ color: '#EF4444' }}>Already in route</div>}
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  );
+                })}
 
                 {/* Display all saved zones as background overlays */}
                 {step === 1 && allSavedZones.map((zone) => {

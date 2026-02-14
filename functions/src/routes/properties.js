@@ -1723,4 +1723,50 @@ router.get('/geocode/status', optionalAuth, async (req, res) => {
   }
 });
 
+// One-time sync: backfill Property.visited from RouteRecord data
+router.post('/sync-visits', optionalAuth, async (req, res) => {
+  try {
+    // Find all RouteRecords that are visited and linked to a property
+    const visitedRouteRecords = await prisma.routeRecord.findMany({
+      where: {
+        visited: true,
+        propertyId: { not: null },
+        visitedAt: { not: null },
+      },
+      select: {
+        propertyId: true,
+        visitedAt: true,
+        visitedBy: true,
+      },
+      orderBy: { visitedAt: 'desc' },
+    });
+
+    // Group by propertyId, keep the most recent visit
+    const latestByProperty = {};
+    for (const rr of visitedRouteRecords) {
+      if (!latestByProperty[rr.propertyId]) {
+        latestByProperty[rr.propertyId] = rr;
+      }
+    }
+
+    let updated = 0;
+    for (const [propertyId, record] of Object.entries(latestByProperty)) {
+      await prisma.property.update({
+        where: { id: propertyId },
+        data: {
+          visited: true,
+          visitedAt: record.visitedAt,
+          visitedBy: record.visitedBy,
+        },
+      });
+      updated++;
+    }
+
+    res.json({ success: true, synced: updated, message: `Synced ${updated} property visit records from routes` });
+  } catch (error) {
+    console.error('[PROPERTIES] Sync visits error:', error);
+    res.status(500).json({ error: 'Failed to sync visits', message: error.message });
+  }
+});
+
 module.exports = router;
