@@ -1168,8 +1168,8 @@ export function AreaSelectorMap({
                   <Polygon positions={[...drawnPolygon, drawnPolygon[0]]} pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.2, weight: 2 }} />
                 )}
 
-                {/* Display all properties as small dots on Step 1 */}
-                {step === 1 && properties.map((p) => {
+                {/* Display all properties as small dots on Step 1 (skip if >10k for performance) */}
+                {step === 1 && properties.length <= 10000 && properties.map((p) => {
                   if (!p.latitude || !p.longitude) return null;
                   const isVisited = p.visited === true;
                   const isInRoute = p.id ? unavailablePropertyIds.has(p.id) && !isVisited : false;
