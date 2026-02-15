@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Marker, Popup } from 'react-leaflet';
+import { Marker, Popup, Tooltip } from 'react-leaflet';
 import { cn } from '@/lib/utils';
 import { ZoneManager } from './ZoneManager';
 import { SavedZone, saveZone, getNextColor, loadZones } from '@/lib/zones';
@@ -1179,20 +1179,20 @@ export function AreaSelectorMap({
                     <CircleMarker
                       key={`prop-${p.id}`}
                       center={[p.latitude, p.longitude]}
-                      radius={10}
+                      radius={5}
                       pathOptions={{
                         color,
                         fillColor: color,
                         fillOpacity: 0.7,
-                        weight: 2,
+                        weight: 1,
                       }}
                     >
-                      <Popup>
-                        <div style={{ padding: '2px', fontSize: '12px' }}>
+                      <Tooltip direction="top" offset={[0, -5]}>
+                        <div style={{ fontSize: '12px' }}>
                           <strong>{p.propertyAddress || p.address || 'N/A'}</strong>
                           <div style={{ color }}>{label}</div>
                         </div>
-                      </Popup>
+                      </Tooltip>
                     </CircleMarker>
                   );
                 })}
