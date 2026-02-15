@@ -3073,7 +3073,9 @@ export function PropertiesView() {
           await handleCreateRouteWithDepot(depotProperty, startingPoint.pinLocation, propertiesToOptimize);
         }}
         properties={filteredProperties.filter(p => {
-          return p.latitude != null && p.longitude != null;
+          if (p.latitude == null || p.longitude == null) return false;
+          if (p.workflow_stage === 'dead_end') return false;
+          return true;
         }).map(p => ({
           id: p.id,
           latitude: p.latitude!,
