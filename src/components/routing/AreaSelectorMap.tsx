@@ -1179,12 +1179,12 @@ export function AreaSelectorMap({
                     <CircleMarker
                       key={`prop-${p.id}`}
                       center={[p.latitude, p.longitude]}
-                      radius={5}
+                      radius={10}
                       pathOptions={{
                         color,
                         fillColor: color,
                         fillOpacity: 0.7,
-                        weight: 1,
+                        weight: 2,
                       }}
                     >
                       <Popup>
