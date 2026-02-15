@@ -93,6 +93,7 @@
 @layer base {
   * {
     @apply border-border;
+    touch-action: manipulation;
   }
 
   html {
