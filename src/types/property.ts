@@ -369,6 +369,7 @@ export interface PreForeclosureRecord {
   visited?: boolean;
   visited_at?: string; // ISO date string
   visited_by?: 'Luciano' | 'Raul';
+  visit_count?: number; // Number of times visited
 
   // Address matching / returning records
   is_returning?: boolean;

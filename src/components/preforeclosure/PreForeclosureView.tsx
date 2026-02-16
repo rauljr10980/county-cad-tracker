@@ -78,6 +78,14 @@ import { UploadHistoryCard } from './UploadHistoryCard';
 import { FullDetailsModal } from './FullDetailsModal';
 
 
+// Helper: get ordinal visit label ("1st visit", "2nd visit", etc.)
+function getVisitLabel(visitCount: number): string {
+  const n = visitCount + 1; // next visit number
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]} visit`;
+}
+
 // Sortable Row Component
 function SortableRow({
   routeRecord,
@@ -156,6 +164,11 @@ function SortableRow({
               {[record.city, record.zip].filter(Boolean).join(', ')}
             </p>
           )}
+          {!routeRecord.isDepot && record.visit_count != null && record.visit_count > 0 && (
+            <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-500/10 text-blue-600 border border-blue-300">
+              {getVisitLabel(record.visit_count)}
+            </span>
+          )}
         </div>
 
         {/* Remove button */}
@@ -206,7 +219,7 @@ function SortableRow({
             {markingVisited === documentNumber ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
-              record.visited ? 'Visited' : 'Pending'
+              record.visited ? `Visited${record.visit_count && record.visit_count > 1 ? ` (${record.visit_count}x)` : ''}` : 'Pending'
             )}
           </Button>
 
@@ -618,11 +631,10 @@ export function PreForeclosureView() {
     radius?: number;
     polygon?: { lat: number; lng: number }[];
   }) => {
-    // Filter records within the selected area (exclude visited and in-progress)
+    // Filter records within the selected area (exclude in-progress, allow visited for re-visits)
     const recordsInArea = filteredRecords.filter(r => {
       if (!r || !r.document_number) return false;
       if (!r.latitude || !r.longitude) return false;
-      if (r.visited === true) return false; // Skip visited records
       if (recordsInRoutes && recordsInRoutes.has(r.document_number)) return false; // Skip records already in routes (in progress)
       
       // If polygon is provided, use point-in-polygon check
@@ -1406,7 +1418,6 @@ export function PreForeclosureView() {
       availableRecords = providedRecords.filter(r => {
         if (!r || !r.document_number) return false;
         if (r.latitude == null || r.longitude == null) return false;
-        if (r.visited === true) return false; // Exclude visited records
         if (recordsInRoutes && recordsInRoutes.has(r.document_number)) return false; // Exclude records already in routes (in progress)
         return true;
       });
@@ -1416,7 +1427,6 @@ export function PreForeclosureView() {
         if (!r || !r.document_number) return false;
         if (!selectedRecordIds.has(r.document_number)) return false;
         if (r.latitude == null || r.longitude == null) return false;
-        if (r.visited === true) return false; // Exclude visited records
         if (recordsInRoutes && recordsInRoutes.has(r.document_number)) return false; // Exclude records already in routes (in progress)
         return true;
       });
@@ -3164,7 +3174,6 @@ export function PreForeclosureView() {
         unavailablePropertyIds={new Set([
           ...depotRecordIds,
           ...recordsInRoutes,
-          ...records.filter(r => r.visited === true).map(r => r.document_number)
         ])}
         onOptimize={async ({ startingPoint, area, selectedProperties }) => {
           // Find the record that matches the starting point property
@@ -3274,7 +3283,9 @@ export function PreForeclosureView() {
           propertyAddress: r.address || '',
           address: r.address || '',
           ownerName: r.property_owner || '',
-          accountNumber: r.document_number
+          accountNumber: r.document_number,
+          visited: r.visited || false,
+          visit_count: r.visit_count || 0
         }))}
         numVehicles={numVehicles}
       />

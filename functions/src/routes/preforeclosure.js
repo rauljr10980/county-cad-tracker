@@ -69,6 +69,7 @@ router.get('/', optionalAuth, async (req, res) => {
       visited: record.visited,
       visited_at: record.visitedAt ? record.visitedAt.toISOString() : null,
       visited_by: record.visitedBy,
+      visit_count: record.visitCount || 0,
       workflow_stage: record.workflowStage || 'not_started',
       workflow_log: record.workflowLog || [],
       first_seen_month: record.firstSeenMonth,
@@ -1371,7 +1372,9 @@ router.put('/:documentNumber/visit', optionalAuth, async (req, res) => {
     const updateData = {
       visited: visitedStatus,
       visitedAt: visitedStatus ? new Date() : null,
-      visitedBy: visitedStatus ? (driver || record.assignedTo || null) : null
+      visitedBy: visitedStatus ? (driver || record.assignedTo || null) : null,
+      // Increment visitCount when marking as visited (visits are historical, don't decrement)
+      ...(visitedStatus ? { visitCount: { increment: 1 } } : {})
     };
 
     const updated = await prisma.preForeclosure.update({
@@ -1383,7 +1386,8 @@ router.put('/:documentNumber/visit', optionalAuth, async (req, res) => {
         address: true,
         visited: true,
         visitedAt: true,
-        visitedBy: true
+        visitedBy: true,
+        visitCount: true
       }
     });
 
@@ -1393,7 +1397,8 @@ router.put('/:documentNumber/visit', optionalAuth, async (req, res) => {
       address: updated.address,
       visited: updated.visited,
       visited_at: updated.visitedAt?.toISOString(),
-      visited_by: updated.visitedBy
+      visited_by: updated.visitedBy,
+      visit_count: updated.visitCount || 0
     });
   } catch (error) {
     console.error('[PRE-FORECLOSURE] Visit update error:', error);

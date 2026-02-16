@@ -19,7 +19,8 @@ function formatRouteRecord(routeRecord) {
       visited_at: routeRecord.preForeclosure.visitedAt ? routeRecord.preForeclosure.visitedAt.toISOString() : null,
       visited_by: routeRecord.preForeclosure.visitedBy || null,
       visitedAt: routeRecord.preForeclosure.visitedAt ? routeRecord.preForeclosure.visitedAt.toISOString() : null,
-      visitedBy: routeRecord.preForeclosure.visitedBy || null
+      visitedBy: routeRecord.preForeclosure.visitedBy || null,
+      visit_count: routeRecord.preForeclosure.visitCount || 0
     };
   } else if (routeRecord.property) {
     return {
@@ -66,6 +67,7 @@ router.get('/', optionalAuth, async (req, res) => {
                 visited: true,
                 visitedAt: true,
                 visitedBy: true,
+                visitCount: true,
               }
             },
             property: {
@@ -142,6 +144,7 @@ router.get('/active', optionalAuth, async (req, res) => {
                 visited: true,
                 visitedAt: true,
                 visitedBy: true,
+                visitCount: true,
               }
             },
             property: {
@@ -295,6 +298,7 @@ router.post('/', optionalAuth, async (req, res) => {
                 zip: true,
                 latitude: true,
                 longitude: true,
+                visitCount: true,
               }
             },
             property: {
@@ -445,6 +449,7 @@ router.delete('/:routeId/records/:recordId', optionalAuth, async (req, res) => {
                 visited: true,
                 visitedAt: true,
                 visitedBy: true,
+                visitCount: true,
               }
             },
             property: {
@@ -565,6 +570,7 @@ router.put('/:routeId/records/:recordId/reorder', optionalAuth, async (req, res)
                   visited: true,
                   visitedAt: true,
                   visitedBy: true,
+                  visitCount: true,
                 }
               },
               property: {
@@ -657,6 +663,7 @@ router.put('/:routeId/records/:recordId/reorder', optionalAuth, async (req, res)
                 visited: true,
                 visitedAt: true,
                 visitedBy: true,
+                visitCount: true,
               }
             },
             property: {

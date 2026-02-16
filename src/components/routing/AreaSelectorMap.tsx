@@ -1019,7 +1019,7 @@ export function AreaSelectorMap({
                       Available
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="inline-block w-3 h-3 rounded-full bg-[#F59E0B]" />
+                      <span className="inline-block w-3 h-3 rounded-full bg-[#3B82F6]" />
                       Visited
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -1172,9 +1172,10 @@ export function AreaSelectorMap({
                 {step === 1 && properties.length <= 10000 && properties.map((p) => {
                   if (!p.latitude || !p.longitude) return null;
                   const isVisited = p.visited === true;
-                  const isInRoute = p.id ? unavailablePropertyIds.has(p.id) && !isVisited : false;
-                  const color = isVisited ? '#F59E0B' : isInRoute ? '#EF4444' : '#10B981';
-                  const label = isVisited ? 'Visited' : isInRoute ? 'In Route' : 'Available';
+                  const visitCount = (p as any).visit_count || 0;
+                  const isInRoute = p.id ? unavailablePropertyIds.has(p.id) : false;
+                  const color = isInRoute ? '#EF4444' : isVisited ? '#3B82F6' : '#10B981';
+                  const label = isInRoute ? 'In Route' : isVisited ? `Visited (${visitCount}x)` : 'Available';
                   return (
                     <CircleMarker
                       key={`prop-${p.id}`}

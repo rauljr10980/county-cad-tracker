@@ -395,6 +395,7 @@ model PreForeclosure {
   visited          Boolean     @default(false) // Mark if property has been visited
   visitedAt        DateTime? // When the property was visited
   visitedBy        String? // Who visited (driver name)
+  visitCount       Int         @default(0) // Number of times visited
   firstSeenMonth   String
   lastSeenMonth    String
   workflowStage    String      @default("not_started")
