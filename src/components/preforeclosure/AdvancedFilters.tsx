@@ -22,6 +22,7 @@ export interface PreForeclosureAdvancedFilters {
   month: string;
   needsFollowUp: boolean;
   hasVisited: boolean;
+  notVisited: boolean;
   hasNotes: boolean;
   hasPhoneNumbers: boolean;
   hasTask: boolean;
@@ -249,10 +250,26 @@ export function AdvancedFiltersPanel({
               <Checkbox
                 id="hasVisited"
                 checked={filters.hasVisited}
-                onCheckedChange={(checked) => updateFilter('hasVisited', checked as boolean)}
+                onCheckedChange={(checked) => {
+                  updateFilter('hasVisited', checked as boolean);
+                  if (checked) updateFilter('notVisited', false);
+                }}
               />
               <Label htmlFor="hasVisited" className="cursor-pointer">
                 Has Been Visited
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="notVisited"
+                checked={filters.notVisited}
+                onCheckedChange={(checked) => {
+                  updateFilter('notVisited', checked as boolean);
+                  if (checked) updateFilter('hasVisited', false);
+                }}
+              />
+              <Label htmlFor="notVisited" className="cursor-pointer">
+                Not Visited
               </Label>
             </div>
           </div>

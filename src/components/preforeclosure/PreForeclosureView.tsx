@@ -250,6 +250,7 @@ export function PreForeclosureView() {
     month: 'all',
     needsFollowUp: false,
     hasVisited: false,
+    notVisited: false,
     hasNotes: false,
     hasPhoneNumbers: false,
     hasTask: false,
@@ -408,6 +409,11 @@ export function PreForeclosureView() {
       filtered = filtered.filter(r => r.visited === true);
     }
 
+    // Not visited filter
+    if (advancedFilters.notVisited) {
+      filtered = filtered.filter(r => !r.visited);
+    }
+
     // Has notes filter
     if (advancedFilters.hasNotes) {
       filtered = filtered.filter(r => r.notes && r.notes.trim().length > 0);
@@ -526,6 +532,7 @@ export function PreForeclosureView() {
     if (advancedFilters.month !== 'all') count++;
     if (advancedFilters.needsFollowUp) count++;
     if (advancedFilters.hasVisited) count++;
+    if (advancedFilters.notVisited) count++;
     if (advancedFilters.hasNotes) count++;
     if (advancedFilters.hasPhoneNumbers) count++;
     if (advancedFilters.hasTask) count++;
