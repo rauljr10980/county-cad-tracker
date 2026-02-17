@@ -251,8 +251,7 @@ export function AdvancedFiltersPanel({
                 id="hasVisited"
                 checked={filters.hasVisited}
                 onCheckedChange={(checked) => {
-                  updateFilter('hasVisited', checked as boolean);
-                  if (checked) updateFilter('notVisited', false);
+                  onFiltersChange({ ...filters, hasVisited: checked as boolean, notVisited: checked ? false : filters.notVisited });
                 }}
               />
               <Label htmlFor="hasVisited" className="cursor-pointer">
@@ -264,8 +263,7 @@ export function AdvancedFiltersPanel({
                 id="notVisited"
                 checked={filters.notVisited}
                 onCheckedChange={(checked) => {
-                  updateFilter('notVisited', checked as boolean);
-                  if (checked) updateFilter('hasVisited', false);
+                  onFiltersChange({ ...filters, notVisited: checked as boolean, hasVisited: checked ? false : filters.hasVisited });
                 }}
               />
               <Label htmlFor="notVisited" className="cursor-pointer">
