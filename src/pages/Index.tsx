@@ -7,6 +7,7 @@ import { TasksView } from '@/components/tasks/TasksView';
 import { UploadView } from '@/components/upload/UploadView';
 import { FileHistory } from '@/components/files/FileHistory';
 import { PreForeclosureView } from '@/components/preforeclosure/PreForeclosureView';
+import { DrivingView } from '@/components/driving/DrivingView';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { SignupModal } from '@/components/auth/SignupModal';
@@ -16,7 +17,7 @@ import { Button } from '@/components/ui/button';
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
   const hash = window.location.hash.slice(1); // Remove the #
-  const validTabs: TabType[] = ['dashboard', 'properties', 'tasks', 'upload', 'files', 'preforeclosure'];
+  const validTabs: TabType[] = ['dashboard', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'driving'];
   return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
 };
 
@@ -64,6 +65,8 @@ const Index = () => {
         return <FileHistory />;
       case 'preforeclosure':
         return <PreForeclosureView />;
+      case 'driving':
+        return <DrivingView />;
       default:
         return <Dashboard />;
     }

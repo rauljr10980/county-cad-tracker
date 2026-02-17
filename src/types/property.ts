@@ -390,3 +390,25 @@ export interface PreForeclosureRecord {
 // Type alias for backward compatibility
 export type PreForeclosure = PreForeclosureRecord;
 export type PreForeclosureInternalStatus = PreForeclosureStatus;
+
+// ============================================================================
+// DRIVING FOR DOLLARS
+// ============================================================================
+
+export type DrivingLeadStatus = 'NEW' | 'RESEARCHING' | 'CONTACTED' | 'UNDER_CONTRACT' | 'DEAD';
+
+export interface DrivingLead {
+  id: string;
+  rawAddress: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  latitude?: number;
+  longitude?: number;
+  notes?: string;
+  status: DrivingLeadStatus;
+  loggedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}

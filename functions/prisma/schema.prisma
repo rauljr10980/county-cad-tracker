@@ -620,3 +620,44 @@ enum ZoneType {
   CIRCLE
   POLYGON
 }
+
+// ============================================================================
+// DRIVING FOR DOLLARS (D4D) - LOGGED PROPERTIES
+// ============================================================================
+
+model DrivingLead {
+  id String @id @default(cuid())
+
+  // Address
+  rawAddress String // Exactly what the user typed
+  street     String
+  city       String @default("San Antonio")
+  state      String @default("TX")
+  zip        String @default("")
+
+  // Geocoded coordinates (filled async after creation)
+  latitude  Float?
+  longitude Float?
+
+  // User notes and status
+  notes  String?            @db.Text
+  status DrivingLeadStatus  @default(NEW)
+
+  // Who logged it
+  loggedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("driving_leads")
+}
+
+enum DrivingLeadStatus {
+  NEW
+  RESEARCHING
+  CONTACTED
+  UNDER_CONTRACT
+  DEAD
+}

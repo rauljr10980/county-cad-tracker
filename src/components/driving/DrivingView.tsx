@@ -1,0 +1,181 @@
+import { useState, useRef } from 'react';
+import { MapPin, Trash2, Loader2, StickyNote, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useDrivingLeads, useCreateDrivingLead, useUpdateDrivingLead, useDeleteDrivingLead } from '@/hooks/useDrivingLeads';
+import type { DrivingLeadStatus } from '@/types/property';
+import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
+
+const STATUS_CONFIG: Record<DrivingLeadStatus, { label: string; color: string }> = {
+  NEW: { label: 'New', color: 'bg-blue-500/10 text-blue-500 border-blue-500/30' },
+  RESEARCHING: { label: 'Researching', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30' },
+  CONTACTED: { label: 'Contacted', color: 'bg-purple-500/10 text-purple-500 border-purple-500/30' },
+  UNDER_CONTRACT: { label: 'Under Contract', color: 'bg-green-500/10 text-green-500 border-green-500/30' },
+  DEAD: { label: 'Dead', color: 'bg-gray-500/10 text-gray-400 border-gray-500/30' },
+};
+
+export function DrivingView() {
+  const [address, setAddress] = useState('');
+  const [notes, setNotes] = useState('');
+  const [showNotes, setShowNotes] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const { data: leads = [], isLoading } = useDrivingLeads();
+  const createMutation = useCreateDrivingLead();
+  const updateMutation = useUpdateDrivingLead();
+  const deleteMutation = useDeleteDrivingLead();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!address.trim()) return;
+
+    try {
+      await createMutation.mutateAsync({
+        address: address.trim(),
+        notes: notes.trim() || undefined,
+      });
+      setAddress('');
+      setNotes('');
+      setShowNotes(false);
+      inputRef.current?.focus();
+      toast({ title: 'Address logged!' });
+    } catch {
+      toast({ title: 'Failed to save', variant: 'destructive' });
+    }
+  };
+
+  const handleStatusChange = (id: string, status: DrivingLeadStatus) => {
+    updateMutation.mutate({ id, status });
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await deleteMutation.mutateAsync(id);
+      toast({ title: 'Lead deleted' });
+    } catch {
+      toast({ title: 'Failed to delete', variant: 'destructive' });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div className="p-2 md:p-4 space-y-4 max-w-2xl mx-auto">
+      {/* Quick-add form */}
+      <form onSubmit={handleSubmit} className="space-y-2 bg-card rounded-lg p-3 border">
+        <div className="flex gap-2">
+          <Input
+            ref={inputRef}
+            autoFocus
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="123 Main St, San Antonio, TX 78201"
+            className="flex-1 text-base"
+            disabled={createMutation.isPending}
+          />
+          <Button type="submit" disabled={!address.trim() || createMutation.isPending} size="icon" className="flex-shrink-0">
+            {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowNotes(!showNotes)}
+            className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
+          >
+            <StickyNote className="h-3 w-3" />
+            {showNotes ? 'Hide notes' : 'Add notes'}
+          </button>
+        </div>
+
+        {showNotes && (
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Boarded windows, overgrown yard, mail piling up..."
+            rows={2}
+            className="text-sm"
+          />
+        )}
+      </form>
+
+      {/* Count */}
+      <div className="text-sm text-muted-foreground">
+        {leads.length} address{leads.length !== 1 ? 'es' : ''} logged
+      </div>
+
+      {/* Lead list */}
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : leads.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p>No addresses logged yet.</p>
+          <p className="text-xs mt-1">Type an address above while driving around!</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {leads.map((lead) => (
+            <div key={lead.id} className={cn(
+              "bg-card rounded-lg border p-3 space-y-2",
+              lead.status === 'DEAD' && 'opacity-50'
+            )}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{lead.street}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {lead.city}, {lead.state} {lead.zip}
+                  </p>
+                  {lead.notes && (
+                    <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{lead.notes}</p>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0"
+                  onClick={() => handleDelete(lead.id)}
+                  disabled={deletingId === lead.id}
+                >
+                  {deletingId === lead.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Select
+                  value={lead.status}
+                  onValueChange={(v) => handleStatusChange(lead.id, v as DrivingLeadStatus)}
+                >
+                  <SelectTrigger className={cn("h-7 w-[150px] text-xs border", STATUS_CONFIG[lead.status].color)}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(STATUS_CONFIG) as [DrivingLeadStatus, { label: string }][]).map(([value, { label }]) => (
+                      <SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-[11px] text-muted-foreground">
+                  {formatDistanceToNow(new Date(lead.createdAt), { addSuffix: true })}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

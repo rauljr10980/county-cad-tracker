@@ -30,6 +30,7 @@ const foreclosureRoutes = require('./routes/foreclosure');
 const routingRoutes = require('./routes/routing');
 const routesRoutes = require('./routes/routes');
 const zonesRoutes = require('./routes/zones');
+const drivingRoutes = require('./routes/driving');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -162,6 +163,7 @@ app.use('/api/foreclosure', foreclosureRoutes);
 app.use('/api/routing', routingRoutes);
 app.use('/api/routes', routesRoutes);
 app.use('/api/zones', zonesRoutes);
+app.use('/api/driving', drivingRoutes);
 
 // ============================================================================
 // ERROR HANDLING

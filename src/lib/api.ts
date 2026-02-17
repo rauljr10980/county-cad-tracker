@@ -1435,3 +1435,52 @@ export async function scrapeBexarForeclosures(options: {
 
   return response.json();
 }
+
+// ============================================================================
+// DRIVING FOR DOLLARS
+// ============================================================================
+
+export async function getDrivingLeads() {
+  const response = await fetch(`${API_BASE_URL}/api/driving`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch driving leads');
+  }
+  return response.json();
+}
+
+export async function createDrivingLead(data: { address: string; notes?: string; loggedBy?: string }) {
+  const response = await fetch(`${API_BASE_URL}/api/driving`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create driving lead');
+  }
+  return response.json();
+}
+
+export async function updateDrivingLead(id: string, data: { status?: string; notes?: string }) {
+  const response = await fetch(`${API_BASE_URL}/api/driving/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update driving lead');
+  }
+  return response.json();
+}
+
+export async function deleteDrivingLead(id: string) {
+  const response = await fetch(`${API_BASE_URL}/api/driving/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete driving lead');
+  }
+}
