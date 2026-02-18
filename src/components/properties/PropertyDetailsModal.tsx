@@ -405,9 +405,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 size="sm"
                 className="flex-1"
                 onClick={() => {
-                  window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
+                  window.open(property.link || 'https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
                 }}
-                title="Tax Assessor"
+                title={property.link ? "View on CAD" : "Tax Assessor"}
               >
                 <ExternalLink className="h-4 w-4" />
               </Button>
