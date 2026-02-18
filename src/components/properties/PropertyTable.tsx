@@ -381,10 +381,7 @@ export function PropertyTable({
                     </div>
                   </td>
                   <td className="max-w-[250px] truncate text-muted-foreground">
-                    {(() => {
-                      const parsed = parsePropertyAddress(property.propertyAddress);
-                      return parsed.address || property.propertyAddress || '';
-                    })()}
+                    {property.ownerName || ''}
                   </td>
                   <td className="text-right font-mono">
                     {formatCurrency(property.totalAmountDue)}

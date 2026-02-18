@@ -502,13 +502,27 @@ function extractProperties(data) {
     if (!finalPropertyAddress) {
       for (const header of headers) {
         const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-        if (normalizedHeader === 'ADDRSTRING' || normalizedHeader.includes('ADDRSTRING') || 
+        if (normalizedHeader === 'ADDRSTRING' || normalizedHeader.includes('ADDRSTRING') ||
             normalizedHeader.includes('ADDRESS')) {
           finalPropertyAddress = (row[header] || '').toString().trim();
           break;
         }
       }
     }
+
+    // Find property situs address from PNUMBER + PSTRNAME columns
+    // These are the actual property street number and name (subject site)
+    let pNumber = '';
+    let pStrName = '';
+    for (const header of headers) {
+      const normalizedHeader = header.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (normalizedHeader === 'PNUMBER') {
+        pNumber = (row[header] || '').toString().trim();
+      } else if (normalizedHeader === 'PSTRNAME') {
+        pStrName = (row[header] || '').toString().trim();
+      }
+    }
+    const situsAddress = [pNumber, pStrName].filter(Boolean).join(' ').trim();
 
     // Find status (LEGALSTATUS) - check multiple variations
     let finalStatus = '';
@@ -614,7 +628,7 @@ function extractProperties(data) {
     // Build property object with all NEW- columns
     const property = {
       accountNumber: finalAccountNumber,
-      ownerName: getValue('ownerName') || getNewColumnValue('Owner Name') || 'Unknown',
+      ownerName: situsAddress || getValue('ownerName') || getNewColumnValue('Owner Name') || 'Unknown',
       propertyAddress: finalPropertyAddress || getValue('propertyAddress') || getNewColumnValue('Property Site Address') || 'Unknown',
       mailingAddress: getValue('mailingAddress') || getNewColumnValue('Owner Address') || null,
       status: statusValue,
