@@ -1779,7 +1779,7 @@ router.post('/sync-visits', optionalAuth, async (req, res) => {
 // Backfill ownerName with situs address (PNUMBER + PSTRNAME) from Excel
 router.post('/backfill-situs', optionalAuth, async (req, res) => {
   try {
-    const { updates } = req.body; // Array of { accountNumber, ownerName }
+    const { updates } = req.body; // Array of { accountNumber, ownerName, propertyAddress? }
     if (!Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({ error: 'updates array required' });
     }
@@ -1792,14 +1792,17 @@ router.post('/backfill-situs', optionalAuth, async (req, res) => {
     for (let i = 0; i < updates.length; i += BATCH_SIZE) {
       const batch = updates.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
-        batch.map(item =>
-          prisma.property.updateMany({
-            where: { accountNumber: String(item.accountNumber) },
-            data: { ownerName: item.ownerName }
-          })
-        )
+        batch.map(item => {
+          const data = {};
+          if (item.ownerName) data.ownerName = item.ownerName;
+          if (item.propertyAddress) data.propertyAddress = item.propertyAddress;
+          const where = item.id ? { id: item.id } : { accountNumber: String(item.accountNumber) };
+          return item.id
+            ? prisma.property.update({ where, data })
+            : prisma.property.updateMany({ where, data });
+        })
       );
-      updated += results.filter(r => r.status === 'fulfilled' && r.value.count > 0).length;
+      updated += results.filter(r => r.status === 'fulfilled' && (r.value.count > 0 || r.value.id)).length;
       console.log(`[BACKFILL] Processed ${Math.min(i + BATCH_SIZE, updates.length)} / ${updates.length}`);
     }
 
