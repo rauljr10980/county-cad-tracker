@@ -446,7 +446,17 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 <p className="font-medium">{parsedAddress || property.propertyAddress}</p>
               </div>
             </div>
-            
+
+            {property.ownerName && (
+              <div className="flex items-start gap-3">
+                <Building className="h-4 w-4 text-primary mt-1 shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Property Address</p>
+                  <p className="font-medium">{property.ownerName}</p>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-start gap-3">
               <FileText className="h-4 w-4 text-primary mt-1 shrink-0" />
               <div>

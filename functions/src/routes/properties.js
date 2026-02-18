@@ -1769,4 +1769,38 @@ router.post('/sync-visits', optionalAuth, async (req, res) => {
   }
 });
 
+// Backfill ownerName with situs address (PNUMBER + PSTRNAME) from Excel
+router.post('/backfill-situs', optionalAuth, async (req, res) => {
+  try {
+    const { updates } = req.body; // Array of { accountNumber, ownerName }
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: 'updates array required' });
+    }
+
+    console.log(`[BACKFILL] Received ${updates.length} situs updates`);
+
+    let updated = 0;
+    const BATCH_SIZE = 500;
+
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const batch = updates.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(item =>
+          prisma.property.updateMany({
+            where: { accountNumber: String(item.accountNumber) },
+            data: { ownerName: item.ownerName }
+          })
+        )
+      );
+      updated += results.filter(r => r.status === 'fulfilled' && r.value.count > 0).length;
+      console.log(`[BACKFILL] Processed ${Math.min(i + BATCH_SIZE, updates.length)} / ${updates.length}`);
+    }
+
+    res.json({ success: true, updated, total: updates.length });
+  } catch (error) {
+    console.error('[BACKFILL] Error:', error);
+    res.status(500).json({ error: 'Backfill failed', message: error.message });
+  }
+});
+
 module.exports = router;
