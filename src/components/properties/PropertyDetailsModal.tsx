@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyVisited, getPreForeclosures } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -435,6 +435,38 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 <Building className="h-4 w-4" />
               </Button>
             </div>}
+          </div>
+
+          {/* Primary / 2nd Property Toggle */}
+          <div className="flex gap-2">
+            <Button
+              variant={property.isPrimaryProperty !== false ? "default" : "outline"}
+              size="sm"
+              className="flex-1 text-xs"
+              onClick={async () => {
+                try {
+                  await updatePropertyPrimaryOverride(property.id, true);
+                  queryClient.invalidateQueries({ queryKey: ['properties'] });
+                  toast({ title: 'Marked as Primary Property' });
+                } catch { toast({ title: 'Error', variant: 'destructive' }); }
+              }}
+            >
+              Primary
+            </Button>
+            <Button
+              variant={property.isPrimaryProperty === false ? "default" : "outline"}
+              size="sm"
+              className="flex-1 text-xs bg-orange-500/20 text-orange-500 border-orange-500/30 hover:bg-orange-500/30"
+              onClick={async () => {
+                try {
+                  await updatePropertyPrimaryOverride(property.id, false);
+                  queryClient.invalidateQueries({ queryKey: ['properties'] });
+                  toast({ title: 'Marked as 2nd Property' });
+                } catch { toast({ title: 'Error', variant: 'destructive' }); }
+              }}
+            >
+              2nd Property
+            </Button>
           </div>
 
           {/* Property Info */}

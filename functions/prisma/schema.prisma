@@ -103,6 +103,9 @@ model Property {
   workflowStage String @default("not_started")
   workflowLog   Json   @default("[]")
 
+  // Primary/2nd property override (null = auto-detect, true = primary, false = 2nd)
+  isPrimaryOverride Boolean?
+
   // Metadata
   isNew             Boolean @default(false)
   isRemoved         Boolean @default(false)
@@ -649,9 +652,26 @@ model DrivingLead {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relations
+  photos DrivingPhoto[]
+
   @@index([status])
   @@index([createdAt])
   @@map("driving_leads")
+}
+
+model DrivingPhoto {
+  id         String @id @default(cuid())
+  data       String @db.Text // base64-encoded JPEG
+  orderIndex Int    @default(0)
+
+  leadId String
+  lead   DrivingLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@map("driving_photos")
 }
 
 enum DrivingLeadStatus {

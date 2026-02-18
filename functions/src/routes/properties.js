@@ -160,7 +160,11 @@ router.get('/',
         // Compare street names without suffixes (DR vs LN vs ST etc.)
         const ownerStripped = stripSuffix(ownerUpper);
         const addressStripped = stripSuffix(addressUpper);
-        const isPrimaryProperty = !!(ownerStripped && addressStripped && addressStripped.includes(ownerStripped));
+        const autoDetected = !!(ownerStripped && addressStripped && addressStripped.includes(ownerStripped));
+        // Manual override takes precedence over auto-detection
+        const isPrimaryProperty = prop.isPrimaryOverride !== null && prop.isPrimaryOverride !== undefined
+          ? prop.isPrimaryOverride
+          : autoDetected;
         return {
           ...prop,
           totalAmountDue: prop.totalDue || 0,
@@ -1465,6 +1469,25 @@ router.put('/:id/visited', optionalAuth, async (req, res) => {
       error: 'Failed to update visited status', 
       message: error.message 
     });
+  }
+});
+
+// Toggle primary/2nd property override
+router.put('/:id/primary-override', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isPrimary } = req.body; // true = primary, false = 2nd, null = auto-detect
+
+    const property = await prisma.property.update({
+      where: { id },
+      data: { isPrimaryOverride: isPrimary === null ? null : !!isPrimary },
+      select: { id: true, isPrimaryOverride: true }
+    });
+
+    res.json({ success: true, property });
+  } catch (error) {
+    console.error('[PROPERTIES] Update primary override error:', error);
+    res.status(500).json({ error: 'Failed to update', message: error.message });
   }
 });
 

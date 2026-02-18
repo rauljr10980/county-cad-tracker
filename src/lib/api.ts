@@ -564,6 +564,25 @@ export async function updatePropertyWorkflowStage(
   return response.json();
 }
 
+export async function updatePropertyPrimaryOverride(
+  propertyId: string,
+  isPrimary: boolean | null
+) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/primary-override`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ isPrimary }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || 'Failed to update primary property status');
+  }
+  return response.json();
+}
+
 export async function updatePropertyVisited(
   propertyId: string,
   visited: boolean,
@@ -1483,4 +1502,34 @@ export async function deleteDrivingLead(id: string) {
   if (!response.ok) {
     throw new Error('Failed to delete driving lead');
   }
+}
+
+export async function getDrivingPhotos(leadId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/driving/${leadId}/photos`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch photos');
+  return response.json();
+}
+
+export async function uploadDrivingPhotos(leadId: string, photos: Array<{ data: string }>) {
+  const response = await fetch(`${API_BASE_URL}/api/driving/${leadId}/photos`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ photos }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to upload photos');
+  }
+  return response.json();
+}
+
+export async function deleteDrivingPhoto(leadId: string, photoId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/driving/${leadId}/photos/${photoId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to delete photo');
+  return response.json();
 }
