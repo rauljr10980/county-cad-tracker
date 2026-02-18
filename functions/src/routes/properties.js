@@ -150,10 +150,17 @@ router.get('/',
       // Map totalDue (database) to totalAmountDue (frontend)
       // Map percentageDue (database) to totalPercentage (frontend)
       // Map dealStage from uppercase (NEW_LEAD) to lowercase (new_lead) for frontend
+      // Strip street suffixes for fuzzy address matching
+      const STREET_SUFFIXES = /\b(ST|DR|LN|AVE|BLVD|CT|CIR|PL|WAY|RD|TRL|PKWY|HWY|LOOP|COVE|RUN|PASS|PATH|WALK|XING|CV|TER|SQ)\b/g;
+      const stripSuffix = (s) => s.replace(STREET_SUFFIXES, '').replace(/\s+/g, ' ').trim();
+
       const mappedProperties = properties.map(prop => {
         const ownerUpper = (prop.ownerName || '').toUpperCase().trim();
         const addressUpper = (prop.propertyAddress || '').toUpperCase().trim();
-        const isPrimaryProperty = !!(ownerUpper && addressUpper && addressUpper.includes(ownerUpper));
+        // Compare street names without suffixes (DR vs LN vs ST etc.)
+        const ownerStripped = stripSuffix(ownerUpper);
+        const addressStripped = stripSuffix(addressUpper);
+        const isPrimaryProperty = !!(ownerStripped && addressStripped && addressStripped.includes(ownerStripped));
         return {
           ...prop,
           totalAmountDue: prop.totalDue || 0,
