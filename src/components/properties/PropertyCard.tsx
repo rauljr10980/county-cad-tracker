@@ -98,7 +98,17 @@ export function PropertyCard({
                 </span>
               )}
             </div>
-            <h3 className="font-semibold text-sm truncate">{property.ownerName}</h3>
+            <h3 className="font-semibold text-sm truncate">
+              {(() => {
+                const name = property.ownerName || '';
+                if (/^\d/.test(name)) return name;
+                const addrMatch = (property.propertyAddress || '').match(/\b(\d+)\s/);
+                if (addrMatch && name && (property.propertyAddress || '').toUpperCase().includes(name.toUpperCase())) {
+                  return `${addrMatch[1]} ${name}`;
+                }
+                return name;
+              })()}
+            </h3>
             <p className="text-xs text-muted-foreground truncate">{property.accountNumber}</p>
           </div>
         </div>

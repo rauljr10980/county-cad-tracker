@@ -442,7 +442,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             <div className="flex items-start gap-3">
               <MapPin className="h-4 w-4 text-primary mt-1 shrink-0" />
               <div>
-                <p className="text-xs text-muted-foreground">Property Address</p>
+                <p className="text-xs text-muted-foreground">Primary Address</p>
                 <p className="font-medium">{parsedAddress || property.propertyAddress}</p>
               </div>
             </div>

@@ -381,7 +381,18 @@ export function PropertyTable({
                     </div>
                   </td>
                   <td className="max-w-[250px] truncate text-muted-foreground">
-                    {property.ownerName || ''}
+                    {(() => {
+                      const name = property.ownerName || '';
+                      if (/^\d/.test(name)) return name;
+                      const parsed = parsePropertyAddress(property.propertyAddress);
+                      if (parsed.address) {
+                        const match = parsed.address.match(/^(\d+)\s/);
+                        if (match && name && parsed.address.toUpperCase().includes(name.toUpperCase())) {
+                          return `${match[1]} ${name}`;
+                        }
+                      }
+                      return name;
+                    })()}
                   </td>
                   <td className="text-right font-mono">
                     {formatCurrency(property.totalAmountDue)}
