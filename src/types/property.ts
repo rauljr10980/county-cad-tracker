@@ -409,6 +409,15 @@ export interface DrivingLead {
   notes?: string;
   status: DrivingLeadStatus;
   loggedBy?: string;
+  photoCount?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DrivingPhoto {
+  id: string;
+  data: string;
+  orderIndex: number;
+  leadId: string;
+  createdAt: string;
 }

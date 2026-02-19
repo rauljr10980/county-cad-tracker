@@ -1,14 +1,16 @@
 import { useState, useRef } from 'react';
-import { MapPin, Trash2, Loader2, StickyNote, Plus } from 'lucide-react';
+import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useDrivingLeads, useCreateDrivingLead, useUpdateDrivingLead, useDeleteDrivingLead } from '@/hooks/useDrivingLeads';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useDrivingLeads, useCreateDrivingLead, useUpdateDrivingLead, useDeleteDrivingLead, useUploadDrivingPhotos, useDrivingPhotos, useDeleteDrivingPhoto } from '@/hooks/useDrivingLeads';
 import type { DrivingLeadStatus } from '@/types/property';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { compressImage } from '@/lib/imageCompress';
 
 const STATUS_CONFIG: Record<DrivingLeadStatus, { label: string; color: string }> = {
   NEW: { label: 'New', color: 'bg-blue-500/10 text-blue-500 border-blue-500/30' },
@@ -18,17 +20,89 @@ const STATUS_CONFIG: Record<DrivingLeadStatus, { label: string; color: string }>
   DEAD: { label: 'Dead', color: 'bg-gray-500/10 text-gray-400 border-gray-500/30' },
 };
 
+function PhotoGallery({ leadId }: { leadId: string }) {
+  const { data: photos = [], isLoading } = useDrivingPhotos(leadId);
+  const deleteMutation = useDeleteDrivingPhoto();
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (photos.length === 0) {
+    return <p className="text-sm text-muted-foreground text-center py-4">No photos yet.</p>;
+  }
+
+  return (
+    <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+      {photos.map((photo) => (
+        <div key={photo.id} className="relative">
+          <img
+            src={`data:image/jpeg;base64,${photo.data}`}
+            alt="Property"
+            className="w-full rounded-lg"
+          />
+          <Button
+            variant="destructive"
+            size="icon"
+            className="absolute top-2 right-2 h-7 w-7"
+            onClick={() => deleteMutation.mutate({ leadId, photoId: photo.id })}
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <X className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PhotoThumbnails({ leadId, onViewAll }: { leadId: string; onViewAll: () => void }) {
+  const { data: photos = [] } = useDrivingPhotos(leadId);
+
+  if (photos.length === 0) return null;
+
+  return (
+    <div className="flex gap-1.5 mt-2 cursor-pointer" onClick={onViewAll}>
+      {photos.slice(0, 3).map((photo) => (
+        <img
+          key={photo.id}
+          src={`data:image/jpeg;base64,${photo.data}`}
+          alt="Property"
+          className="h-12 w-12 rounded object-cover border"
+        />
+      ))}
+      {photos.length > 3 && (
+        <div className="h-12 w-12 rounded border bg-muted flex items-center justify-center text-xs text-muted-foreground">
+          +{photos.length - 3}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DrivingView() {
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [viewingPhotosLeadId, setViewingPhotosLeadId] = useState<string | null>(null);
+  const [uploadingLeadId, setUploadingLeadId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { data: leads = [], isLoading } = useDrivingLeads();
   const createMutation = useCreateDrivingLead();
   const updateMutation = useUpdateDrivingLead();
   const deleteMutation = useDeleteDrivingLead();
+  const uploadPhotosMutation = useUploadDrivingPhotos();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +137,27 @@ export function DrivingView() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handlePhotoCapture = async (leadId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setUploadingLeadId(leadId);
+    try {
+      const compressed = await Promise.all(
+        files.slice(0, 5).map(async (file) => ({
+          data: await compressImage(file),
+        }))
+      );
+      await uploadPhotosMutation.mutateAsync({ leadId, photos: compressed });
+      toast({ title: `${compressed.length} photo${compressed.length > 1 ? 's' : ''} uploaded!` });
+    } catch {
+      toast({ title: 'Failed to upload photo', variant: 'destructive' });
+    } finally {
+      setUploadingLeadId(null);
+    }
+    e.target.value = '';
   };
 
   return (
@@ -139,20 +234,57 @@ export function DrivingView() {
                     <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{lead.notes}</p>
                   )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0"
-                  onClick={() => handleDelete(lead.id)}
-                  disabled={deletingId === lead.id}
-                >
-                  {deletingId === lead.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-3.5 w-3.5" />
-                  )}
-                </Button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* Camera button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-primary relative"
+                    onClick={() => fileInputRefs.current[lead.id]?.click()}
+                    disabled={uploadingLeadId === lead.id}
+                  >
+                    {uploadingLeadId === lead.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <>
+                        <Camera className="h-3.5 w-3.5" />
+                        {(lead.photoCount ?? 0) > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[9px] rounded-full h-3.5 min-w-[14px] flex items-center justify-center px-0.5 leading-none">
+                            {lead.photoCount}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </Button>
+                  <input
+                    ref={(el) => { fileInputRefs.current[lead.id] = el; }}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => handlePhotoCapture(lead.id, e)}
+                  />
+                  {/* Delete button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(lead.id)}
+                    disabled={deletingId === lead.id}
+                  >
+                    {deletingId === lead.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
               </div>
+
+              {/* Photo thumbnails */}
+              {(lead.photoCount ?? 0) > 0 && (
+                <PhotoThumbnails leadId={lead.id} onViewAll={() => setViewingPhotosLeadId(lead.id)} />
+              )}
 
               <div className="flex items-center justify-between">
                 <Select
@@ -176,6 +308,16 @@ export function DrivingView() {
           ))}
         </div>
       )}
+
+      {/* Photo Gallery Dialog */}
+      <Dialog open={!!viewingPhotosLeadId} onOpenChange={() => setViewingPhotosLeadId(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Photos</DialogTitle>
+          </DialogHeader>
+          {viewingPhotosLeadId && <PhotoGallery leadId={viewingPhotosLeadId} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

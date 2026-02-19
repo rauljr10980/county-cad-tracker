@@ -71,13 +71,17 @@ async function geocodeLead(leadId, parsed) {
   }
 }
 
-// GET /api/driving - List all driving leads
+// GET /api/driving - List all driving leads (with photo count)
 router.get('/', optionalAuth, async (req, res) => {
   try {
     const leads = await prisma.drivingLead.findMany({
       orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { photos: true } } },
     });
-    res.json(leads);
+    res.json(leads.map(({ _count, ...lead }) => ({
+      ...lead,
+      photoCount: _count.photos,
+    })));
   } catch (error) {
     console.error('[D4D] Fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch driving leads' });
@@ -162,6 +166,90 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('[D4D] Delete error:', error);
     res.status(500).json({ error: 'Failed to delete driving lead' });
+  }
+});
+
+// ============================================================================
+// DRIVING PHOTOS
+// ============================================================================
+
+// GET /api/driving/:id/photos - Get photos for a lead
+router.get('/:id/photos', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const photos = await prisma.drivingPhoto.findMany({
+      where: { leadId: id },
+      orderBy: { orderIndex: 'asc' },
+    });
+    res.json(photos);
+  } catch (error) {
+    console.error('[D4D] Fetch photos error:', error);
+    res.status(500).json({ error: 'Failed to fetch photos' });
+  }
+});
+
+// POST /api/driving/:id/photos - Upload photos for a lead (max 5 total)
+router.post('/:id/photos', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { photos } = req.body; // Array of { data: string (base64) }
+
+    if (!Array.isArray(photos) || photos.length === 0) {
+      return res.status(400).json({ error: 'No photos provided' });
+    }
+
+    const lead = await prisma.drivingLead.findUnique({ where: { id } });
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    const existingCount = await prisma.drivingPhoto.count({ where: { leadId: id } });
+    const allowed = 5 - existingCount;
+    if (allowed <= 0) {
+      return res.status(400).json({ error: 'Maximum 5 photos per lead' });
+    }
+
+    const toInsert = photos.slice(0, allowed);
+    const created = await prisma.$transaction(
+      toInsert.map((p, i) =>
+        prisma.drivingPhoto.create({
+          data: {
+            leadId: id,
+            data: p.data,
+            orderIndex: existingCount + i,
+          },
+        })
+      )
+    );
+
+    res.status(201).json(created.map(p => ({
+      id: p.id,
+      orderIndex: p.orderIndex,
+      createdAt: p.createdAt,
+    })));
+  } catch (error) {
+    console.error('[D4D] Upload photos error:', error);
+    res.status(500).json({ error: 'Failed to upload photos' });
+  }
+});
+
+// DELETE /api/driving/:id/photos/:photoId - Delete a photo
+router.delete('/:id/photos/:photoId', authenticateToken, async (req, res) => {
+  try {
+    const { id, photoId } = req.params;
+
+    const photo = await prisma.drivingPhoto.findFirst({
+      where: { id: photoId, leadId: id },
+    });
+    if (!photo) {
+      return res.status(404).json({ error: 'Photo not found' });
+    }
+
+    await prisma.drivingPhoto.delete({ where: { id: photoId } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[D4D] Delete photo error:', error);
+    res.status(500).json({ error: 'Failed to delete photo' });
   }
 });
 
