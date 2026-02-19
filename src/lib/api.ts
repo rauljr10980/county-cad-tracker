@@ -1219,7 +1219,8 @@ export async function createRoute(
   driver: 'Luciano' | 'Raul',
   routeData: any,
   recordIds: string[],
-  routeType: 'PROPERTY' | 'PREFORECLOSURE' = 'PREFORECLOSURE'
+  routeType: 'PROPERTY' | 'PREFORECLOSURE' = 'PREFORECLOSURE',
+  name?: string
 ): Promise<{ id: string; driver: string; status: string; createdAt: string; recordCount: number }> {
   const response = await fetch(`${API_BASE_URL}/api/routes`, {
     method: 'POST',
@@ -1227,7 +1228,7 @@ export async function createRoute(
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
-    body: JSON.stringify({ driver, routeData, recordIds, routeType }),
+    body: JSON.stringify({ driver, routeData, recordIds, routeType, name }),
   });
 
   if (!response.ok) {

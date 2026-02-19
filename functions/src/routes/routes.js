@@ -200,7 +200,7 @@ router.get('/active', optionalAuth, async (req, res) => {
 // POST /api/routes - Create a new route
 router.post('/', optionalAuth, async (req, res) => {
   try {
-    const { driver, routeData, recordIds, routeType = 'PREFORECLOSURE' } = req.body;
+    const { driver, routeData, recordIds, routeType = 'PREFORECLOSURE', name } = req.body;
 
     if (!driver || !routeData || !recordIds || !Array.isArray(recordIds)) {
       return res.status(400).json({ error: 'driver, routeData, and recordIds array are required' });
@@ -278,6 +278,7 @@ router.post('/', optionalAuth, async (req, res) => {
     // Create route with records
     const route = await prisma.route.create({
       data: {
+        name: name || null,
         driver,
         status: 'ACTIVE',
         routeType,

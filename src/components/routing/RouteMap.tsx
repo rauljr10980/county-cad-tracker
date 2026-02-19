@@ -48,6 +48,7 @@ interface RouteMapProps {
   recordIds?: string[]; // Optional: pre-foreclosure record IDs for route tracking
   onRouteSaved?: () => void; // Optional: callback when route is saved
   routeType?: 'PROPERTY' | 'PREFORECLOSURE'; // Type of records in the route
+  routeName?: string; // Optional route name (e.g., "2nd Visit")
   compact?: boolean; // Whether to render in compact mode (no save button)
 }
 
@@ -73,7 +74,7 @@ function MapBoundsFitter({ waypoints }: { waypoints: Waypoint[] }) {
   return null;
 }
 
-export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose, recordIds, onRouteSaved, routeType = 'PREFORECLOSURE', compact = false }: RouteMapProps) {
+export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose, recordIds, onRouteSaved, routeType = 'PREFORECLOSURE', routeName, compact = false }: RouteMapProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allWaypoints, setAllWaypoints] = useState<Waypoint[]>([]);
@@ -168,7 +169,7 @@ export function RouteMap({ routes, numVehicles, totalDistance, isOpen, onClose, 
         numVehicles: numVehicles,
       };
 
-      await createRoute(selectedDriver, routeData, recordIds, routeType);
+      await createRoute(selectedDriver, routeData, recordIds, routeType, routeName);
       
       toast({
         title: "Route Saved",

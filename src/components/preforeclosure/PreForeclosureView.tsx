@@ -642,8 +642,8 @@ export function PreForeclosureView() {
     const recordsInArea = filteredRecords.filter(r => {
       if (!r || !r.document_number) return false;
       if (!r.latitude || !r.longitude) return false;
-      if (recordsInRoutes && recordsInRoutes.has(r.document_number)) return false; // Skip records already in routes (in progress)
-      
+      if (recordsInRoutes && recordsInRoutes.has(r.document_number) && !r.visited) return false; // Skip non-visited records already in routes
+
       // If polygon is provided, use point-in-polygon check
       if (bounds.polygon && bounds.polygon.length >= 3) {
         return isPointInPolygon({ lat: r.latitude, lng: r.longitude }, bounds.polygon);
@@ -1425,7 +1425,7 @@ export function PreForeclosureView() {
       availableRecords = providedRecords.filter(r => {
         if (!r || !r.document_number) return false;
         if (r.latitude == null || r.longitude == null) return false;
-        if (recordsInRoutes && recordsInRoutes.has(r.document_number)) return false; // Exclude records already in routes (in progress)
+        if (recordsInRoutes && recordsInRoutes.has(r.document_number) && !r.visited) return false; // Allow visited records for re-visits
         return true;
       });
     } else {
@@ -1434,7 +1434,7 @@ export function PreForeclosureView() {
         if (!r || !r.document_number) return false;
         if (!selectedRecordIds.has(r.document_number)) return false;
         if (r.latitude == null || r.longitude == null) return false;
-        if (recordsInRoutes && recordsInRoutes.has(r.document_number)) return false; // Exclude records already in routes (in progress)
+        if (recordsInRoutes && recordsInRoutes.has(r.document_number) && !r.visited) return false; // Allow visited records for re-visits
         return true;
       });
       
@@ -3165,6 +3165,7 @@ export function PreForeclosureView() {
             setOptimizedRecordIds([]);
           }}
           recordIds={optimizedRecordIds}
+          routeName={optimizedRecordIds.some(id => records.find(r => r.document_number === id)?.visited) ? '2nd Visit' : undefined}
           onRouteSaved={async () => {
             // Reload active routes after route is saved
             await loadActiveRoutes();
@@ -3178,10 +3179,16 @@ export function PreForeclosureView() {
       <AreaSelectorMap
         isOpen={areaSelectorOpen}
         onClose={() => setAreaSelectorOpen(false)}
-        unavailablePropertyIds={new Set([
-          ...depotRecordIds,
-          ...recordsInRoutes,
-        ])}
+        unavailablePropertyIds={(() => {
+          // Allow visited records to be re-added to routes for 2nd visits
+          const visitedIds = new Set(records.filter(r => r.visited).map(r => r.document_number));
+          const blocked = new Set<string>();
+          depotRecordIds.forEach(id => blocked.add(id));
+          recordsInRoutes.forEach(id => {
+            if (!visitedIds.has(id)) blocked.add(id);
+          });
+          return blocked;
+        })()}
         onOptimize={async ({ startingPoint, area, selectedProperties }) => {
           // Find the record that matches the starting point property
           const depotRecord = filteredRecords.find(r => r.document_number === startingPoint.property.id) ||
@@ -3280,10 +3287,7 @@ export function PreForeclosureView() {
           // Create route with depot, passing the limited records from area selector
           await handleCreateRouteWithDepot(depotRecord, startingPoint.pinLocation, selectedRecords);
         }}
-        properties={(selectedRecordIds.size > 0
-          ? filteredRecords.filter(r => selectedRecordIds.has(r.document_number))
-          : filteredRecords
-        ).filter(r => r.latitude != null && r.longitude != null && r.workflow_stage !== 'dead_end').map(r => ({
+        properties={filteredRecords.filter(r => r.latitude != null && r.longitude != null && r.workflow_stage !== 'dead_end').map(r => ({
           id: r.document_number,
           latitude: r.latitude!,
           longitude: r.longitude!,

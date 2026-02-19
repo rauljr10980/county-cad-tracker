@@ -513,8 +513,9 @@ model Route {
   id String @id @default(cuid())
 
   // Route Details
-  driver String // "Luciano" or "Raul"
-  status RouteStatus @default(ACTIVE)
+  name      String? // Optional route name (e.g., "2nd Visit")
+  driver    String // "Luciano" or "Raul"
+  status    RouteStatus @default(ACTIVE)
   routeType RouteType @default(PREFORECLOSURE) // Type of records in this route
 
   // Route Data (stored as JSON)
