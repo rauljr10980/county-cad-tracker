@@ -3,15 +3,18 @@ import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
   format, isSameMonth, isSameDay, isToday, addMonths, subMonths, isPast,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, CalendarDays, Check, Trash2, Loader2, Undo2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, Check, Trash2, Loader2, Undo2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useFollowUps, useUpdateFollowUp, useDeleteFollowUp } from '@/hooks/useFollowUps';
 import { WORKFLOW_STAGES } from '@/types/property';
-import type { FollowUp, WorkflowStage } from '@/types/property';
+import type { FollowUp, WorkflowStage, Property, PreForeclosureRecord } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { getProperties, getPreForeclosures } from '@/lib/api';
+import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
+import { FullDetailsModal } from '@/components/preforeclosure/FullDetailsModal';
 
 const STAGE_COLORS: Record<string, string> = {
   negotiating: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
@@ -43,6 +46,8 @@ function getType(followUp: FollowUp): 'property' | 'preforeclosure' {
 export function CalendarView() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [selectedPreForeclosure, setSelectedPreForeclosure] = useState<PreForeclosureRecord | null>(null);
 
   const monthKey = format(currentMonth, 'yyyy-MM');
   const { data: followUps, isLoading } = useFollowUps(monthKey);
@@ -105,6 +110,35 @@ export function CalendarView() {
       toast({ title: 'Follow-up deleted' });
     } catch {
       toast({ title: 'Error', description: 'Failed to delete follow-up', variant: 'destructive' });
+    }
+  };
+
+  const handleViewDetails = async (followUp: FollowUp) => {
+    if (followUp.propertyId && followUp.property) {
+      try {
+        const result = await getProperties(1, 50000);
+        const properties = result.properties || result.data || result;
+        const found = (properties as Property[]).find(p => p.id === followUp.propertyId);
+        if (found) {
+          setSelectedProperty(found);
+        } else {
+          toast({ title: 'Property not found', variant: 'destructive' });
+        }
+      } catch {
+        toast({ title: 'Error', description: 'Failed to load property', variant: 'destructive' });
+      }
+    } else if (followUp.preForeclosure) {
+      try {
+        const records = await getPreForeclosures();
+        const found = records.find((r: PreForeclosureRecord) => r.document_number === followUp.preForeclosure?.documentNumber);
+        if (found) {
+          setSelectedPreForeclosure(found);
+        } else {
+          toast({ title: 'Record not found', variant: 'destructive' });
+        }
+      } catch {
+        toast({ title: 'Error', description: 'Failed to load record', variant: 'destructive' });
+      }
     }
   };
 
@@ -319,6 +353,14 @@ export function CalendarView() {
                   {/* Actions */}
                   <div className="flex gap-2 mt-3">
                     <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => handleViewDetails(fu)}
+                    >
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                    <Button
                       variant={fu.completed ? 'outline' : 'default'}
                       size="sm"
                       className={cn(
@@ -350,6 +392,20 @@ export function CalendarView() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Property Details Modal */}
+      <PropertyDetailsModal
+        property={selectedProperty}
+        isOpen={!!selectedProperty}
+        onClose={() => setSelectedProperty(null)}
+      />
+
+      {/* Pre-Foreclosure Details Modal */}
+      <FullDetailsModal
+        record={selectedPreForeclosure}
+        isOpen={!!selectedPreForeclosure}
+        onClose={() => setSelectedPreForeclosure(null)}
+      />
     </div>
   );
 }
