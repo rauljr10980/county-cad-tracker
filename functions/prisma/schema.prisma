@@ -30,6 +30,7 @@ model User {
   createdTasks   Task[]         @relation("CreatedTasks")
   notes          Note[]
   taskActivities TaskActivity[]
+  followUps      FollowUp[]
 
   @@index([email])
   @@index([username])
@@ -125,6 +126,7 @@ model Property {
   tasks          Task[]
   paymentHistory PaymentHistory[]
   routeRecords   RouteRecord[]    // Routes this property is in
+  followUps      FollowUp[]
 
   // Indexes for performance (50k+ properties)
   @@index([accountNumber])
@@ -416,6 +418,7 @@ model PreForeclosure {
 
   // Relations
   routeRecords RouteRecord[]
+  followUps    FollowUp[]
 
   @@index([documentNumber])
   @@index([type])
@@ -681,4 +684,35 @@ enum DrivingLeadStatus {
   CONTACTED
   UNDER_CONTRACT
   DEAD
+}
+
+// ============================================================================
+// FOLLOW-UP CALENDAR
+// ============================================================================
+
+model FollowUp {
+  id          String    @id @default(cuid())
+  date        DateTime
+  note        String?   @db.Text
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+
+  // Polymorphic: one of these will be set
+  propertyId       String?
+  property         Property?       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  preforeclosureId String?
+  preForeclosure   PreForeclosure? @relation(fields: [preforeclosureId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([propertyId])
+  @@index([preforeclosureId])
+  @@index([completed])
+  @@index([date, completed])
+  @@map("follow_ups")
 }

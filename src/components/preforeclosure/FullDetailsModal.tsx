@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, ChevronDown, Home, Building, AlertTriangle, Copy, Search, User, Mail } from 'lucide-react';
+import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, CalendarDays, ChevronDown, Home, Building, AlertTriangle, Copy, Search, User, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,11 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useUpdatePreForeclosure, useOwnerLookup } from '@/hooks/usePreForeclosure';
-import { PreForeclosureRecord, PreForeclosureType, WORKFLOW_STAGES } from '@/types/property';
+import { PreForeclosureRecord, PreForeclosureType, WORKFLOW_STAGES, FOLLOWUP_ELIGIBLE_STAGES } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { markPreForeclosureVisited } from '@/lib/api';
+import { markPreForeclosureVisited, createFollowUp } from '@/lib/api';
 import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
 import { WorkflowTracker } from './WorkflowTracker';
 import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
@@ -54,6 +54,9 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [ownerInfoExpanded, setOwnerInfoExpanded] = useState(false);
   const [showVisitedWizard, setShowVisitedWizard] = useState(false);
   const [wizardPending, setWizardPending] = useState(false);
+  const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
+  const [followUpNote, setFollowUpNote] = useState('');
+  const [savingFollowUp, setSavingFollowUp] = useState(false);
   const lookupMutation = useOwnerLookup();
 
   // Parse visit details from workflow log
@@ -586,6 +589,64 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
             record={viewRecord}
             onRecordUpdate={(updates) => setViewRecord(prev => prev ? { ...prev, ...updates } : prev)}
           />
+
+          {/* Schedule Follow-Up */}
+          {viewRecord.workflow_stage && FOLLOWUP_ELIGIBLE_STAGES.includes(viewRecord.workflow_stage as any) && (
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 sm:p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CalendarDays className="h-4 w-4 text-blue-400" />
+                <span className="text-sm font-medium text-blue-400">Schedule Follow-Up</span>
+              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {followUpDate ? format(followUpDate, 'PPP') : 'Pick a follow-up date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={followUpDate}
+                    onSelect={setFollowUpDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Input
+                className="mt-2"
+                placeholder="Optional note... (e.g. Call back Monday)"
+                value={followUpNote}
+                onChange={(e) => setFollowUpNote(e.target.value)}
+              />
+              <Button
+                size="sm"
+                className="mt-2 w-full bg-blue-600 hover:bg-blue-700"
+                disabled={!followUpDate || savingFollowUp}
+                onClick={async () => {
+                  if (!followUpDate || !viewRecord) return;
+                  setSavingFollowUp(true);
+                  try {
+                    await createFollowUp({
+                      date: followUpDate.toISOString(),
+                      note: followUpNote || undefined,
+                      documentNumber: viewRecord.document_number,
+                    });
+                    toast({ title: 'Follow-up scheduled', description: format(followUpDate, 'PPP') });
+                    setFollowUpDate(undefined);
+                    setFollowUpNote('');
+                  } catch {
+                    toast({ title: 'Error', description: 'Failed to schedule follow-up', variant: 'destructive' });
+                  } finally {
+                    setSavingFollowUp(false);
+                  }
+                }}
+              >
+                {savingFollowUp ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CalendarDays className="h-4 w-4 mr-2" />}
+                {savingFollowUp ? 'Scheduling...' : 'Schedule Follow-Up'}
+              </Button>
+            </div>
+          )}
 
           {/* Owner Information - hidden */}
 

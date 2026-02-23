@@ -31,6 +31,7 @@ const routingRoutes = require('./routes/routing');
 const routesRoutes = require('./routes/routes');
 const zonesRoutes = require('./routes/zones');
 const drivingRoutes = require('./routes/driving');
+const followupRoutes = require('./routes/followups');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -164,6 +165,7 @@ app.use('/api/routing', routingRoutes);
 app.use('/api/routes', routesRoutes);
 app.use('/api/zones', zonesRoutes);
 app.use('/api/driving', drivingRoutes);
+app.use('/api/followups', followupRoutes);
 
 // ============================================================================
 // ERROR HANDLING

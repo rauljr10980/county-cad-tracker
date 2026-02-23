@@ -421,3 +421,46 @@ export interface DrivingPhoto {
   leadId: string;
   createdAt: string;
 }
+
+// ============================================================================
+// FOLLOW-UP CALENDAR
+// ============================================================================
+
+export interface FollowUp {
+  id: string;
+  date: string;
+  note?: string;
+  completed: boolean;
+  completedAt?: string;
+  propertyId?: string;
+  property?: {
+    id: string;
+    propertyAddress: string;
+    ownerName?: string;
+    workflowStage: string;
+    status: string;
+  };
+  preforeclosureId?: string;
+  preForeclosure?: {
+    id: string;
+    documentNumber: string;
+    address: string;
+    city: string;
+    zip: string;
+    ownerName?: string;
+    workflowStage: string;
+    type: string;
+  };
+  createdBy: {
+    id: string;
+    username: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const FOLLOWUP_ELIGIBLE_STAGES: WorkflowStage[] = [
+  'negotiating',
+  'comps',
+  'sent_offer',
+];

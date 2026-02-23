@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ExternalLink, MapPin, DollarSign, Calendar, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown } from 'lucide-react';
+import { ExternalLink, MapPin, DollarSign, Calendar, CalendarDays, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Property } from '@/types/property';
+import { Property, FOLLOWUP_ELIGIBLE_STAGES } from '@/types/property';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -56,6 +56,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [visitQuestionsExpanded, setVisitQuestionsExpanded] = useState(true);
   const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
   const [phoneExpanded, setPhoneExpanded] = useState(false);
+  const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
+  const [followUpNote, setFollowUpNote] = useState('');
+  const [savingFollowUp, setSavingFollowUp] = useState(false);
 
   // Visited status state
   const [visited, setVisited] = useState(false);
@@ -1117,6 +1120,64 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               Object.assign(property, updated);
             }}
           />
+
+          {/* Schedule Follow-Up */}
+          {property.workflow_stage && FOLLOWUP_ELIGIBLE_STAGES.includes(property.workflow_stage as any) && (
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 sm:p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CalendarDays className="h-4 w-4 text-blue-400" />
+                <span className="text-sm font-medium text-blue-400">Schedule Follow-Up</span>
+              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {followUpDate ? format(followUpDate, 'PPP') : 'Pick a follow-up date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={followUpDate}
+                    onSelect={setFollowUpDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Input
+                className="mt-2"
+                placeholder="Optional note... (e.g. Call back Monday)"
+                value={followUpNote}
+                onChange={(e) => setFollowUpNote(e.target.value)}
+              />
+              <Button
+                size="sm"
+                className="mt-2 w-full bg-blue-600 hover:bg-blue-700"
+                disabled={!followUpDate || savingFollowUp}
+                onClick={async () => {
+                  if (!followUpDate || !property) return;
+                  setSavingFollowUp(true);
+                  try {
+                    await createFollowUp({
+                      date: followUpDate.toISOString(),
+                      note: followUpNote || undefined,
+                      propertyId: property.id,
+                    });
+                    toast({ title: 'Follow-up scheduled', description: format(followUpDate, 'PPP') });
+                    setFollowUpDate(undefined);
+                    setFollowUpNote('');
+                  } catch {
+                    toast({ title: 'Error', description: 'Failed to schedule follow-up', variant: 'destructive' });
+                  } finally {
+                    setSavingFollowUp(false);
+                  }
+                }}
+              >
+                {savingFollowUp ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CalendarDays className="h-4 w-4 mr-2" />}
+                {savingFollowUp ? 'Scheduling...' : 'Schedule Follow-Up'}
+              </Button>
+            </div>
+          )}
 
           {/* Phone Numbers Section */}
           <div className="bg-secondary/30 rounded-lg p-3">

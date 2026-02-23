@@ -8,6 +8,7 @@ import { UploadView } from '@/components/upload/UploadView';
 import { FileHistory } from '@/components/files/FileHistory';
 import { PreForeclosureView } from '@/components/preforeclosure/PreForeclosureView';
 import { DrivingView } from '@/components/driving/DrivingView';
+import { CalendarView } from '@/components/calendar/CalendarView';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { SignupModal } from '@/components/auth/SignupModal';
@@ -17,7 +18,7 @@ import { Button } from '@/components/ui/button';
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
   const hash = window.location.hash.slice(1); // Remove the #
-  const validTabs: TabType[] = ['dashboard', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'driving'];
+  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'driving'];
   return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
 };
 
@@ -55,6 +56,8 @@ const Index = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard onFilterChange={() => setActiveTab('properties')} />;
+      case 'calendar':
+        return <CalendarView />;
       case 'properties':
         return <PropertiesView />;
       case 'tasks':

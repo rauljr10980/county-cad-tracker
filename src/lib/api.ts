@@ -1534,3 +1534,55 @@ export async function deleteDrivingPhoto(leadId: string, photoId: string) {
   if (!response.ok) throw new Error('Failed to delete photo');
   return response.json();
 }
+
+// ============================================================================
+// FOLLOW-UP CALENDAR
+// ============================================================================
+
+export async function getFollowUps(month: string) {
+  const response = await fetch(`${API_BASE_URL}/api/followups?month=${encodeURIComponent(month)}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch follow-ups');
+  return response.json();
+}
+
+export async function createFollowUp(data: {
+  date: string;
+  note?: string;
+  propertyId?: string;
+  documentNumber?: string;
+}) {
+  const response = await fetch(`${API_BASE_URL}/api/followups`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create follow-up');
+  }
+  return response.json();
+}
+
+export async function updateFollowUp(id: string, data: {
+  completed?: boolean;
+  note?: string;
+  date?: string;
+}) {
+  const response = await fetch(`${API_BASE_URL}/api/followups/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to update follow-up');
+  return response.json();
+}
+
+export async function deleteFollowUp(id: string) {
+  const response = await fetch(`${API_BASE_URL}/api/followups/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to delete follow-up');
+}
