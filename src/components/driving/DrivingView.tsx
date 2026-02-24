@@ -155,7 +155,21 @@ export function DrivingView() {
       if (found) {
         setSelectedProperty(found);
       } else {
-        toast({ title: 'No matching property found', description: 'This address is not in the properties database yet.', variant: 'destructive' });
+        // No match — open modal with a stub so user can still view address & enter details
+        const fullAddress = [lead.street, lead.city, lead.state, lead.zip].filter(Boolean).join(', ');
+        setSelectedProperty({
+          id: `d4d-${lead.id}`,
+          accountNumber: '',
+          ownerName: '',
+          propertyAddress: fullAddress,
+          mailingAddress: '',
+          status: 'UNKNOWN',
+          totalAmountDue: 0,
+          totalPercentage: 0,
+          latitude: lead.latitude,
+          longitude: lead.longitude,
+          notes: lead.notes || '',
+        } as Property);
       }
     } catch {
       toast({ title: 'Error', description: 'Failed to load property details', variant: 'destructive' });
