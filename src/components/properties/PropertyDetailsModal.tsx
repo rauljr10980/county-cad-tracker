@@ -57,8 +57,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
   const [phoneExpanded, setPhoneExpanded] = useState(false);
   const [emailExpanded, setEmailExpanded] = useState(false);
-  const [recipientEmail, setRecipientEmail] = useState('');
+  const [emailAddresses, setEmailAddresses] = useState<string[]>(['', '', '', '', '', '']);
   const [senderName, setSenderName] = useState('Raul');
+  const [emailSubject, setEmailSubject] = useState('Quick question');
+  const [emailBody, setEmailBody] = useState('');
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
   const [followUpNote, setFollowUpNote] = useState('');
   const [savingFollowUp, setSavingFollowUp] = useState(false);
@@ -101,7 +103,13 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       // Initialize visited status
       setVisited(property.visited || false);
       setVisitedBy(property.visitedBy || '');
-      
+
+      // Initialize email template
+      setEmailAddresses(['', '', '', '', '', '']);
+      const firstName = (property.ownerName || '').split(/[\s,]+/).filter(Boolean)[0] || 'there';
+      const city = (property.propertyAddress || '').match(/,\s*([A-Za-z\s]+?)(?:\s+[A-Z]{2}|,)/)?.[1]?.trim() || 'San Antonio';
+      setEmailBody(`Hi ${firstName},\n\nMy name is ${senderName} and I buy homes in ${city}. I came across a property that may be connected to your family and wanted to reach out respectfully.\n\nIf you've ever considered selling it, I'd be happy to talk and see if I can help. If this doesn't apply to you, please feel free to ignore this message.\n\nThank you,\n${senderName}`);
+
       // Load pre-foreclosure records for this property
       loadPreForeclosureRecords();
     }
@@ -1245,7 +1253,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             )}
           </div>
 
-          {/* Email Template Section */}
+          {/* Email Section */}
           <div className="bg-secondary/30 rounded-lg p-3">
             <div
               className="flex items-center justify-between cursor-pointer"
@@ -1260,63 +1268,86 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 !emailExpanded && "-rotate-90"
               )} />
             </div>
-            {emailExpanded && (() => {
-              const firstName = (property.ownerName || '').split(/[\s,]+/).filter(Boolean)[0] || 'there';
-              const city = (property.propertyAddress || '').match(/,\s*([A-Za-z\s]+?)(?:\s+[A-Z]{2}|,)/)?.[1]?.trim() || 'San Antonio';
-              const subject = 'Quick question';
-              const body = `Hi ${firstName},\n\nMy name is ${senderName} and I buy homes in ${city}. I came across a property that may be connected to your family and wanted to reach out respectfully.\n\nIf you've ever considered selling it, I'd be happy to talk and see if I can help. If this doesn't apply to you, please feel free to ignore this message.\n\nThank you,\n${senderName}`;
-
-              return (
-                <div className="space-y-3 mt-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">Your Name:</span>
-                    <Input
-                      value={senderName}
-                      onChange={(e) => setSenderName(e.target.value)}
-                      placeholder="Your name"
-                      className="flex-1"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">To:</span>
+            {emailExpanded && (
+              <div className="space-y-2 mt-3">
+                {emailAddresses.map((email, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-16 shrink-0">
+                      Email {index + 1}:
+                    </span>
                     <Input
                       type="email"
-                      value={recipientEmail}
-                      onChange={(e) => setRecipientEmail(e.target.value)}
-                      placeholder="recipient@email.com"
+                      value={email}
+                      onChange={(e) => {
+                        const newEmails = [...emailAddresses];
+                        newEmails[index] = e.target.value;
+                        setEmailAddresses(newEmails);
+                      }}
+                      placeholder="Enter email address"
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                      onClick={() => {
+                        if (!email.trim()) return;
+                        const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                        window.open(mailto, '_blank');
+                      }}
+                      disabled={!email.trim()}
+                      title="Send to this email"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+
+                <div className="border-t border-border pt-3 mt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-16 shrink-0">Subject:</span>
+                    <Input
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      placeholder="Email subject"
                       className="flex-1"
                     />
                   </div>
-                  <div className="bg-background/50 rounded-md p-3 text-sm whitespace-pre-wrap border">
-                    <p className="text-xs text-muted-foreground mb-1 font-medium">Subject: {subject}</p>
-                    <p className="text-muted-foreground">{body}</p>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        navigator.clipboard.writeText(body);
-                        toast({ title: 'Email copied to clipboard' });
-                      }}
-                    >
-                      Copy Text
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        const mailto = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-                        window.open(mailto, '_blank');
-                      }}
-                      disabled={!recipientEmail.trim()}
-                    >
-                      <Mail className="h-3.5 w-3.5 mr-1.5" />
-                      Compose Email
-                    </Button>
-                  </div>
+                  <Textarea
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    rows={8}
+                    className="text-sm"
+                  />
                 </div>
-              );
-            })()}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(emailBody);
+                      toast({ title: 'Email copied to clipboard' });
+                    }}
+                  >
+                    Copy Text
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const recipients = emailAddresses.filter(e => e.trim());
+                      if (recipients.length === 0) return;
+                      const mailto = `mailto:${recipients.map(e => encodeURIComponent(e)).join(',')}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                      window.open(mailto, '_blank');
+                    }}
+                    disabled={!emailAddresses.some(e => e.trim())}
+                  >
+                    <Mail className="h-3.5 w-3.5 mr-1.5" />
+                    Send to All
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
