@@ -99,6 +99,7 @@ export function DrivingView() {
   const [uploadingLeadId, setUploadingLeadId] = useState<string | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [loadingDetailsId, setLoadingDetailsId] = useState<string | null>(null);
+  const [dbStatus, setDbStatus] = useState<Record<string, 'found' | 'not_found'>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -153,9 +154,11 @@ export function DrivingView() {
         p.propertyAddress?.toLowerCase().includes(lead.street?.toLowerCase() || '')
       );
       if (found) {
+        setDbStatus(prev => ({ ...prev, [lead.id]: 'found' }));
         setSelectedProperty(found);
       } else {
         // No match — open modal with a stub so user can still view address & enter details
+        setDbStatus(prev => ({ ...prev, [lead.id]: 'not_found' }));
         const fullAddress = [lead.street, lead.city, lead.state, lead.zip].filter(Boolean).join(', ');
         setSelectedProperty({
           id: `d4d-${lead.id}`,
@@ -265,7 +268,18 @@ export function DrivingView() {
             )}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{lead.street}</p>
+                  <div className="flex items-center gap-1.5">
+                    {dbStatus[lead.id] && (
+                      <span
+                        className={cn(
+                          "h-2.5 w-2.5 rounded-full flex-shrink-0",
+                          dbStatus[lead.id] === 'found' ? 'bg-green-500' : 'bg-red-500'
+                        )}
+                        title={dbStatus[lead.id] === 'found' ? 'Found in database' : 'Not in database'}
+                      />
+                    )}
+                    <p className="font-medium text-sm truncate">{lead.street}</p>
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {lead.city}, {lead.state} {lead.zip}
                   </p>
