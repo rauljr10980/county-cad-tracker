@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ExternalLink, MapPin, DollarSign, Calendar, CalendarDays, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown, Loader2 } from 'lucide-react';
+import { ExternalLink, MapPin, DollarSign, Calendar, CalendarDays, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown, Loader2, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -56,6 +56,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [visitQuestionsExpanded, setVisitQuestionsExpanded] = useState(true);
   const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
   const [phoneExpanded, setPhoneExpanded] = useState(false);
+  const [emailExpanded, setEmailExpanded] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [senderName, setSenderName] = useState('Raul');
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
   const [followUpNote, setFollowUpNote] = useState('');
   const [savingFollowUp, setSavingFollowUp] = useState(false);
@@ -1242,6 +1245,79 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             )}
           </div>
 
+          {/* Email Template Section */}
+          <div className="bg-secondary/30 rounded-lg p-3">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setEmailExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Send Email</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !emailExpanded && "-rotate-90"
+              )} />
+            </div>
+            {emailExpanded && (() => {
+              const firstName = (property.ownerName || '').split(/[\s,]+/).filter(Boolean)[0] || 'there';
+              const city = (property.propertyAddress || '').match(/,\s*([A-Za-z\s]+?)(?:\s+[A-Z]{2}|,)/)?.[1]?.trim() || 'San Antonio';
+              const subject = 'Quick question';
+              const body = `Hi ${firstName},\n\nMy name is ${senderName} and I buy homes in ${city}. I came across a property that may be connected to your family and wanted to reach out respectfully.\n\nIf you've ever considered selling it, I'd be happy to talk and see if I can help. If this doesn't apply to you, please feel free to ignore this message.\n\nThank you,\n${senderName}`;
+
+              return (
+                <div className="space-y-3 mt-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-16 shrink-0">Your Name:</span>
+                    <Input
+                      value={senderName}
+                      onChange={(e) => setSenderName(e.target.value)}
+                      placeholder="Your name"
+                      className="flex-1"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-16 shrink-0">To:</span>
+                    <Input
+                      type="email"
+                      value={recipientEmail}
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      placeholder="recipient@email.com"
+                      className="flex-1"
+                    />
+                  </div>
+                  <div className="bg-background/50 rounded-md p-3 text-sm whitespace-pre-wrap border">
+                    <p className="text-xs text-muted-foreground mb-1 font-medium">Subject: {subject}</p>
+                    <p className="text-muted-foreground">{body}</p>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(body);
+                        toast({ title: 'Email copied to clipboard' });
+                      }}
+                    >
+                      Copy Text
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const mailto = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                        window.open(mailto, '_blank');
+                      }}
+                      disabled={!recipientEmail.trim()}
+                    >
+                      <Mail className="h-3.5 w-3.5 mr-1.5" />
+                      Compose Email
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
