@@ -57,7 +57,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
   const [phoneExpanded, setPhoneExpanded] = useState(false);
   const [emailExpanded, setEmailExpanded] = useState(false);
-  const [emailAddresses, setEmailAddresses] = useState<string[]>(['', '', '', '', '', '']);
+  const [emailRecipients, setEmailRecipients] = useState<{ name: string; email: string }[]>(
+    Array.from({ length: 6 }, () => ({ name: '', email: '' }))
+  );
   const [senderName, setSenderName] = useState('Raul');
   const [emailSubject, setEmailSubject] = useState('Quick question');
   const [emailBody, setEmailBody] = useState('');
@@ -105,10 +107,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setVisitedBy(property.visitedBy || '');
 
       // Initialize email template
-      setEmailAddresses(['', '', '', '', '', '']);
-      const firstName = (property.ownerName || '').split(/[\s,]+/).filter(Boolean)[0] || 'there';
+      setEmailRecipients(Array.from({ length: 6 }, () => ({ name: '', email: '' })));
       const city = (property.propertyAddress || '').match(/,\s*([A-Za-z\s]+?)(?:\s+[A-Z]{2}|,)/)?.[1]?.trim() || 'San Antonio';
-      setEmailBody(`Hi ${firstName},\n\nMy name is ${senderName} and I buy homes in ${city}. I came across a property that may be connected to your family and wanted to reach out respectfully.\n\nIf you've ever considered selling it, I'd be happy to talk and see if I can help. If this doesn't apply to you, please feel free to ignore this message.\n\nThank you,\n${senderName}`);
+      setEmailBody(`Hi {{Name}},\n\nMy name is ${senderName} and I buy homes in ${city}. I came across a property that may be connected to your family and wanted to reach out respectfully.\n\nIf you've ever considered selling it, I'd be happy to talk and see if I can help. If this doesn't apply to you, please feel free to ignore this message.\n\nThank you,\n${senderName}`);
 
       // Load pre-foreclosure records for this property
       loadPreForeclosureRecords();
@@ -1270,20 +1271,30 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             </div>
             {emailExpanded && (
               <div className="space-y-2 mt-3">
-                {emailAddresses.map((email, index) => (
+                {emailRecipients.map((recipient, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">
-                      Email {index + 1}:
+                    <span className="text-xs text-muted-foreground w-6 shrink-0">
+                      {index + 1}.
                     </span>
                     <Input
-                      type="email"
-                      value={email}
+                      value={recipient.name}
                       onChange={(e) => {
-                        const newEmails = [...emailAddresses];
-                        newEmails[index] = e.target.value;
-                        setEmailAddresses(newEmails);
+                        const updated = [...emailRecipients];
+                        updated[index] = { ...updated[index], name: e.target.value };
+                        setEmailRecipients(updated);
                       }}
-                      placeholder="Enter email address"
+                      placeholder="Name"
+                      className="w-28 shrink-0"
+                    />
+                    <Input
+                      type="email"
+                      value={recipient.email}
+                      onChange={(e) => {
+                        const updated = [...emailRecipients];
+                        updated[index] = { ...updated[index], email: e.target.value };
+                        setEmailRecipients(updated);
+                      }}
+                      placeholder="Email address"
                       className="flex-1"
                     />
                     <Button
@@ -1291,12 +1302,13 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       size="icon"
                       className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
                       onClick={() => {
-                        if (!email.trim()) return;
-                        const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                        if (!recipient.email.trim()) return;
+                        const personalBody = emailBody.replace(/\{\{Name\}\}/g, recipient.name.trim() || 'there');
+                        const mailto = `mailto:${encodeURIComponent(recipient.email)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(personalBody)}`;
                         window.open(mailto, '_blank');
                       }}
-                      disabled={!email.trim()}
-                      title="Send to this email"
+                      disabled={!recipient.email.trim()}
+                      title="Send to this person"
                     >
                       <Send className="h-4 w-4" />
                     </Button>
@@ -1313,6 +1325,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       className="flex-1"
                     />
                   </div>
+                  <p className="text-[11px] text-muted-foreground">Use <code className="bg-muted px-1 rounded">{'{{Name}}'}</code> in the body to personalize per recipient</p>
                   <Textarea
                     value={emailBody}
                     onChange={(e) => setEmailBody(e.target.value)}
@@ -1335,12 +1348,13 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   <Button
                     size="sm"
                     onClick={() => {
-                      const recipients = emailAddresses.filter(e => e.trim());
-                      if (recipients.length === 0) return;
-                      const mailto = `mailto:${recipients.map(e => encodeURIComponent(e)).join(',')}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                      const filled = emailRecipients.filter(r => r.email.trim());
+                      if (filled.length === 0) return;
+                      const emails = filled.map(r => encodeURIComponent(r.email)).join(',');
+                      const mailto = `mailto:${emails}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
                       window.open(mailto, '_blank');
                     }}
-                    disabled={!emailAddresses.some(e => e.trim())}
+                    disabled={!emailRecipients.some(r => r.email.trim())}
                   >
                     <Mail className="h-3.5 w-3.5 mr-1.5" />
                     Send to All
