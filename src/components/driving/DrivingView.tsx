@@ -1,12 +1,14 @@
 import { useState, useRef } from 'react';
-import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X } from 'lucide-react';
+import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useDrivingLeads, useCreateDrivingLead, useUpdateDrivingLead, useDeleteDrivingLead, useUploadDrivingPhotos, useDrivingPhotos, useDeleteDrivingPhoto } from '@/hooks/useDrivingLeads';
-import type { DrivingLeadStatus } from '@/types/property';
+import type { DrivingLeadStatus, Property } from '@/types/property';
+import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
+import { getProperties } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -95,6 +97,8 @@ export function DrivingView() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewingPhotosLeadId, setViewingPhotosLeadId] = useState<string | null>(null);
   const [uploadingLeadId, setUploadingLeadId] = useState<string | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [loadingDetailsId, setLoadingDetailsId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -136,6 +140,27 @@ export function DrivingView() {
       toast({ title: 'Failed to delete', variant: 'destructive' });
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleViewDetails = async (lead: typeof leads[0]) => {
+    setLoadingDetailsId(lead.id);
+    try {
+      const searchTerm = lead.street || lead.rawAddress;
+      const result = await getProperties(1, 100, undefined, searchTerm);
+      const properties = result.properties || result.data || result;
+      const found = (properties as Property[]).find(p =>
+        p.propertyAddress?.toLowerCase().includes(lead.street?.toLowerCase() || '')
+      );
+      if (found) {
+        setSelectedProperty(found);
+      } else {
+        toast({ title: 'No matching property found', description: 'This address is not in the properties database yet.', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load property details', variant: 'destructive' });
+    } finally {
+      setLoadingDetailsId(null);
     }
   };
 
@@ -235,6 +260,20 @@ export function DrivingView() {
                   )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* Property Details button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-primary"
+                    onClick={() => handleViewDetails(lead)}
+                    disabled={loadingDetailsId === lead.id}
+                  >
+                    {loadingDetailsId === lead.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
                   {/* Camera button */}
                   <Button
                     variant="ghost"
@@ -318,6 +357,13 @@ export function DrivingView() {
           {viewingPhotosLeadId && <PhotoGallery leadId={viewingPhotosLeadId} />}
         </DialogContent>
       </Dialog>
+
+      {/* Property Details Modal */}
+      <PropertyDetailsModal
+        property={selectedProperty}
+        isOpen={!!selectedProperty}
+        onClose={() => setSelectedProperty(null)}
+      />
     </div>
   );
 }
