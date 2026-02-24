@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -108,6 +108,32 @@ export function DrivingView() {
   const updateMutation = useUpdateDrivingLead();
   const deleteMutation = useDeleteDrivingLead();
   const uploadPhotosMutation = useUploadDrivingPhotos();
+
+  // Check all leads against the properties DB on load
+  useEffect(() => {
+    if (leads.length === 0) return;
+    const unchecked = leads.filter(l => !dbStatus[l.id]);
+    if (unchecked.length === 0) return;
+
+    (async () => {
+      try {
+        const result = await getProperties(1, 50000);
+        const properties = (result.properties || result.data || result) as Property[];
+        const statusMap: Record<string, 'found' | 'not_found'> = { ...dbStatus };
+        for (const lead of unchecked) {
+          const street = (lead.street || '').toLowerCase();
+          if (!street) { statusMap[lead.id] = 'not_found'; continue; }
+          const match = properties.find(p =>
+            p.propertyAddress?.toLowerCase().includes(street)
+          );
+          statusMap[lead.id] = match ? 'found' : 'not_found';
+        }
+        setDbStatus(statusMap);
+      } catch {
+        // silently fail — dots just won't show
+      }
+    })();
+  }, [leads]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
