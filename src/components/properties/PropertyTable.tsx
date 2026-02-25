@@ -313,12 +313,7 @@ export function PropertyTable({
                   )}
                 </div>
               </th>
-              <th 
-                className="cursor-pointer hover:bg-secondary"
-                onClick={() => handleSort('lastFollowUp')}
-              >
-                Last Follow Up
-              </th>
+              <th>Phone Number</th>
               <th className="w-28">Actions</th>
             </tr>
           </thead>
@@ -403,40 +398,12 @@ export function PropertyTable({
                   <td className="text-right font-mono text-muted-foreground">
                     {calculatePercentage(property.totalAmountDue, property.marketValue)}
                   </td>
-                  <td>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button 
-                          className={cn(
-                            "flex items-center gap-1.5 px-2 py-1 rounded hover:bg-secondary transition-colors",
-                            savingFollowUp === property.id && "opacity-50 pointer-events-none"
-                          )}
-                          title="Click to set follow-up date"
-                        >
-                          {followUp ? (
-                            <>
-                              <Calendar className="h-3 w-3 text-primary" />
-                              <span className="text-sm" title={followUp.relative}>
-                                {followUp.formatted}
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <CalendarPlus className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-muted-foreground text-sm">Set date</span>
-                            </>
-                          )}
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={followUpDate ? new Date(followUpDate) : undefined}
-                          onSelect={(date) => handleSetFollowUp(property, date)}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                  <td className="text-center">
+                    {property.phoneNumbers && property.phoneNumbers.some(p => p) ? (
+                      <span className="text-green-500 text-sm font-medium">Yes</span>
+                    ) : (
+                      <span className="text-red-500 text-sm font-medium">No</span>
+                    )}
                   </td>
                   <td>
                     <div className="flex items-center gap-1">
