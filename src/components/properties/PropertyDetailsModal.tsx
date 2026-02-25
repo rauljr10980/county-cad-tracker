@@ -60,7 +60,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [emailRecipients, setEmailRecipients] = useState<{ name: string; email: string }[]>(
     Array.from({ length: 6 }, () => ({ name: '', email: '' }))
   );
-  const [senderName, setSenderName] = useState('Raul');
   const [emailSubject, setEmailSubject] = useState('Quick question');
   const [emailBody, setEmailBody] = useState('');
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
@@ -108,8 +107,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
       // Initialize email template
       setEmailRecipients(Array.from({ length: 6 }, () => ({ name: '', email: '' })));
-      const city = (property.propertyAddress || '').match(/,\s*([A-Za-z\s]+?)(?:\s+[A-Z]{2}|,)/)?.[1]?.trim() || 'San Antonio';
-      setEmailBody(`Hi {{Name}},\n\nMy name is ${senderName} and I buy homes in ${city}. I came across a property that may be connected to your family and wanted to reach out respectfully.\n\nIf you've ever considered selling it, I'd be happy to talk and see if I can help. If this doesn't apply to you, please feel free to ignore this message.\n\nThank you,\n${senderName}`);
+      setEmailBody(`Hi {{Name}},\n\nMy name is Raul, and I purchase vacant homes. I came across the property at {{PropertyAddress}}, which is recorded under {{Owner}}, and wanted to reach out respectfully.\n\nIf you're related to the owner, I would appreciate it if you could let me know the best person to speak with. If the home is vacant, I would be interested in discussing a purchase.\n\nIf I've contacted the wrong person, please accept my apologies.\n\nThank you,\nRaul\n{{PhoneNumber}}`);
 
       // Load pre-foreclosure records for this property
       loadPreForeclosureRecords();
@@ -1303,7 +1301,14 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
                       onClick={() => {
                         if (!recipient.email.trim()) return;
-                        const personalBody = emailBody.replace(/\{\{Name\}\}/g, recipient.name.trim() || 'there');
+                        const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
+                          ? property.phoneNumbers[property.ownerPhoneIndex]
+                          : (property.phoneNumbers?.find(p => p) || '');
+                        const personalBody = emailBody
+                          .replace(/\{\{Name\}\}/g, recipient.name.trim() || 'there')
+                          .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
+                          .replace(/\{\{Owner\}\}/g, property.ownerName || '')
+                          .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
                         const mailto = `mailto:${encodeURIComponent(recipient.email)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(personalBody)}`;
                         window.open(mailto, '_blank');
                       }}
@@ -1325,7 +1330,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       className="flex-1"
                     />
                   </div>
-                  <p className="text-[11px] text-muted-foreground">Use <code className="bg-muted px-1 rounded">{'{{Name}}'}</code> in the body to personalize per recipient</p>
+                  <p className="text-[11px] text-muted-foreground">Variables: <code className="bg-muted px-1 rounded">{'{{Name}}'}</code> <code className="bg-muted px-1 rounded">{'{{PropertyAddress}}'}</code> <code className="bg-muted px-1 rounded">{'{{Owner}}'}</code> <code className="bg-muted px-1 rounded">{'{{PhoneNumber}}'}</code></p>
                   <Textarea
                     value={emailBody}
                     onChange={(e) => setEmailBody(e.target.value)}
@@ -1339,7 +1344,14 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     size="sm"
                     variant="outline"
                     onClick={() => {
-                      navigator.clipboard.writeText(emailBody);
+                      const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
+                        ? property.phoneNumbers[property.ownerPhoneIndex]
+                        : (property.phoneNumbers?.find(p => p) || '');
+                      const resolved = emailBody
+                        .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
+                        .replace(/\{\{Owner\}\}/g, property.ownerName || '')
+                        .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
+                      navigator.clipboard.writeText(resolved);
                       toast({ title: 'Email copied to clipboard' });
                     }}
                   >
@@ -1350,8 +1362,15 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     onClick={() => {
                       const filled = emailRecipients.filter(r => r.email.trim());
                       if (filled.length === 0) return;
+                      const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
+                        ? property.phoneNumbers[property.ownerPhoneIndex]
+                        : (property.phoneNumbers?.find(p => p) || '');
+                      const resolved = emailBody
+                        .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
+                        .replace(/\{\{Owner\}\}/g, property.ownerName || '')
+                        .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
                       const emails = filled.map(r => encodeURIComponent(r.email)).join(',');
-                      const mailto = `mailto:${emails}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                      const mailto = `mailto:${emails}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(resolved)}`;
                       window.open(mailto, '_blank');
                     }}
                     disabled={!emailRecipients.some(r => r.email.trim())}
