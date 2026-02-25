@@ -1292,6 +1292,24 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         updated[index] = { ...updated[index], email: e.target.value };
                         setEmailRecipients(updated);
                       }}
+                      onPaste={(e) => {
+                        const text = e.clipboardData.getData('text');
+                        const emails = text.split(/[\n,;\s]+/).map(s => s.trim()).filter(s => s.includes('@'));
+                        if (emails.length > 1) {
+                          e.preventDefault();
+                          const updated = [...emailRecipients];
+                          emails.forEach((em, i) => {
+                            const slot = index + i;
+                            if (slot < updated.length) {
+                              updated[slot] = { ...updated[slot], email: em };
+                            } else {
+                              updated.push({ name: '', email: em });
+                            }
+                          });
+                          setEmailRecipients(updated);
+                          toast({ title: `${emails.length} emails pasted` });
+                        }
+                      }}
                       placeholder="Email address"
                       className="flex-1"
                     />
