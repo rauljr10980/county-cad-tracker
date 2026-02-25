@@ -30,7 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus, markPropertyVisitedInRoute, updatePropertyDealStage, updatePropertyWorkflowStage, updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyVisited } from '@/lib/api';
+import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus, markPropertyVisitedInRoute, updatePropertyDealStage, updatePropertyWorkflowStage, updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyVisited, getPreForeclosures } from '@/lib/api';
 import { VisitedWizard, VisitedWizardResult } from '@/components/shared/VisitedWizard';
 import { batchGeocodeAddresses } from '@/lib/geocoding';
 import { RouteMap } from '@/components/routing/RouteMap';
@@ -354,6 +354,7 @@ export function PropertiesView() {
     followUpDateTo: undefined,
     lastPaymentDateFrom: undefined,
     lastPaymentDateTo: undefined,
+    inForeclosure: 'any',
   });
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -362,6 +363,27 @@ export function PropertiesView() {
   const [sortField, setSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
+  // Pre-foreclosure address set for "In Foreclosure" filter
+  const [foreclosureAddresses, setForeclosureAddresses] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    (async () => {
+      try {
+        const records = await getPreForeclosures();
+        const addrSet = new Set<string>();
+        for (const r of records) {
+          if (r.address) {
+            // Normalize: extract street number + name, uppercase
+            const norm = r.address.trim().toUpperCase().replace(/\s+/g, ' ');
+            if (norm) addrSet.add(norm);
+          }
+        }
+        setForeclosureAddresses(addrSet);
+      } catch {
+        // silently fail
+      }
+    })();
+  }, []);
+
   // Convert advancedFilters.statuses to legacy format for API
   const selectedStatuses = advancedFilters.statuses;
   
@@ -397,7 +419,8 @@ export function PropertiesView() {
       (advancedFilters.followUpDateFrom !== undefined) ||
       (advancedFilters.followUpDateTo !== undefined) ||
       (advancedFilters.lastPaymentDateFrom !== undefined) ||
-      (advancedFilters.lastPaymentDateTo !== undefined)
+      (advancedFilters.lastPaymentDateTo !== undefined) ||
+      (advancedFilters.inForeclosure !== 'any' && advancedFilters.inForeclosure !== undefined)
     );
   }, [advancedFilters]);
   
@@ -804,6 +827,14 @@ export function PropertiesView() {
         if (p.isPrimaryProperty !== false) return false;
       }
 
+      // In Foreclosure filter
+      if (advancedFilters.inForeclosure === 'yes' || advancedFilters.inForeclosure === 'no') {
+        const propAddr = (p.propertyAddress || '').toUpperCase().replace(/\s+/g, ' ');
+        const isInForeclosure = Array.from(foreclosureAddresses).some(fa => propAddr.includes(fa));
+        if (advancedFilters.inForeclosure === 'yes' && !isInForeclosure) return false;
+        if (advancedFilters.inForeclosure === 'no' && isInForeclosure) return false;
+      }
+
       // Follow-up Date range
       if (advancedFilters.followUpDateFrom) {
         if (!p.lastFollowUp) return false;
@@ -897,7 +928,7 @@ export function PropertiesView() {
     }
     
     return filtered;
-  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery, propertiesInRoutes, workflowStageFilter]);
+  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery, propertiesInRoutes, workflowStageFilter, foreclosureAddresses]);
   
   // Apply sorting to all properties before pagination (only for filtered cases)
   const sortedProperties = useMemo(() => {
@@ -1153,6 +1184,7 @@ export function PropertiesView() {
       followUpDateTo: undefined,
       lastPaymentDateFrom: undefined,
       lastPaymentDateTo: undefined,
+      inForeclosure: 'any',
     });
     setPage(1);
   };
