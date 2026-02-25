@@ -1269,74 +1269,65 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             </div>
             {emailExpanded && (
               <div className="space-y-2 mt-3">
-                {emailRecipients.map((recipient, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-6 shrink-0">
-                      {index + 1}.
-                    </span>
-                    <Input
-                      value={recipient.name}
-                      onChange={(e) => {
-                        const updated = [...emailRecipients];
-                        updated[index] = { ...updated[index], name: e.target.value };
-                        setEmailRecipients(updated);
-                      }}
-                      placeholder="Name"
-                      className="w-28 shrink-0"
-                    />
-                    <Input
-                      type="email"
-                      value={recipient.email}
-                      onChange={(e) => {
-                        const updated = [...emailRecipients];
-                        updated[index] = { ...updated[index], email: e.target.value };
-                        setEmailRecipients(updated);
-                      }}
-                      onPaste={(e) => {
-                        const text = e.clipboardData.getData('text');
-                        const emails = text.split(/[\n,;\s]+/).map(s => s.trim()).filter(s => s.includes('@'));
-                        if (emails.length > 1) {
-                          e.preventDefault();
+                {emailRecipients.map((recipient, index) => {
+                  const emailCount = recipient.email.split(/[\n,;\s]+/).filter(s => s.includes('@')).length;
+                  return (
+                    <div key={index} className="flex items-start gap-2">
+                      <span className="text-xs text-muted-foreground w-6 shrink-0 pt-2">
+                        {index + 1}.
+                      </span>
+                      <Input
+                        value={recipient.name}
+                        onChange={(e) => {
                           const updated = [...emailRecipients];
-                          emails.forEach((em, i) => {
-                            const slot = index + i;
-                            if (slot < updated.length) {
-                              updated[slot] = { ...updated[slot], email: em };
-                            } else {
-                              updated.push({ name: '', email: em });
-                            }
-                          });
+                          updated[index] = { ...updated[index], name: e.target.value };
                           setEmailRecipients(updated);
-                          toast({ title: `${emails.length} emails pasted` });
-                        }
-                      }}
-                      placeholder="Email address"
-                      className="flex-1"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-                      onClick={() => {
-                        if (!recipient.email.trim()) return;
-                        const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
-                          ? property.phoneNumbers[property.ownerPhoneIndex]
-                          : (property.phoneNumbers?.find(p => p) || '');
-                        const personalBody = emailBody
-                          .replace(/\{\{Name\}\}/g, recipient.name.trim() || 'there')
-                          .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
-                          .replace(/\{\{Owner\}\}/g, property.ownerName || '')
-                          .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
-                        const mailto = `mailto:${encodeURIComponent(recipient.email)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(personalBody)}`;
-                        window.open(mailto, '_blank');
-                      }}
-                      disabled={!recipient.email.trim()}
-                      title="Send to this person"
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                        }}
+                        placeholder="Name"
+                        className="w-28 shrink-0"
+                      />
+                      <Textarea
+                        value={recipient.email}
+                        onChange={(e) => {
+                          const updated = [...emailRecipients];
+                          updated[index] = { ...updated[index], email: e.target.value };
+                          setEmailRecipients(updated);
+                        }}
+                        placeholder="Paste emails here (one per line)"
+                        rows={emailCount > 1 ? Math.min(emailCount, 5) : 1}
+                        className="flex-1 text-sm min-h-[36px] resize-none"
+                      />
+                      <div className="flex flex-col items-center gap-0.5 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => {
+                            const emails = recipient.email.split(/[\n,;\s]+/).map(s => s.trim()).filter(s => s.includes('@'));
+                            if (emails.length === 0) return;
+                            const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
+                              ? property.phoneNumbers[property.ownerPhoneIndex]
+                              : (property.phoneNumbers?.find(p => p) || '');
+                            const personalBody = emailBody
+                              .replace(/\{\{Name\}\}/g, recipient.name.trim() || 'there')
+                              .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
+                              .replace(/\{\{Owner\}\}/g, property.ownerName || '')
+                              .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
+                            const mailto = `mailto:${emails.map(e => encodeURIComponent(e)).join(',')}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(personalBody)}`;
+                            window.open(mailto, '_blank');
+                          }}
+                          disabled={!recipient.email.trim()}
+                          title="Send to all emails in this row"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                        {emailCount > 1 && (
+                          <span className="text-[10px] text-muted-foreground">{emailCount}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
 
                 <div className="border-t border-border pt-3 mt-3 space-y-2">
                   <div className="flex items-center gap-2">
@@ -1378,8 +1369,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   <Button
                     size="sm"
                     onClick={() => {
-                      const filled = emailRecipients.filter(r => r.email.trim());
-                      if (filled.length === 0) return;
+                      const allEmails = emailRecipients
+                        .flatMap(r => r.email.split(/[\n,;\s]+/).map(s => s.trim()).filter(s => s.includes('@')));
+                      if (allEmails.length === 0) return;
                       const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
                         ? property.phoneNumbers[property.ownerPhoneIndex]
                         : (property.phoneNumbers?.find(p => p) || '');
@@ -1387,8 +1379,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
                         .replace(/\{\{Owner\}\}/g, property.ownerName || '')
                         .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
-                      const emails = filled.map(r => encodeURIComponent(r.email)).join(',');
-                      const mailto = `mailto:${emails}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(resolved)}`;
+                      const mailto = `mailto:${allEmails.map(e => encodeURIComponent(e)).join(',')}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(resolved)}`;
                       window.open(mailto, '_blank');
                     }}
                     disabled={!emailRecipients.some(r => r.email.trim())}
