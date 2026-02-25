@@ -1294,7 +1294,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           setEmailRecipients(updated);
                         }}
                         placeholder="Paste emails here (one per line)"
-                        rows={emailCount > 1 ? Math.min(emailCount, 5) : 1}
+                        rows={emailCount > 1 ? emailCount : 1}
                         className="flex-1 text-sm min-h-[36px] resize-none"
                       />
                       <div className="flex flex-col items-center gap-0.5 shrink-0">
