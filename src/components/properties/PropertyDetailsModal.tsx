@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -62,6 +62,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   );
   const [emailSubject, setEmailSubject] = useState('Quick question');
   const [emailBody, setEmailBody] = useState('');
+  const [sendingEmailIndex, setSendingEmailIndex] = useState<number | null>(null);
+  const [sendingAllEmails, setSendingAllEmails] = useState(false);
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
   const [followUpNote, setFollowUpNote] = useState('');
   const [savingFollowUp, setSavingFollowUp] = useState(false);
@@ -1302,24 +1304,35 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => {
+                          onClick={async () => {
                             const emails = recipient.email.split(/[\n,;\s]+/).map(s => s.trim()).filter(s => s.includes('@'));
                             if (emails.length === 0) return;
-                            const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
-                              ? property.phoneNumbers[property.ownerPhoneIndex]
-                              : (property.phoneNumbers?.find(p => p) || '');
-                            const personalBody = emailBody
-                              .replace(/\{\{Name\}\}/g, recipient.name.trim() || 'there')
-                              .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
-                              .replace(/\{\{Owner\}\}/g, property.ownerName || '')
-                              .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
-                            const mailto = `mailto:${emails.map(e => encodeURIComponent(e)).join(',')}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(personalBody)}`;
-                            window.open(mailto, '_blank');
+                            setSendingEmailIndex(index);
+                            try {
+                              const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
+                                ? property.phoneNumbers[property.ownerPhoneIndex]
+                                : (property.phoneNumbers?.find(p => p) || '');
+                              const personalBody = emailBody
+                                .replace(/\{\{Name\}\}/g, recipient.name.trim() || 'there')
+                                .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
+                                .replace(/\{\{Owner\}\}/g, property.ownerName || '')
+                                .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
+                              await sendEmail({ to: emails, subject: emailSubject, body: personalBody });
+                              toast({ title: `Email sent to ${emails.length} address${emails.length > 1 ? 'es' : ''}` });
+                            } catch (err) {
+                              toast({ title: 'Failed to send', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+                            } finally {
+                              setSendingEmailIndex(null);
+                            }
                           }}
-                          disabled={!recipient.email.trim()}
+                          disabled={!recipient.email.trim() || sendingEmailIndex === index}
                           title="Send to all emails in this row"
                         >
-                          <Send className="h-4 w-4" />
+                          {sendingEmailIndex === index ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
                         </Button>
                         {emailCount > 1 && (
                           <span className="text-[10px] text-muted-foreground">{emailCount}</span>
@@ -1368,24 +1381,36 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   </Button>
                   <Button
                     size="sm"
-                    onClick={() => {
+                    onClick={async () => {
                       const allEmails = emailRecipients
                         .flatMap(r => r.email.split(/[\n,;\s]+/).map(s => s.trim()).filter(s => s.includes('@')));
                       if (allEmails.length === 0) return;
-                      const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
-                        ? property.phoneNumbers[property.ownerPhoneIndex]
-                        : (property.phoneNumbers?.find(p => p) || '');
-                      const resolved = emailBody
-                        .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
-                        .replace(/\{\{Owner\}\}/g, property.ownerName || '')
-                        .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
-                      const mailto = `mailto:${allEmails.map(e => encodeURIComponent(e)).join(',')}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(resolved)}`;
-                      window.open(mailto, '_blank');
+                      setSendingAllEmails(true);
+                      try {
+                        const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
+                          ? property.phoneNumbers[property.ownerPhoneIndex]
+                          : (property.phoneNumbers?.find(p => p) || '');
+                        const resolved = emailBody
+                          .replace(/\{\{Name\}\}/g, 'there')
+                          .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
+                          .replace(/\{\{Owner\}\}/g, property.ownerName || '')
+                          .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
+                        await sendEmail({ to: allEmails, subject: emailSubject, body: resolved });
+                        toast({ title: `Email sent to ${allEmails.length} address${allEmails.length > 1 ? 'es' : ''}` });
+                      } catch (err) {
+                        toast({ title: 'Failed to send', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+                      } finally {
+                        setSendingAllEmails(false);
+                      }
                     }}
-                    disabled={!emailRecipients.some(r => r.email.trim())}
+                    disabled={!emailRecipients.some(r => r.email.trim()) || sendingAllEmails}
                   >
-                    <Mail className="h-3.5 w-3.5 mr-1.5" />
-                    Send to All
+                    {sendingAllEmails ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Mail className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    {sendingAllEmails ? 'Sending...' : 'Send to All'}
                   </Button>
                 </div>
               </div>

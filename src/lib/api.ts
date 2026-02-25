@@ -1586,3 +1586,20 @@ export async function deleteFollowUp(id: string) {
   });
   if (!response.ok) throw new Error('Failed to delete follow-up');
 }
+
+// ============================================================================
+// EMAIL
+// ============================================================================
+
+export async function sendEmail(data: { to: string[]; subject: string; body: string }) {
+  const response = await fetch(`${API_BASE_URL}/api/email/send`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to send email');
+  }
+  return response.json();
+}
