@@ -216,64 +216,67 @@ router.post('/', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'routeType must be "PROPERTY" or "PREFORECLOSURE"' });
     }
 
-    let records;
     let routeRecordsData;
 
-    if (routeType === 'PROPERTY') {
-      // For properties, recordIds are property IDs
-      records = await prisma.property.findMany({
-        where: {
-          id: { in: recordIds }
-        }
-      });
+    // Split recordIds into property IDs and pre-foreclosure document numbers (pf- prefix)
+    const pfIds = recordIds.filter(id => id.startsWith('pf-'));
+    const propertyIds = recordIds.filter(id => !id.startsWith('pf-'));
+    // Strip pf- prefix to get actual document numbers
+    const pfDocNumbers = pfIds.map(id => id.replace(/^pf-/, ''));
 
-      if (records.length !== recordIds.length) {
+    // Look up property records
+    let propertyRecords = [];
+    if (propertyIds.length > 0) {
+      propertyRecords = await prisma.property.findMany({
+        where: { id: { in: propertyIds } }
+      });
+      if (propertyRecords.length !== propertyIds.length) {
+        const found = new Set(propertyRecords.map(r => r.id));
+        const missing = propertyIds.filter(id => !found.has(id));
+        console.error('[ROUTES] Missing property IDs:', missing);
         return res.status(400).json({ error: 'Some property records not found' });
       }
+    }
 
-      routeRecordsData = recordIds.map((propertyId, index) => {
-        const record = records.find(r => r.id === propertyId);
-        if (!record) {
-          throw new Error(`Property ${propertyId} not found`);
-        }
-        // Find if this is the depot in routeData
-        const isDepot = routeData.routes?.[0]?.waypoints?.[0]?.id === propertyId ||
-                       routeData.routes?.[0]?.waypoints?.[0]?.originalId === propertyId;
-
-        return {
-          propertyId: record.id,
-          orderIndex: index,
-          isDepot: isDepot || false
-        };
+    // Look up pre-foreclosure records
+    let pfRecords = [];
+    if (pfDocNumbers.length > 0) {
+      pfRecords = await prisma.preForeclosure.findMany({
+        where: { documentNumber: { in: pfDocNumbers } }
       });
-    } else {
-      // For pre-foreclosures, recordIds are document numbers
-      records = await prisma.preForeclosure.findMany({
-        where: {
-          documentNumber: { in: recordIds }
-        }
-      });
-
-      if (records.length !== recordIds.length) {
+      if (pfRecords.length !== pfDocNumbers.length) {
+        const found = new Set(pfRecords.map(r => r.documentNumber));
+        const missing = pfDocNumbers.filter(dn => !found.has(dn));
+        console.error('[ROUTES] Missing pre-foreclosure doc numbers:', missing);
         return res.status(400).json({ error: 'Some pre-foreclosure records not found' });
       }
+    }
 
-      routeRecordsData = recordIds.map((documentNumber, index) => {
-        const record = records.find(r => r.documentNumber === documentNumber);
-        if (!record) {
-          throw new Error(`Record ${documentNumber} not found`);
-        }
-        // Find if this is the depot in routeData
-        const isDepot = routeData.routes?.[0]?.waypoints?.[0]?.id === documentNumber ||
-                       routeData.routes?.[0]?.waypoints?.[0]?.originalId === documentNumber;
+    // Build route records data for both types
+    const propertyMap = new Map(propertyRecords.map(r => [r.id, r]));
+    const pfMap = new Map(pfRecords.map(r => [r.documentNumber, r]));
 
+    routeRecordsData = recordIds.map((id, index) => {
+      const isDepot = routeData.routes?.[0]?.waypoints?.[0]?.id === id ||
+                     routeData.routes?.[0]?.waypoints?.[0]?.originalId === id;
+
+      if (id.startsWith('pf-')) {
+        const docNumber = id.replace(/^pf-/, '');
+        const record = pfMap.get(docNumber);
         return {
           preForeclosureId: record.id,
           orderIndex: index,
           isDepot: isDepot || false
         };
-      });
-    }
+      } else {
+        const record = propertyMap.get(id);
+        return {
+          propertyId: record.id,
+          orderIndex: index,
+          isDepot: isDepot || false
+        };
+      }
+    });
 
     // Create route with records
     const route = await prisma.route.create({
