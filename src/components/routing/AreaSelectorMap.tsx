@@ -285,6 +285,7 @@ export function AreaSelectorMap({
 }: AreaSelectorMapProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [includePreForeclosure, setIncludePreForeclosure] = useState(false);
+  const [pfRecordedDateFrom, setPfRecordedDateFrom] = useState<string>('');
   const [drawingMode, setDrawingMode] = useState<'rectangle' | 'circle' | 'polygon' | 'pin' | null>(null);
   const [selectedShape, setSelectedShape] = useState<{ type: 'rectangle' | 'circle' | 'polygon'; bounds: LatLngBounds; center?: LatLng; radius?: number; polygon?: LatLng[] } | null>(null);
   const [drawnRectangle, setDrawnRectangle] = useState<LatLngBounds | null>(null);
@@ -306,16 +307,27 @@ export function AreaSelectorMap({
   const [loadedZone, setLoadedZone] = useState<SavedZone | null>(null);
   const [allSavedZones, setAllSavedZones] = useState<SavedZone[]>([]);
 
-  // Merge regular + pre-foreclosure properties when toggle is on
+  // Filter pre-foreclosure by recorded date, then merge with regular properties
+  const filteredPfProperties = useMemo(() => {
+    if (!includePreForeclosure || preForeclosureProperties.length === 0) return [];
+    if (!pfRecordedDateFrom) return preForeclosureProperties;
+    const fromDate = new Date(pfRecordedDateFrom);
+    return preForeclosureProperties.filter(p => {
+      const rd = p.recorded_date;
+      if (!rd) return false;
+      return new Date(rd) >= fromDate;
+    });
+  }, [preForeclosureProperties, includePreForeclosure, pfRecordedDateFrom]);
+
   const allProperties = useMemo(() => {
-    if (!includePreForeclosure || preForeclosureProperties.length === 0) return properties;
-    return [...properties, ...preForeclosureProperties];
-  }, [properties, preForeclosureProperties, includePreForeclosure]);
+    if (!includePreForeclosure) return properties;
+    return [...properties, ...filteredPfProperties];
+  }, [properties, filteredPfProperties, includePreForeclosure]);
 
   // Set of pre-foreclosure IDs for color coding
   const pfIdSet = useMemo(() => {
-    return new Set(preForeclosureProperties.map(p => p.id));
-  }, [preForeclosureProperties]);
+    return new Set(filteredPfProperties.map(p => p.id));
+  }, [filteredPfProperties]);
 
   // Calculate property counts for all saved zones
   // Track both total properties and available properties (not in routes)
@@ -389,6 +401,7 @@ export function AreaSelectorMap({
       setSelectedProperties([]);
       setStartingPointValidation(null);
       setIncludePreForeclosure(false);
+      setPfRecordedDateFrom('');
       // Load all saved zones to display on map
       loadZones().then(setAllSavedZones).catch(error => {
         console.error('Failed to load zones:', error);
@@ -1029,15 +1042,35 @@ export function AreaSelectorMap({
                   )}
                   {/* Pre-Foreclosure Toggle */}
                   {preForeclosureProperties.length > 0 && (
-                    <Button
-                      variant={includePreForeclosure ? 'default' : 'outline'}
-                      size="sm"
-                      className={includePreForeclosure ? 'w-full bg-amber-600 hover:bg-amber-700' : 'w-full'}
-                      onClick={() => setIncludePreForeclosure(!includePreForeclosure)}
-                    >
-                      <span className={`inline-block w-3 h-3 rounded-full mr-2 ${includePreForeclosure ? 'bg-white' : 'bg-amber-500'}`} />
-                      Include Pre-Foreclosure ({preForeclosureProperties.length})
-                    </Button>
+                    <div className="space-y-2">
+                      <Button
+                        variant={includePreForeclosure ? 'default' : 'outline'}
+                        size="sm"
+                        className={includePreForeclosure ? 'w-full bg-amber-600 hover:bg-amber-700' : 'w-full'}
+                        onClick={() => {
+                          if (includePreForeclosure) {
+                            setIncludePreForeclosure(false);
+                            setPfRecordedDateFrom('');
+                          } else {
+                            setIncludePreForeclosure(true);
+                          }
+                        }}
+                      >
+                        <span className={`inline-block w-3 h-3 rounded-full mr-2 ${includePreForeclosure ? 'bg-white' : 'bg-amber-500'}`} />
+                        Include Pre-Foreclosure ({includePreForeclosure ? filteredPfProperties.length : preForeclosureProperties.length})
+                      </Button>
+                      {includePreForeclosure && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-muted-foreground whitespace-nowrap">Recorded from:</label>
+                          <Input
+                            type="date"
+                            value={pfRecordedDateFrom}
+                            onChange={(e) => setPfRecordedDateFrom(e.target.value)}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      )}
+                    </div>
                   )}
                   {/* Map Legend */}
                   <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground pt-1">

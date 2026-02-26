@@ -386,6 +386,7 @@ export function PropertiesView() {
         propertyAddress: `${r.address}, ${r.city} ${r.zip}`,
         ownerName: r.ownerName || 'N/A',
         accountNumber: r.document_number,
+        recorded_date: r.recorded_date || null,
       }));
   }, [preForeclosureForMap]);
 
