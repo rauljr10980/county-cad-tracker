@@ -21,7 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { AdvancedFiltersPanel, AdvancedFilters } from './AdvancedFilters';
-import { Property, PropertyStatus, WorkflowStage } from '@/types/property';
+import { Property, PropertyStatus, WorkflowStage, PreForeclosureRecord } from '@/types/property';
 import { useProperties } from '@/hooks/useFiles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -363,21 +363,13 @@ export function PropertiesView() {
   const [sortField, setSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
-  // Pre-foreclosure address set for "In Foreclosure" filter
-  const [foreclosureAddresses, setForeclosureAddresses] = useState<Set<string>>(new Set());
+  // Pre-foreclosure records for "In Foreclosure" filter
+  const [foreclosureRecords, setForeclosureRecords] = useState<PreForeclosureRecord[]>([]);
   useEffect(() => {
     (async () => {
       try {
         const records = await getPreForeclosures();
-        const addrSet = new Set<string>();
-        for (const r of records) {
-          if (r.address) {
-            // Normalize: extract street number + name, uppercase
-            const norm = r.address.trim().toUpperCase().replace(/\s+/g, ' ');
-            if (norm) addrSet.add(norm);
-          }
-        }
-        setForeclosureAddresses(addrSet);
+        setForeclosureRecords(records);
       } catch {
         // silently fail
       }
@@ -827,13 +819,8 @@ export function PropertiesView() {
         if (p.isPrimaryProperty !== false) return false;
       }
 
-      // In Foreclosure filter
-      if (advancedFilters.inForeclosure === 'yes' || advancedFilters.inForeclosure === 'no') {
-        const propAddr = (p.propertyAddress || '').toUpperCase().replace(/\s+/g, ' ');
-        const isInForeclosure = Array.from(foreclosureAddresses).some(fa => propAddr.includes(fa));
-        if (advancedFilters.inForeclosure === 'yes' && !isInForeclosure) return false;
-        if (advancedFilters.inForeclosure === 'no' && isInForeclosure) return false;
-      }
+      // In Foreclosure filter — "no" just shows normal properties (skip foreclosure injection handled below)
+      // "yes" is handled after the filter loop by injecting pre-foreclosure records directly
 
       // Follow-up Date range
       if (advancedFilters.followUpDateFrom) {
@@ -927,8 +914,27 @@ export function PropertiesView() {
       });
     }
     
+    // If "In Foreclosure: Yes", replace results with pre-foreclosure records converted to Property objects
+    if (advancedFilters.inForeclosure === 'yes') {
+      return foreclosureRecords.map((r): Property => ({
+        id: `pf-${r.document_number}`,
+        accountNumber: r.document_number,
+        ownerName: 'N/A',
+        propertyAddress: `${r.address}, ${r.city} ${r.zip}`,
+        mailingAddress: 'N/A',
+        status: 'UNKNOWN' as PropertyStatus,
+        totalAmountDue: 0,
+        totalPercentage: 0,
+        notes: r.notes || '',
+        phoneNumbers: r.phoneNumbers || [],
+        ownerPhoneIndex: r.ownerPhoneIndex,
+        latitude: r.latitude,
+        longitude: r.longitude,
+      }));
+    }
+
     return filtered;
-  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery, propertiesInRoutes, workflowStageFilter, foreclosureAddresses]);
+  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery, propertiesInRoutes, workflowStageFilter, foreclosureRecords]);
   
   // Apply sorting to all properties before pagination (only for filtered cases)
   const sortedProperties = useMemo(() => {
