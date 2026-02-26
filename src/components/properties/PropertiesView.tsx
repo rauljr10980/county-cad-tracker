@@ -3436,6 +3436,7 @@ export function PropertiesView() {
                                             handleViewRecordDetails={handleViewRecordDetails}
                                             markingVisited={markingVisited}
                                             handleDealStageChange={handleDealStageChange}
+                                            handleOpenVisitWizard={handleOpenVisitWizard}
                                           />
                                         );
                                       })}
