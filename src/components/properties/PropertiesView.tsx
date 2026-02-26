@@ -22,6 +22,7 @@ import { PropertyTable } from './PropertyTable';
 import { PropertyDetailsModal } from './PropertyDetailsModal';
 import { AdvancedFiltersPanel, AdvancedFilters } from './AdvancedFilters';
 import { Property, PropertyStatus, WorkflowStage, PreForeclosureRecord } from '@/types/property';
+import { FullDetailsModal } from '@/components/preforeclosure/FullDetailsModal';
 import { useProperties } from '@/hooks/useFiles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -289,6 +290,7 @@ function SortableRouteRow({
 export function PropertiesView() {
   const queryClient = useQueryClient();
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [selectedPfRecord, setSelectedPfRecord] = useState<PreForeclosureRecord | null>(null);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<Set<string>>(new Set());
   const numVehicles = 1; // Always use 1 vehicle
   const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
@@ -2176,10 +2178,20 @@ export function PropertiesView() {
     }
   };
 
-  const handleViewRecordDetails = (propertyId: string) => {
-    const property = rawProperties.find(p => p.id === propertyId);
-    if (property) {
-      setSelectedProperty(property);
+  const handleViewRecordDetails = (recordId: string) => {
+    if (recordId.startsWith('pf-')) {
+      // Pre-foreclosure record — open FullDetailsModal
+      const docNumber = recordId.replace(/^pf-/, '');
+      const pfRecord = preForeclosureForMap.find(r => r.document_number === docNumber);
+      if (pfRecord) {
+        setSelectedPfRecord(pfRecord);
+      }
+    } else {
+      // Regular property
+      const property = rawProperties.find(p => p.id === recordId);
+      if (property) {
+        setSelectedProperty(property);
+      }
     }
   };
 
@@ -2883,6 +2895,13 @@ export function PropertiesView() {
         onClose={() => setSelectedProperty(null)}
       />
 
+      {/* Pre-Foreclosure Details Modal (for route stops) */}
+      <FullDetailsModal
+        record={selectedPfRecord}
+        isOpen={!!selectedPfRecord}
+        onClose={() => setSelectedPfRecord(null)}
+      />
+
       {/* Visit Wizard Popup */}
       <Dialog open={visitWizardOpen} onOpenChange={(open) => { if (!open) setVisitWizardOpen(false); }}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden bg-card border-border p-4 sm:p-6">
@@ -3345,7 +3364,7 @@ export function PropertiesView() {
                                 {sortedRecords.map((routeRecord, index) => {
                                   const record = routeRecord.record;
                                   if (!record) return null;
-                                  const propertyId = record.id;
+                                  const propertyId = record.document_number ? `pf-${record.document_number}` : record.id;
                                   if (!propertyId) return null;
                                   return (
                                     <SortableRouteRow
