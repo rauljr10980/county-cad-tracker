@@ -40,7 +40,6 @@ export interface AdvancedFilters {
   followUpDateTo?: string;
   lastPaymentDateFrom?: string;
   lastPaymentDateTo?: string;
-  inForeclosure?: 'yes' | 'no' | 'any';
 }
 
 interface AdvancedFiltersProps {
@@ -553,37 +552,6 @@ export function AdvancedFiltersPanel({
                 className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 2nd Property
-              </Button>
-            </div>
-          </div>
-
-          {/* In Foreclosure */}
-          <div className="space-y-3">
-            <Label>In Foreclosure</Label>
-            <div className="flex gap-2">
-              <Button
-                variant={filters.inForeclosure === 'any' || !filters.inForeclosure ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => updateFilter('inForeclosure', 'any')}
-                className="flex-1 mobile-touch-target text-xs sm:text-sm"
-              >
-                Any
-              </Button>
-              <Button
-                variant={filters.inForeclosure === 'yes' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => updateFilter('inForeclosure', 'yes')}
-                className="flex-1 mobile-touch-target text-xs sm:text-sm"
-              >
-                Yes
-              </Button>
-              <Button
-                variant={filters.inForeclosure === 'no' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => updateFilter('inForeclosure', 'no')}
-                className="flex-1 mobile-touch-target text-xs sm:text-sm"
-              >
-                No
               </Button>
             </div>
           </div>

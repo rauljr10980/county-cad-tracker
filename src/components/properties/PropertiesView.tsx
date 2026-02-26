@@ -354,7 +354,6 @@ export function PropertiesView() {
     followUpDateTo: undefined,
     lastPaymentDateFrom: undefined,
     lastPaymentDateTo: undefined,
-    inForeclosure: 'any',
   });
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -363,18 +362,32 @@ export function PropertiesView() {
   const [sortField, setSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
-  // Pre-foreclosure records for "In Foreclosure" filter
-  const [foreclosureRecords, setForeclosureRecords] = useState<PreForeclosureRecord[]>([]);
+  // Pre-foreclosure records for AreaSelectorMap toggle
+  const [preForeclosureForMap, setPreForeclosureForMap] = useState<PreForeclosureRecord[]>([]);
   useEffect(() => {
     (async () => {
       try {
         const records = await getPreForeclosures();
-        setForeclosureRecords(records);
+        setPreForeclosureForMap(records);
       } catch {
         // silently fail
       }
     })();
   }, []);
+
+  // Convert pre-foreclosure records to PropertyLike objects for map display
+  const preForeclosureMapProperties = useMemo(() => {
+    return preForeclosureForMap
+      .filter(r => !r.inactive && r.latitude != null && r.longitude != null)
+      .map(r => ({
+        id: `pf-${r.document_number}`,
+        latitude: r.latitude!,
+        longitude: r.longitude!,
+        propertyAddress: `${r.address}, ${r.city} ${r.zip}`,
+        ownerName: r.ownerName || 'N/A',
+        accountNumber: r.document_number,
+      }));
+  }, [preForeclosureForMap]);
 
   // Convert advancedFilters.statuses to legacy format for API
   const selectedStatuses = advancedFilters.statuses;
@@ -411,8 +424,7 @@ export function PropertiesView() {
       (advancedFilters.followUpDateFrom !== undefined) ||
       (advancedFilters.followUpDateTo !== undefined) ||
       (advancedFilters.lastPaymentDateFrom !== undefined) ||
-      (advancedFilters.lastPaymentDateTo !== undefined) ||
-      (advancedFilters.inForeclosure !== 'any' && advancedFilters.inForeclosure !== undefined)
+      (advancedFilters.lastPaymentDateTo !== undefined)
     );
   }, [advancedFilters]);
   
@@ -819,9 +831,6 @@ export function PropertiesView() {
         if (p.isPrimaryProperty !== false) return false;
       }
 
-      // In Foreclosure filter — "no" just shows normal properties (skip foreclosure injection handled below)
-      // "yes" is handled after the filter loop by injecting pre-foreclosure records directly
-
       // Follow-up Date range
       if (advancedFilters.followUpDateFrom) {
         if (!p.lastFollowUp) return false;
@@ -914,39 +923,8 @@ export function PropertiesView() {
       });
     }
     
-    // If "In Foreclosure: Yes", replace results with pre-foreclosure records converted to Property objects
-    if (advancedFilters.inForeclosure === 'yes') {
-      const converted = foreclosureRecords
-        .filter(r => !r.inactive)
-        .map((r): Property => ({
-          id: `pf-${r.document_number}`,
-          accountNumber: r.document_number,
-          ownerName: r.ownerName || 'N/A',
-          propertyAddress: `${r.address}, ${r.city} ${r.zip}`,
-          mailingAddress: r.ownerAddress || 'N/A',
-          status: 'UNKNOWN' as PropertyStatus,
-          totalAmountDue: 0,
-          totalPercentage: 0,
-          notes: r.notes || '',
-          phoneNumbers: r.phoneNumbers || [],
-          ownerPhoneIndex: r.ownerPhoneIndex,
-          latitude: r.latitude,
-          longitude: r.longitude,
-        }));
-      // Apply search filter if active
-      if (debouncedSearchQuery && debouncedSearchQuery.trim()) {
-        const q = debouncedSearchQuery.trim().toUpperCase();
-        return converted.filter(p =>
-          p.ownerName.toUpperCase().includes(q) ||
-          p.propertyAddress.toUpperCase().includes(q) ||
-          p.accountNumber.toUpperCase().includes(q)
-        );
-      }
-      return converted;
-    }
-
     return filtered;
-  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery, propertiesInRoutes, workflowStageFilter, foreclosureRecords]);
+  }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery, propertiesInRoutes, workflowStageFilter]);
   
   // Apply sorting to all properties before pagination (only for filtered cases)
   const sortedProperties = useMemo(() => {
@@ -1202,7 +1180,6 @@ export function PropertiesView() {
       followUpDateTo: undefined,
       lastPaymentDateFrom: undefined,
       lastPaymentDateTo: undefined,
-      inForeclosure: 'any',
     });
     setPage(1);
   };
@@ -2957,6 +2934,7 @@ export function PropertiesView() {
       <AreaSelectorMap
         isOpen={areaSelectorOpen}
         onClose={() => setAreaSelectorOpen(false)}
+        preForeclosureProperties={preForeclosureMapProperties}
         onOptimize={async ({ startingPoint, area, selectedProperties }) => {
           console.log('[onOptimize] Called from AreaSelectorMap:', {
             selectedPropertiesCount: selectedProperties.length,
@@ -2964,9 +2942,33 @@ export function PropertiesView() {
             areaType: area.polygon ? 'polygon' : area.radius !== undefined ? 'circle' : 'rectangle'
           });
 
-          // Find the property that matches the starting point (use filteredProperties to match what's shown on map)
-          const depotProperty = filteredProperties.find(p => p.id === startingPoint.property.id);
-          
+          // Helper to convert a pre-foreclosure record to a Property object
+          const pfRecordMap = new Map(preForeclosureForMap.map(r => [`pf-${r.document_number}`, r]));
+          const convertPfToProperty = (id: string): Property | null => {
+            const r = pfRecordMap.get(id);
+            if (!r || r.latitude == null || r.longitude == null) return null;
+            return {
+              id,
+              accountNumber: r.document_number,
+              ownerName: r.ownerName || 'N/A',
+              propertyAddress: `${r.address}, ${r.city} ${r.zip}`,
+              mailingAddress: r.ownerAddress || 'N/A',
+              status: 'UNKNOWN' as PropertyStatus,
+              totalAmountDue: 0,
+              totalPercentage: 0,
+              notes: r.notes || '',
+              phoneNumbers: r.phoneNumbers || [],
+              latitude: r.latitude,
+              longitude: r.longitude,
+            };
+          };
+
+          // Find the property that matches the starting point
+          const isPfDepot = startingPoint.property.id.startsWith('pf-');
+          const depotProperty = isPfDepot
+            ? convertPfToProperty(startingPoint.property.id)
+            : filteredProperties.find(p => p.id === startingPoint.property.id);
+
           if (!depotProperty) {
             toast({
               title: "Error",
@@ -3035,12 +3037,19 @@ export function PropertiesView() {
           
           // Convert to Property objects - trust that AreaSelectorMap already limited and validated
           for (const sp of selectedProperties) {
-            const fullProperty = propertyMap.get(sp.id);
-            if (!fullProperty || fullProperty.latitude == null || fullProperty.longitude == null) {
-              console.warn(`[Route Optimization] Property ${sp.id} not found or missing coordinates, skipping`);
-              continue;
+            if (sp.id.startsWith('pf-')) {
+              // Pre-foreclosure property
+              const pfProp = convertPfToProperty(sp.id);
+              if (pfProp) propertiesToOptimize.push(pfProp);
+              else console.warn(`[Route Optimization] Pre-foreclosure ${sp.id} not found, skipping`);
+            } else {
+              const fullProperty = propertyMap.get(sp.id);
+              if (!fullProperty || fullProperty.latitude == null || fullProperty.longitude == null) {
+                console.warn(`[Route Optimization] Property ${sp.id} not found or missing coordinates, skipping`);
+                continue;
+              }
+              propertiesToOptimize.push(fullProperty);
             }
-            propertiesToOptimize.push(fullProperty);
           }
 
           console.log('[Route Optimization] Converted to Property objects:', {

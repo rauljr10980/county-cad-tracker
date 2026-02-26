@@ -56,6 +56,7 @@ interface AreaSelectorMapProps {
   }) => void;
   unavailablePropertyIds?: Set<string>; // Properties that are depots or in progress
   properties?: PropertyLike[];
+  preForeclosureProperties?: PropertyLike[];
   initialCenter?: { lat: number; lng: number };
   initialZoom?: number;
   numVehicles?: number;
@@ -271,17 +272,19 @@ function PropertyCountOverlay({
   );
 }
 
-export function AreaSelectorMap({ 
-  isOpen, 
-  onClose, 
+export function AreaSelectorMap({
+  isOpen,
+  onClose,
   onOptimize,
   unavailablePropertyIds = new Set(),
   properties = [],
+  preForeclosureProperties = [],
   initialCenter = { lat: 29.4241, lng: -98.4936 },
   initialZoom = 11,
   numVehicles = 1
 }: AreaSelectorMapProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [includePreForeclosure, setIncludePreForeclosure] = useState(false);
   const [drawingMode, setDrawingMode] = useState<'rectangle' | 'circle' | 'polygon' | 'pin' | null>(null);
   const [selectedShape, setSelectedShape] = useState<{ type: 'rectangle' | 'circle' | 'polygon'; bounds: LatLngBounds; center?: LatLng; radius?: number; polygon?: LatLng[] } | null>(null);
   const [drawnRectangle, setDrawnRectangle] = useState<LatLngBounds | null>(null);
@@ -303,13 +306,24 @@ export function AreaSelectorMap({
   const [loadedZone, setLoadedZone] = useState<SavedZone | null>(null);
   const [allSavedZones, setAllSavedZones] = useState<SavedZone[]>([]);
 
+  // Merge regular + pre-foreclosure properties when toggle is on
+  const allProperties = useMemo(() => {
+    if (!includePreForeclosure || preForeclosureProperties.length === 0) return properties;
+    return [...properties, ...preForeclosureProperties];
+  }, [properties, preForeclosureProperties, includePreForeclosure]);
+
+  // Set of pre-foreclosure IDs for color coding
+  const pfIdSet = useMemo(() => {
+    return new Set(preForeclosureProperties.map(p => p.id));
+  }, [preForeclosureProperties]);
+
   // Calculate property counts for all saved zones
   // Track both total properties and available properties (not in routes)
   const savedZoneCounts = useMemo(() => {
     const counts: Record<string, { total: number; available: number }> = {};
 
     console.log('=== Calculating Saved Zone Counts ===');
-    console.log('Total properties to check:', properties.length);
+    console.log('Total properties to check:', allProperties.length);
     console.log('Unavailable property IDs:', unavailablePropertyIds.size);
     console.log('Number of saved zones:', allSavedZones.length);
 
@@ -318,7 +332,7 @@ export function AreaSelectorMap({
       let availableCount = 0;
       let skippedNoCoords = 0;
 
-      properties.forEach(p => {
+      allProperties.forEach(p => {
         if (!p.latitude || !p.longitude) {
           skippedNoCoords++;
           return;
@@ -358,7 +372,7 @@ export function AreaSelectorMap({
     console.log('=== End Zone Count Calculation ===');
 
     return counts;
-  }, [allSavedZones, properties, unavailablePropertyIds]);
+  }, [allSavedZones, allProperties, unavailablePropertyIds]);
 
   // Reset when modal opens/closes
   useEffect(() => {
@@ -374,6 +388,7 @@ export function AreaSelectorMap({
       setPolygonPointsBeingDrawn([]);
       setSelectedProperties([]);
       setStartingPointValidation(null);
+      setIncludePreForeclosure(false);
       // Load all saved zones to display on map
       loadZones().then(setAllSavedZones).catch(error => {
         console.error('Failed to load zones:', error);
@@ -390,7 +405,7 @@ export function AreaSelectorMap({
     let totalCount = 0;
     let availableCount = 0;
 
-    properties.forEach(p => {
+    allProperties.forEach(p => {
       if (!p.latitude || !p.longitude) return;
       const point = { lat: p.latitude, lng: p.longitude };
       let isInZone = false;
@@ -472,7 +487,7 @@ export function AreaSelectorMap({
     setPinLocation(latlng);
     setIsFindingClosest(true);
 
-    const validProperties = properties.filter(p => p.latitude != null && p.longitude != null);
+    const validProperties = allProperties.filter(p => p.latitude != null && p.longitude != null);
     if (validProperties.length === 0) {
       setClosestProperty(null);
       setIsFindingClosest(false);
@@ -550,8 +565,8 @@ export function AreaSelectorMap({
       const propsInZoneForDisplay: PropertyLike[] = [];
 
       // First pass: Count and collect properties from the filtered set (limit collection to avoid memory issues)
-      // This only considers properties that match current filters (e.g., 435 filtered properties)
-      for (const p of properties) {
+      // This considers filtered properties + pre-foreclosure when toggle is on
+      for (const p of allProperties) {
         if (!p.latitude || !p.longitude) continue;
         const point = { lat: p.latitude, lng: p.longitude };
         let isInZone = false;
@@ -608,10 +623,10 @@ export function AreaSelectorMap({
         const candidateProps: Array<{ prop: PropertyLike; distance: number }> = [];
         const startingPoint = { lat: closestProperty.latitude!, lng: closestProperty.longitude! };
         
-        for (const p of properties) {
+        for (const p of allProperties) {
           if (!p.latitude || !p.longitude) continue;
           if (p.id && unavailablePropertyIds.has(p.id)) continue;
-          
+
           const point = { lat: p.latitude, lng: p.longitude };
           let isInZone = false;
 
@@ -1012,8 +1027,20 @@ export function AreaSelectorMap({
                       Area drawn successfully!
                     </div>
                   )}
+                  {/* Pre-Foreclosure Toggle */}
+                  {preForeclosureProperties.length > 0 && (
+                    <Button
+                      variant={includePreForeclosure ? 'default' : 'outline'}
+                      size="sm"
+                      className={includePreForeclosure ? 'w-full bg-amber-600 hover:bg-amber-700' : 'w-full'}
+                      onClick={() => setIncludePreForeclosure(!includePreForeclosure)}
+                    >
+                      <span className={`inline-block w-3 h-3 rounded-full mr-2 ${includePreForeclosure ? 'bg-white' : 'bg-amber-500'}`} />
+                      Include Pre-Foreclosure ({preForeclosureProperties.length})
+                    </Button>
+                  )}
                   {/* Map Legend */}
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground pt-1">
                     <div className="flex items-center gap-1.5">
                       <span className="inline-block w-3 h-3 rounded-full bg-[#10B981]" />
                       Available
@@ -1026,6 +1053,12 @@ export function AreaSelectorMap({
                       <span className="inline-block w-3 h-3 rounded-full bg-[#EF4444]" />
                       In Route
                     </div>
+                    {includePreForeclosure && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-block w-3 h-3 rounded-full bg-[#F59E0B]" />
+                        Pre-Foreclosure
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1169,13 +1202,14 @@ export function AreaSelectorMap({
                 )}
 
                 {/* Display all properties as small dots on Step 1 (skip if >10k for performance) */}
-                {step === 1 && properties.length <= 10000 && properties.map((p) => {
+                {step === 1 && allProperties.length <= 10000 && allProperties.map((p) => {
                   if (!p.latitude || !p.longitude) return null;
+                  const isPf = pfIdSet.has(p.id);
                   const isVisited = p.visited === true;
                   const visitCount = (p as any).visit_count || 0;
                   const isInRoute = p.id ? unavailablePropertyIds.has(p.id) : false;
-                  const color = isInRoute ? '#EF4444' : isVisited ? '#3B82F6' : '#10B981';
-                  const label = isInRoute ? 'In Route' : isVisited ? `Visited (${visitCount}x)` : 'Available';
+                  const color = isInRoute ? '#EF4444' : isPf ? '#F59E0B' : isVisited ? '#3B82F6' : '#10B981';
+                  const label = isInRoute ? 'In Route' : isPf ? 'Pre-Foreclosure' : isVisited ? `Visited (${visitCount}x)` : 'Available';
                   return (
                     <CircleMarker
                       key={`prop-${p.id}`}
