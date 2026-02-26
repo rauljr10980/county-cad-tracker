@@ -2179,18 +2179,33 @@ export function PropertiesView() {
   };
 
   const handleViewRecordDetails = (recordId: string) => {
+    // Check if it's a pf- prefixed ID (from map selection)
     if (recordId.startsWith('pf-')) {
-      // Pre-foreclosure record — open FullDetailsModal
       const docNumber = recordId.replace(/^pf-/, '');
       const pfRecord = preForeclosureForMap.find(r => r.document_number === docNumber);
       if (pfRecord) {
         setSelectedPfRecord(pfRecord);
+        return;
       }
-    } else {
-      // Regular property
-      const property = rawProperties.find(p => p.id === recordId);
-      if (property) {
-        setSelectedProperty(property);
+    }
+
+    // Try regular property first
+    const property = rawProperties.find(p => p.id === recordId);
+    if (property) {
+      setSelectedProperty(property);
+      return;
+    }
+
+    // Not found in properties — check if it's a pre-foreclosure record from a saved route
+    // Route records have the pre-foreclosure DB id, so look up by checking viewRoute records
+    if (viewRoute) {
+      const routeRec = viewRoute.records.find(rr => rr.record?.id === recordId);
+      if (routeRec?.record?.document_number) {
+        const pfRecord = preForeclosureForMap.find(r => r.document_number === routeRec.record.document_number);
+        if (pfRecord) {
+          setSelectedPfRecord(pfRecord);
+          return;
+        }
       }
     }
   };
@@ -3364,7 +3379,7 @@ export function PropertiesView() {
                                 {sortedRecords.map((routeRecord, index) => {
                                   const record = routeRecord.record;
                                   if (!record) return null;
-                                  const propertyId = record.document_number ? `pf-${record.document_number}` : record.id;
+                                  const propertyId = record.id;
                                   if (!propertyId) return null;
                                   return (
                                     <SortableRouteRow
@@ -3404,7 +3419,7 @@ export function PropertiesView() {
                                       {sortedRecords.map((routeRecord, index) => {
                                         const record = routeRecord.record;
                                         if (!record) return null;
-                                        const propertyId = record.document_number ? `pf-${record.document_number}` : record.id;
+                                        const propertyId = record.id;
                                         if (!propertyId) return null;
                                         return (
                                           <SortableRouteRow
