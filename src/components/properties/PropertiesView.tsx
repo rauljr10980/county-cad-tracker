@@ -916,21 +916,33 @@ export function PropertiesView() {
     
     // If "In Foreclosure: Yes", replace results with pre-foreclosure records converted to Property objects
     if (advancedFilters.inForeclosure === 'yes') {
-      return foreclosureRecords.map((r): Property => ({
-        id: `pf-${r.document_number}`,
-        accountNumber: r.document_number,
-        ownerName: 'N/A',
-        propertyAddress: `${r.address}, ${r.city} ${r.zip}`,
-        mailingAddress: 'N/A',
-        status: 'UNKNOWN' as PropertyStatus,
-        totalAmountDue: 0,
-        totalPercentage: 0,
-        notes: r.notes || '',
-        phoneNumbers: r.phoneNumbers || [],
-        ownerPhoneIndex: r.ownerPhoneIndex,
-        latitude: r.latitude,
-        longitude: r.longitude,
-      }));
+      const converted = foreclosureRecords
+        .filter(r => !r.inactive)
+        .map((r): Property => ({
+          id: `pf-${r.document_number}`,
+          accountNumber: r.document_number,
+          ownerName: r.ownerName || 'N/A',
+          propertyAddress: `${r.address}, ${r.city} ${r.zip}`,
+          mailingAddress: r.ownerAddress || 'N/A',
+          status: 'UNKNOWN' as PropertyStatus,
+          totalAmountDue: 0,
+          totalPercentage: 0,
+          notes: r.notes || '',
+          phoneNumbers: r.phoneNumbers || [],
+          ownerPhoneIndex: r.ownerPhoneIndex,
+          latitude: r.latitude,
+          longitude: r.longitude,
+        }));
+      // Apply search filter if active
+      if (debouncedSearchQuery && debouncedSearchQuery.trim()) {
+        const q = debouncedSearchQuery.trim().toUpperCase();
+        return converted.filter(p =>
+          p.ownerName.toUpperCase().includes(q) ||
+          p.propertyAddress.toUpperCase().includes(q) ||
+          p.accountNumber.toUpperCase().includes(q)
+        );
+      }
+      return converted;
     }
 
     return filtered;
