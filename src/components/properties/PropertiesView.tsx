@@ -3404,7 +3404,7 @@ export function PropertiesView() {
                                       {sortedRecords.map((routeRecord, index) => {
                                         const record = routeRecord.record;
                                         if (!record) return null;
-                                        const propertyId = record.id;
+                                        const propertyId = record.document_number ? `pf-${record.document_number}` : record.id;
                                         if (!propertyId) return null;
                                         return (
                                           <SortableRouteRow
