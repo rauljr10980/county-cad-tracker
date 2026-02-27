@@ -33,10 +33,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
-  const [phoneNumbers, setPhoneNumbers] = useState<string[]>(['', '', '', '', '', '']);
+  const [phoneContacts, setPhoneContacts] = useState<{ name: string; phones: string[] }[]>(
+    Array.from({ length: 6 }, () => ({ name: '', phones: [''] }))
+  );
   const [ownerPhoneIndex, setOwnerPhoneIndex] = useState<number | undefined>(undefined);
   const [savingPhones, setSavingPhones] = useState(false);
-  const [contactName, setContactName] = useState('');
 
   // Actions & Tasks state
   const [actionType, setActionType] = useState<'call' | 'text' | 'mail' | 'driveby' | ''>('');
@@ -91,15 +92,14 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
     if (property && isOpen) {
       setNotes(property.notes || '');
       setIsEditingNotes(false);
+      // Initialize phone contacts — put all existing phones in row 1
       const phones = property.phoneNumbers || [];
-      setPhoneNumbers([
-        phones[0] || '',
-        phones[1] || '',
-        phones[2] || '',
-        phones[3] || '',
-        phones[4] || '',
-        phones[5] || '',
-      ]);
+      const initPhoneContacts = Array.from({ length: 6 }, () => ({ name: '', phones: [''] }));
+      if (phones.length > 0) {
+        initPhoneContacts[0] = { name: '', phones: phones.filter(p => p) };
+        if (initPhoneContacts[0].phones.length === 0) initPhoneContacts[0].phones = [''];
+      }
+      setPhoneContacts(initPhoneContacts);
       setOwnerPhoneIndex(property.ownerPhoneIndex);
 
       // Initialize actions & tasks
@@ -115,7 +115,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       // Initialize saved emails and contact extractor
       setEmails(property.emails || []);
       setRawContactText('');
-      setContactName('');
 
       // Initialize email template
       setEmailRecipients(Array.from({ length: 6 }, () => ({ name: '', emails: [''] })));
@@ -272,13 +271,14 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const handleSavePhoneNumbers = async () => {
     setSavingPhones(true);
     try {
-      const filteredPhones = phoneNumbers.filter(p => p.trim() !== '');
-      await updatePropertyPhoneNumbers(property.id, filteredPhones, ownerPhoneIndex);
+      // Collect all non-empty phones from all rows
+      const allPhones = phoneContacts.flatMap(row => row.phones.filter(p => p.trim() !== ''));
+      await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex);
       toast({
         title: "Phone Numbers Saved",
-        description: `Phone numbers saved for ${property.accountNumber}`,
+        description: `${allPhones.length} phone number${allPhones.length !== 1 ? 's' : ''} saved for ${property.accountNumber}`,
       });
-      property.phoneNumbers = filteredPhones;
+      property.phoneNumbers = allPhones;
       property.ownerPhoneIndex = ownerPhoneIndex;
     } catch (error) {
       toast({
@@ -960,7 +960,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         const newPhones = [...currentPhones, result.phoneNumber];
                         await updatePropertyPhoneNumbers(property.id, newPhones, property.ownerPhoneIndex);
                         property.phoneNumbers = newPhones;
-                        setPhoneNumbers([...newPhones, ...Array(Math.max(0, 6 - newPhones.length)).fill('')]);
+                        // Add to first row of phoneContacts
+                        const updatedContacts = [...phoneContacts];
+                        updatedContacts[0] = { ...updatedContacts[0], phones: newPhones };
+                        setPhoneContacts(updatedContacts);
                       }
                     }
 
@@ -1218,54 +1221,71 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             </div>
             {phoneExpanded && (
               <div className="space-y-2 mt-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-6 shrink-0">1.</span>
-                  <Input
-                    value={contactName}
-                    onChange={(e) => setContactName(e.target.value)}
-                    placeholder="Name"
-                    className="w-28 shrink-0"
-                  />
-                  <div className="flex-1 overflow-x-auto">
-                    <div className="flex items-center gap-1.5">
-                      {phoneNumbers.map((phone, index) => (
-                        <Input
-                          key={index}
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => {
-                            const updated = [...phoneNumbers];
-                            updated[index] = e.target.value;
-                            setPhoneNumbers(updated);
+                {phoneContacts.map((contact, rowIndex) => (
+                  <div key={rowIndex} className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-6 shrink-0">
+                      {rowIndex + 1}.
+                    </span>
+                    <Input
+                      value={contact.name}
+                      onChange={(e) => {
+                        const updated = [...phoneContacts];
+                        updated[rowIndex] = { ...updated[rowIndex], name: e.target.value };
+                        setPhoneContacts(updated);
+                      }}
+                      placeholder="Name"
+                      className="w-28 shrink-0"
+                    />
+                    <div className="flex-1 overflow-x-auto">
+                      <div className="flex items-center gap-1.5">
+                        {contact.phones.map((phone, phoneIdx) => (
+                          <Input
+                            key={phoneIdx}
+                            type="tel"
+                            value={phone}
+                            onChange={(e) => {
+                              const updated = [...phoneContacts];
+                              const newPhones = [...updated[rowIndex].phones];
+                              newPhones[phoneIdx] = e.target.value;
+                              updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
+                              setPhoneContacts(updated);
+                            }}
+                            placeholder={`Phone ${phoneIdx + 1}`}
+                            className="w-[140px] shrink-0 text-xs font-mono"
+                          />
+                        ))}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                          onClick={() => {
+                            const updated = [...phoneContacts];
+                            updated[rowIndex] = { ...updated[rowIndex], phones: [...updated[rowIndex].phones, ''] };
+                            setPhoneContacts(updated);
                           }}
-                          placeholder={`Phone ${index + 1}`}
-                          className="w-[140px] shrink-0 text-xs font-mono"
-                        />
-                      ))}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-                        onClick={() => setPhoneNumbers([...phoneNumbers, ''])}
-                        title="Add phone field"
-                      >
-                        <span className="text-lg leading-none">+</span>
-                      </Button>
+                          title="Add phone field"
+                        >
+                          <span className="text-lg leading-none">+</span>
+                        </Button>
+                      </div>
                     </div>
                   </div>
+                ))}
+                <div className="flex justify-end">
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                    size="sm"
+                    className="text-muted-foreground hover:text-primary"
                     onClick={handleSavePhoneNumbers}
                     disabled={savingPhones}
-                    title="Save phone numbers"
+                    title="Save all phone numbers"
                   >
                     {savingPhones ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
                     ) : (
-                      <CheckCircle className="h-4 w-4" />
+                      <CheckCircle className="h-4 w-4 mr-1" />
                     )}
+                    Save
                   </Button>
                 </div>
               </div>
@@ -1300,30 +1320,30 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   variant="outline"
                   onClick={() => {
                     const result = extractContacts(rawContactText);
-                    // Fill phone section — append if different person, replace if same/empty
-                    if (result.phones.length > 0) {
-                      const currentEmpty = !contactName.trim() && !phoneNumbers.some(p => p.trim());
-                      const sameName = result.name && contactName.trim().toLowerCase() === result.name.toLowerCase();
-                      if (currentEmpty || sameName) {
-                        // Same person or empty — replace
-                        setPhoneNumbers(result.phones);
+                    // Fill phone section — smart row placement (same logic as emails)
+                    if (result.phones.length > 0 || result.name) {
+                      const updated = [...phoneContacts];
+                      const row1Empty = !updated[0].name.trim() && !updated[0].phones.some(p => p.trim());
+                      const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
+                      let targetRow: number;
+                      if (row1Empty || row1SameName) {
+                        targetRow = 0;
                       } else {
-                        // Different person — append new phones to existing
-                        const existingPhones = phoneNumbers.filter(p => p.trim());
-                        const existingDigits = new Set(existingPhones.map(p => p.replace(/\D/g, '').slice(-10)));
-                        const newPhones = result.phones.filter(p => !existingDigits.has(p.replace(/\D/g, '').slice(-10)));
-                        setPhoneNumbers([...existingPhones, ...newPhones]);
+                        // Find next empty row
+                        const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.phones.some(p => p.trim()));
+                        if (emptyIdx !== -1) {
+                          targetRow = emptyIdx;
+                        } else {
+                          // All rows full — add a new row
+                          updated.push({ name: '', phones: [''] });
+                          targetRow = updated.length - 1;
+                        }
                       }
-                    }
-                    if (result.name) {
-                      // Update name — if appending, show both names
-                      const currentEmpty = !contactName.trim();
-                      const sameName = contactName.trim().toLowerCase() === result.name.toLowerCase();
-                      if (currentEmpty || sameName) {
-                        setContactName(result.name);
-                      } else {
-                        setContactName(`${contactName.trim()}, ${result.name}`);
-                      }
+                      updated[targetRow] = {
+                        name: result.name || '',
+                        phones: result.phones.length > 0 ? result.phones : [''],
+                      };
+                      setPhoneContacts(updated);
                     }
                     // Fill email section — find the right row
                     if (result.emails.length > 0 || result.name) {
