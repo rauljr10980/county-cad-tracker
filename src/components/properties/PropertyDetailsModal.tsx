@@ -63,8 +63,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [emails, setEmails] = useState<string[]>([]);
   const [savedEmailsExpanded, setSavedEmailsExpanded] = useState(false);
   const [emailExpanded, setEmailExpanded] = useState(false);
-  const [emailRecipients, setEmailRecipients] = useState<{ name: string; email: string }[]>(
-    Array.from({ length: 6 }, () => ({ name: '', email: '' }))
+  const [emailRecipients, setEmailRecipients] = useState<{ name: string; emails: string[] }[]>(
+    Array.from({ length: 6 }, () => ({ name: '', emails: [''] }))
   );
   const [emailSubject, setEmailSubject] = useState('Quick question');
   const [emailBody, setEmailBody] = useState('');
@@ -119,7 +119,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setContactName('');
 
       // Initialize email template
-      setEmailRecipients(Array.from({ length: 6 }, () => ({ name: '', email: '' })));
+      setEmailRecipients(Array.from({ length: 6 }, () => ({ name: '', emails: [''] })));
       setEmailBody(`Hi {{Name}},\n\nMy name is Raul, and I purchase vacant homes. I came across the property at {{PropertyAddress}}, which is recorded under {{Owner}}, and wanted to reach out respectfully.\n\nIf you're related to the owner, I would appreciate it if you could let me know the best person to speak with. If the home is vacant, I would be interested in discussing a purchase.\n\nIf I've contacted the wrong person, please accept my apologies.\n\nThank you,\nRaul\n{{PhoneNumber}}`);
 
       // Load pre-foreclosure records for this property
@@ -1219,47 +1219,55 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             </div>
             {phoneExpanded && (
               <div className="space-y-2 mt-3">
-                <div className="flex items-start gap-2">
-                  <span className="text-xs text-muted-foreground w-6 shrink-0 pt-2">1.</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-6 shrink-0">1.</span>
                   <Input
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
                     placeholder="Name"
                     className="w-28 shrink-0"
                   />
-                  <Textarea
-                    value={phoneNumbers.filter(p => p.trim()).join('\n')}
-                    onChange={(e) => {
-                      const lines = e.target.value.split('\n');
-                      const minSlots = Math.max(6, lines.length);
-                      const padded = [...lines, ...Array(Math.max(0, minSlots - lines.length)).fill('')];
-                      setPhoneNumbers(padded);
-                    }}
-                    placeholder="Paste phone numbers here (one per line)"
-                    rows={Math.max(1, phoneNumbers.filter(p => p.trim()).length)}
-                    className="flex-1 text-sm min-h-[36px] resize-none font-mono"
-                  />
-                  <div className="flex flex-col items-center gap-0.5 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-primary"
-                      onClick={handleSavePhoneNumbers}
-                      disabled={savingPhones}
-                      title="Save phone numbers"
-                    >
-                      {savingPhones ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <CheckCircle className="h-4 w-4" />
-                      )}
-                    </Button>
-                    {phoneNumbers.filter(p => p.trim()).length > 0 && (
-                      <span className="text-[10px] text-muted-foreground">
-                        {phoneNumbers.filter(p => p.trim()).length}
-                      </span>
-                    )}
+                  <div className="flex-1 overflow-x-auto">
+                    <div className="flex items-center gap-1.5">
+                      {phoneNumbers.map((phone, index) => (
+                        <Input
+                          key={index}
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => {
+                            const updated = [...phoneNumbers];
+                            updated[index] = e.target.value;
+                            setPhoneNumbers(updated);
+                          }}
+                          placeholder={`Phone ${index + 1}`}
+                          className="w-[140px] shrink-0 text-xs font-mono"
+                        />
+                      ))}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                        onClick={() => setPhoneNumbers([...phoneNumbers, ''])}
+                        title="Add phone field"
+                      >
+                        <span className="text-lg leading-none">+</span>
+                      </Button>
+                    </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                    onClick={handleSavePhoneNumbers}
+                    disabled={savingPhones}
+                    title="Save phone numbers"
+                  >
+                    {savingPhones ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
             )}
@@ -1305,7 +1313,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       const updated = [...emailRecipients];
                       updated[0] = {
                         name: result.name || '',
-                        email: result.emails.join('\n'),
+                        emails: result.emails.length > 0 ? result.emails : [''],
                       };
                       setEmailRecipients(updated);
                     }
@@ -1380,10 +1388,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             {emailExpanded && (
               <div className="space-y-2 mt-3">
                 {emailRecipients.map((recipient, index) => {
-                  const emailCount = recipient.email.split(/[\n,;\s]+/).filter(s => s.includes('@')).length;
+                  const validEmails = recipient.emails.filter(e => e.includes('@'));
                   return (
-                    <div key={index} className="flex items-start gap-2">
-                      <span className="text-xs text-muted-foreground w-6 shrink-0 pt-2">
+                    <div key={index} className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-6 shrink-0">
                         {index + 1}.
                       </span>
                       <Input
@@ -1396,56 +1404,72 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         placeholder="Name"
                         className="w-28 shrink-0"
                       />
-                      <Textarea
-                        value={recipient.email}
-                        onChange={(e) => {
-                          const updated = [...emailRecipients];
-                          updated[index] = { ...updated[index], email: e.target.value };
-                          setEmailRecipients(updated);
-                        }}
-                        placeholder="Paste emails here (one per line)"
-                        rows={emailCount > 1 ? emailCount : 1}
-                        className="flex-1 text-sm min-h-[36px] resize-none"
-                      />
-                      <div className="flex flex-col items-center gap-0.5 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={async () => {
-                            const emails = recipient.email.split(/[\n,;\s]+/).map(s => s.trim()).filter(s => s.includes('@'));
-                            if (emails.length === 0) return;
-                            setSendingEmailIndex(index);
-                            try {
-                              const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
-                                ? property.phoneNumbers[property.ownerPhoneIndex]
-                                : (property.phoneNumbers?.find(p => p) || '');
-                              const personalBody = emailBody
-                                .replace(/\{\{Name\}\}/g, recipient.name.trim() || 'there')
-                                .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
-                                .replace(/\{\{Owner\}\}/g, property.ownerName || '')
-                                .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
-                              await sendEmail({ to: emails, subject: emailSubject, body: personalBody });
-                              toast({ title: `Email sent to ${emails.length} address${emails.length > 1 ? 'es' : ''}` });
-                            } catch (err) {
-                              toast({ title: 'Failed to send', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
-                            } finally {
-                              setSendingEmailIndex(null);
-                            }
-                          }}
-                          disabled={!recipient.email.trim() || sendingEmailIndex === index}
-                          title="Send to all emails in this row"
-                        >
-                          {sendingEmailIndex === index ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Send className="h-4 w-4" />
-                          )}
-                        </Button>
-                        {emailCount > 1 && (
-                          <span className="text-[10px] text-muted-foreground">{emailCount}</span>
-                        )}
+                      <div className="flex-1 overflow-x-auto">
+                        <div className="flex items-center gap-1.5">
+                          {recipient.emails.map((email, emailIdx) => (
+                            <Input
+                              key={emailIdx}
+                              type="email"
+                              value={email}
+                              onChange={(e) => {
+                                const updated = [...emailRecipients];
+                                const newEmails = [...updated[index].emails];
+                                newEmails[emailIdx] = e.target.value;
+                                updated[index] = { ...updated[index], emails: newEmails };
+                                setEmailRecipients(updated);
+                              }}
+                              placeholder={`Email ${emailIdx + 1}`}
+                              className="w-[180px] shrink-0 text-xs"
+                            />
+                          ))}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                            onClick={() => {
+                              const updated = [...emailRecipients];
+                              updated[index] = { ...updated[index], emails: [...updated[index].emails, ''] };
+                              setEmailRecipients(updated);
+                            }}
+                            title="Add email field"
+                          >
+                            <span className="text-lg leading-none">+</span>
+                          </Button>
+                        </div>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                        onClick={async () => {
+                          if (validEmails.length === 0) return;
+                          setSendingEmailIndex(index);
+                          try {
+                            const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
+                              ? property.phoneNumbers[property.ownerPhoneIndex]
+                              : (property.phoneNumbers?.find(p => p) || '');
+                            const personalBody = emailBody
+                              .replace(/\{\{Name\}\}/g, recipient.name.trim() || 'there')
+                              .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
+                              .replace(/\{\{Owner\}\}/g, property.ownerName || '')
+                              .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
+                            await sendEmail({ to: validEmails, subject: emailSubject, body: personalBody });
+                            toast({ title: `Email sent to ${validEmails.length} address${validEmails.length > 1 ? 'es' : ''}` });
+                          } catch (err) {
+                            toast({ title: 'Failed to send', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+                          } finally {
+                            setSendingEmailIndex(null);
+                          }
+                        }}
+                        disabled={validEmails.length === 0 || sendingEmailIndex === index}
+                        title="Send to all emails in this row"
+                      >
+                        {sendingEmailIndex === index ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
                   );
                 })}
@@ -1491,7 +1515,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     size="sm"
                     onClick={async () => {
                       const allEmails = emailRecipients
-                        .flatMap(r => r.email.split(/[\n,;\s]+/).map(s => s.trim()).filter(s => s.includes('@')));
+                        .flatMap(r => r.emails.filter(e => e.includes('@')));
                       if (allEmails.length === 0) return;
                       setSendingAllEmails(true);
                       try {
@@ -1511,7 +1535,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         setSendingAllEmails(false);
                       }
                     }}
-                    disabled={!emailRecipients.some(r => r.email.trim()) || sendingAllEmails}
+                    disabled={!emailRecipients.some(r => r.emails.some(e => e.includes('@'))) || sendingAllEmails}
                   >
                     {sendingAllEmails ? (
                       <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
