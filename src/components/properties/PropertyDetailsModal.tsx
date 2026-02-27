@@ -61,7 +61,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [contactExtractorExpanded, setContactExtractorExpanded] = useState(false);
   const [rawContactText, setRawContactText] = useState('');
   const [emails, setEmails] = useState<string[]>([]);
-  const [savedEmailsExpanded, setSavedEmailsExpanded] = useState(false);
   const [emailExpanded, setEmailExpanded] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState<{ name: string; emails: string[] }[]>(
     Array.from({ length: 6 }, () => ({ name: '', emails: [''] }))
@@ -1308,10 +1307,28 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     if (result.phones.length > 0) {
                       setPhoneNumbers(result.phones);
                     }
-                    // Fill email section Row 1
+                    // Fill email section — find the right row
                     if (result.emails.length > 0 || result.name) {
                       const updated = [...emailRecipients];
-                      updated[0] = {
+                      // Find the right row: if row 1 is empty or has the same name, use it
+                      // Otherwise use the next empty row (new person / heir)
+                      const row1Empty = !updated[0].name.trim() && !updated[0].emails.some(e => e.includes('@'));
+                      const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
+                      let targetRow: number;
+                      if (row1Empty || row1SameName) {
+                        targetRow = 0;
+                      } else {
+                        // Find next empty row
+                        const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.emails.some(e => e.includes('@')));
+                        if (emptyIdx !== -1) {
+                          targetRow = emptyIdx;
+                        } else {
+                          // All rows full — add a new row
+                          updated.push({ name: '', emails: [''] });
+                          targetRow = updated.length - 1;
+                        }
+                      }
+                      updated[targetRow] = {
                         name: result.name || '',
                         emails: result.emails.length > 0 ? result.emails : [''],
                       };
@@ -1320,6 +1337,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     // Expand both sections so user can see the filled data
                     setPhoneExpanded(true);
                     setEmailExpanded(true);
+                    // Clear the textarea for the next paste
+                    setRawContactText('');
                     // Show confirmation
                     const parts = [];
                     if (result.name) parts.push(`Name: ${result.name}`);
@@ -1338,37 +1357,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               </div>
             )}
           </div>
-
-          {/* Saved Emails Section */}
-          {emails.length > 0 && (
-            <div className="bg-secondary/30 rounded-lg p-3">
-              <div
-                className="flex items-center justify-between cursor-pointer"
-                onClick={() => setSavedEmailsExpanded(prev => !prev)}
-              >
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">
-                    Saved Emails ({emails.length})
-                  </span>
-                </div>
-                <ChevronDown className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                  !savedEmailsExpanded && "-rotate-90"
-                )} />
-              </div>
-              {savedEmailsExpanded && (
-                <div className="space-y-1 mt-3">
-                  {emails.map((email, index) => (
-                    <div key={index} className="flex items-center gap-2 text-sm">
-                      <Mail className="h-3 w-3 text-muted-foreground" />
-                      <span className="font-mono text-xs">{email}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Email Section */}
           <div className="bg-secondary/30 rounded-lg p-3">
