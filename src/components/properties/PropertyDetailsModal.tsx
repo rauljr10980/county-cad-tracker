@@ -1300,12 +1300,30 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   variant="outline"
                   onClick={() => {
                     const result = extractContacts(rawContactText);
-                    // Fill phone section
-                    if (result.name) {
-                      setContactName(result.name);
-                    }
+                    // Fill phone section — append if different person, replace if same/empty
                     if (result.phones.length > 0) {
-                      setPhoneNumbers(result.phones);
+                      const currentEmpty = !contactName.trim() && !phoneNumbers.some(p => p.trim());
+                      const sameName = result.name && contactName.trim().toLowerCase() === result.name.toLowerCase();
+                      if (currentEmpty || sameName) {
+                        // Same person or empty — replace
+                        setPhoneNumbers(result.phones);
+                      } else {
+                        // Different person — append new phones to existing
+                        const existingPhones = phoneNumbers.filter(p => p.trim());
+                        const existingDigits = new Set(existingPhones.map(p => p.replace(/\D/g, '').slice(-10)));
+                        const newPhones = result.phones.filter(p => !existingDigits.has(p.replace(/\D/g, '').slice(-10)));
+                        setPhoneNumbers([...existingPhones, ...newPhones]);
+                      }
+                    }
+                    if (result.name) {
+                      // Update name — if appending, show both names
+                      const currentEmpty = !contactName.trim();
+                      const sameName = contactName.trim().toLowerCase() === result.name.toLowerCase();
+                      if (currentEmpty || sameName) {
+                        setContactName(result.name);
+                      } else {
+                        setContactName(`${contactName.trim()}, ${result.name}`);
+                      }
                     }
                     // Fill email section — find the right row
                     if (result.emails.length > 0 || result.name) {
