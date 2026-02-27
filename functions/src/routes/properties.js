@@ -1154,6 +1154,41 @@ router.put('/:id/phones', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
+// UPDATE PROPERTY EMAILS
+// ============================================================================
+
+router.put('/:id/emails', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { emails } = req.body;
+
+    if (!Array.isArray(emails)) {
+      return res.status(400).json({ error: 'emails must be an array' });
+    }
+
+    const property = await prisma.property.update({
+      where: { id },
+      data: {
+        emails: emails.filter(e => e && e.trim().length > 0),
+      },
+      select: {
+        id: true,
+        accountNumber: true,
+        emails: true,
+      }
+    });
+
+    res.json(property);
+  } catch (error) {
+    console.error('[PROPERTIES] Emails update error:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+    res.status(500).json({ error: 'Failed to update emails' });
+  }
+});
+
+// ============================================================================
 // UPDATE PROPERTY PRIORITY (updates related task priority)
 // ============================================================================
 

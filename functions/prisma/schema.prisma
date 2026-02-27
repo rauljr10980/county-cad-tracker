@@ -90,6 +90,7 @@ model Property {
   // Contact Information
   phoneNumbers    String[] // Array of phone numbers
   ownerPhoneIndex Int? // Index of owner's primary phone
+  emails          String[] @default([]) // Array of email addresses
 
   // Notes (simple string field for quick notes, separate from Note relation for detailed notes)
   notes String? @db.Text

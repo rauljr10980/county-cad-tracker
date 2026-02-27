@@ -412,6 +412,24 @@ export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumber
 }
 
 /**
+ * Update property emails
+ */
+export async function updatePropertyEmails(propertyId: string, emails: string[]) {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/emails`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ emails }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update emails');
+  }
+  return response.json();
+}
+
+/**
  * Get all properties with actions/tasks (dueTime or actionType)
  */
 export async function getTasks(): Promise<Property[]> {

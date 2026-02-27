@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ExternalLink, MapPin, DollarSign, Calendar, CalendarDays, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown, Loader2, Mail } from 'lucide-react';
+import { ExternalLink, MapPin, DollarSign, Calendar, CalendarDays, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown, Loader2, Mail, ClipboardPaste } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail } from '@/lib/api';
+import { extractContacts, type ExtractedContact } from '@/lib/contactParser';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -56,6 +57,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [visitQuestionsExpanded, setVisitQuestionsExpanded] = useState(true);
   const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
   const [phoneExpanded, setPhoneExpanded] = useState(false);
+  const [contactExtractorExpanded, setContactExtractorExpanded] = useState(false);
+  const [rawContactText, setRawContactText] = useState('');
+  const [extractedContact, setExtractedContact] = useState<ExtractedContact | null>(null);
+  const [savingExtracted, setSavingExtracted] = useState(false);
+  const [emails, setEmails] = useState<string[]>([]);
+  const [savedEmailsExpanded, setSavedEmailsExpanded] = useState(false);
   const [emailExpanded, setEmailExpanded] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState<{ name: string; email: string }[]>(
     Array.from({ length: 6 }, () => ({ name: '', email: '' }))
@@ -106,6 +113,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       // Initialize visited status
       setVisited(property.visited || false);
       setVisitedBy(property.visitedBy || '');
+
+      // Initialize saved emails and contact extractor
+      setEmails(property.emails || []);
+      setRawContactText('');
+      setExtractedContact(null);
 
       // Initialize email template
       setEmailRecipients(Array.from({ length: 6 }, () => ({ name: '', email: '' })));
@@ -1253,6 +1265,171 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               </div>
             )}
           </div>
+
+          {/* Contact Extractor Section */}
+          <div className="bg-secondary/30 rounded-lg p-3">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setContactExtractorExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <ClipboardPaste className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Contact Extractor</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !contactExtractorExpanded && "-rotate-90"
+              )} />
+            </div>
+            {contactExtractorExpanded && (
+              <div className="space-y-3 mt-3">
+                <Textarea
+                  value={rawContactText}
+                  onChange={(e) => setRawContactText(e.target.value)}
+                  placeholder="Paste raw text from TruePeopleSearch or similar site..."
+                  className="min-h-[120px] text-xs font-mono"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const result = extractContacts(rawContactText);
+                    setExtractedContact(result);
+                  }}
+                  disabled={!rawContactText.trim()}
+                >
+                  Extract Contacts
+                </Button>
+
+                {extractedContact && (
+                  <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Extracted Results
+                    </p>
+                    {extractedContact.name && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">Name: </span>
+                        <span className="text-sm font-medium">{extractedContact.name}</span>
+                      </div>
+                    )}
+                    {extractedContact.phones.length > 0 && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">
+                          Phones ({extractedContact.phones.length}):
+                        </span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {extractedContact.phones.map((p, i) => (
+                            <Badge key={i} variant="outline" className="text-xs font-mono">
+                              {p}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {extractedContact.emails.length > 0 && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">
+                          Emails ({extractedContact.emails.length}):
+                        </span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {extractedContact.emails.map((e, i) => (
+                            <Badge key={i} variant="outline" className="text-xs">
+                              {e}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {!extractedContact.name && extractedContact.phones.length === 0 && extractedContact.emails.length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">
+                        No contacts found. Try pasting more text.
+                      </p>
+                    )}
+
+                    {(extractedContact.phones.length > 0 || extractedContact.emails.length > 0) && (
+                      <Button
+                        size="sm"
+                        className="w-full mt-2"
+                        disabled={savingExtracted}
+                        onClick={async () => {
+                          if (!property) return;
+                          setSavingExtracted(true);
+                          try {
+                            if (extractedContact.phones.length > 0) {
+                              const existingPhones = phoneNumbers.filter(p => p.trim());
+                              const merged = [...new Set([...existingPhones, ...extractedContact.phones])].slice(0, 6);
+                              await updatePropertyPhoneNumbers(property.id, merged, ownerPhoneIndex);
+                              const padded = [...merged, ...Array(Math.max(0, 6 - merged.length)).fill('')];
+                              setPhoneNumbers(padded);
+                            }
+                            if (extractedContact.emails.length > 0) {
+                              const existingEmails = emails.filter(e => e.trim());
+                              const mergedEmails = [...new Set([...existingEmails, ...extractedContact.emails])];
+                              await updatePropertyEmails(property.id, mergedEmails);
+                              setEmails(mergedEmails);
+                            }
+                            queryClient.invalidateQueries({ queryKey: ['properties'] });
+                            toast({
+                              title: 'Contacts Saved',
+                              description: `Saved ${extractedContact.phones.length} phones and ${extractedContact.emails.length} emails`,
+                            });
+                            setRawContactText('');
+                            setExtractedContact(null);
+                          } catch (error) {
+                            toast({
+                              title: 'Error',
+                              description: 'Failed to save extracted contacts',
+                              variant: 'destructive',
+                            });
+                          } finally {
+                            setSavingExtracted(false);
+                          }
+                        }}
+                      >
+                        {savingExtracted ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : 'Save to Property'}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Saved Emails Section */}
+          {emails.length > 0 && (
+            <div className="bg-secondary/30 rounded-lg p-3">
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setSavedEmailsExpanded(prev => !prev)}
+              >
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">
+                    Saved Emails ({emails.length})
+                  </span>
+                </div>
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  !savedEmailsExpanded && "-rotate-90"
+                )} />
+              </div>
+              {savedEmailsExpanded && (
+                <div className="space-y-1 mt-3">
+                  {emails.map((email, index) => (
+                    <div key={index} className="flex items-center gap-2 text-sm">
+                      <Mail className="h-3 w-3 text-muted-foreground" />
+                      <span className="font-mono text-xs">{email}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Email Section */}
           <div className="bg-secondary/30 rounded-lg p-3">
