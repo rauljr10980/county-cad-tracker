@@ -1219,56 +1219,47 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             </div>
             {phoneExpanded && (
               <div className="space-y-2 mt-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">Name:</span>
+                <div className="flex items-start gap-2">
+                  <span className="text-xs text-muted-foreground w-6 shrink-0 pt-2">1.</span>
                   <Input
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
-                    placeholder="Contact name"
-                    className="flex-1"
+                    placeholder="Name"
+                    className="w-28 shrink-0"
                   />
-                </div>
-                {phoneNumbers.map((phone, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">
-                      Phone {index + 1}:
-                    </span>
-                    <Input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => {
-                        const newPhones = [...phoneNumbers];
-                        newPhones[index] = e.target.value;
-                        setPhoneNumbers(newPhones);
-                      }}
-                      placeholder="Enter phone number"
-                      className="flex-1"
-                    />
+                  <Textarea
+                    value={phoneNumbers.filter(p => p.trim()).join('\n')}
+                    onChange={(e) => {
+                      const lines = e.target.value.split('\n');
+                      const minSlots = Math.max(6, lines.length);
+                      const padded = [...lines, ...Array(Math.max(0, minSlots - lines.length)).fill('')];
+                      setPhoneNumbers(padded);
+                    }}
+                    placeholder="Paste phone numbers here (one per line)"
+                    rows={Math.max(1, phoneNumbers.filter(p => p.trim()).length)}
+                    className="flex-1 text-sm min-h-[36px] resize-none font-mono"
+                  />
+                  <div className="flex flex-col items-center gap-0.5 shrink-0">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={cn(
-                        "h-8 w-8 shrink-0",
-                        ownerPhoneIndex === index && "text-yellow-500"
-                      )}
-                      onClick={() => handleToggleOwnerPhone(index)}
-                      title={ownerPhoneIndex === index ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={handleSavePhoneNumbers}
+                      disabled={savingPhones}
+                      title="Save phone numbers"
                     >
-                      <Star className={cn(
-                        "h-4 w-4",
-                        ownerPhoneIndex === index ? "fill-yellow-500" : "fill-none"
-                      )} />
+                      {savingPhones ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4" />
+                      )}
                     </Button>
+                    {phoneNumbers.filter(p => p.trim()).length > 0 && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {phoneNumbers.filter(p => p.trim()).length}
+                      </span>
+                    )}
                   </div>
-                ))}
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    onClick={handleSavePhoneNumbers}
-                    disabled={savingPhones}
-                  >
-                    {savingPhones ? 'Saving...' : 'Save Phone Numbers'}
-                  </Button>
                 </div>
               </div>
             )}
@@ -1307,9 +1298,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       setContactName(result.name);
                     }
                     if (result.phones.length > 0) {
-                      const minSlots = Math.max(6, result.phones.length);
-                      const padded = [...result.phones, ...Array(minSlots - result.phones.length).fill('')];
-                      setPhoneNumbers(padded);
+                      setPhoneNumbers(result.phones);
                     }
                     // Fill email section Row 1
                     if (result.emails.length > 0 || result.name) {
