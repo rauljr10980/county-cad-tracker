@@ -1116,20 +1116,25 @@ router.put('/:id/notes', optionalAuth, async (req, res) => {
 router.put('/:id/phones', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { phoneNumbers, ownerPhoneIndex } = req.body;
+    const { phoneNumbers, ownerPhoneIndex, contacts } = req.body;
 
     if (!Array.isArray(phoneNumbers)) {
       return res.status(400).json({ error: 'phoneNumbers must be an array' });
     }
 
     const updateData = {
-      phoneNumbers: phoneNumbers.filter(p => p && p.trim().length > 0), // Remove empty strings
+      phoneNumbers: phoneNumbers.filter(p => p && p.trim().length > 0),
     };
 
     if (ownerPhoneIndex !== undefined) {
-      updateData.ownerPhoneIndex = ownerPhoneIndex >= 0 && ownerPhoneIndex < phoneNumbers.length 
-        ? ownerPhoneIndex 
+      updateData.ownerPhoneIndex = ownerPhoneIndex >= 0 && ownerPhoneIndex < phoneNumbers.length
+        ? ownerPhoneIndex
         : null;
+    }
+
+    // Also persist structured contacts JSON if provided
+    if (contacts !== undefined) {
+      updateData.contacts = contacts;
     }
 
     const property = await prisma.property.update({
@@ -1139,7 +1144,8 @@ router.put('/:id/phones', optionalAuth, async (req, res) => {
         id: true,
         accountNumber: true,
         phoneNumbers: true,
-        ownerPhoneIndex: true
+        ownerPhoneIndex: true,
+        contacts: true,
       }
     });
 
@@ -1160,21 +1166,29 @@ router.put('/:id/phones', optionalAuth, async (req, res) => {
 router.put('/:id/emails', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { emails } = req.body;
+    const { emails, contacts } = req.body;
 
     if (!Array.isArray(emails)) {
       return res.status(400).json({ error: 'emails must be an array' });
     }
 
+    const updateData = {
+      emails: emails.filter(e => e && e.trim().length > 0),
+    };
+
+    // Also persist structured contacts JSON if provided
+    if (contacts !== undefined) {
+      updateData.contacts = contacts;
+    }
+
     const property = await prisma.property.update({
       where: { id },
-      data: {
-        emails: emails.filter(e => e && e.trim().length > 0),
-      },
+      data: updateData,
       select: {
         id: true,
         accountNumber: true,
         emails: true,
+        contacts: true,
       }
     });
 

@@ -36,6 +36,10 @@ export interface Property {
   phoneNumbers?: string[];
   ownerPhoneIndex?: number; // Index of which phone number is the owner's (0-5)
   emails?: string[]; // Array of email addresses
+  contacts?: {
+    phoneRows?: { name: string; phones: string[] }[];
+    emailRows?: { name: string; emails: string[] }[];
+  };
   // Task/Action fields
   taskId?: string; // Task ID for deletion
   actionType?: 'call' | 'text' | 'mail' | 'driveby';

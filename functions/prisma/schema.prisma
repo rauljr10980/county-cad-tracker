@@ -88,9 +88,10 @@ model Property {
   longitude               Float?
 
   // Contact Information
-  phoneNumbers    String[] // Array of phone numbers
+  phoneNumbers    String[] // Array of phone numbers (flat, for backward compat)
   ownerPhoneIndex Int? // Index of owner's primary phone
-  emails          String[] @default([]) // Array of email addresses
+  emails          String[] @default([]) // Array of email addresses (flat, for backward compat)
+  contacts        Json?    // Structured contacts: {phoneRows: [{name, phones}], emailRows: [{name, emails}]}
 
   // Notes (simple string field for quick notes, separate from Note relation for detailed notes)
   notes String? @db.Text

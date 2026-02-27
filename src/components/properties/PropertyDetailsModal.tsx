@@ -92,14 +92,26 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
     if (property && isOpen) {
       setNotes(property.notes || '');
       setIsEditingNotes(false);
-      // Initialize phone contacts — put all existing phones in row 1
-      const phones = property.phoneNumbers || [];
-      const initPhoneContacts = Array.from({ length: 6 }, () => ({ name: '', phones: [''] }));
-      if (phones.length > 0) {
-        initPhoneContacts[0] = { name: '', phones: phones.filter(p => p) };
-        if (initPhoneContacts[0].phones.length === 0) initPhoneContacts[0].phones = [''];
+      // Initialize phone contacts from structured contacts or flat phoneNumbers
+      const savedContacts = property.contacts;
+      const emptyPhoneRows = Array.from({ length: 6 }, () => ({ name: '', phones: [''] }));
+      if (savedContacts?.phoneRows && savedContacts.phoneRows.length > 0) {
+        const restored = savedContacts.phoneRows.map((r: { name: string; phones: string[] }) => ({
+          name: r.name || '',
+          phones: r.phones?.length > 0 ? r.phones : [''],
+        }));
+        // Pad to at least 6 rows
+        while (restored.length < 6) restored.push({ name: '', phones: [''] });
+        setPhoneContacts(restored);
+      } else {
+        // Fallback: load flat phoneNumbers into row 1
+        const phones = property.phoneNumbers || [];
+        if (phones.length > 0) {
+          emptyPhoneRows[0] = { name: '', phones: phones.filter(p => p) };
+          if (emptyPhoneRows[0].phones.length === 0) emptyPhoneRows[0].phones = [''];
+        }
+        setPhoneContacts(emptyPhoneRows);
       }
-      setPhoneContacts(initPhoneContacts);
       setOwnerPhoneIndex(property.ownerPhoneIndex);
 
       // Initialize actions & tasks
@@ -116,8 +128,18 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setEmails(property.emails || []);
       setRawContactText('');
 
-      // Initialize email template
-      setEmailRecipients(Array.from({ length: 6 }, () => ({ name: '', emails: [''] })));
+      // Initialize email recipients from structured contacts or empty
+      const emptyEmailRows = Array.from({ length: 6 }, () => ({ name: '', emails: [''] }));
+      if (savedContacts?.emailRows && savedContacts.emailRows.length > 0) {
+        const restored = savedContacts.emailRows.map((r: { name: string; emails: string[] }) => ({
+          name: r.name || '',
+          emails: r.emails?.length > 0 ? r.emails : [''],
+        }));
+        while (restored.length < 6) restored.push({ name: '', emails: [''] });
+        setEmailRecipients(restored);
+      } else {
+        setEmailRecipients(emptyEmailRows);
+      }
       setEmailBody(`Hi {{Name}},\n\nMy name is Raul, and I purchase vacant homes. I came across the property at {{PropertyAddress}}, which is recorded under {{Owner}}, and wanted to reach out respectfully.\n\nIf you're related to the owner, I would appreciate it if you could let me know the best person to speak with. If the home is vacant, I would be interested in discussing a purchase.\n\nIf I've contacted the wrong person, please accept my apologies.\n\nThank you,\nRaul\n{{PhoneNumber}}`);
 
       // Load pre-foreclosure records for this property
@@ -268,18 +290,30 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
     }
   };
 
+  // Build current contacts JSON from both phone and email rows
+  const buildContactsJson = () => ({
+    phoneRows: phoneContacts
+      .filter(r => r.name.trim() || r.phones.some(p => p.trim()))
+      .map(r => ({ name: r.name, phones: r.phones.filter(p => p.trim()) })),
+    emailRows: emailRecipients
+      .filter(r => r.name.trim() || r.emails.some(e => e.trim()))
+      .map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()) })),
+  });
+
   const handleSavePhoneNumbers = async () => {
     setSavingPhones(true);
     try {
       // Collect all non-empty phones from all rows
       const allPhones = phoneContacts.flatMap(row => row.phones.filter(p => p.trim() !== ''));
-      await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex);
+      const contacts = buildContactsJson();
+      await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex, contacts);
       toast({
         title: "Phone Numbers Saved",
         description: `${allPhones.length} phone number${allPhones.length !== 1 ? 's' : ''} saved for ${property.accountNumber}`,
       });
       property.phoneNumbers = allPhones;
       property.ownerPhoneIndex = ownerPhoneIndex;
+      property.contacts = contacts;
     } catch (error) {
       toast({
         title: "Error",
@@ -1545,6 +1579,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       if (allEmails.length === 0) return;
                       setSendingAllEmails(true);
                       try {
+                        // Save contacts structure + flat emails to persist row data
+                        const contacts = buildContactsJson();
+                        await updatePropertyEmails(property.id, allEmails, contacts);
+                        property.emails = allEmails;
+                        property.contacts = contacts;
+
                         const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
                           ? property.phoneNumbers[property.ownerPhoneIndex]
                           : (property.phoneNumbers?.find(p => p) || '');

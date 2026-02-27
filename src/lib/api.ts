@@ -396,14 +396,14 @@ export async function updatePropertyNotes(propertyId: string, notes: string) {
 /**
  * Update property phone numbers
  */
-export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumbers: string[], ownerPhoneIndex?: number) {
+export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumbers: string[], ownerPhoneIndex?: number, contacts?: Record<string, unknown>) {
   const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/phones`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
-    body: JSON.stringify({ phoneNumbers, ownerPhoneIndex }),
+    body: JSON.stringify({ phoneNumbers, ownerPhoneIndex, contacts }),
   });
   if (!response.ok) {
     throw new Error('Failed to update phone numbers');
@@ -414,14 +414,14 @@ export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumber
 /**
  * Update property emails
  */
-export async function updatePropertyEmails(propertyId: string, emails: string[]) {
+export async function updatePropertyEmails(propertyId: string, emails: string[], contacts?: Record<string, unknown>) {
   const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/emails`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
-    body: JSON.stringify({ emails }),
+    body: JSON.stringify({ emails, contacts }),
   });
   if (!response.ok) {
     throw new Error('Failed to update emails');
