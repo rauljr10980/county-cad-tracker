@@ -4,7 +4,45 @@ export interface ExtractedContact {
   emails: string[];
 }
 
-const SKIP_WORDS = ['age', 'phone', 'email', 'address', 'lives', 'born', 'resides', 'also known', 'aka', 'related', 'associates'];
+// Use word-boundary regex patterns to avoid false matches (e.g. "Nagel" containing "age")
+const SKIP_PATTERNS = [
+  /\bage\s+\d/i,          // "Age 54" but not "Nagel"
+  /\bphone\b/i,
+  /\bemail\b/i,
+  /\baddress\b/i,
+  /\blives\s+in\b/i,
+  /\bborn\b/i,
+  /\bresides\b/i,
+  /\balso known\b/i,
+  /\baka\b/i,
+  /\brelat/i,
+  /\bassociat/i,
+  /\barrest/i,
+  /\bcriminal/i,
+  /\brecords\b/i,
+  /\bmisdemeanor/i,
+  /\bfeloni/i,
+  /\bsex offender/i,
+  /\bwarrant/i,
+  /\bcourt\b/i,
+  /\beviction/i,
+  /\bforeclosure/i,
+  /\bmarriage/i,
+  /\bdivorce/i,
+  /\bbankrupt/i,
+  /\blien/i,
+  /\bjudgment/i,
+  /\basset/i,
+  /\bproperties\b/i,
+  /\bbusiness\b/i,
+  /\blicense/i,
+  /\bsocial media/i,
+  /\bsponsored/i,
+  /\bbackground\b/i,
+  /\breport\b/i,
+  /\bcheck\b/i,
+  /\bneighbor/i,
+];
 
 function extractName(lines: string[]): string | null {
   // Look at first 10 non-empty lines for a person name
@@ -13,15 +51,20 @@ function extractName(lines: string[]): string | null {
     const trimmed = line.trim();
     if (!trimmed) continue;
     // Skip lines with known labels
-    if (SKIP_WORDS.some(w => trimmed.toLowerCase().includes(w))) continue;
+    if (SKIP_PATTERNS.some(p => p.test(trimmed))) continue;
+    // Skip lines with slashes (navigation breadcrumbs)
+    if (trimmed.includes('/')) continue;
     // Skip lines with digits, @, or special chars
     if (/[@\d]/.test(trimmed)) continue;
+    // Skip lines that are too long to be a name
+    if (trimmed.length > 40) continue;
     // Match 2-4 words that look like a name (capitalized or all-caps)
-    if (/^[A-Z][A-Za-z'-]+(\s+[A-Z]\.?)?(\s+[A-Z][A-Za-z'-]+){1,3}$/.test(trimmed)) {
+    // Middle initial requires a dot (e.g. "J.") to avoid grabbing first letter of last name
+    if (/^[A-Z][A-Za-z'-]+(\s+[A-Z]\.)?(\s+[A-Z][A-Za-z'-]+){1,3}$/.test(trimmed)) {
       return trimmed;
     }
     // Also match ALL CAPS names like "RAUL MEDINA"
-    if (/^[A-Z'-]+(\s+[A-Z]\.?)?(\s+[A-Z'-]+){1,3}$/.test(trimmed) && trimmed.length < 50) {
+    if (/^[A-Z'-]+(\s+[A-Z]\.)?(\s+[A-Z'-]+){1,3}$/.test(trimmed) && trimmed.length < 40) {
       return trimmed;
     }
   }
@@ -37,7 +80,8 @@ function normalizePhone(raw: string): string {
 }
 
 function extractPhones(text: string): string[] {
-  const phoneRegex = /(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}/g;
+  // Negative lookbehind: don't match numbers preceded by a digit or dash (e.g. APN 125-275-001-0014)
+  const phoneRegex = /(?<![\d-])(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}(?![\d-])/g;
   const matches = text.match(phoneRegex) || [];
   const normalized = matches.map(normalizePhone);
   // Deduplicate by digits
