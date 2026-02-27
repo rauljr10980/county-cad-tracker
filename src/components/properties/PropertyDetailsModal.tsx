@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail } from '@/lib/api';
-import { extractContacts, type ExtractedContact } from '@/lib/contactParser';
+import { extractContacts } from '@/lib/contactParser';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -36,6 +36,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [phoneNumbers, setPhoneNumbers] = useState<string[]>(['', '', '', '', '', '']);
   const [ownerPhoneIndex, setOwnerPhoneIndex] = useState<number | undefined>(undefined);
   const [savingPhones, setSavingPhones] = useState(false);
+  const [contactName, setContactName] = useState('');
 
   // Actions & Tasks state
   const [actionType, setActionType] = useState<'call' | 'text' | 'mail' | 'driveby' | ''>('');
@@ -59,8 +60,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [phoneExpanded, setPhoneExpanded] = useState(false);
   const [contactExtractorExpanded, setContactExtractorExpanded] = useState(false);
   const [rawContactText, setRawContactText] = useState('');
-  const [extractedContact, setExtractedContact] = useState<ExtractedContact | null>(null);
-  const [savingExtracted, setSavingExtracted] = useState(false);
   const [emails, setEmails] = useState<string[]>([]);
   const [savedEmailsExpanded, setSavedEmailsExpanded] = useState(false);
   const [emailExpanded, setEmailExpanded] = useState(false);
@@ -117,7 +116,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       // Initialize saved emails and contact extractor
       setEmails(property.emails || []);
       setRawContactText('');
-      setExtractedContact(null);
+      setContactName('');
 
       // Initialize email template
       setEmailRecipients(Array.from({ length: 6 }, () => ({ name: '', email: '' })));
@@ -1220,6 +1219,15 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             </div>
             {phoneExpanded && (
               <div className="space-y-2 mt-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">Name:</span>
+                  <Input
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    placeholder="Contact name"
+                    className="flex-1"
+                  />
+                </div>
                 {phoneNumbers.map((phone, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground w-16 shrink-0">
@@ -1294,108 +1302,42 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   variant="outline"
                   onClick={() => {
                     const result = extractContacts(rawContactText);
-                    setExtractedContact(result);
+                    // Fill phone section
+                    if (result.name) {
+                      setContactName(result.name);
+                    }
+                    if (result.phones.length > 0) {
+                      const minSlots = Math.max(6, result.phones.length);
+                      const padded = [...result.phones, ...Array(minSlots - result.phones.length).fill('')];
+                      setPhoneNumbers(padded);
+                    }
+                    // Fill email section Row 1
+                    if (result.emails.length > 0 || result.name) {
+                      const updated = [...emailRecipients];
+                      updated[0] = {
+                        name: result.name || '',
+                        email: result.emails.join('\n'),
+                      };
+                      setEmailRecipients(updated);
+                    }
+                    // Expand both sections so user can see the filled data
+                    setPhoneExpanded(true);
+                    setEmailExpanded(true);
+                    // Show confirmation
+                    const parts = [];
+                    if (result.name) parts.push(`Name: ${result.name}`);
+                    if (result.phones.length > 0) parts.push(`${result.phones.length} phones`);
+                    if (result.emails.length > 0) parts.push(`${result.emails.length} emails`);
+                    if (parts.length > 0) {
+                      toast({ title: 'Contacts Extracted', description: parts.join(', ') });
+                    } else {
+                      toast({ title: 'No contacts found', description: 'Try pasting more text', variant: 'destructive' });
+                    }
                   }}
                   disabled={!rawContactText.trim()}
                 >
                   Extract Contacts
                 </Button>
-
-                {extractedContact && (
-                  <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Extracted Results
-                    </p>
-                    {extractedContact.name && (
-                      <div>
-                        <span className="text-xs text-muted-foreground">Name: </span>
-                        <span className="text-sm font-medium">{extractedContact.name}</span>
-                      </div>
-                    )}
-                    {extractedContact.phones.length > 0 && (
-                      <div>
-                        <span className="text-xs text-muted-foreground">
-                          Phones ({extractedContact.phones.length}):
-                        </span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {extractedContact.phones.map((p, i) => (
-                            <Badge key={i} variant="outline" className="text-xs font-mono">
-                              {p}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {extractedContact.emails.length > 0 && (
-                      <div>
-                        <span className="text-xs text-muted-foreground">
-                          Emails ({extractedContact.emails.length}):
-                        </span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {extractedContact.emails.map((e, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">
-                              {e}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {!extractedContact.name && extractedContact.phones.length === 0 && extractedContact.emails.length === 0 && (
-                      <p className="text-xs text-muted-foreground italic">
-                        No contacts found. Try pasting more text.
-                      </p>
-                    )}
-
-                    {(extractedContact.phones.length > 0 || extractedContact.emails.length > 0) && (
-                      <Button
-                        size="sm"
-                        className="w-full mt-2"
-                        disabled={savingExtracted}
-                        onClick={async () => {
-                          if (!property) return;
-                          setSavingExtracted(true);
-                          try {
-                            if (extractedContact.phones.length > 0) {
-                              const existingPhones = phoneNumbers.filter(p => p.trim());
-                              const merged = [...new Set([...existingPhones, ...extractedContact.phones])].slice(0, 6);
-                              await updatePropertyPhoneNumbers(property.id, merged, ownerPhoneIndex);
-                              const padded = [...merged, ...Array(Math.max(0, 6 - merged.length)).fill('')];
-                              setPhoneNumbers(padded);
-                            }
-                            if (extractedContact.emails.length > 0) {
-                              const existingEmails = emails.filter(e => e.trim());
-                              const mergedEmails = [...new Set([...existingEmails, ...extractedContact.emails])];
-                              await updatePropertyEmails(property.id, mergedEmails);
-                              setEmails(mergedEmails);
-                            }
-                            queryClient.invalidateQueries({ queryKey: ['properties'] });
-                            toast({
-                              title: 'Contacts Saved',
-                              description: `Saved ${extractedContact.phones.length} phones and ${extractedContact.emails.length} emails`,
-                            });
-                            setRawContactText('');
-                            setExtractedContact(null);
-                          } catch (error) {
-                            toast({
-                              title: 'Error',
-                              description: 'Failed to save extracted contacts',
-                              variant: 'destructive',
-                            });
-                          } finally {
-                            setSavingExtracted(false);
-                          }
-                        }}
-                      >
-                        {savingExtracted ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Saving...
-                          </>
-                        ) : 'Save to Property'}
-                      </Button>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>
