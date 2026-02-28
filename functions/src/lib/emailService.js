@@ -1,8 +1,10 @@
 const nodemailer = require('nodemailer');
+const { resolve4 } = require('dns').promises;
 
 let transporter = null;
+let resolvedHost = null;
 
-function getTransporter() {
+async function getTransporter() {
   if (transporter) return transporter;
 
   const user = process.env.GMAIL_USER;
@@ -12,14 +14,27 @@ function getTransporter() {
     throw new Error('GMAIL_USER and GMAIL_APP_PASSWORD environment variables are required');
   }
 
+  // Resolve smtp.gmail.com to IPv4 manually — Railway doesn't support IPv6
+  if (!resolvedHost) {
+    try {
+      const addresses = await resolve4('smtp.gmail.com');
+      resolvedHost = addresses[0];
+      console.log(`[EMAIL] Resolved smtp.gmail.com to IPv4: ${resolvedHost}`);
+    } catch {
+      resolvedHost = 'smtp.gmail.com';
+      console.log('[EMAIL] DNS resolve failed, using hostname directly');
+    }
+  }
+
   transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
+    host: resolvedHost,
     port: 587,
     secure: false,
     auth: { user, pass },
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 20000,
+    tls: { servername: 'smtp.gmail.com' },
   });
 
   return transporter;
@@ -34,7 +49,7 @@ function getTransporter() {
  * @returns {Promise<Object>} Nodemailer send result
  */
 async function sendEmail({ to, subject, text }) {
-  const t = getTransporter();
+  const t = await getTransporter();
   const from = process.env.GMAIL_USER;
 
   const recipients = Array.isArray(to) ? to.join(', ') : to;
