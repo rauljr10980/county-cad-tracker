@@ -1,8 +1,4 @@
 const nodemailer = require('nodemailer');
-const dns = require('dns');
-
-// Force Node.js to resolve DNS over IPv4 — Railway doesn't support IPv6
-dns.setDefaultResultOrder('ipv4first');
 
 let transporter = null;
 
