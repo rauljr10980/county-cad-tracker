@@ -28,8 +28,8 @@ async function getTransporter() {
 
   transporter = nodemailer.createTransport({
     host: resolvedHost,
-    port: 587,
-    secure: false,
+    port: 465,
+    secure: true,
     auth: { user, pass },
     connectionTimeout: 15000,
     greetingTimeout: 15000,
