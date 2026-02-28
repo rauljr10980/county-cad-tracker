@@ -76,7 +76,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [emailRecipients, setEmailRecipients] = useState<{ name: string; emails: string[] }[]>(
     Array.from({ length: 6 }, () => ({ name: '', emails: [''] }))
   );
-  const [emailSubject, setEmailSubject] = useState('Quick question');
+  const [emailSubject, setEmailSubject] = useState('Quick question regarding {{PropertyAddress}}');
   const [emailBody, setEmailBody] = useState('');
   const [sendingEmailIndex, setSendingEmailIndex] = useState<number | null>(null);
   const [sendingAllEmails, setSendingAllEmails] = useState(false);
@@ -154,7 +154,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       } else {
         setEmailRecipients(emptyEmailRows);
       }
-      setEmailBody(`Hi {{Name}},\n\nMy name is Raul, and I purchase vacant homes. I came across the property at {{PropertyAddress}}, which is recorded under {{Owner}}, and wanted to reach out respectfully.\n\nIf you're related to the owner, I would appreciate it if you could let me know the best person to speak with. If the home is vacant, I would be interested in discussing a purchase.\n\nIf I've contacted the wrong person, please accept my apologies.\n\nThank you,\nRaul\n{{PhoneNumber}}`);
+      setEmailBody(`Hi {{Name}},\n\nMy name is Raul. I'm reaching out regarding the property at {{PropertyAddress}}, which is listed under {{Owner}}.\n\nIf you're connected to the property, could you please let me know the best person to speak with? If the home is vacant, I would be interested in discussing a possible purchase.\n\nWe also work with real estate attorneys to help streamline the process, and you wouldn't have to pay out of pocket for those legal services.\n\nIf I've reached you by mistake, please disregard this message and accept my apologies.\n\nThank you,\nRaul\n210-425-7584`);
 
       // Load pre-foreclosure records for this property
       loadPreForeclosureRecords();
@@ -1591,7 +1591,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                               .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
                               .replace(/\{\{Owner\}\}/g, property.ownerName || '')
                               .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
-                            await sendEmail({ to: validEmails, subject: emailSubject, body: personalBody });
+                            const resolvedSubject = emailSubject
+                              .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
+                              .replace(/\{\{Owner\}\}/g, property.ownerName || '');
+                            await sendEmail({ to: validEmails, subject: resolvedSubject, body: personalBody });
                             toast({ title: `Email sent to ${validEmails.length} address${validEmails.length > 1 ? 'es' : ''}` });
                           } catch (err) {
                             toast({ title: 'Failed to send', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
@@ -1671,7 +1674,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
                           .replace(/\{\{Owner\}\}/g, property.ownerName || '')
                           .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
-                        await sendEmail({ to: allEmails, subject: emailSubject, body: resolved });
+                        const resolvedSubject = emailSubject
+                          .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
+                          .replace(/\{\{Owner\}\}/g, property.ownerName || '');
+                        await sendEmail({ to: allEmails, subject: resolvedSubject, body: resolved });
                         toast({ title: `Email sent to ${allEmails.length} address${allEmails.length > 1 ? 'es' : ''}` });
                       } catch (err) {
                         toast({ title: 'Failed to send', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
