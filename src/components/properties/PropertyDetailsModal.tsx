@@ -154,7 +154,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       } else {
         setEmailRecipients(emptyEmailRows);
       }
-      setEmailBody(`Hi {{Name}},\n\nMy name is Raul. I'm reaching out regarding the property at {{PropertyAddress}}, which is listed under {{Owner}}.\n\nIf you're connected to the property, could you please let me know the best person to speak with? If the home is vacant, I would be interested in discussing a possible purchase.\n\nWe also work with real estate attorneys to help streamline the process, and you wouldn't have to pay out of pocket for those legal services.\n\nIf I've reached you by mistake, please disregard this message and accept my apologies.\n\nThank you,\nRaul\n210-425-7584`);
+      setEmailBody(`Hi Ms./Mr. {{LastName}},\n\nMy name is Raul. I'm reaching out regarding the property at {{PropertyAddress}}, which is listed under {{Owner}}.\n\nIf you're connected to the property, could you please let me know the best person to speak with? If the home is vacant, I would be interested in discussing a possible purchase.\n\nWe also work with real estate attorneys to help streamline the process, and you wouldn't have to pay out of pocket for those legal services.\n\nIf I've reached you by mistake, please disregard this message and accept my apologies.\n\nThank you,\nRaul\n210-425-7584`);
 
       // Load pre-foreclosure records for this property
       loadPreForeclosureRecords();
@@ -1586,8 +1586,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                             const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
                               ? property.phoneNumbers[property.ownerPhoneIndex]
                               : (property.phoneNumbers?.find(p => p) || '');
+                            const fullName = recipient.name.trim();
+                            const lastName = fullName.split(/\s+/).pop() || fullName || 'there';
                             const personalBody = emailBody
-                              .replace(/\{\{Name\}\}/g, recipient.name.trim() || 'there')
+                              .replace(/\{\{LastName\}\}/g, lastName)
+                              .replace(/\{\{Name\}\}/g, fullName || 'there')
                               .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
                               .replace(/\{\{Owner\}\}/g, property.ownerName || '')
                               .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
@@ -1625,7 +1628,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       className="flex-1"
                     />
                   </div>
-                  <p className="text-[11px] text-muted-foreground">Variables: <code className="bg-muted px-1 rounded">{'{{Name}}'}</code> <code className="bg-muted px-1 rounded">{'{{PropertyAddress}}'}</code> <code className="bg-muted px-1 rounded">{'{{Owner}}'}</code> <code className="bg-muted px-1 rounded">{'{{PhoneNumber}}'}</code></p>
+                  <p className="text-[11px] text-muted-foreground">Variables: <code className="bg-muted px-1 rounded">{'{{LastName}}'}</code> <code className="bg-muted px-1 rounded">{'{{Name}}'}</code> <code className="bg-muted px-1 rounded">{'{{PropertyAddress}}'}</code> <code className="bg-muted px-1 rounded">{'{{Owner}}'}</code></p>
                   <Textarea
                     value={emailBody}
                     onChange={(e) => setEmailBody(e.target.value)}
@@ -1643,6 +1646,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         ? property.phoneNumbers[property.ownerPhoneIndex]
                         : (property.phoneNumbers?.find(p => p) || '');
                       const resolved = emailBody
+                        .replace(/\{\{LastName\}\}/g, '___')
+                        .replace(/\{\{Name\}\}/g, '___')
                         .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
                         .replace(/\{\{Owner\}\}/g, property.ownerName || '')
                         .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
@@ -1670,6 +1675,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           ? property.phoneNumbers[property.ownerPhoneIndex]
                           : (property.phoneNumbers?.find(p => p) || '');
                         const resolved = emailBody
+                          .replace(/\{\{LastName\}\}/g, 'there')
                           .replace(/\{\{Name\}\}/g, 'there')
                           .replace(/\{\{PropertyAddress\}\}/g, property.propertyAddress || '')
                           .replace(/\{\{Owner\}\}/g, property.ownerName || '')
