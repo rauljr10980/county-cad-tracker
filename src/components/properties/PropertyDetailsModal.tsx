@@ -1430,8 +1430,23 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   variant="outline"
                   onClick={() => {
                     const result = extractContacts(rawContactText);
-                    // Fill phone section — smart row placement (same logic as emails)
-                    if (result.phones.length > 0 || result.name) {
+
+                    // Collect all existing phone digits across all rows for dedup
+                    const existingPhoneDigits = new Set(
+                      phoneContacts.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number.replace(/\D/g, '').slice(-10)))
+                    );
+                    // Collect all existing emails across all rows for dedup
+                    const existingEmails = new Set(
+                      emailRecipients.flatMap(r => r.emails.filter(e => e.includes('@')).map(e => e.toLowerCase().trim()))
+                    );
+
+                    // Filter out duplicate phones
+                    const newPhones = result.phones.filter(p => !existingPhoneDigits.has(p.replace(/\D/g, '').slice(-10)));
+                    // Filter out duplicate emails
+                    const newEmails = result.emails.filter(e => !existingEmails.has(e.toLowerCase().trim()));
+
+                    // Fill phone section — smart row placement
+                    if (newPhones.length > 0 || result.name) {
                       const updated = [...phoneContacts];
                       const row1Empty = !updated[0].name.trim() && !updated[0].phones.some(p => p.number.trim());
                       const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
@@ -1439,48 +1454,42 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       if (row1Empty || row1SameName) {
                         targetRow = 0;
                       } else {
-                        // Find next empty row
                         const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.phones.some(p => p.number.trim()));
                         if (emptyIdx !== -1) {
                           targetRow = emptyIdx;
                         } else {
-                          // All rows full — add a new row
                           updated.push({ name: '', phones: [{ number: '', status: '' }] });
                           targetRow = updated.length - 1;
                         }
                       }
                       updated[targetRow] = {
                         name: result.name || '',
-                        phones: result.phones.length > 0
-                          ? result.phones.map(p => ({ number: p, status: '' as const }))
+                        phones: newPhones.length > 0
+                          ? newPhones.map(p => ({ number: p, status: '' as const }))
                           : [{ number: '', status: '' as const }],
                       };
                       setPhoneContacts(updated);
                     }
-                    // Fill email section — find the right row
-                    if (result.emails.length > 0 || result.name) {
+                    // Fill email section — smart row placement
+                    if (newEmails.length > 0 || result.name) {
                       const updated = [...emailRecipients];
-                      // Find the right row: if row 1 is empty or has the same name, use it
-                      // Otherwise use the next empty row (new person / heir)
                       const row1Empty = !updated[0].name.trim() && !updated[0].emails.some(e => e.includes('@'));
                       const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
                       let targetRow: number;
                       if (row1Empty || row1SameName) {
                         targetRow = 0;
                       } else {
-                        // Find next empty row
                         const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.emails.some(e => e.includes('@')));
                         if (emptyIdx !== -1) {
                           targetRow = emptyIdx;
                         } else {
-                          // All rows full — add a new row
                           updated.push({ name: '', emails: [''] });
                           targetRow = updated.length - 1;
                         }
                       }
                       updated[targetRow] = {
                         name: result.name || '',
-                        emails: result.emails.length > 0 ? result.emails : [''],
+                        emails: newEmails.length > 0 ? newEmails : [''],
                       };
                       setEmailRecipients(updated);
                     }
@@ -1492,8 +1501,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     // Show confirmation
                     const parts = [];
                     if (result.name) parts.push(`Name: ${result.name}`);
-                    if (result.phones.length > 0) parts.push(`${result.phones.length} phones`);
-                    if (result.emails.length > 0) parts.push(`${result.emails.length} emails`);
+                    if (newPhones.length > 0) parts.push(`${newPhones.length} phones`);
+                    if (newEmails.length > 0) parts.push(`${newEmails.length} emails`);
+                    const dupeCount = (result.phones.length - newPhones.length) + (result.emails.length - newEmails.length);
+                    if (dupeCount > 0) parts.push(`${dupeCount} duplicates skipped`);
                     if (parts.length > 0) {
                       toast({ title: 'Contacts Extracted', description: parts.join(', ') });
                     } else {
