@@ -22,6 +22,16 @@ import { PropertyWorkflowTracker } from './PropertyWorkflowTracker';
 import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
 import { updatePropertyWorkflowStage } from '@/lib/api';
 
+interface PhoneEntry {
+  number: string;
+  status?: '' | 'rings' | 'not_working' | 'voicemail';
+}
+
+interface PhoneContactRow {
+  name: string;
+  phones: PhoneEntry[];
+}
+
 interface PropertyDetailsModalProps {
   property: Property | null;
   isOpen: boolean;
@@ -33,8 +43,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
-  const [phoneContacts, setPhoneContacts] = useState<{ name: string; phones: string[] }[]>(
-    Array.from({ length: 6 }, () => ({ name: '', phones: [''] }))
+  const [phoneContacts, setPhoneContacts] = useState<PhoneContactRow[]>(
+    Array.from({ length: 6 }, () => ({ name: '', phones: [{ number: '', status: '' }] }))
   );
   const [ownerPhoneIndex, setOwnerPhoneIndex] = useState<number | undefined>(undefined);
   const [savingPhones, setSavingPhones] = useState(false);
@@ -94,21 +104,25 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setIsEditingNotes(false);
       // Initialize phone contacts from structured contacts or flat phoneNumbers
       const savedContacts = property.contacts;
-      const emptyPhoneRows = Array.from({ length: 6 }, () => ({ name: '', phones: [''] }));
+      const mkEmpty = (): PhoneContactRow => ({ name: '', phones: [{ number: '', status: '' }] });
+      const emptyPhoneRows: PhoneContactRow[] = Array.from({ length: 6 }, mkEmpty);
       if (savedContacts?.phoneRows && savedContacts.phoneRows.length > 0) {
-        const restored = savedContacts.phoneRows.map((r: { name: string; phones: string[] }) => ({
+        const restored: PhoneContactRow[] = savedContacts.phoneRows.map((r: any) => ({
           name: r.name || '',
-          phones: r.phones?.length > 0 ? r.phones : [''],
+          phones: (r.phones && r.phones.length > 0)
+            ? r.phones.map((p: any) => typeof p === 'string'
+              ? { number: p, status: '' as const }
+              : { number: p.number || '', status: p.status || '' })
+            : [{ number: '', status: '' as const }],
         }));
-        // Pad to at least 6 rows
-        while (restored.length < 6) restored.push({ name: '', phones: [''] });
+        while (restored.length < 6) restored.push(mkEmpty());
         setPhoneContacts(restored);
       } else {
         // Fallback: load flat phoneNumbers into row 1
         const phones = property.phoneNumbers || [];
         if (phones.length > 0) {
-          emptyPhoneRows[0] = { name: '', phones: phones.filter(p => p) };
-          if (emptyPhoneRows[0].phones.length === 0) emptyPhoneRows[0].phones = [''];
+          emptyPhoneRows[0] = { name: '', phones: phones.filter(p => p).map(p => ({ number: p, status: '' as const })) };
+          if (emptyPhoneRows[0].phones.length === 0) emptyPhoneRows[0].phones = [{ number: '', status: '' }];
         }
         setPhoneContacts(emptyPhoneRows);
       }
@@ -293,8 +307,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   // Build current contacts JSON from both phone and email rows
   const buildContactsJson = () => ({
     phoneRows: phoneContacts
-      .filter(r => r.name.trim() || r.phones.some(p => p.trim()))
-      .map(r => ({ name: r.name, phones: r.phones.filter(p => p.trim()) })),
+      .filter(r => r.name.trim() || r.phones.some(p => p.number.trim()))
+      .map(r => ({
+        name: r.name,
+        phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '' })),
+      })),
     emailRows: emailRecipients
       .filter(r => r.name.trim() || r.emails.some(e => e.trim()))
       .map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()) })),
@@ -303,8 +320,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const handleSavePhoneNumbers = async () => {
     setSavingPhones(true);
     try {
-      // Collect all non-empty phones from all rows
-      const allPhones = phoneContacts.flatMap(row => row.phones.filter(p => p.trim() !== ''));
+      // Collect all non-empty phone numbers from all rows (flat array for backward compat)
+      const allPhones = phoneContacts.flatMap(row => row.phones.filter(p => p.number.trim() !== '').map(p => p.number));
       const contacts = buildContactsJson();
       await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex, contacts);
       toast({
@@ -996,7 +1013,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         property.phoneNumbers = newPhones;
                         // Add to first row of phoneContacts
                         const updatedContacts = [...phoneContacts];
-                        updatedContacts[0] = { ...updatedContacts[0], phones: newPhones };
+                        updatedContacts[0] = {
+                          ...updatedContacts[0],
+                          phones: [...updatedContacts[0].phones.filter(p => p.number.trim()), { number: result.phoneNumber, status: '' }],
+                        };
                         setPhoneContacts(updatedContacts);
                       }
                     }
@@ -1273,20 +1293,49 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     <div className="flex-1 overflow-x-auto">
                       <div className="flex items-center gap-1.5">
                         {contact.phones.map((phone, phoneIdx) => (
-                          <Input
-                            key={phoneIdx}
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => {
-                              const updated = [...phoneContacts];
-                              const newPhones = [...updated[rowIndex].phones];
-                              newPhones[phoneIdx] = e.target.value;
-                              updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
-                              setPhoneContacts(updated);
-                            }}
-                            placeholder={`Phone ${phoneIdx + 1}`}
-                            className="w-[140px] shrink-0 text-xs font-mono"
-                          />
+                          <div key={phoneIdx} className="flex items-center gap-0.5 shrink-0">
+                            <Input
+                              type="tel"
+                              value={phone.number}
+                              onChange={(e) => {
+                                const updated = [...phoneContacts];
+                                const newPhones = [...updated[rowIndex].phones];
+                                newPhones[phoneIdx] = { ...newPhones[phoneIdx], number: e.target.value };
+                                updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
+                                setPhoneContacts(updated);
+                              }}
+                              placeholder={`Phone ${phoneIdx + 1}`}
+                              className={cn(
+                                "w-[130px] shrink-0 text-xs font-mono",
+                                phone.status === 'not_working' && "border-red-500 bg-red-500/15 text-red-400",
+                                phone.status === 'rings' && "border-green-500 bg-green-500/10 text-green-400",
+                                phone.status === 'voicemail' && "border-yellow-500 bg-yellow-500/10 text-yellow-400",
+                              )}
+                            />
+                            <select
+                              value={phone.status || ''}
+                              onChange={(e) => {
+                                const updated = [...phoneContacts];
+                                const newPhones = [...updated[rowIndex].phones];
+                                newPhones[phoneIdx] = { ...newPhones[phoneIdx], status: e.target.value as PhoneEntry['status'] };
+                                updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
+                                setPhoneContacts(updated);
+                              }}
+                              className={cn(
+                                "h-8 w-6 shrink-0 bg-transparent border-0 text-xs cursor-pointer appearance-none text-center",
+                                !phone.status && "text-muted-foreground opacity-40",
+                                phone.status === 'not_working' && "text-red-400",
+                                phone.status === 'rings' && "text-green-400",
+                                phone.status === 'voicemail' && "text-yellow-400",
+                              )}
+                              title={phone.status === 'not_working' ? 'Not Working' : phone.status === 'rings' ? 'Rings' : phone.status === 'voicemail' ? 'Voicemail' : 'Set status'}
+                            >
+                              <option value="">-</option>
+                              <option value="rings">G</option>
+                              <option value="not_working">X</option>
+                              <option value="voicemail">V</option>
+                            </select>
+                          </div>
                         ))}
                         <Button
                           variant="ghost"
@@ -1294,7 +1343,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
                           onClick={() => {
                             const updated = [...phoneContacts];
-                            updated[rowIndex] = { ...updated[rowIndex], phones: [...updated[rowIndex].phones, ''] };
+                            updated[rowIndex] = { ...updated[rowIndex], phones: [...updated[rowIndex].phones, { number: '', status: '' }] };
                             setPhoneContacts(updated);
                           }}
                           title="Add phone field"
@@ -1305,7 +1354,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     </div>
                   </div>
                 ))}
-                <div className="flex justify-end">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                    <span className="text-green-400">G</span>=Rings
+                    <span className="text-red-400">X</span>=Not Working
+                    <span className="text-yellow-400">V</span>=Voicemail
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1357,25 +1411,27 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     // Fill phone section — smart row placement (same logic as emails)
                     if (result.phones.length > 0 || result.name) {
                       const updated = [...phoneContacts];
-                      const row1Empty = !updated[0].name.trim() && !updated[0].phones.some(p => p.trim());
+                      const row1Empty = !updated[0].name.trim() && !updated[0].phones.some(p => p.number.trim());
                       const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
                       let targetRow: number;
                       if (row1Empty || row1SameName) {
                         targetRow = 0;
                       } else {
                         // Find next empty row
-                        const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.phones.some(p => p.trim()));
+                        const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.phones.some(p => p.number.trim()));
                         if (emptyIdx !== -1) {
                           targetRow = emptyIdx;
                         } else {
                           // All rows full — add a new row
-                          updated.push({ name: '', phones: [''] });
+                          updated.push({ name: '', phones: [{ number: '', status: '' }] });
                           targetRow = updated.length - 1;
                         }
                       }
                       updated[targetRow] = {
                         name: result.name || '',
-                        phones: result.phones.length > 0 ? result.phones : [''],
+                        phones: result.phones.length > 0
+                          ? result.phones.map(p => ({ number: p, status: '' as const }))
+                          : [{ number: '', status: '' as const }],
                       };
                       setPhoneContacts(updated);
                     }
