@@ -37,8 +37,8 @@ router.post('/send', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('[EMAIL] Send failed:', error.message);
 
-    if (error.message.includes('RESEND_API_KEY')) {
-      return res.status(500).json({ error: 'Email not configured. Add RESEND_API_KEY to environment variables.' });
+    if (error.message.includes('BREVO_API_KEY')) {
+      return res.status(500).json({ error: 'Email not configured. Add BREVO_API_KEY to environment variables.' });
     }
 
     res.status(500).json({ error: 'Failed to send email: ' + error.message });

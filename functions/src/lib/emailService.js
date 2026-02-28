@@ -1,45 +1,46 @@
-const { Resend } = require('resend');
+const SibApiV3Sdk = require('@getbrevo/brevo');
 
-let resend = null;
+let apiInstance = null;
 
 function getClient() {
-  if (resend) return resend;
+  if (apiInstance) return apiInstance;
 
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
-    throw new Error('RESEND_API_KEY environment variable is required');
+    throw new Error('BREVO_API_KEY environment variable is required');
   }
 
-  resend = new Resend(apiKey);
-  return resend;
+  apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+  apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, apiKey);
+  return apiInstance;
 }
 
 /**
- * Send an email via Resend API (HTTPS — no SMTP ports needed)
+ * Send an email via Brevo API (HTTPS — no SMTP ports needed)
  * @param {Object} options
  * @param {string|string[]} options.to - Recipient email(s)
  * @param {string} options.subject - Email subject
  * @param {string} options.text - Plain text body
- * @returns {Promise<Object>} Resend send result
+ * @returns {Promise<Object>} Brevo send result
  */
 async function sendEmail({ to, subject, text }) {
   const client = getClient();
-  const from = process.env.EMAIL_FROM || 'County CAD Tracker <onboarding@resend.dev>';
+
+  const senderEmail = process.env.BREVO_SENDER_EMAIL || 'raul.b.medina.jr@gmail.com';
+  const senderName = process.env.BREVO_SENDER_NAME || 'Raul Medina';
 
   const recipients = Array.isArray(to) ? to : [to];
+  const toList = recipients.map(email => ({ email: email.trim() }));
 
-  const { data, error } = await client.emails.send({
-    from,
-    to: recipients,
-    subject,
-    text,
-  });
+  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+  sendSmtpEmail.sender = { name: senderName, email: senderEmail };
+  sendSmtpEmail.to = toList;
+  sendSmtpEmail.subject = subject;
+  sendSmtpEmail.textContent = text;
 
-  if (error) {
-    throw new Error(error.message || 'Resend API error');
-  }
+  const data = await client.sendTransacEmail(sendSmtpEmail);
 
-  console.log(`[EMAIL] Sent to ${recipients.join(', ')} — id: ${data.id}`);
+  console.log(`[EMAIL] Sent to ${recipients.join(', ')} — messageId: ${data.messageId}`);
   return data;
 }
 
