@@ -1293,7 +1293,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     <div className="flex-1 overflow-x-auto">
                       <div className="flex items-center gap-1.5">
                         {contact.phones.map((phone, phoneIdx) => (
-                          <div key={phoneIdx} className="flex items-center gap-0.5 shrink-0">
+                          <div key={phoneIdx} className="relative shrink-0">
                             <Input
                               type="tel"
                               value={phone.number}
@@ -1306,35 +1306,63 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                               }}
                               placeholder={`Phone ${phoneIdx + 1}`}
                               className={cn(
-                                "w-[130px] shrink-0 text-xs font-mono",
-                                phone.status === 'not_working' && "border-red-500 bg-red-500/15 text-red-400",
+                                "w-[130px] shrink-0 text-xs font-mono pr-7",
+                                phone.status === 'not_working' && "border-red-500 bg-red-500/15 text-red-400 line-through",
                                 phone.status === 'rings' && "border-green-500 bg-green-500/10 text-green-400",
                                 phone.status === 'voicemail' && "border-yellow-500 bg-yellow-500/10 text-yellow-400",
                               )}
                             />
-                            <select
-                              value={phone.status || ''}
-                              onChange={(e) => {
-                                const updated = [...phoneContacts];
-                                const newPhones = [...updated[rowIndex].phones];
-                                newPhones[phoneIdx] = { ...newPhones[phoneIdx], status: e.target.value as PhoneEntry['status'] };
-                                updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
-                                setPhoneContacts(updated);
-                              }}
-                              className={cn(
-                                "h-8 w-6 shrink-0 bg-transparent border-0 text-xs cursor-pointer appearance-none text-center",
-                                !phone.status && "text-muted-foreground opacity-40",
-                                phone.status === 'not_working' && "text-red-400",
-                                phone.status === 'rings' && "text-green-400",
-                                phone.status === 'voicemail' && "text-yellow-400",
-                              )}
-                              title={phone.status === 'not_working' ? 'Not Working' : phone.status === 'rings' ? 'Rings' : phone.status === 'voicemail' ? 'Voicemail' : 'Set status'}
-                            >
-                              <option value="">-</option>
-                              <option value="rings">G</option>
-                              <option value="not_working">X</option>
-                              <option value="voicemail">V</option>
-                            </select>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    "absolute right-0.5 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded text-[10px] font-bold cursor-pointer hover:bg-muted/50",
+                                    !phone.status && "text-muted-foreground/50",
+                                    phone.status === 'not_working' && "text-red-400",
+                                    phone.status === 'rings' && "text-green-400",
+                                    phone.status === 'voicemail' && "text-yellow-400",
+                                  )}
+                                >
+                                  {!phone.status && <ChevronDown className="h-3 w-3" />}
+                                  {phone.status === 'rings' && <span>✓</span>}
+                                  {phone.status === 'not_working' && <span>✗</span>}
+                                  {phone.status === 'voicemail' && <span>VM</span>}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-36 p-1" align="end" side="bottom">
+                                {[
+                                  { value: '', label: 'No Status', color: '' },
+                                  { value: 'rings', label: 'Rings', color: 'text-green-400' },
+                                  { value: 'not_working', label: 'Not Working', color: 'text-red-400' },
+                                  { value: 'voicemail', label: 'Voicemail', color: 'text-yellow-400' },
+                                ].map((opt) => (
+                                  <button
+                                    key={opt.value}
+                                    type="button"
+                                    className={cn(
+                                      "w-full text-left px-2 py-1.5 text-xs rounded hover:bg-muted flex items-center gap-2",
+                                      phone.status === opt.value && "bg-muted font-medium",
+                                    )}
+                                    onClick={() => {
+                                      const updated = [...phoneContacts];
+                                      const newPhones = [...updated[rowIndex].phones];
+                                      newPhones[phoneIdx] = { ...newPhones[phoneIdx], status: opt.value as PhoneEntry['status'] };
+                                      updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
+                                      setPhoneContacts(updated);
+                                    }}
+                                  >
+                                    <span className={cn("w-2 h-2 rounded-full shrink-0", {
+                                      'bg-muted-foreground/30': !opt.value,
+                                      'bg-green-400': opt.value === 'rings',
+                                      'bg-red-400': opt.value === 'not_working',
+                                      'bg-yellow-400': opt.value === 'voicemail',
+                                    })} />
+                                    <span className={opt.color}>{opt.label}</span>
+                                  </button>
+                                ))}
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         ))}
                         <Button
@@ -1354,12 +1382,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     </div>
                   </div>
                 ))}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                    <span className="text-green-400">G</span>=Rings
-                    <span className="text-red-400">X</span>=Not Working
-                    <span className="text-yellow-400">V</span>=Voicemail
-                  </div>
+                <div className="flex justify-end">
                   <Button
                     variant="ghost"
                     size="sm"
