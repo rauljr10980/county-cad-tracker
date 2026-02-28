@@ -1,68 +1,46 @@
-const nodemailer = require('nodemailer');
-const { resolve4 } = require('dns').promises;
+const { Resend } = require('resend');
 
-let transporter = null;
-let resolvedHost = null;
+let resend = null;
 
-async function getTransporter() {
-  if (transporter) return transporter;
+function getClient() {
+  if (resend) return resend;
 
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-
-  if (!user || !pass) {
-    throw new Error('GMAIL_USER and GMAIL_APP_PASSWORD environment variables are required');
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY environment variable is required');
   }
 
-  // Resolve smtp.gmail.com to IPv4 manually — Railway doesn't support IPv6
-  if (!resolvedHost) {
-    try {
-      const addresses = await resolve4('smtp.gmail.com');
-      resolvedHost = addresses[0];
-      console.log(`[EMAIL] Resolved smtp.gmail.com to IPv4: ${resolvedHost}`);
-    } catch {
-      resolvedHost = 'smtp.gmail.com';
-      console.log('[EMAIL] DNS resolve failed, using hostname directly');
-    }
-  }
-
-  transporter = nodemailer.createTransport({
-    host: resolvedHost,
-    port: 465,
-    secure: true,
-    auth: { user, pass },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 20000,
-    tls: { servername: 'smtp.gmail.com' },
-  });
-
-  return transporter;
+  resend = new Resend(apiKey);
+  return resend;
 }
 
 /**
- * Send an email via Gmail SMTP
+ * Send an email via Resend API (HTTPS — no SMTP ports needed)
  * @param {Object} options
  * @param {string|string[]} options.to - Recipient email(s)
  * @param {string} options.subject - Email subject
  * @param {string} options.text - Plain text body
- * @returns {Promise<Object>} Nodemailer send result
+ * @returns {Promise<Object>} Resend send result
  */
 async function sendEmail({ to, subject, text }) {
-  const t = await getTransporter();
-  const from = process.env.GMAIL_USER;
+  const client = getClient();
+  const from = process.env.EMAIL_FROM || 'County CAD Tracker <onboarding@resend.dev>';
 
-  const recipients = Array.isArray(to) ? to.join(', ') : to;
+  const recipients = Array.isArray(to) ? to : [to];
 
-  const info = await t.sendMail({
+  const { data, error } = await client.emails.send({
     from,
     to: recipients,
     subject,
     text,
   });
 
-  console.log(`[EMAIL] Sent to ${recipients} — messageId: ${info.messageId}`);
-  return info;
+  if (error) {
+    throw new Error(error.message || 'Resend API error');
+  }
+
+  console.log(`[EMAIL] Sent to ${recipients.join(', ')} — id: ${data.id}`);
+  return data;
 }
 
 module.exports = { sendEmail };
