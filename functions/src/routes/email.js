@@ -41,7 +41,15 @@ router.post('/send', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: 'Email not configured. Add GMAIL_USER and GMAIL_APP_PASSWORD to environment variables.' });
     }
 
-    res.status(500).json({ error: 'Failed to send email' });
+    if (error.message.includes('Invalid login') || error.code === 'EAUTH') {
+      return res.status(500).json({ error: 'Gmail authentication failed. Check GMAIL_USER and GMAIL_APP_PASSWORD are correct.' });
+    }
+
+    if (error.code === 'ETIMEDOUT' || error.code === 'ESOCKET') {
+      return res.status(500).json({ error: 'Connection to Gmail timed out. Check your app password is correct.' });
+    }
+
+    res.status(500).json({ error: 'Failed to send email: ' + error.message });
   }
 });
 
