@@ -1335,7 +1335,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                   { value: '', label: 'No Status', color: '' },
                                   { value: 'rings', label: 'Rings', color: 'text-green-400' },
                                   { value: 'not_working', label: 'Not Working', color: 'text-red-400' },
-                                  { value: 'voicemail', label: 'Voicemail', color: 'text-yellow-400' },
                                 ].map((opt) => (
                                   <button
                                     key={opt.value}
