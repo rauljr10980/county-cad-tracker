@@ -73,13 +73,19 @@ async def dial_numbers(contacts):
         )
         user_data = os.path.expandvars(r'%LOCALAPPDATA%\Google\Chrome\User Data')
 
-        browser = await p.chromium.launch_persistent_context(
-            user_data_dir=user_data,
-            executable_path=chrome_path,
-            headless=False,
-            args=['--start-maximized'],
-            no_viewport=True,
-        )
+        try:
+            browser = await p.chromium.launch_persistent_context(
+                user_data_dir=user_data,
+                executable_path=chrome_path,
+                headless=False,
+                args=['--start-maximized'],
+                no_viewport=True,
+            )
+        except Exception as e:
+            print(f'\nFailed to launch Chrome: {e}')
+            print('\nMake sure Chrome is fully closed before clicking Start Dialing.')
+            input('Press Enter to exit...')
+            return
         page = browser.pages[0] if browser.pages else await browser.new_page()
 
         print('\nOpening Google Voice...')
@@ -185,9 +191,17 @@ if __name__ == '__main__':
 
     elif arg.startswith('dialer://'):
         contacts = parse_url(arg)
-        asyncio.run(dial_numbers(contacts))
+        try:
+            asyncio.run(dial_numbers(contacts))
+        except Exception as e:
+            print(f'\n\nERROR: {e}')
+            if 'already running' in str(e).lower() or 'user data directory' in str(e).lower():
+                print('\nChrome is already open. Please close Chrome completely and try again.')
+            input('\nPress Enter to exit...')
+            sys.exit(1)
 
     else:
         print(f'Unknown argument: {arg}')
         print('Run with --help for usage.')
+        input('Press Enter to exit...')
         sys.exit(1)
