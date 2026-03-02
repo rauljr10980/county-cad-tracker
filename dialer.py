@@ -67,14 +67,20 @@ async def dial_numbers(contacts):
         print(f'  - {c["name"] or "Unknown"}: {c["phone"]}')
 
     async with async_playwright() as p:
-        # Launch Chrome (non-headless so you can see and interact)
-        browser = await p.chromium.launch(
-            headless=False,
-            channel='chrome',
-            args=['--start-maximized']
+        # Use real Chrome with your existing profile so Google doesn't block login
+        chrome_path = (
+            r'C:\Program Files\Google\Chrome\Application\chrome.exe'
         )
-        context = await browser.new_context(no_viewport=True)
-        page = await context.new_page()
+        user_data = os.path.expandvars(r'%LOCALAPPDATA%\Google\Chrome\User Data')
+
+        browser = await p.chromium.launch_persistent_context(
+            user_data_dir=user_data,
+            executable_path=chrome_path,
+            headless=False,
+            args=['--start-maximized'],
+            no_viewport=True,
+        )
+        page = browser.pages[0] if browser.pages else await browser.new_page()
 
         print('\nOpening Google Voice...')
         await page.goto('https://voice.google.com')
