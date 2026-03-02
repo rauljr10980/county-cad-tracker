@@ -281,6 +281,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   };
 
   const { ownerName: parsedOwnerName, address: parsedAddress } = parsePropertyAddress(property.propertyAddress);
+  // property.ownerName often contains the actual street address (e.g. "WICKLOW DR")
+  // Use it as the display property address when available
+  const displayPropertyAddress = property.ownerName || parsedAddress || property.propertyAddress || '';
+  const displayOwnerName = parsedOwnerName || '';
 
   const handleSaveNotes = async () => {
     setSavingNotes(true);
@@ -1602,12 +1606,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                             const personalBody = emailBody
                               .replace(/\{\{LastName\}\}/g, lastName)
                               .replace(/\{\{Name\}\}/g, fullName || 'there')
-                              .replace(/\{\{PropertyAddress\}\}/g, parsedAddress || '')
-                              .replace(/\{\{Owner\}\}/g, parsedOwnerName || property.ownerName || '')
+                              .replace(/\{\{PropertyAddress\}\}/g, displayPropertyAddress)
+                              .replace(/\{\{Owner\}\}/g, displayOwnerName)
                               .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
                             const resolvedSubject = emailSubject
-                              .replace(/\{\{PropertyAddress\}\}/g, parsedAddress || '')
-                              .replace(/\{\{Owner\}\}/g, parsedOwnerName || property.ownerName || '');
+                              .replace(/\{\{PropertyAddress\}\}/g, displayPropertyAddress)
+                              .replace(/\{\{Owner\}\}/g, displayOwnerName);
                             await sendEmail({ to: validEmails, subject: resolvedSubject, body: personalBody });
                             toast({ title: `Email sent to ${validEmails.length} address${validEmails.length > 1 ? 'es' : ''}` });
                           } catch (err) {
@@ -1659,8 +1663,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       const resolved = emailBody
                         .replace(/\{\{LastName\}\}/g, '___')
                         .replace(/\{\{Name\}\}/g, '___')
-                        .replace(/\{\{PropertyAddress\}\}/g, parsedAddress || '')
-                        .replace(/\{\{Owner\}\}/g, parsedOwnerName || property.ownerName || '')
+                        .replace(/\{\{PropertyAddress\}\}/g, displayPropertyAddress)
+                        .replace(/\{\{Owner\}\}/g, displayOwnerName)
                         .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
                       navigator.clipboard.writeText(resolved);
                       toast({ title: 'Email copied to clipboard' });
@@ -1686,8 +1690,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           ? property.phoneNumbers[property.ownerPhoneIndex]
                           : (property.phoneNumbers?.find(p => p) || '');
                         const resolvedSubject = emailSubject
-                          .replace(/\{\{PropertyAddress\}\}/g, parsedAddress || '')
-                          .replace(/\{\{Owner\}\}/g, parsedOwnerName || property.ownerName || '');
+                          .replace(/\{\{PropertyAddress\}\}/g, displayPropertyAddress)
+                          .replace(/\{\{Owner\}\}/g, displayOwnerName);
                         // Send personalized email per row so each person gets their own name
                         let sentCount = 0;
                         for (const recipient of emailRecipients) {
@@ -1698,8 +1702,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           const resolved = emailBody
                             .replace(/\{\{LastName\}\}/g, lastName)
                             .replace(/\{\{Name\}\}/g, fullName || 'there')
-                            .replace(/\{\{PropertyAddress\}\}/g, parsedAddress || '')
-                            .replace(/\{\{Owner\}\}/g, parsedOwnerName || property.ownerName || '')
+                            .replace(/\{\{PropertyAddress\}\}/g, displayPropertyAddress)
+                            .replace(/\{\{Owner\}\}/g, displayOwnerName)
                             .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
                           await sendEmail({ to: rowEmails, subject: resolvedSubject, body: resolved });
                           sentCount += rowEmails.length;
