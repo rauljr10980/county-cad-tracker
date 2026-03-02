@@ -1685,19 +1685,26 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
                           ? property.phoneNumbers[property.ownerPhoneIndex]
                           : (property.phoneNumbers?.find(p => p) || '');
-                        const firstRecipientName = emailRecipients.find(r => r.name.trim())?.name.trim() || '';
-                        const firstLastName = firstRecipientName.split(/\s+/).pop() || firstRecipientName || 'there';
-                        const resolved = emailBody
-                          .replace(/\{\{LastName\}\}/g, firstLastName)
-                          .replace(/\{\{Name\}\}/g, firstRecipientName || 'there')
-                          .replace(/\{\{PropertyAddress\}\}/g, parsedAddress || '')
-                          .replace(/\{\{Owner\}\}/g, parsedOwnerName || property.ownerName || '')
-                          .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
                         const resolvedSubject = emailSubject
                           .replace(/\{\{PropertyAddress\}\}/g, parsedAddress || '')
                           .replace(/\{\{Owner\}\}/g, parsedOwnerName || property.ownerName || '');
-                        await sendEmail({ to: allEmails, subject: resolvedSubject, body: resolved });
-                        toast({ title: `Email sent to ${allEmails.length} address${allEmails.length > 1 ? 'es' : ''}` });
+                        // Send personalized email per row so each person gets their own name
+                        let sentCount = 0;
+                        for (const recipient of emailRecipients) {
+                          const rowEmails = recipient.emails.filter(e => e.includes('@'));
+                          if (rowEmails.length === 0) continue;
+                          const fullName = recipient.name.trim();
+                          const lastName = fullName.split(/\s+/).pop() || fullName || 'there';
+                          const resolved = emailBody
+                            .replace(/\{\{LastName\}\}/g, lastName)
+                            .replace(/\{\{Name\}\}/g, fullName || 'there')
+                            .replace(/\{\{PropertyAddress\}\}/g, parsedAddress || '')
+                            .replace(/\{\{Owner\}\}/g, parsedOwnerName || property.ownerName || '')
+                            .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
+                          await sendEmail({ to: rowEmails, subject: resolvedSubject, body: resolved });
+                          sentCount += rowEmails.length;
+                        }
+                        toast({ title: `Email sent to ${sentCount} address${sentCount > 1 ? 'es' : ''}` });
                       } catch (err) {
                         toast({ title: 'Failed to send', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
                       } finally {
