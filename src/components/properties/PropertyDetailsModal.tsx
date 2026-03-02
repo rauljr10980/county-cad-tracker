@@ -73,7 +73,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [rawContactText, setRawContactText] = useState('');
   const [emails, setEmails] = useState<string[]>([]);
   const [emailExpanded, setEmailExpanded] = useState(false);
-  const [emailRecipients, setEmailRecipients] = useState<{ name: string; emails: string[] }[]>(
+  const [emailRecipients, setEmailRecipients] = useState<{ name: string; emails: string[]; sent?: boolean }[]>(
     Array.from({ length: 6 }, () => ({ name: '', emails: [''] }))
   );
   const [emailSubject, setEmailSubject] = useState('Quick question regarding {{PropertyAddress}}');
@@ -145,9 +145,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       // Initialize email recipients from structured contacts or empty
       const emptyEmailRows = Array.from({ length: 6 }, () => ({ name: '', emails: [''] }));
       if (savedContacts?.emailRows && savedContacts.emailRows.length > 0) {
-        const restored = savedContacts.emailRows.map((r: { name: string; emails: string[] }) => ({
+        const restored = savedContacts.emailRows.map((r: { name: string; emails: string[]; sent?: boolean }) => ({
           name: r.name || '',
           emails: r.emails?.length > 0 ? r.emails : [''],
+          sent: r.sent || false,
         }));
         while (restored.length < 6) restored.push({ name: '', emails: [''] });
         setEmailRecipients(restored);
@@ -318,7 +319,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       })),
     emailRows: emailRecipients
       .filter(r => r.name.trim() || r.emails.some(e => e.trim()))
-      .map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()) })),
+      .map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: r.sent || false })),
   });
 
   const handleSavePhoneNumbers = async () => {
@@ -1578,8 +1579,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   const validEmails = recipient.emails.filter(e => e.includes('@'));
                   return (
                     <div key={index} className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground w-6 shrink-0">
-                        {index + 1}.
+                      <span className="text-xs w-6 shrink-0 flex items-center justify-center">
+                        {recipient.sent
+                          ? <CheckCircle className="h-3.5 w-3.5 text-green-400" />
+                          : <span className="text-muted-foreground">{index + 1}.</span>
+                        }
                       </span>
                       <Input
                         value={recipient.name}
@@ -1728,7 +1732,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           .replace(/\{\{Owner\}\}/g, displayOwnerName);
                         // Send personalized email per row so each person gets their own name
                         let sentCount = 0;
-                        for (const recipient of emailRecipients) {
+                        const updatedRecipients = [...emailRecipients];
+                        for (let ri = 0; ri < emailRecipients.length; ri++) {
+                          const recipient = emailRecipients[ri];
                           const rowEmails = recipient.emails.filter(e => e.includes('@'));
                           if (rowEmails.length === 0) continue;
                           const fullName = recipient.name.trim();
@@ -1741,7 +1747,13 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                             .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
                           await sendEmail({ to: rowEmails, subject: resolvedSubject, body: resolved });
                           sentCount += rowEmails.length;
+                          updatedRecipients[ri] = { ...updatedRecipients[ri], sent: true };
                         }
+                        setEmailRecipients(updatedRecipients);
+                        // Persist sent flags
+                        const updatedContacts = { ...buildContactsJson(), emailRows: updatedRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: r.sent || false })) };
+                        await updatePropertyEmails(property.id, allEmails, updatedContacts);
+                        property.contacts = updatedContacts;
                         toast({ title: `Email sent to ${sentCount} address${sentCount > 1 ? 'es' : ''}` });
                       } catch (err) {
                         toast({ title: 'Failed to send', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
