@@ -1297,7 +1297,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     <div className="flex-1 overflow-x-auto">
                       <div className="flex items-center gap-1.5">
                         {contact.phones.map((phone, phoneIdx) => (
-                          <div key={phoneIdx} className="relative shrink-0">
+                          <div key={phoneIdx} className="flex items-center gap-1 shrink-0">
+                          <div className="relative">
                             <Input
                               type="tel"
                               value={phone.number}
@@ -1366,6 +1367,16 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                 ))}
                               </PopoverContent>
                             </Popover>
+                          </div>
+                          {phone.number.trim() && (
+                            <a
+                              href={`tel:+${phone.number.replace(/\D/g, '').length === 10 ? '1' + phone.number.replace(/\D/g, '') : phone.number.replace(/\D/g, '')}`}
+                              title={`Call ${phone.number}`}
+                              className="h-7 w-7 flex items-center justify-center rounded text-green-400 hover:bg-green-400/10 shrink-0"
+                            >
+                              <Phone className="h-3.5 w-3.5" />
+                            </a>
+                          )}
                           </div>
                         ))}
                         <Button
