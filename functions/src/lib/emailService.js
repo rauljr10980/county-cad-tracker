@@ -10,7 +10,7 @@ function getClient() {
     throw new Error('BREVO_API_KEY environment variable is required');
   }
 
-  client = new BrevoClient({ token: apiKey });
+  client = new BrevoClient({ apiKey });
   return client;
 }
 
