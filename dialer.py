@@ -2,7 +2,8 @@
 """
 County CAD Tracker - Auto Dialer
 ---------------------------------
-Registers as a dialer:// protocol handler and auto-dials numbers via Google Voice.
+Opens Google Voice in your default browser for each number.
+Press ENTER in this window to move to the next number.
 
 SETUP (run once):
     python dialer.py --register
@@ -13,14 +14,20 @@ USAGE:
     python dialer.py "dialer://start?numbers=2105551234|2105556789&names=John+Smith|Jane+Doe"
 
 REQUIREMENTS:
-    pip install playwright
-    playwright install chromium
+    Just Python — no extra installs needed!
 """
 
 import sys
-import asyncio
+import webbrowser
 import urllib.parse
 import os
+import time
+
+try:
+    import pyautogui
+    pyautogui.FAILSAFE = False
+except ImportError:
+    pyautogui = None
 
 
 def register_protocol():
@@ -28,7 +35,7 @@ def register_protocol():
     try:
         import winreg
     except ImportError:
-        print("Windows registry not available. On Mac/Linux, see README for manual setup.")
+        print("Windows registry not available.")
         return
 
     python_exe = sys.executable
@@ -46,18 +53,15 @@ def register_protocol():
         winreg.SetValue(cmd_key, '', winreg.REG_SZ, command)
         winreg.CloseKey(cmd_key)
 
-        print(f'Protocol registered successfully!')
+        print(f'Protocol registered!')
         print(f'Command: {command}')
-        print(f'\nYou can now use the "Start Dialing" button in the app.')
     except Exception as e:
-        print(f'Failed to register protocol: {e}')
+        print(f'Failed to register: {e}')
         print('Try running as Administrator.')
 
 
-async def dial_numbers(contacts):
-    """Auto-dial a list of contacts via Google Voice using Playwright."""
-    from playwright.async_api import async_playwright
-
+def dial_numbers(contacts):
+    """Dial contacts by opening Google Voice in the default browser."""
     if not contacts:
         print('No contacts to dial.')
         return
@@ -66,99 +70,51 @@ async def dial_numbers(contacts):
     for c in contacts:
         print(f'  - {c["name"] or "Unknown"}: {c["phone"]}')
 
-    async with async_playwright() as p:
-        # Use real Chrome with your existing profile so Google doesn't block login
-        chrome_path = (
-            r'C:\Program Files\Google\Chrome\Application\chrome.exe'
-        )
-        user_data = os.path.expandvars(r'%LOCALAPPDATA%\Google\Chrome\User Data')
+    print('\nMake sure you are logged into Google Voice in your browser.\n')
+    input('Press ENTER to start dialing the first number...')
 
-        try:
-            browser = await p.chromium.launch_persistent_context(
-                user_data_dir=user_data,
-                executable_path=chrome_path,
-                headless=False,
-                args=['--start-maximized'],
-                no_viewport=True,
-            )
-        except Exception as e:
-            print(f'\nFailed to launch Chrome: {e}')
-            print('\nMake sure Chrome is fully closed before clicking Start Dialing.')
-            input('Press Enter to exit...')
-            return
-        page = browser.pages[0] if browser.pages else await browser.new_page()
+    for i, contact in enumerate(contacts):
+        name = contact.get('name') or 'Unknown'
+        phone = contact.get('phone', '')
 
-        print('\nOpening Google Voice...')
-        await page.goto('https://voice.google.com')
+        digits = ''.join(c for c in phone if c.isdigit())
+        if len(digits) == 10:
+            digits = '1' + digits
 
-        # Give user time to log in if needed
-        print('Waiting for Google Voice to load (log in if prompted)...')
-        try:
-            await page.wait_for_url('**/voice.google.com/**', timeout=60000)
-            await asyncio.sleep(2)
-        except Exception:
-            print('Timed out waiting for Google Voice. Make sure you are logged in.')
-            await browser.close()
-            return
+        if not digits:
+            print(f'\n[{i+1}/{len(contacts)}] Skipping {name} — invalid number: {phone}')
+            continue
 
-        for i, contact in enumerate(contacts):
-            name = contact.get('name') or 'Unknown'
-            phone = contact.get('phone', '')
+        print(f'\n[{i+1}/{len(contacts)}] {name}  -->  +{digits}')
 
-            # Clean to digits only
-            digits = ''.join(c for c in phone if c.isdigit())
-            if len(digits) == 10:
-                digits = '1' + digits
+        # Open Google Voice new-call URL (opens the dialpad)
+        url = f'https://voice.google.com/u/0/calls?a=nc,+{digits}'
+        webbrowser.open(url)
 
-            if not digits:
-                print(f'\n[{i+1}/{len(contacts)}] Skipping {name} — invalid number: {phone}')
-                continue
+        if pyautogui:
+            # Wait for the tab to load and the dialpad input to be ready
+            time.sleep(3)
+            # Type the number into the focused dialpad input
+            pyautogui.typewrite(digits, interval=0.08)
+            time.sleep(0.3)
+            # Press Enter to start the call
+            pyautogui.press('enter')
+            print(f'  Dialing...')
+        else:
+            print(f'  pyautogui not installed — type the number manually.')
+            print(f'  Run: pip install pyautogui')
 
-            print(f'\n[{i+1}/{len(contacts)}] Calling {name}: +{digits}')
+        if i < len(contacts) - 1:
+            input(f'  Press ENTER when done to dial next number...')
+        else:
+            input(f'  Press ENTER when done (last number)...')
 
-            call_url = f'https://voice.google.com/u/0/calls?a=nc,+{digits}'
-            await page.goto(call_url)
-            await asyncio.sleep(3)
-
-            # Try to detect call state via "End call" button
-            call_detected = False
-            try:
-                # Wait for end call button to appear (call is active)
-                await page.wait_for_selector(
-                    '[aria-label="End call"], [data-tooltip="End call"], button:has-text("End call")',
-                    timeout=15000
-                )
-                call_detected = True
-                print(f'  Call active...')
-
-                # Wait for it to disappear (call ended)
-                await page.wait_for_selector(
-                    '[aria-label="End call"], [data-tooltip="End call"], button:has-text("End call")',
-                    state='detached',
-                    timeout=600000  # 10 min max per call
-                )
-                print(f'  Call ended.')
-
-            except Exception:
-                if call_detected:
-                    print(f'  Call ended (selector timeout).')
-                else:
-                    print(f'  Could not detect call state — waiting 10 seconds...')
-                    await asyncio.sleep(10)
-
-            # Pause between calls
-            if i < len(contacts) - 1:
-                print(f'  Next call in 2 seconds...')
-                await asyncio.sleep(2)
-
-        print('\n\nAll numbers called!')
-        input('Press Enter to close the browser...')
-        await browser.close()
+    print('\n\nAll numbers called!')
+    input('Press Enter to close...')
 
 
 def parse_url(url):
     """Parse dialer:// URL and extract contacts list."""
-    # Remove the dialer:// prefix and decode
     parsed = urllib.parse.urlparse(url)
     params = urllib.parse.parse_qs(parsed.query)
 
@@ -192,11 +148,9 @@ if __name__ == '__main__':
     elif arg.startswith('dialer://'):
         contacts = parse_url(arg)
         try:
-            asyncio.run(dial_numbers(contacts))
+            dial_numbers(contacts)
         except Exception as e:
-            print(f'\n\nERROR: {e}')
-            if 'already running' in str(e).lower() or 'user data directory' in str(e).lower():
-                print('\nChrome is already open. Please close Chrome completely and try again.')
+            print(f'\nERROR: {e}')
             input('\nPress Enter to exit...')
             sys.exit(1)
 
