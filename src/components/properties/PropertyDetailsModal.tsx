@@ -1385,7 +1385,30 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     </div>
                   </div>
                 ))}
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-green-500"
+                    onClick={() => {
+                      const contacts = phoneContacts
+                        .filter(r => r.phones.some(p => p.number.trim()))
+                        .map(r => ({
+                          name: r.name.trim(),
+                          phones: r.phones.filter(p => p.number.trim() && p.status !== 'not_working').map(p => p.number.trim()),
+                        }))
+                        .filter(r => r.phones.length > 0);
+                      if (contacts.length === 0) return;
+                      const numbers = contacts.flatMap(c => c.phones.map(p => ({ name: c.name, phone: p })));
+                      const numbersParam = numbers.map(n => encodeURIComponent(n.phone)).join('|');
+                      const namesParam = numbers.map(n => encodeURIComponent(n.name)).join('|');
+                      window.location.href = `dialer://start?numbers=${numbersParam}&names=${namesParam}`;
+                    }}
+                    title="Start sequential dialing via Google Voice (requires dialer.py installed)"
+                  >
+                    <Phone className="h-4 w-4 mr-1" />
+                    Start Dialing
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
