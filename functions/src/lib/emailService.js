@@ -21,17 +21,21 @@ async function sendEmail({ to, subject, text }) {
   const senderName = process.env.BREVO_SENDER_NAME || 'Raul Medina';
 
   const recipients = Array.isArray(to) ? to : [to];
-  const toList = recipients.map(email => ({ email: email.trim() }));
 
-  const data = await brevo.transactionalEmails.sendTransacEmail({
-    sender: { name: senderName, email: senderEmail },
-    to: toList,
-    subject,
-    textContent: text,
-  });
+  // Send each email individually so recipients can't see each other
+  const results = [];
+  for (const recipient of recipients) {
+    const data = await brevo.transactionalEmails.sendTransacEmail({
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: recipient.trim() }],
+      subject,
+      textContent: text,
+    });
+    console.log(`[EMAIL] Sent to ${recipient} -- messageId: ${data.messageId}`);
+    results.push(data);
+  }
 
-  console.log(`[EMAIL] Sent to ${recipients.join(', ')} -- messageId: ${data.messageId}`);
-  return data;
+  return results;
 }
 
 module.exports = { sendEmail };
