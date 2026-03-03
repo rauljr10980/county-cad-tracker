@@ -80,6 +80,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [emailBody, setEmailBody] = useState('');
   const [sendingEmailIndex, setSendingEmailIndex] = useState<number | null>(null);
   const [sendingAllEmails, setSendingAllEmails] = useState(false);
+  const [ownerOverride, setOwnerOverride] = useState('');
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
   const [followUpNote, setFollowUpNote] = useState('');
   const [savingFollowUp, setSavingFollowUp] = useState(false);
@@ -156,6 +157,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
         setEmailRecipients(emptyEmailRows);
       }
       setEmailBody(`Hi Ms./Mr. {{LastName}},\n\nMy name is Raul. I'm reaching out regarding the property at {{PropertyAddress}}, which is listed under {{Owner}}.\n\nIf you're connected to the property, could you please let me know the best person to speak with? If the home is vacant, I would be interested in discussing a possible purchase.\n\nWe also work with real estate attorneys to help streamline the process, and you wouldn't have to pay out of pocket for those legal services.\n\nIf I've reached you by mistake, please disregard this message and accept my apologies.\n\nThank you,\nRaul\n210-425-7584`);
+
+      setOwnerOverride(savedContacts?.ownerOverride || '');
 
       // Load pre-foreclosure records for this property
       loadPreForeclosureRecords();
@@ -288,7 +291,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const displayOwnerName = parsedOwnerName || '';
   const toTitleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   const emailAddress = toTitleCase(displayPropertyAddress);
-  const emailOwner = toTitleCase(displayOwnerName);
+  const emailOwner = ownerOverride.trim() || toTitleCase(displayOwnerName);
 
   const handleSaveNotes = async () => {
     setSavingNotes(true);
@@ -314,6 +317,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
   // Build current contacts JSON from both phone and email rows
   const buildContactsJson = () => ({
+    ownerOverride: ownerOverride.trim(),
     phoneRows: phoneContacts
       .filter(r => r.name.trim() || r.phones.some(p => p.number.trim()))
       .map(r => ({
@@ -583,9 +587,21 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
             <div className="flex items-start gap-3">
               <Calendar className="h-4 w-4 text-primary mt-1 shrink-0" />
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">Owner</p>
-                <p className="font-medium">{parsedOwnerName || property.ownerName}</p>
+                <input
+                  type="text"
+                  value={ownerOverride || parsedOwnerName || property.ownerName || ''}
+                  onChange={(e) => setOwnerOverride(e.target.value)}
+                  onBlur={async () => {
+                    const contacts = buildContactsJson();
+                    const allEmails = emailRecipients.flatMap(r => r.emails.filter(e => e.includes('@')));
+                    await updatePropertyEmails(property.id, allEmails, contacts);
+                    property.contacts = contacts;
+                  }}
+                  placeholder="Click to add owner name..."
+                  className="font-medium bg-transparent border-none outline-none w-full placeholder:text-muted-foreground/40 placeholder:text-sm hover:bg-muted/30 focus:bg-muted/50 rounded px-1 -ml-1"
+                />
                 <p className="text-sm text-muted-foreground">{property.mailingAddress}</p>
               </div>
             </div>
