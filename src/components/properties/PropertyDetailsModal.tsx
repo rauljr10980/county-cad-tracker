@@ -1377,12 +1377,26 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                       "w-full text-left px-2 py-1.5 text-xs rounded hover:bg-muted flex items-center gap-2",
                                       phone.status === opt.value && "bg-muted font-medium",
                                     )}
-                                    onClick={() => {
+                                    onClick={async () => {
                                       const updated = [...phoneContacts];
                                       const newPhones = [...updated[rowIndex].phones];
                                       newPhones[phoneIdx] = { ...newPhones[phoneIdx], status: opt.value as PhoneEntry['status'] };
                                       updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
                                       setPhoneContacts(updated);
+                                      // Auto-save immediately using locally computed values
+                                      try {
+                                        const allPhoneNumbers = updated.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
+                                        const contacts = {
+                                          ownerOverride: ownerOverride.trim(),
+                                          phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '' })) })),
+                                          emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })),
+                                        };
+                                        if (isD4d) {
+                                          await updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride);
+                                        } else {
+                                          await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts);
+                                        }
+                                      } catch { /* silent — don't interrupt UX */ }
                                     }}
                                   >
                                     <span className={cn("w-2 h-2 rounded-full shrink-0", {
