@@ -406,7 +406,8 @@ export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumber
     body: JSON.stringify({ phoneNumbers, ownerPhoneIndex, contacts }),
   });
   if (!response.ok) {
-    throw new Error('Failed to update phone numbers');
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `Server error ${response.status}`);
   }
   return response.json();
 }

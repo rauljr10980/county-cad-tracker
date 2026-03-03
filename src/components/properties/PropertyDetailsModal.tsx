@@ -345,8 +345,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       property.contacts = contacts;
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to save phone numbers",
+        title: "Failed to save phone numbers",
+        description: error instanceof Error ? error.message : 'Unknown error',
         variant: "destructive",
       });
     } finally {
