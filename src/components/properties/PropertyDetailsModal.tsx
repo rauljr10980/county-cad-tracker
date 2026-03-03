@@ -98,13 +98,22 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [showPreForeclosure, setShowPreForeclosure] = useState(false);
   const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
 
+  const isD4d = !!property?.id?.startsWith('d4d-');
+  const d4dKey = property ? `d4d-contacts-${property.id}` : '';
+
+  const saveD4dContacts = (contacts: Record<string, unknown>, phones: string[], ownerIdx?: number) => {
+    localStorage.setItem(d4dKey, JSON.stringify({ contacts, phoneNumbers: phones, ownerPhoneIndex: ownerIdx }));
+  };
+
   // Initialize notes and phone numbers from property when modal opens or property changes
   useEffect(() => {
     if (property && isOpen) {
       setNotes(property.notes || '');
       setIsEditingNotes(false);
-      // Initialize phone contacts from structured contacts or flat phoneNumbers
-      const savedContacts = property.contacts;
+      // For d4d stubs, load contacts from localStorage instead of API
+      const savedContacts = isD4d
+        ? (() => { try { return JSON.parse(localStorage.getItem(d4dKey) || '{}').contacts || null; } catch { return null; } })()
+        : property.contacts;
       const mkEmpty = (): PhoneContactRow => ({ name: '', phones: [{ number: '', status: '' }] });
       const emptyPhoneRows: PhoneContactRow[] = Array.from({ length: 6 }, mkEmpty);
       if (savedContacts?.phoneRows && savedContacts.phoneRows.length > 0) {
@@ -332,14 +341,14 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const handleSavePhoneNumbers = async () => {
     setSavingPhones(true);
     try {
-      // Collect all non-empty phone numbers from all rows (flat array for backward compat)
       const allPhones = phoneContacts.flatMap(row => row.phones.filter(p => p.number.trim() !== '').map(p => p.number));
       const contacts = buildContactsJson();
-      await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex, contacts);
-      toast({
-        title: "Phone Numbers Saved",
-        description: `${allPhones.length} phone number${allPhones.length !== 1 ? 's' : ''} saved for ${property.accountNumber}`,
-      });
+      if (isD4d) {
+        saveD4dContacts(contacts, allPhones, ownerPhoneIndex);
+      } else {
+        await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex, contacts);
+      }
+      toast({ title: "Phone Numbers Saved", description: `${allPhones.length} phone number${allPhones.length !== 1 ? 's' : ''} saved` });
       property.phoneNumbers = allPhones;
       property.ownerPhoneIndex = ownerPhoneIndex;
       property.contacts = contacts;
@@ -596,7 +605,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   onBlur={async () => {
                     const contacts = buildContactsJson();
                     const allEmails = emailRecipients.flatMap(r => r.emails.filter(e => e.includes('@')));
-                    await updatePropertyEmails(property.id, allEmails, contacts);
+                    if (isD4d) {
+                      saveD4dContacts(contacts, property.phoneNumbers || [], ownerPhoneIndex);
+                    } else {
+                      await updatePropertyEmails(property.id, allEmails, contacts);
+                    }
                     property.contacts = contacts;
                   }}
                   placeholder="Click to add owner name..."
@@ -1739,7 +1752,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       try {
                         // Save contacts structure + flat emails to persist row data
                         const contacts = buildContactsJson();
-                        await updatePropertyEmails(property.id, allEmails, contacts);
+                        if (!isD4d) await updatePropertyEmails(property.id, allEmails, contacts);
+                        else saveD4dContacts(contacts, property.phoneNumbers || [], ownerPhoneIndex);
                         property.emails = allEmails;
                         property.contacts = contacts;
 
@@ -1771,7 +1785,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         setEmailRecipients(updatedRecipients);
                         // Persist sent flags
                         const updatedContacts = { ...buildContactsJson(), emailRows: updatedRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: r.sent || false })) };
-                        await updatePropertyEmails(property.id, allEmails, updatedContacts);
+                        if (!isD4d) await updatePropertyEmails(property.id, allEmails, updatedContacts);
+                        else saveD4dContacts(updatedContacts, property.phoneNumbers || [], ownerPhoneIndex);
                         property.contacts = updatedContacts;
                         toast({ title: `Email sent to ${sentCount} address${sentCount > 1 ? 'es' : ''}` });
                       } catch (err) {
