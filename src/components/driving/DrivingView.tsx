@@ -189,7 +189,7 @@ export function DrivingView() {
         setSelectedProperty({
           id: `d4d-${lead.id}`,
           accountNumber: '',
-          ownerName: '',
+          ownerName: (lead as any).ownerName || '',
           propertyAddress: fullAddress,
           mailingAddress: '',
           status: 'UNKNOWN',
@@ -198,6 +198,10 @@ export function DrivingView() {
           latitude: lead.latitude,
           longitude: lead.longitude,
           notes: lead.notes || '',
+          phoneNumbers: (lead as any).phoneNumbers || [],
+          ownerPhoneIndex: (lead as any).ownerPhoneIndex ?? undefined,
+          emails: (lead as any).emails || [],
+          contacts: (lead as any).contacts || null,
         } as Property);
       }
     } catch {

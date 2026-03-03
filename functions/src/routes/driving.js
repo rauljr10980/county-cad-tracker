@@ -151,6 +151,67 @@ router.put('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// PUT /api/driving/:id/phones - Save phone numbers + contacts for a driving lead
+router.put('/:id/phones', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { phoneNumbers, ownerPhoneIndex, contacts, ownerName } = req.body;
+
+    if (!Array.isArray(phoneNumbers)) {
+      return res.status(400).json({ error: 'phoneNumbers must be an array' });
+    }
+
+    const updateData = {
+      phoneNumbers: phoneNumbers.filter(p => p && p.trim().length > 0),
+    };
+    if (ownerPhoneIndex !== undefined) updateData.ownerPhoneIndex = ownerPhoneIndex ?? null;
+    if (contacts !== undefined) updateData.contacts = contacts;
+    if (ownerName !== undefined) updateData.ownerName = ownerName;
+
+    const updated = await prisma.drivingLead.update({
+      where: { id },
+      data: updateData,
+      select: { id: true, phoneNumbers: true, ownerPhoneIndex: true, contacts: true, ownerName: true },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('[D4D] Phone update error:', error);
+    if (error.code === 'P2025') return res.status(404).json({ error: 'Lead not found' });
+    res.status(500).json({ error: 'Failed to update phone numbers' });
+  }
+});
+
+// PUT /api/driving/:id/emails - Save emails + contacts for a driving lead
+router.put('/:id/emails', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { emails, contacts, ownerName } = req.body;
+
+    if (!Array.isArray(emails)) {
+      return res.status(400).json({ error: 'emails must be an array' });
+    }
+
+    const updateData = {
+      emails: emails.filter(e => e && e.trim().length > 0),
+    };
+    if (contacts !== undefined) updateData.contacts = contacts;
+    if (ownerName !== undefined) updateData.ownerName = ownerName;
+
+    const updated = await prisma.drivingLead.update({
+      where: { id },
+      data: updateData,
+      select: { id: true, emails: true, contacts: true, ownerName: true },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('[D4D] Email update error:', error);
+    if (error.code === 'P2025') return res.status(404).json({ error: 'Lead not found' });
+    res.status(500).json({ error: 'Failed to update emails' });
+  }
+});
+
 // DELETE /api/driving/:id - Delete a lead
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {

@@ -431,6 +431,38 @@ export async function updatePropertyEmails(propertyId: string, emails: string[],
 }
 
 /**
+ * Update driving lead phone numbers + contacts
+ */
+export async function updateDrivingLeadPhones(leadId: string, phoneNumbers: string[], ownerPhoneIndex?: number, contacts?: Record<string, unknown>, ownerName?: string) {
+  const response = await fetch(`${API_BASE_URL}/api/driving/${leadId}/phones`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ phoneNumbers, ownerPhoneIndex, contacts, ownerName }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `Server error ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Update driving lead emails + contacts
+ */
+export async function updateDrivingLeadEmails(leadId: string, emails: string[], contacts?: Record<string, unknown>, ownerName?: string) {
+  const response = await fetch(`${API_BASE_URL}/api/driving/${leadId}/emails`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ emails, contacts, ownerName }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `Server error ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
  * Get all properties with actions/tasks (dueTime or actionType)
  */
 export async function getTasks(): Promise<Property[]> {

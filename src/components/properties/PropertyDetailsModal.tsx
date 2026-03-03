@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail, updateDrivingLeadPhones, updateDrivingLeadEmails } from '@/lib/api';
 import { extractContacts } from '@/lib/contactParser';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -99,20 +99,16 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
 
   const isD4d = !!property?.id?.startsWith('d4d-');
-  const d4dKey = property ? `d4d-contacts-${property.id}` : '';
-
-  const saveD4dContacts = (contacts: Record<string, unknown>, phones: string[], ownerIdx?: number) => {
-    localStorage.setItem(d4dKey, JSON.stringify({ contacts, phoneNumbers: phones, ownerPhoneIndex: ownerIdx }));
-  };
+  // Strip the d4d- prefix to get the actual DrivingLead id
+  const d4dLeadId = isD4d ? property!.id.replace('d4d-', '') : '';
 
   // Initialize notes and phone numbers from property when modal opens or property changes
   useEffect(() => {
     if (property && isOpen) {
       setNotes(property.notes || '');
       setIsEditingNotes(false);
-      // For d4d stubs, load contacts from localStorage instead of API
-      const savedContacts = isD4d
-        ? (() => { try { return JSON.parse(localStorage.getItem(d4dKey) || '{}').contacts || null; } catch { return null; } })()
+      // For d4d stubs, contacts come from the DrivingLead record (property.contacts loaded by DrivingView)
+      const savedContacts = property.contacts
         : property.contacts;
       const mkEmpty = (): PhoneContactRow => ({ name: '', phones: [{ number: '', status: '' }] });
       const emptyPhoneRows: PhoneContactRow[] = Array.from({ length: 6 }, mkEmpty);
@@ -344,7 +340,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       const allPhones = phoneContacts.flatMap(row => row.phones.filter(p => p.number.trim() !== '').map(p => p.number));
       const contacts = buildContactsJson();
       if (isD4d) {
-        saveD4dContacts(contacts, allPhones, ownerPhoneIndex);
+        await updateDrivingLeadPhones(d4dLeadId, allPhones, ownerPhoneIndex, contacts, ownerOverride);
       } else {
         await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex, contacts);
       }
@@ -606,7 +602,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     const contacts = buildContactsJson();
                     const allEmails = emailRecipients.flatMap(r => r.emails.filter(e => e.includes('@')));
                     if (isD4d) {
-                      saveD4dContacts(contacts, property.phoneNumbers || [], ownerPhoneIndex);
+                      await updateDrivingLeadEmails(d4dLeadId, allEmails, contacts, ownerOverride).catch(() => {});
                     } else {
                       await updatePropertyEmails(property.id, allEmails, contacts);
                     }
@@ -1753,7 +1749,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         // Save contacts structure + flat emails to persist row data
                         const contacts = buildContactsJson();
                         if (!isD4d) await updatePropertyEmails(property.id, allEmails, contacts);
-                        else saveD4dContacts(contacts, property.phoneNumbers || [], ownerPhoneIndex);
+                        else await updateDrivingLeadEmails(d4dLeadId, allEmails, contacts, ownerOverride);
                         property.emails = allEmails;
                         property.contacts = contacts;
 
@@ -1786,7 +1782,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         // Persist sent flags
                         const updatedContacts = { ...buildContactsJson(), emailRows: updatedRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: r.sent || false })) };
                         if (!isD4d) await updatePropertyEmails(property.id, allEmails, updatedContacts);
-                        else saveD4dContacts(updatedContacts, property.phoneNumbers || [], ownerPhoneIndex);
+                        else await updateDrivingLeadEmails(d4dLeadId, allEmails, updatedContacts, ownerOverride);
                         property.contacts = updatedContacts;
                         toast({ title: `Email sent to ${sentCount} address${sentCount > 1 ? 'es' : ''}` });
                       } catch (err) {

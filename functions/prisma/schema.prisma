@@ -652,6 +652,13 @@ model DrivingLead {
   notes  String?            @db.Text
   status DrivingLeadStatus  @default(NEW)
 
+  // Contacts (mirrors Property fields)
+  phoneNumbers   String[]  @default([])
+  ownerPhoneIndex Int?
+  emails         String[]  @default([])
+  contacts       Json?
+  ownerName      String?
+
   // Who logged it
   loggedBy String?
 
