@@ -1495,7 +1495,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
+                  onClick={async () => {
                     const result = extractContacts(rawContactText);
 
                     // Collect all existing phone digits across all rows for dedup
@@ -1513,6 +1513,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     const newEmails = result.emails.filter(e => !existingEmails.has(e.toLowerCase().trim()));
 
                     // Fill phone section — smart row placement
+                    let finalPhones = phoneContacts;
                     if (newPhones.length > 0 || result.name) {
                       const updated = [...phoneContacts];
                       const row1Empty = !updated[0].name.trim() && !updated[0].phones.some(p => p.number.trim());
@@ -1535,9 +1536,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           ? newPhones.map(p => ({ number: p, status: '' as const }))
                           : [{ number: '', status: '' as const }],
                       };
+                      finalPhones = updated;
                       setPhoneContacts(updated);
                     }
                     // Fill email section — smart row placement
+                    let finalEmails = emailRecipients;
                     if (newEmails.length > 0 || result.name) {
                       const updated = [...emailRecipients];
                       const row1Empty = !updated[0].name.trim() && !updated[0].emails.some(e => e.includes('@'));
@@ -1558,8 +1561,28 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         name: result.name || '',
                         emails: newEmails.length > 0 ? newEmails : [''],
                       };
+                      finalEmails = updated;
                       setEmailRecipients(updated);
                     }
+                    // Auto-save immediately using the locally computed values
+                    try {
+                      const allPhoneNumbers = finalPhones.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
+                      const allEmailAddresses = finalEmails.flatMap(r => r.emails.filter(e => e.includes('@')));
+                      const contacts = {
+                        ownerOverride: ownerOverride.trim(),
+                        phoneRows: finalPhones.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '' })) })),
+                        emailRows: finalEmails.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })),
+                      };
+                      if (isD4d) {
+                        await updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride);
+                      } else {
+                        await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts);
+                        await updatePropertyEmails(property.id, allEmailAddresses, contacts);
+                      }
+                      property.phoneNumbers = allPhoneNumbers;
+                      property.emails = allEmailAddresses;
+                      property.contacts = contacts;
+                    } catch { /* silent — don't block UI */ }
                     // Expand both sections so user can see the filled data
                     setPhoneExpanded(true);
                     setEmailExpanded(true);
@@ -1573,7 +1596,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     const dupeCount = (result.phones.length - newPhones.length) + (result.emails.length - newEmails.length);
                     if (dupeCount > 0) parts.push(`${dupeCount} duplicates skipped`);
                     if (parts.length > 0) {
-                      toast({ title: 'Contacts Extracted', description: parts.join(', ') });
+                      toast({ title: 'Contacts Extracted & Saved', description: parts.join(', ') });
                     } else {
                       toast({ title: 'No contacts found', description: 'Try pasting more text', variant: 'destructive' });
                     }
