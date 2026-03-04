@@ -1805,7 +1805,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         for (let ri = 0; ri < emailRecipients.length; ri++) {
                           const recipient = emailRecipients[ri];
                           const rowEmails = recipient.emails.filter(e => e.includes('@'));
-                          if (rowEmails.length === 0) continue;
+                          if (rowEmails.length === 0 || recipient.sent) continue;
                           const fullName = recipient.name.trim();
                           const lastName = fullName.split(/\s+/).pop() || fullName || 'there';
                           const resolved = emailBody
