@@ -129,10 +129,13 @@ export function CalendarView() {
         propertyAddress: fullAddress || dl.rawAddress,
         mailingAddress: '',
         status: 'UNKNOWN',
-        phoneNumbers: [],
-        emails: [],
-        contacts: null,
-        notes: '',
+        phoneNumbers: dl.phoneNumbers || [],
+        ownerPhoneIndex: dl.ownerPhoneIndex,
+        emails: dl.emails || [],
+        contacts: dl.contacts || null,
+        notes: dl.notes || '',
+        latitude: dl.latitude,
+        longitude: dl.longitude,
       } as unknown as Property;
       setSelectedProperty(stub);
     } else if (followUp.propertyId && followUp.property) {

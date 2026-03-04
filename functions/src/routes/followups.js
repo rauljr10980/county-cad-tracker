@@ -51,6 +51,13 @@ router.get('/', optionalAuth, async (req, res) => {
             zip: true,
             ownerName: true,
             status: true,
+            notes: true,
+            phoneNumbers: true,
+            ownerPhoneIndex: true,
+            emails: true,
+            contacts: true,
+            latitude: true,
+            longitude: true,
           },
         },
         createdBy: {
@@ -113,7 +120,7 @@ router.post('/', authenticateToken, async (req, res) => {
       include: {
         property: { select: { id: true, propertyAddress: true, ownerName: true, workflowStage: true } },
         preForeclosure: { select: { id: true, documentNumber: true, address: true, workflowStage: true } },
-        drivingLead: { select: { id: true, rawAddress: true, street: true, city: true, state: true, zip: true, ownerName: true, status: true } },
+        drivingLead: { select: { id: true, rawAddress: true, street: true, city: true, state: true, zip: true, ownerName: true, status: true, notes: true, phoneNumbers: true, ownerPhoneIndex: true, emails: true, contacts: true, latitude: true, longitude: true } },
         createdBy: { select: { id: true, username: true } },
       },
     });
@@ -150,7 +157,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       include: {
         property: { select: { id: true, propertyAddress: true, ownerName: true, workflowStage: true } },
         preForeclosure: { select: { id: true, documentNumber: true, address: true, workflowStage: true } },
-        drivingLead: { select: { id: true, rawAddress: true, street: true, city: true, state: true, zip: true, ownerName: true, status: true } },
+        drivingLead: { select: { id: true, rawAddress: true, street: true, city: true, state: true, zip: true, ownerName: true, status: true, notes: true, phoneNumbers: true, ownerPhoneIndex: true, emails: true, contacts: true, latitude: true, longitude: true } },
         createdBy: { select: { id: true, username: true } },
       },
     });

@@ -466,6 +466,13 @@ export interface FollowUp {
     zip: string;
     ownerName?: string;
     status: string;
+    notes?: string;
+    phoneNumbers?: string[];
+    ownerPhoneIndex?: number;
+    emails?: string[];
+    contacts?: any;
+    latitude?: number;
+    longitude?: number;
   };
   createdBy: {
     id: string;
