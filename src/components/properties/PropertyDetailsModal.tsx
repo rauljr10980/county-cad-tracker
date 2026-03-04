@@ -108,8 +108,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setNotes(property.notes || '');
       setIsEditingNotes(false);
       // For d4d stubs, contacts come from the DrivingLead record (property.contacts loaded by DrivingView)
-      const savedContacts = property.contacts
-        : property.contacts;
+      const savedContacts = property.contacts;
       const mkEmpty = (): PhoneContactRow => ({ name: '', phones: [{ number: '', status: '' }] });
       const emptyPhoneRows: PhoneContactRow[] = Array.from({ length: 6 }, mkEmpty);
       if (savedContacts?.phoneRows && savedContacts.phoneRows.length > 0) {
