@@ -344,6 +344,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       const contacts = buildContactsJson();
       if (isD4d) {
         await updateDrivingLeadPhones(d4dLeadId, allPhones, ownerPhoneIndex, contacts, ownerOverride);
+        queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
       } else {
         await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex, contacts);
       }
@@ -1323,6 +1324,25 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         updated[rowIndex] = { ...updated[rowIndex], name: e.target.value };
                         setPhoneContacts(updated);
                       }}
+                      onBlur={async (e) => {
+                        if (!e.target.value.trim() && !contact.phones.some(p => p.number.trim())) return;
+                        const updated = [...phoneContacts];
+                        updated[rowIndex] = { ...updated[rowIndex], name: e.target.value };
+                        const allPhoneNumbers = updated.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
+                        const contacts = {
+                          ownerOverride: ownerOverride.trim(),
+                          phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '' })) })),
+                          emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })),
+                        };
+                        try {
+                          if (isD4d) {
+                            await updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride);
+                            queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+                          } else {
+                            await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts);
+                          }
+                        } catch { /* silent */ }
+                      }}
                       placeholder="Name"
                       className="w-28 shrink-0"
                     />
@@ -1396,6 +1416,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                         };
                                         if (isD4d) {
                                           await updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride);
+                                          queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
                                         } else {
                                           await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts);
                                         }
@@ -1821,8 +1842,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         setEmailRecipients(updatedRecipients);
                         // Persist sent flags
                         const updatedContacts = { ...buildContactsJson(), emailRows: updatedRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: r.sent || false })) };
-                        if (!isD4d) await updatePropertyEmails(property.id, allEmails, updatedContacts);
-                        else await updateDrivingLeadEmails(d4dLeadId, allEmails, updatedContacts, ownerOverride);
+                        if (!isD4d) {
+                          await updatePropertyEmails(property.id, allEmails, updatedContacts);
+                        } else {
+                          await updateDrivingLeadEmails(d4dLeadId, allEmails, updatedContacts, ownerOverride);
+                          queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+                        }
                         property.contacts = updatedContacts;
                         toast({ title: `Email sent to ${sentCount} address${sentCount > 1 ? 'es' : ''}` });
                       } catch (err) {

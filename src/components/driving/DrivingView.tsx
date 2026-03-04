@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X, FileText } from 'lucide-react';
+import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X, FileText, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -102,6 +102,8 @@ export function DrivingView() {
   const [dbStatus, setDbStatus] = useState<Record<string, 'found' | 'not_found'>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: leads = [], isLoading } = useDrivingLeads();
   const createMutation = useCreateDrivingLead();
@@ -232,6 +234,20 @@ export function DrivingView() {
     e.target.value = '';
   };
 
+  const filteredLeads = searchQuery.trim()
+    ? leads.filter(lead => {
+        const q = searchQuery.toLowerCase().trim();
+        return (
+          (lead.rawAddress && lead.rawAddress.toLowerCase().includes(q)) ||
+          (lead.street && lead.street.toLowerCase().includes(q)) ||
+          ((lead as any).ownerName && (lead as any).ownerName.toLowerCase().includes(q)) ||
+          ((lead as any).notes && (lead as any).notes.toLowerCase().includes(q)) ||
+          ((lead as any).phoneNumbers && Array.isArray((lead as any).phoneNumbers) &&
+            (lead as any).phoneNumbers.some((p: string) => p && p.toLowerCase().includes(q)))
+        );
+      })
+    : leads;
+
   return (
     <div className="p-2 md:p-4 space-y-4 max-w-2xl mx-auto">
       {/* Quick-add form */}
@@ -273,9 +289,28 @@ export function DrivingView() {
         )}
       </form>
 
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        <Input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by address, phone, name, notes..."
+          className="pl-8 text-sm h-9"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
       {/* Count */}
       <div className="text-sm text-muted-foreground">
-        {leads.length} address{leads.length !== 1 ? 'es' : ''} logged
+        {searchQuery ? `${filteredLeads.length} of ${leads.length}` : `${leads.length}`} address{leads.length !== 1 ? 'es' : ''} logged
       </div>
 
       {/* Lead list */}
@@ -289,9 +324,14 @@ export function DrivingView() {
           <p>No addresses logged yet.</p>
           <p className="text-xs mt-1">Type an address above while driving around!</p>
         </div>
+      ) : filteredLeads.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <Search className="h-6 w-6 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No results for "{searchQuery}"</p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {leads.map((lead) => (
+          {filteredLeads.map((lead) => (
             <div key={lead.id} className={cn(
               "bg-card rounded-lg border p-3 space-y-2",
               lead.status === 'DEAD' && 'opacity-50'
