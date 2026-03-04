@@ -456,6 +456,17 @@ export interface FollowUp {
     workflowStage: string;
     type: string;
   };
+  drivingLeadId?: string;
+  drivingLead?: {
+    id: string;
+    rawAddress: string;
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    ownerName?: string;
+    status: string;
+  };
   createdBy: {
     id: string;
     username: string;

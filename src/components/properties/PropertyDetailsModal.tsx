@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail, updateDrivingLeadPhones, updateDrivingLeadEmails } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail, updateDrivingLeadPhones, updateDrivingLeadEmails, updateDrivingLead } from '@/lib/api';
 import { extractContacts } from '@/lib/contactParser';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -301,10 +301,14 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const handleSaveNotes = async () => {
     setSavingNotes(true);
     try {
-      await updatePropertyNotes(property.id, notes);
+      if (isD4d) {
+        await updateDrivingLead(d4dLeadId, { notes });
+      } else {
+        await updatePropertyNotes(property.id, notes);
+      }
       toast({
         title: "Notes Saved",
-        description: `Notes saved for ${property.accountNumber}`,
+        description: isD4d ? "Notes saved" : `Notes saved for ${property.accountNumber}`,
       });
       setIsEditingNotes(false);
       // Update property object directly (will be refreshed on next load)
@@ -1234,7 +1238,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
           />
 
           {/* Schedule Follow-Up */}
-          {property.workflow_stage && FOLLOWUP_ELIGIBLE_STAGES.includes(property.workflow_stage as any) && (
+          {(isD4d || (property.workflow_stage && FOLLOWUP_ELIGIBLE_STAGES.includes(property.workflow_stage as any))) && (
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-3">
                 <CalendarDays className="h-4 w-4 text-blue-400" />
@@ -1273,7 +1277,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     await createFollowUp({
                       date: followUpDate.toISOString(),
                       note: followUpNote || undefined,
-                      propertyId: property.id,
+                      ...(isD4d ? { drivingLeadId: d4dLeadId } : { propertyId: property.id }),
                     });
                     toast({ title: 'Follow-up scheduled', description: format(followUpDate, 'PPP') });
                     setFollowUpDate(undefined);

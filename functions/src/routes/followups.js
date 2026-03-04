@@ -41,6 +41,18 @@ router.get('/', optionalAuth, async (req, res) => {
             type: true,
           },
         },
+        drivingLead: {
+          select: {
+            id: true,
+            rawAddress: true,
+            street: true,
+            city: true,
+            state: true,
+            zip: true,
+            ownerName: true,
+            status: true,
+          },
+        },
         createdBy: {
           select: { id: true, username: true },
         },
@@ -58,13 +70,13 @@ router.get('/', optionalAuth, async (req, res) => {
 // POST /api/followups
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { date, note, propertyId, documentNumber } = req.body;
+    const { date, note, propertyId, documentNumber, drivingLeadId } = req.body;
 
     if (!date) {
       return res.status(400).json({ error: 'date is required' });
     }
-    if (!propertyId && !documentNumber) {
-      return res.status(400).json({ error: 'propertyId or documentNumber is required' });
+    if (!propertyId && !documentNumber && !drivingLeadId) {
+      return res.status(400).json({ error: 'propertyId, documentNumber, or drivingLeadId is required' });
     }
 
     let preforeclosureId = null;
@@ -79,17 +91,29 @@ router.post('/', authenticateToken, async (req, res) => {
       preforeclosureId = pf.id;
     }
 
+    if (drivingLeadId) {
+      const dl = await prisma.drivingLead.findUnique({
+        where: { id: drivingLeadId },
+        select: { id: true },
+      });
+      if (!dl) {
+        return res.status(404).json({ error: 'Driving lead not found' });
+      }
+    }
+
     const followUp = await prisma.followUp.create({
       data: {
         date: new Date(date),
         note: note || null,
         propertyId: propertyId || null,
         preforeclosureId: preforeclosureId,
+        drivingLeadId: drivingLeadId || null,
         createdById: req.user.id,
       },
       include: {
         property: { select: { id: true, propertyAddress: true, ownerName: true, workflowStage: true } },
         preForeclosure: { select: { id: true, documentNumber: true, address: true, workflowStage: true } },
+        drivingLead: { select: { id: true, rawAddress: true, street: true, city: true, state: true, zip: true, ownerName: true, status: true } },
         createdBy: { select: { id: true, username: true } },
       },
     });
@@ -126,6 +150,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       include: {
         property: { select: { id: true, propertyAddress: true, ownerName: true, workflowStage: true } },
         preForeclosure: { select: { id: true, documentNumber: true, address: true, workflowStage: true } },
+        drivingLead: { select: { id: true, rawAddress: true, street: true, city: true, state: true, zip: true, ownerName: true, status: true } },
         createdBy: { select: { id: true, username: true } },
       },
     });

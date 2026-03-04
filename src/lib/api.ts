@@ -1603,6 +1603,7 @@ export async function createFollowUp(data: {
   note?: string;
   propertyId?: string;
   documentNumber?: string;
+  drivingLeadId?: string;
 }) {
   const response = await fetch(`${API_BASE_URL}/api/followups`, {
     method: 'POST',

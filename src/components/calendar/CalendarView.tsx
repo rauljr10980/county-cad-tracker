@@ -23,6 +23,9 @@ const STAGE_COLORS: Record<string, string> = {
 };
 
 function getAddress(followUp: FollowUp): string {
+  if (followUp.drivingLead) {
+    return followUp.drivingLead.rawAddress || followUp.drivingLead.street || 'Unknown';
+  }
   if (followUp.property) {
     const name = followUp.property.ownerName || '';
     if (/^\d/.test(name)) return name;
@@ -35,11 +38,13 @@ function getAddress(followUp: FollowUp): string {
 }
 
 function getStageLabel(followUp: FollowUp): string {
+  if (followUp.drivingLead) return followUp.drivingLead.status || '';
   const stage = followUp.property?.workflowStage || followUp.preForeclosure?.workflowStage || '';
   return WORKFLOW_STAGES[stage as WorkflowStage]?.shortLabel || stage || '';
 }
 
-function getType(followUp: FollowUp): 'property' | 'preforeclosure' {
+function getType(followUp: FollowUp): 'property' | 'preforeclosure' | 'd4$' {
+  if (followUp.drivingLeadId) return 'd4$';
   return followUp.propertyId ? 'property' : 'preforeclosure';
 }
 
@@ -114,7 +119,23 @@ export function CalendarView() {
   };
 
   const handleViewDetails = async (followUp: FollowUp) => {
-    if (followUp.propertyId && followUp.property) {
+    if (followUp.drivingLead) {
+      const dl = followUp.drivingLead;
+      const fullAddress = [dl.street, dl.city, dl.state, dl.zip].filter(Boolean).join(', ');
+      const stub = {
+        id: `d4d-${dl.id}`,
+        accountNumber: '',
+        ownerName: dl.ownerName || '',
+        propertyAddress: fullAddress || dl.rawAddress,
+        mailingAddress: '',
+        status: 'UNKNOWN',
+        phoneNumbers: [],
+        emails: [],
+        contacts: null,
+        notes: '',
+      } as unknown as Property;
+      setSelectedProperty(stub);
+    } else if (followUp.propertyId && followUp.property) {
       try {
         const result = await getProperties(1, 50000);
         const properties = result.properties || result.data || result;
@@ -330,8 +351,11 @@ export function CalendarView() {
                         {stageLabel}
                       </Badge>
                     )}
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                      {type === 'preforeclosure' ? 'Pre-FC' : 'Property'}
+                    <Badge variant="outline" className={cn(
+                      'text-[10px] px-1.5 py-0',
+                      type === 'd4$' && 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                    )}>
+                      {type === 'preforeclosure' ? 'Pre-FC' : type === 'd4$' ? 'D4$' : 'Property'}
                     </Badge>
                     {fu.preForeclosure?.type && (
                       <Badge variant="outline" className={cn(
