@@ -289,10 +289,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   };
 
   const { ownerName: parsedOwnerName, address: parsedAddress } = parsePropertyAddress(property.propertyAddress);
-  // property.ownerName often contains the actual street address (e.g. "WICKLOW DR")
-  // Use it as the display property address when available
-  const displayPropertyAddress = property.ownerName || parsedAddress || property.propertyAddress || '';
-  const displayOwnerName = parsedOwnerName || '';
+  // For d4$ stubs, propertyAddress IS the address and ownerName IS the owner — use them directly
+  // For DB properties, ownerName field often contains the street address (e.g. "WICKLOW DR")
+  const displayPropertyAddress = isD4d
+    ? (property.propertyAddress || '')
+    : (property.ownerName || parsedAddress || property.propertyAddress || '');
+  const displayOwnerName = isD4d ? (property.ownerName || '') : (parsedOwnerName || '');
   const toTitleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   const emailAddress = toTitleCase(displayPropertyAddress);
   const emailOwner = ownerOverride.trim() || toTitleCase(displayOwnerName);
