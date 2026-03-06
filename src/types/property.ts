@@ -400,7 +400,7 @@ export type PreForeclosureInternalStatus = PreForeclosureStatus;
 // DRIVING FOR DOLLARS
 // ============================================================================
 
-export type DrivingLeadStatus = 'NEW' | 'RESEARCHING' | 'CONTACTED' | 'UNDER_CONTRACT' | 'DEAD';
+export type DrivingLeadStatus = 'NEW' | 'RESEARCHING' | 'CONTACTED' | 'UNDER_CONTRACT' | 'DEAD' | 'FOUND_OBITUARY';
 
 export interface DrivingLead {
   id: string;

@@ -20,6 +20,7 @@ const STATUS_CONFIG: Record<DrivingLeadStatus, { label: string; color: string }>
   CONTACTED: { label: 'Contacted', color: 'bg-purple-500/10 text-purple-500 border-purple-500/30' },
   UNDER_CONTRACT: { label: 'Under Contract', color: 'bg-green-500/10 text-green-500 border-green-500/30' },
   DEAD: { label: 'Dead', color: 'bg-gray-500/10 text-gray-400 border-gray-500/30' },
+  FOUND_OBITUARY: { label: 'Found Obituary', color: 'bg-rose-500/10 text-rose-400 border-rose-500/30' },
 };
 
 function PhotoGallery({ leadId }: { leadId: string }) {

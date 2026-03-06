@@ -694,6 +694,7 @@ enum DrivingLeadStatus {
   CONTACTED
   UNDER_CONTRACT
   DEAD
+  FOUND_OBITUARY
 }
 
 // ============================================================================
