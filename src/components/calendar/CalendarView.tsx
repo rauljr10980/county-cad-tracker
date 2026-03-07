@@ -380,6 +380,11 @@ export function CalendarView() {
               const stageLabel = getStageLabel(fu);
               const stage = fu.property?.workflowStage || fu.preForeclosure?.workflowStage || '';
               const type = getType(fu);
+              // Enrich D4$ follow-ups with pipeline metadata from the lead
+              const matchingLead = type === 'd4$' ? drivingLeads.find(l => l.id === fu.drivingLeadId) : null;
+              const d4dWf = (matchingLead?.metadata as any) || null;
+              const d4dOutcome = d4dWf?.contactedOutcome;
+              const d4dOutcomeLabel = d4dOutcome === 'wants_to_sell' ? 'Wants to Sell' : d4dOutcome === 'thinking_about_selling' ? 'Thinking About Selling' : d4dOutcome === 'doesnt_want_to_sell' ? "Doesn't Want to Sell" : null;
 
               return (
                 <div
@@ -400,7 +405,7 @@ export function CalendarView() {
                   </p>
 
                   {/* Stage + Type badges */}
-                  <div className="flex items-center gap-2 mt-1.5">
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     {stageLabel && (
                       <Badge
                         variant="outline"
@@ -415,6 +420,9 @@ export function CalendarView() {
                     )}>
                       {type === 'preforeclosure' ? 'Pre-FC' : type === 'd4$' ? 'D4$' : 'Property'}
                     </Badge>
+                    {d4dOutcomeLabel && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-secondary">{d4dOutcomeLabel}</Badge>
+                    )}
                     {fu.preForeclosure?.type && (
                       <Badge variant="outline" className={cn(
                         'text-[10px] px-1.5 py-0',
@@ -430,6 +438,24 @@ export function CalendarView() {
                   {/* Note */}
                   {fu.note && (
                     <p className="text-xs text-muted-foreground mt-2 italic">{fu.note}</p>
+                  )}
+
+                  {/* D4$ pipeline metadata */}
+                  {d4dWf && (
+                    <div className="mt-2 space-y-0.5 text-xs text-muted-foreground border-t border-border/50 pt-2">
+                      {d4dWf.lastFollowUpAt && (
+                        <p>Last follow up: <span className="text-foreground">{formatDistanceToNow(new Date(d4dWf.lastFollowUpAt), { addSuffix: true })}</span></p>
+                      )}
+                      {d4dWf.scheduledFollowUpAt && (() => {
+                        const s = new Date(d4dWf.scheduledFollowUpAt);
+                        const overdue = s < new Date();
+                        return (
+                          <p className={overdue ? 'text-yellow-400' : ''}>
+                            {overdue ? '⚠ Follow-up overdue' : `Next follow up: ${format(s, 'MMM d, yyyy')}`}
+                          </p>
+                        );
+                      })()}
+                    </div>
                   )}
 
                   {/* Actions */}
