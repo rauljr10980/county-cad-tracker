@@ -1,15 +1,16 @@
 import { useState, useMemo } from 'react';
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
-  format, isSameMonth, isSameDay, isToday, addMonths, subMonths, isPast,
+  format, isSameMonth, isSameDay, isToday, addMonths, subMonths, isPast, formatDistanceToNow,
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, CalendarDays, Check, Trash2, Loader2, Undo2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useFollowUps, useUpdateFollowUp, useDeleteFollowUp } from '@/hooks/useFollowUps';
+import { useDrivingLeads } from '@/hooks/useDrivingLeads';
 import { WORKFLOW_STAGES } from '@/types/property';
-import type { FollowUp, WorkflowStage, Property, PreForeclosureRecord } from '@/types/property';
+import type { FollowUp, WorkflowStage, Property, PreForeclosureRecord, DrivingLead } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { getProperties, getPreForeclosures } from '@/lib/api';
@@ -56,8 +57,22 @@ export function CalendarView() {
 
   const monthKey = format(currentMonth, 'yyyy-MM');
   const { data: followUps, isLoading } = useFollowUps(monthKey);
+  const { data: drivingLeads = [] } = useDrivingLeads();
   const updateMutation = useUpdateFollowUp();
   const deleteMutation = useDeleteFollowUp();
+
+  // D4$ leads with a scheduled follow-up date
+  const d4dScheduled = useMemo(() => {
+    const map = new Map<string, DrivingLead[]>();
+    for (const lead of drivingLeads) {
+      const wf = (lead.metadata as any) || {};
+      if (!wf.scheduledFollowUpAt) continue;
+      const key = format(new Date(wf.scheduledFollowUpAt), 'yyyy-MM-dd');
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(lead);
+    }
+    return map;
+  }, [drivingLeads]);
 
   // Build calendar grid days
   const calendarDays = useMemo(() => {
@@ -85,6 +100,12 @@ export function CalendarView() {
     const key = format(selectedDay, 'yyyy-MM-dd');
     return followUpsByDate.get(key) || [];
   }, [selectedDay, followUpsByDate]);
+
+  const selectedDayD4d = useMemo(() => {
+    if (!selectedDay) return [];
+    const key = format(selectedDay, 'yyyy-MM-dd');
+    return d4dScheduled.get(key) || [];
+  }, [selectedDay, d4dScheduled]);
 
   // Stats
   const totalPending = useMemo(() => {
@@ -234,7 +255,8 @@ export function CalendarView() {
               const dayFollowUps = followUpsByDate.get(dateKey) || [];
               const pendingCount = dayFollowUps.filter(f => !f.completed).length;
               const completedCount = dayFollowUps.filter(f => f.completed).length;
-              const hasFollowUps = dayFollowUps.length > 0;
+              const dayD4dLeads = d4dScheduled.get(dateKey) || [];
+              const hasFollowUps = dayFollowUps.length > 0 || dayD4dLeads.length > 0;
               const isCurrentMonth = isSameMonth(day, currentMonth);
               const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
               const dayIsPast = isPast(day) && !isToday(day);
@@ -285,7 +307,32 @@ export function CalendarView() {
                           +{dayFollowUps.length - 3} more
                         </div>
                       )}
-                      {/* Mobile: just show dots */}
+                      {/* D4$ scheduled follow-ups */}
+                      {dayD4dLeads.slice(0, 2).map(lead => {
+                        const wf = (lead.metadata as any) || {};
+                        const done = wf.lastFollowUpAt && new Date(wf.lastFollowUpAt) >= new Date(wf.scheduledFollowUpAt);
+                        return (
+                          <div
+                            key={lead.id}
+                            className={cn(
+                              'hidden sm:block text-[10px] leading-tight px-1 py-0.5 rounded truncate',
+                              done
+                                ? 'bg-green-500/10 text-green-400 line-through'
+                                : isPast(day) && !isToday(day)
+                                  ? 'bg-yellow-500/10 text-yellow-400'
+                                  : 'bg-purple-500/10 text-purple-400',
+                            )}
+                          >
+                            D4$ {lead.street || lead.rawAddress}
+                          </div>
+                        );
+                      })}
+                      {dayD4dLeads.length > 2 && (
+                        <div className="hidden sm:block text-[10px] text-muted-foreground px-1">
+                          +{dayD4dLeads.length - 2} D4$
+                        </div>
+                      )}
+                      {/* Mobile: show dots */}
                       <div className="sm:hidden flex gap-1 mt-0.5">
                         {pendingCount > 0 && (
                           <span className="flex items-center gap-0.5">
@@ -297,6 +344,12 @@ export function CalendarView() {
                           <span className="flex items-center gap-0.5">
                             <span className="w-2 h-2 rounded-full bg-green-500/50" />
                             {completedCount > 1 && <span className="text-[10px] text-green-400">{completedCount}</span>}
+                          </span>
+                        )}
+                        {dayD4dLeads.length > 0 && (
+                          <span className="flex items-center gap-0.5">
+                            <span className="w-2 h-2 rounded-full bg-purple-500" />
+                            {dayD4dLeads.length > 1 && <span className="text-[10px] text-purple-400">{dayD4dLeads.length}</span>}
                           </span>
                         )}
                       </div>
@@ -319,7 +372,7 @@ export function CalendarView() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-            {selectedDayFollowUps.length === 0 && (
+            {selectedDayFollowUps.length === 0 && selectedDayD4d.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No follow-ups for this day</p>
             )}
             {selectedDayFollowUps.map(fu => {
@@ -418,6 +471,71 @@ export function CalendarView() {
                 </div>
               );
             })}
+
+            {/* D4$ Scheduled Follow-ups */}
+            {selectedDayD4d.length > 0 && (
+              <>
+                {selectedDayFollowUps.length > 0 && <hr className="border-border" />}
+                <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide">D4$ Scheduled Follow-ups</p>
+                {selectedDayD4d.map(lead => {
+                  const wf = (lead.metadata as any) || {};
+                  const scheduled = new Date(wf.scheduledFollowUpAt);
+                  const done = wf.lastFollowUpAt && new Date(wf.lastFollowUpAt) >= scheduled;
+                  const overdue = !done && isPast(scheduled) && !isToday(scheduled);
+                  const address = lead.street || lead.rawAddress;
+                  const outcome = wf.contactedOutcome;
+                  const outcomeLabel = outcome === 'wants_to_sell' ? 'Wants to Sell' : outcome === 'thinking_about_selling' ? 'Thinking About Selling' : outcome === 'doesnt_want_to_sell' ? "Doesn't Want to Sell" : null;
+
+                  const openLead = () => {
+                    const fullAddress = [lead.street, lead.city, lead.state, lead.zip].filter(Boolean).join(', ');
+                    setSelectedProperty({
+                      id: `d4d-${lead.id}`,
+                      accountNumber: '',
+                      ownerName: (lead as any).ownerName || '',
+                      propertyAddress: fullAddress || lead.rawAddress,
+                      mailingAddress: '',
+                      status: 'UNKNOWN',
+                      phoneNumbers: (lead as any).phoneNumbers || [],
+                      ownerPhoneIndex: (lead as any).ownerPhoneIndex,
+                      emails: (lead as any).emails || [],
+                      contacts: (lead as any).contacts || null,
+                      notes: lead.notes || '',
+                      latitude: lead.latitude,
+                      longitude: lead.longitude,
+                      d4dStatus: lead.status,
+                      metadata: lead.metadata || null,
+                    } as unknown as Property);
+                  };
+
+                  return (
+                    <div key={lead.id} className={cn(
+                      'rounded-lg border p-3',
+                      done ? 'border-green-500/20 bg-green-500/5 opacity-70'
+                        : overdue ? 'border-yellow-500/30 bg-yellow-500/5'
+                        : 'border-purple-500/20 bg-purple-500/5',
+                    )}>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={cn('font-medium text-sm', done && 'line-through text-muted-foreground')}>{address}</p>
+                        <Button variant="outline" size="sm" className="h-6 w-6 p-0 flex-shrink-0" onClick={openLead}>
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-purple-500/20 text-purple-400 border-purple-500/30">
+                          D4$ Follow-up
+                        </Badge>
+                        {done && <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-green-500/20 text-green-400 border-green-500/30">✓ Done</Badge>}
+                        {overdue && !done && <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-yellow-500/20 text-yellow-400 border-yellow-500/30">⚠ Overdue</Badge>}
+                        {outcomeLabel && <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-secondary">{outcomeLabel}</Badge>}
+                      </div>
+                      {wf.lastFollowUpAt && (
+                        <p className="text-xs text-muted-foreground mt-1">Last follow up: {formatDistanceToNow(new Date(wf.lastFollowUpAt), { addSuffix: true })}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
