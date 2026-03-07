@@ -99,8 +99,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
 
   const isD4d = !!property?.id?.startsWith('d4d-');
-  // Strip the d4d- prefix to get the actual DrivingLead id
-  const d4dLeadId = isD4d ? property!.id.replace('d4d-', '') : '';
+  // d4dLeadId works for both red-dot stubs (id = 'd4d-...') and green-dot found properties (d4dLeadId injected on stub)
+  const d4dLeadId = isD4d ? property!.id.replace('d4d-', '') : ((property as any)?.d4dLeadId || '');
+  const isFromD4d = isD4d || !!d4dLeadId;
 
   // D4$ Pipeline state
   const [d4dPipelineStage, setD4dPipelineStage] = useState<string>('NEW');
@@ -168,8 +169,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
       setOwnerOverride(savedContacts?.ownerOverride || '');
 
-      // Initialize D4$ pipeline state
-      if (isD4d) {
+      // Initialize D4$ pipeline state (works for both red-dot stubs and green-dot found properties)
+      if (isFromD4d) {
         setD4dPipelineStage((property as any).d4dStatus || 'NEW');
         setD4dWorkflow((property as any).metadata || {});
       }
@@ -1250,7 +1251,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
           />
 
           {/* D4$ Pipeline Workflow */}
-          {isD4d && (() => {
+          {isFromD4d && (() => {
             const RESEARCH_ITEMS = [
               { key: 'bcad_tax', label: 'BCAD - TAX' },
               { key: 'tps', label: 'TPS' },
@@ -1424,7 +1425,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
           })()}
 
           {/* Schedule Follow-Up */}
-          {(isD4d || (property.workflow_stage && FOLLOWUP_ELIGIBLE_STAGES.includes(property.workflow_stage as any))) && (
+          {(isFromD4d || (property.workflow_stage && FOLLOWUP_ELIGIBLE_STAGES.includes(property.workflow_stage as any))) && (
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-3">
                 <CalendarDays className="h-4 w-4 text-blue-400" />
@@ -1463,7 +1464,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     await createFollowUp({
                       date: followUpDate.toISOString(),
                       note: followUpNote || undefined,
-                      ...(isD4d ? { drivingLeadId: d4dLeadId } : { propertyId: property.id }),
+                      ...(isFromD4d ? { drivingLeadId: d4dLeadId } : { propertyId: property.id }),
                     });
                     toast({ title: 'Follow-up scheduled', description: format(followUpDate, 'PPP') });
                     setFollowUpDate(undefined);

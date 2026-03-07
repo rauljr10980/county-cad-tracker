@@ -185,7 +185,12 @@ export function DrivingView() {
       );
       if (found) {
         setDbStatus(prev => ({ ...prev, [lead.id]: 'found' }));
-        setSelectedProperty(found);
+        setSelectedProperty({
+          ...found,
+          d4dLeadId: lead.id,
+          d4dStatus: lead.status,
+          metadata: (lead as any).metadata || null,
+        } as unknown as Property);
       } else {
         // No match — open modal with a stub so user can still view address & enter details
         setDbStatus(prev => ({ ...prev, [lead.id]: 'not_found' }));
