@@ -409,6 +409,8 @@ export interface D4dWorkflow {
   deadReason?: 'real_estate_company' | 'doesnt_want_to_sell';
   contactedOutcome?: 'doesnt_want_to_sell' | 'thinking_about_selling' | 'wants_to_sell';
   lastContactedAt?: string;
+  lastFollowUpAt?: string;
+  scheduledFollowUpAt?: string;
 }
 
 export interface DrivingLead {

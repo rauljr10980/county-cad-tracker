@@ -221,9 +221,46 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
           <div className="flex items-center justify-between">
             {(() => { const o = CONTACTED_OUTCOMES.find(x => x.key === wf.contactedOutcome)!;
               return <span className={cn('text-xs flex items-center gap-1', o.color)}><o.icon className="h-3 w-3" />{o.label}</span>; })()}
-            <button className="text-[10px] text-muted-foreground underline" onClick={() => setContactedOutcome(lead, wf.contactedOutcome as any)}>change</button>
+            <button className="text-[10px] text-muted-foreground underline"
+              onClick={() => saveMeta(lead.id, { ...wf, contactedOutcome: undefined })}>change</button>
           </div>
         )}
+        {/* Follow-up tracking */}
+        <div className="border-t border-border/50 pt-2 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {wf.lastFollowUpAt
+                ? <>Last follow up: <span className="text-foreground ml-0.5">{formatDistanceToNow(new Date(wf.lastFollowUpAt), { addSuffix: true })}</span></>
+                : <span>No follow up yet</span>}
+            </div>
+            <button
+              className="text-[10px] text-primary underline flex-shrink-0"
+              onClick={() => saveMeta(lead.id, { ...wf, lastFollowUpAt: new Date().toISOString() })}
+            >
+              Mark Now
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground flex-shrink-0">Scheduled:</span>
+            <input
+              type="date"
+              value={wf.scheduledFollowUpAt ? wf.scheduledFollowUpAt.slice(0, 10) : ''}
+              onChange={e => saveMeta(lead.id, { ...wf, scheduledFollowUpAt: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+              className="flex-1 h-6 text-xs bg-secondary border border-border rounded px-1.5 text-foreground cursor-pointer"
+            />
+          </div>
+          {wf.scheduledFollowUpAt && (() => {
+            const scheduled = new Date(wf.scheduledFollowUpAt);
+            const isPast = scheduled < new Date();
+            const daysUntil = Math.ceil((scheduled.getTime() - Date.now()) / 86400000);
+            return (
+              <p className={cn('text-[11px]', isPast ? 'text-yellow-400' : 'text-muted-foreground')}>
+                {isPast ? `⚠ Overdue by ${Math.abs(daysUntil)} day${Math.abs(daysUntil) !== 1 ? 's' : ''}` : `In ${daysUntil} day${daysUntil !== 1 ? 's' : ''} — ${format(scheduled, 'MMM d, yyyy')}`}
+              </p>
+            );
+          })()}
+        </div>
         <div className="space-y-0.5">
           {CONTACT_ITEMS.map(item =>
             renderCheckbox(checks.includes(item.key), item.label, () => toggleCheck(lead, 'contactChecks', item.key))

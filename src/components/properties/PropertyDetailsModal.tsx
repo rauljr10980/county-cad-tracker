@@ -1375,6 +1375,41 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       </Button>
                     ))}
                   </div>
+                  {/* Follow-up tracking */}
+                  <div className="border-t border-border/50 pt-2 space-y-2">
+                    <p className="text-xs text-muted-foreground font-medium">Follow Up</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {d4dWorkflow.lastFollowUpAt
+                          ? <>Last: <span className="text-foreground ml-0.5">{formatDistanceToNow(new Date(d4dWorkflow.lastFollowUpAt), { addSuffix: true })}</span></>
+                          : 'No follow up yet'}
+                      </div>
+                      <Button size="sm" variant="outline" className="h-6 text-[11px] px-2"
+                        onClick={() => saveMeta({ ...d4dWorkflow, lastFollowUpAt: new Date().toISOString() })}>
+                        Mark Now
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground flex-shrink-0">Scheduled:</span>
+                      <input
+                        type="date"
+                        value={d4dWorkflow.scheduledFollowUpAt ? d4dWorkflow.scheduledFollowUpAt.slice(0, 10) : ''}
+                        onChange={e => saveMeta({ ...d4dWorkflow, scheduledFollowUpAt: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                        className="flex-1 h-7 text-xs bg-secondary border border-border rounded px-2 text-foreground cursor-pointer"
+                      />
+                    </div>
+                    {d4dWorkflow.scheduledFollowUpAt && (() => {
+                      const scheduled = new Date(d4dWorkflow.scheduledFollowUpAt);
+                      const isPast = scheduled < new Date();
+                      const daysUntil = Math.ceil((scheduled.getTime() - Date.now()) / 86400000);
+                      return (
+                        <p className={cn('text-[11px]', isPast ? 'text-yellow-400' : 'text-muted-foreground')}>
+                          {isPast ? `⚠ Overdue by ${Math.abs(daysUntil)} day${Math.abs(daysUntil) !== 1 ? 's' : ''}` : `In ${daysUntil} day${daysUntil !== 1 ? 's' : ''} — ${format(scheduled, 'MMM d, yyyy')}`}
+                        </p>
+                      );
+                    })()}
+                  </div>
                   <div className="space-y-1">
                     {CONTACT_ITEMS.map(item => renderCheck(contactChecks.includes(item.key), item.label, () => toggleCheck('contactChecks', item.key)))}
                   </div>
