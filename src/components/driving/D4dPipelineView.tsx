@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Building2, AlertCircle, Clock } from 'lucide-react';
+import { ChevronDown, Building2, AlertCircle, Clock, TrendingUp, Minus, ThumbsUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { updateDrivingLead } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -158,6 +158,17 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
     </div>
   );
 
+  const CONTACTED_OUTCOMES = [
+    { key: 'doesnt_want_to_sell' as const, label: "Doesn't Want to Sell", icon: AlertCircle, color: 'text-red-400' },
+    { key: 'thinking_about_selling' as const, label: 'Thinking About Selling', icon: Minus, color: 'text-yellow-400' },
+    { key: 'wants_to_sell' as const, label: 'Wants to Sell', icon: ThumbsUp, color: 'text-green-400' },
+  ];
+
+  const setContactedOutcome = (lead: DrivingLead, outcome: 'doesnt_want_to_sell' | 'thinking_about_selling' | 'wants_to_sell') => {
+    const wf = getWorkflow(lead);
+    saveMeta(lead.id, { ...wf, contactedOutcome: outcome });
+  };
+
   const renderContactedCard = (lead: DrivingLead) => {
     const wf = getWorkflow(lead);
     const checks = wf.contactChecks || [];
@@ -170,16 +181,27 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
             ? <>Last contacted: <span className="text-foreground">{formatDistanceToNow(new Date(wf.lastContactedAt), { addSuffix: true })}</span></>
             : 'Never contacted'}
         </div>
-        <Button size="sm" variant="outline" className="h-7 text-xs w-full" onClick={() => markContacted(lead)}>
-          Mark Contacted Now
-        </Button>
+        {!wf.contactedOutcome && (
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] text-muted-foreground">Outcome?</p>
+            {CONTACTED_OUTCOMES.map(o => (
+              <Button key={o.key} size="sm" variant="outline" className="h-7 text-[11px] w-full justify-start gap-1.5"
+                onClick={() => setContactedOutcome(lead, o.key)}>
+                <o.icon className={cn('h-3 w-3', o.color)} />{o.label}
+              </Button>
+            ))}
+          </div>
+        )}
+        {wf.contactedOutcome && (
+          <div className="flex items-center justify-between">
+            {(() => { const o = CONTACTED_OUTCOMES.find(x => x.key === wf.contactedOutcome)!;
+              return <span className={cn('text-xs flex items-center gap-1', o.color)}><o.icon className="h-3 w-3" />{o.label}</span>; })()}
+            <button className="text-[10px] text-muted-foreground underline" onClick={() => setContactedOutcome(lead, wf.contactedOutcome as any)}>change</button>
+          </div>
+        )}
         <div className="space-y-0.5">
           {CONTACT_ITEMS.map(item =>
-            renderCheckbox(
-              checks.includes(item.key),
-              item.label,
-              () => toggleCheck(lead, 'contactChecks', item.key)
-            )
+            renderCheckbox(checks.includes(item.key), item.label, () => toggleCheck(lead, 'contactChecks', item.key))
           )}
         </div>
         {renderProgressBar(checks.length, CONTACT_ITEMS.length)}
@@ -269,6 +291,13 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
     });
   };
 
+  // Contacted leads split by outcome
+  const contactedLeads = leads.filter(l => l.status === 'CONTACTED');
+  const contactedDNWTS = contactedLeads.filter(l => getWorkflow(l).contactedOutcome === 'doesnt_want_to_sell');
+  const contactedThinking = contactedLeads.filter(l => getWorkflow(l).contactedOutcome === 'thinking_about_selling');
+  const contactedWants = contactedLeads.filter(l => getWorkflow(l).contactedOutcome === 'wants_to_sell');
+  const contactedUnset = contactedLeads.filter(l => !getWorkflow(l).contactedOutcome);
+
   // Dead leads split by reason
   const deadRE = deadLeads.filter(l => getWorkflow(l).deadReason === 'real_estate_company');
   const deadNS = deadLeads.filter(l => getWorkflow(l).deadReason === 'doesnt_want_to_sell');
@@ -319,9 +348,28 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
                     )}
                   </div>
                 </div>
-                {isExpanded && (
+                {isExpanded && stage.key !== 'CONTACTED' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 mb-1">
                     {renderStageCards(stage.key, stage.key === 'NEW' ? leads : leads.filter(l => l.status === stage.key))}
+                  </div>
+                )}
+                {isExpanded && stage.key === 'CONTACTED' && (
+                  <div className="mt-2 mb-1 space-y-4">
+                    {[
+                      { leads: contactedWants, icon: ThumbsUp, label: "Wants to Sell", color: 'text-green-400' },
+                      { leads: contactedThinking, icon: Minus, label: "Thinking About Selling", color: 'text-yellow-400' },
+                      { leads: contactedDNWTS, icon: AlertCircle, label: "Doesn't Want to Sell", color: 'text-red-400' },
+                      { leads: contactedUnset, icon: Clock, label: "Outcome Not Set", color: 'text-muted-foreground' },
+                    ].map(({ leads: bucket, icon: Icon, label, color }) => bucket.length > 0 && (
+                      <div key={label}>
+                        <p className={cn("text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5", color)}>
+                          <Icon className="h-3.5 w-3.5" />{label} ({bucket.length})
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {bucket.map(l => renderContactedCard(l))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

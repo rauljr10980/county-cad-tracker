@@ -407,6 +407,7 @@ export interface D4dWorkflow {
   contactChecks?: string[];
   underContract?: boolean;
   deadReason?: 'real_estate_company' | 'doesnt_want_to_sell';
+  contactedOutcome?: 'doesnt_want_to_sell' | 'thinking_about_selling' | 'wants_to_sell';
   lastContactedAt?: string;
 }
 

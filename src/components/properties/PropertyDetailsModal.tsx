@@ -1359,6 +1359,22 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     onClick={() => saveMeta({ ...d4dWorkflow, lastContactedAt: new Date().toISOString() })}>
                     Mark Contacted Now
                   </Button>
+                  {/* Contacted outcome */}
+                  <div className="space-y-1 pt-1">
+                    <p className="text-xs text-muted-foreground font-medium">Outcome</p>
+                    {([
+                      { key: 'wants_to_sell', label: 'Wants to Sell', color: 'border-green-500/50 text-green-400' },
+                      { key: 'thinking_about_selling', label: 'Thinking About Selling', color: 'border-yellow-500/50 text-yellow-400' },
+                      { key: 'doesnt_want_to_sell', label: "Doesn't Want to Sell", color: 'border-red-500/50 text-red-400' },
+                    ] as const).map(o => (
+                      <Button key={o.key} size="sm"
+                        variant={d4dWorkflow.contactedOutcome === o.key ? 'default' : 'outline'}
+                        className={cn('h-7 text-xs w-full', d4dWorkflow.contactedOutcome !== o.key && o.color)}
+                        onClick={() => saveMeta({ ...d4dWorkflow, contactedOutcome: o.key })}>
+                        {o.label}
+                      </Button>
+                    ))}
+                  </div>
                   <div className="space-y-1">
                     {CONTACT_ITEMS.map(item => renderCheck(contactChecks.includes(item.key), item.label, () => toggleCheck('contactChecks', item.key)))}
                   </div>
