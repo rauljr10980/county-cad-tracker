@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X, FileText, Search } from 'lucide-react';
+import { D4dPipelineView } from './D4dPipelineView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -308,6 +309,9 @@ export function DrivingView() {
           </button>
         )}
       </div>
+
+      {/* D4$ Pipeline */}
+      {leads.length > 0 && <D4dPipelineView leads={leads as any} />}
 
       {/* Count */}
       <div className="text-sm text-muted-foreground">

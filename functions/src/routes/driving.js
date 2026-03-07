@@ -128,7 +128,7 @@ router.post('/', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, notes } = req.body;
+    const { status, notes, metadata } = req.body;
 
     const existing = await prisma.drivingLead.findUnique({ where: { id } });
     if (!existing) {
@@ -138,6 +138,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const updateData = {};
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
+    if (metadata !== undefined) updateData.metadata = metadata;
 
     const updated = await prisma.drivingLead.update({
       where: { id },

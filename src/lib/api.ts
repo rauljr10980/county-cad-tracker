@@ -1534,10 +1534,10 @@ export async function createDrivingLead(data: { address: string; notes?: string;
   return response.json();
 }
 
-export async function updateDrivingLead(id: string, data: { status?: string; notes?: string }) {
+export async function updateDrivingLead(id: string, data: { status?: string; notes?: string; metadata?: Record<string, unknown> }) {
   const response = await fetch(`${API_BASE_URL}/api/driving/${id}`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!response.ok) {

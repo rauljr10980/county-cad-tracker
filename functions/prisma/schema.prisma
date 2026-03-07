@@ -659,6 +659,9 @@ model DrivingLead {
   contacts       Json?
   ownerName      String?
 
+  // Workflow metadata (research/contact checklists, dead reason, last contacted)
+  metadata   Json?
+
   // Who logged it
   loggedBy String?
 

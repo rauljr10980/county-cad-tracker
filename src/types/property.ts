@@ -402,6 +402,14 @@ export type PreForeclosureInternalStatus = PreForeclosureStatus;
 
 export type DrivingLeadStatus = 'NEW' | 'RESEARCHING' | 'CONTACTED' | 'UNDER_CONTRACT' | 'DEAD' | 'FOUND_OBITUARY';
 
+export interface D4dWorkflow {
+  researchChecks?: string[];
+  contactChecks?: string[];
+  underContract?: boolean;
+  deadReason?: 'real_estate_company' | 'doesnt_want_to_sell';
+  lastContactedAt?: string;
+}
+
 export interface DrivingLead {
   id: string;
   rawAddress: string;
@@ -415,6 +423,11 @@ export interface DrivingLead {
   status: DrivingLeadStatus;
   loggedBy?: string;
   photoCount?: number;
+  ownerName?: string;
+  phoneNumbers?: string[];
+  emails?: string[];
+  contacts?: Record<string, unknown> | null;
+  metadata?: D4dWorkflow;
   createdAt: string;
   updatedAt: string;
 }
