@@ -356,7 +356,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       const contacts = buildContactsJson();
       if (isD4d) {
         await updateDrivingLeadPhones(d4dLeadId, allPhones, ownerPhoneIndex, contacts, ownerOverride);
-        queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+        queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
       } else {
         await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex, contacts);
       }
@@ -1275,7 +1275,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               setD4dPipelineStage(newStage);
               try {
                 await updateDrivingLead(d4dLeadId, { status: newStage });
-                queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+                queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
               } catch { toast({ title: 'Failed to save stage', variant: 'destructive' }); }
             };
 
@@ -1283,7 +1283,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               setD4dWorkflow(wf);
               try {
                 await updateDrivingLead(d4dLeadId, { metadata: wf as Record<string, unknown> });
-                queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+                queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
               } catch { toast({ title: 'Failed to save', variant: 'destructive' }); }
             };
 
@@ -1338,35 +1338,31 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   </SelectContent>
                 </Select>
 
-                {/* Researching checklist */}
-                {d4dPipelineStage === 'RESEARCHING' && (
-                  <div className="space-y-1 pt-1">
-                    <p className="text-xs text-muted-foreground font-medium mb-1">Research Checklist</p>
-                    {RESEARCH_ITEMS.map(item => renderCheck(researchChecks.includes(item.key), item.label, () => toggleCheck('researchChecks', item.key)))}
-                    {renderProgress(researchChecks.length, RESEARCH_ITEMS.length)}
-                  </div>
-                )}
+                {/* Research Checklist — always visible */}
+                <div className="space-y-1 pt-1 border-t border-border">
+                  <p className="text-xs text-muted-foreground font-medium mb-1 mt-2">Research Checklist</p>
+                  {RESEARCH_ITEMS.map(item => renderCheck(researchChecks.includes(item.key), item.label, () => toggleCheck('researchChecks', item.key)))}
+                  {renderProgress(researchChecks.length, RESEARCH_ITEMS.length)}
+                </div>
 
-                {/* Contacted checklist */}
-                {d4dPipelineStage === 'CONTACTED' && (
-                  <div className="space-y-2 pt-1">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {lastContact
-                        ? <span>Last contacted: <span className="text-foreground">{formatDistanceToNow(lastContact, { addSuffix: true })}</span></span>
-                        : 'Never marked as contacted'}
-                    </div>
-                    <Button size="sm" variant="outline" className="h-7 text-xs w-full"
-                      onClick={() => saveMeta({ ...d4dWorkflow, lastContactedAt: new Date().toISOString() })}>
-                      Mark Contacted Now
-                    </Button>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground font-medium">Contact Checklist</p>
-                      {CONTACT_ITEMS.map(item => renderCheck(contactChecks.includes(item.key), item.label, () => toggleCheck('contactChecks', item.key)))}
-                    </div>
-                    {renderProgress(contactChecks.length, CONTACT_ITEMS.length)}
+                {/* Contact section — always visible */}
+                <div className="space-y-2 pt-1 border-t border-border">
+                  <p className="text-xs text-muted-foreground font-medium mt-1">Contact Checklist</p>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {lastContact
+                      ? <span>Last contacted: <span className="text-foreground">{formatDistanceToNow(lastContact, { addSuffix: true })}</span></span>
+                      : 'Never marked as contacted'}
                   </div>
-                )}
+                  <Button size="sm" variant="outline" className="h-7 text-xs w-full"
+                    onClick={() => saveMeta({ ...d4dWorkflow, lastContactedAt: new Date().toISOString() })}>
+                    Mark Contacted Now
+                  </Button>
+                  <div className="space-y-1">
+                    {CONTACT_ITEMS.map(item => renderCheck(contactChecks.includes(item.key), item.label, () => toggleCheck('contactChecks', item.key)))}
+                  </div>
+                  {renderProgress(contactChecks.length, CONTACT_ITEMS.length)}
+                </div>
 
                 {/* Under Contract */}
                 {d4dPipelineStage === 'UNDER_CONTRACT' && (
@@ -1527,7 +1523,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         try {
                           if (isD4d) {
                             await updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride);
-                            queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+                            queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
                           } else {
                             await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts);
                           }
@@ -1606,7 +1602,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                         };
                                         if (isD4d) {
                                           await updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride);
-                                          queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+                                          queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
                                         } else {
                                           await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts);
                                         }
@@ -2036,7 +2032,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           await updatePropertyEmails(property.id, allEmails, updatedContacts);
                         } else {
                           await updateDrivingLeadEmails(d4dLeadId, allEmails, updatedContacts, ownerOverride);
-                          queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+                          queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
                         }
                         property.contacts = updatedContacts;
                         toast({ title: `Email sent to ${sentCount} address${sentCount > 1 ? 'es' : ''}` });

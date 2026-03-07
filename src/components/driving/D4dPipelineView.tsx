@@ -43,7 +43,7 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
     setLocalMeta(prev => ({ ...prev, [leadId]: wf }));
     try {
       await updateDrivingLead(leadId, { metadata: wf as Record<string, unknown> });
-      queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+      queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
     } catch {
       setLocalMeta(prev => { const n = { ...prev }; delete n[leadId]; return n; });
       toast({ title: 'Failed to save', variant: 'destructive' });
