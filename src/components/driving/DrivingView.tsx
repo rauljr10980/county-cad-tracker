@@ -206,7 +206,9 @@ export function DrivingView() {
           ownerPhoneIndex: (lead as any).ownerPhoneIndex ?? undefined,
           emails: (lead as any).emails || [],
           contacts: (lead as any).contacts || null,
-        } as Property);
+          d4dStatus: lead.status,
+          metadata: (lead as any).metadata || null,
+        } as unknown as Property);
       }
     } catch {
       toast({ title: 'Error', description: 'Failed to load property details', variant: 'destructive' });

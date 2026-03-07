@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ExternalLink, MapPin, DollarSign, Calendar, CalendarDays, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown, Loader2, Mail, ClipboardPaste } from 'lucide-react';
+import { ExternalLink, MapPin, DollarSign, Calendar, CalendarDays, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown, Loader2, Mail, ClipboardPaste, Clock, GitBranch } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Property, FOLLOWUP_ELIGIBLE_STAGES } from '@/types/property';
+import { Property, FOLLOWUP_ELIGIBLE_STAGES, D4dWorkflow } from '@/types/property';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow, addYears } from 'date-fns';
 import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail, updateDrivingLeadPhones, updateDrivingLeadEmails, updateDrivingLead } from '@/lib/api';
 import { extractContacts } from '@/lib/contactParser';
 import { toast } from '@/hooks/use-toast';
@@ -102,6 +102,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   // Strip the d4d- prefix to get the actual DrivingLead id
   const d4dLeadId = isD4d ? property!.id.replace('d4d-', '') : '';
 
+  // D4$ Pipeline state
+  const [d4dPipelineStage, setD4dPipelineStage] = useState<string>('NEW');
+  const [d4dWorkflow, setD4dWorkflow] = useState<D4dWorkflow>({});
+
   // Initialize notes and phone numbers from property when modal opens or property changes
   useEffect(() => {
     if (property && isOpen) {
@@ -163,6 +167,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setEmailBody(`Hi Ms./Mr. {{LastName}},\n\nMy name is Raul. I'm reaching out regarding the property at {{PropertyAddress}}, which is listed under {{Owner}}.\n\nIf you're connected to the property, could you please let me know the best person to speak with? If the home is vacant, I would be interested in discussing a possible purchase.\n\nWe also work with real estate attorneys to help streamline the process, and you wouldn't have to pay out of pocket for those legal services.\n\nIf I've reached you by mistake, please disregard this message and accept my apologies.\n\nThank you,\nRaul\n210-425-7584`);
 
       setOwnerOverride(savedContacts?.ownerOverride || '');
+
+      // Initialize D4$ pipeline state
+      if (isD4d) {
+        setD4dPipelineStage((property as any).d4dStatus || 'NEW');
+        setD4dWorkflow((property as any).metadata || {});
+      }
 
       // Load pre-foreclosure records for this property
       loadPreForeclosureRecords();
@@ -1238,6 +1248,184 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               Object.assign(property, updated);
             }}
           />
+
+          {/* D4$ Pipeline Workflow */}
+          {isD4d && (() => {
+            const RESEARCH_ITEMS = [
+              { key: 'bcad_tax', label: 'BCAD - TAX' },
+              { key: 'tps', label: 'TPS' },
+              { key: 'google', label: 'GOOGLE' },
+              { key: 'land_records', label: 'LAND RECORDS' },
+              { key: 'obituary', label: 'OBITUARY' },
+            ];
+            const CONTACT_ITEMS = [
+              { key: 'called', label: 'Called' },
+              { key: 'emailed', label: 'Emailed all available emails' },
+            ];
+            const D4D_STAGES = [
+              { key: 'NEW', label: '1. New' },
+              { key: 'RESEARCHING', label: '2. Researching' },
+              { key: 'FOUND_OBITUARY', label: '3. Found Obituary' },
+              { key: 'CONTACTED', label: '4. Contacted' },
+              { key: 'UNDER_CONTRACT', label: '5. Under Contract' },
+              { key: 'DEAD', label: '6. Dead Deal' },
+            ];
+
+            const saveStage = async (newStage: string) => {
+              setD4dPipelineStage(newStage);
+              try {
+                await updateDrivingLead(d4dLeadId, { status: newStage });
+                queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+              } catch { toast({ title: 'Failed to save stage', variant: 'destructive' }); }
+            };
+
+            const saveMeta = async (wf: D4dWorkflow) => {
+              setD4dWorkflow(wf);
+              try {
+                await updateDrivingLead(d4dLeadId, { metadata: wf as Record<string, unknown> });
+                queryClient.invalidateQueries({ queryKey: ['drivingLeads'] });
+              } catch { toast({ title: 'Failed to save', variant: 'destructive' }); }
+            };
+
+            const toggleCheck = (field: 'researchChecks' | 'contactChecks', key: string) => {
+              const cur = d4dWorkflow[field] || [];
+              saveMeta({ ...d4dWorkflow, [field]: cur.includes(key) ? cur.filter(k => k !== key) : [...cur, key] });
+            };
+
+            const renderCheck = (checked: boolean, label: string, onToggle: () => void) => (
+              <button key={label} className="flex items-center gap-2 w-full text-left hover:bg-secondary/40 rounded px-1 py-0.5 transition-colors" onClick={onToggle}>
+                <div className={cn('h-4 w-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors', checked ? 'bg-primary border-primary' : 'border-muted-foreground/40')}>
+                  {checked && <span className="text-primary-foreground text-[10px] font-bold leading-none">✓</span>}
+                </div>
+                <span className={cn('text-xs', checked && 'line-through text-muted-foreground')}>{label}</span>
+              </button>
+            );
+
+            const renderProgress = (done: number, total: number) => {
+              const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+              return (
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                    <div className={cn('h-full rounded-full transition-all', pct === 100 ? 'bg-green-500' : 'bg-primary')} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className={cn('text-xs font-mono', pct === 100 ? 'text-green-400 font-semibold' : 'text-muted-foreground')}>{pct}%</span>
+                </div>
+              );
+            };
+
+            const researchChecks = d4dWorkflow.researchChecks || [];
+            const contactChecks = d4dWorkflow.contactChecks || [];
+            const lastContact = d4dWorkflow.lastContactedAt ? new Date(d4dWorkflow.lastContactedAt) : null;
+            const twoYearMark = lastContact ? addYears(lastContact, 2) : null;
+            const daysUntil = twoYearMark ? Math.ceil((twoYearMark.getTime() - Date.now()) / 86400000) : null;
+
+            return (
+              <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">D4$ Pipeline Stage</span>
+                </div>
+
+                {/* Stage selector */}
+                <Select value={d4dPipelineStage} onValueChange={saveStage}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {D4D_STAGES.map(s => (
+                      <SelectItem key={s.key} value={s.key} className="text-xs">{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Researching checklist */}
+                {d4dPipelineStage === 'RESEARCHING' && (
+                  <div className="space-y-1 pt-1">
+                    <p className="text-xs text-muted-foreground font-medium mb-1">Research Checklist</p>
+                    {RESEARCH_ITEMS.map(item => renderCheck(researchChecks.includes(item.key), item.label, () => toggleCheck('researchChecks', item.key)))}
+                    {renderProgress(researchChecks.length, RESEARCH_ITEMS.length)}
+                  </div>
+                )}
+
+                {/* Contacted checklist */}
+                {d4dPipelineStage === 'CONTACTED' && (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {lastContact
+                        ? <span>Last contacted: <span className="text-foreground">{formatDistanceToNow(lastContact, { addSuffix: true })}</span></span>
+                        : 'Never marked as contacted'}
+                    </div>
+                    <Button size="sm" variant="outline" className="h-7 text-xs w-full"
+                      onClick={() => saveMeta({ ...d4dWorkflow, lastContactedAt: new Date().toISOString() })}>
+                      Mark Contacted Now
+                    </Button>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-medium">Contact Checklist</p>
+                      {CONTACT_ITEMS.map(item => renderCheck(contactChecks.includes(item.key), item.label, () => toggleCheck('contactChecks', item.key)))}
+                    </div>
+                    {renderProgress(contactChecks.length, CONTACT_ITEMS.length)}
+                  </div>
+                )}
+
+                {/* Under Contract */}
+                {d4dPipelineStage === 'UNDER_CONTRACT' && (
+                  <div className="space-y-2 pt-1">
+                    <p className="text-xs text-muted-foreground">Under Contract?</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant={d4dWorkflow.underContract === true ? 'default' : 'outline'} className="flex-1 h-7 text-xs"
+                        onClick={() => saveMeta({ ...d4dWorkflow, underContract: true })}>Yes</Button>
+                      <Button size="sm" variant={d4dWorkflow.underContract === false ? 'default' : 'outline'} className="flex-1 h-7 text-xs"
+                        onClick={() => saveMeta({ ...d4dWorkflow, underContract: false })}>No</Button>
+                    </div>
+                    {d4dWorkflow.underContract === false && (
+                      <p className="text-xs text-muted-foreground text-center">Consider moving to Dead Deal</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Dead Deal */}
+                {d4dPipelineStage === 'DEAD' && (
+                  <div className="space-y-2 pt-1">
+                    {!d4dWorkflow.deadReason && (
+                      <>
+                        <p className="text-xs text-muted-foreground">Why did this go dead?</p>
+                        <div className="flex flex-col gap-1.5">
+                          <Button size="sm" variant="outline" className="h-7 text-xs"
+                            onClick={() => saveMeta({ ...d4dWorkflow, deadReason: 'real_estate_company', lastContactedAt: d4dWorkflow.lastContactedAt || new Date().toISOString() })}>
+                            RE company bought it
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs"
+                            onClick={() => saveMeta({ ...d4dWorkflow, deadReason: 'doesnt_want_to_sell', lastContactedAt: d4dWorkflow.lastContactedAt || new Date().toISOString() })}>
+                            Doesn't want to sell
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                    {d4dWorkflow.deadReason && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          {d4dWorkflow.deadReason === 'real_estate_company' ? 'RE company bought it' : "Doesn't want to sell"}
+                        </span>
+                        <button className="text-[10px] text-muted-foreground underline" onClick={() => saveMeta({ ...d4dWorkflow, deadReason: undefined })}>change</button>
+                      </div>
+                    )}
+                    {lastContact && (
+                      <div className="text-xs space-y-0.5 pt-1">
+                        <p className="text-muted-foreground">Last contact: {format(lastContact, 'MMM d, yyyy')}</p>
+                        {daysUntil !== null && daysUntil > 0 && (
+                          <p className="text-yellow-500">Re-contact in {daysUntil} days ({format(twoYearMark!, 'MMM d, yyyy')})</p>
+                        )}
+                        {daysUntil !== null && daysUntil <= 0 && (
+                          <p className="text-green-400 font-medium">✓ 2-year mark passed — consider reaching out</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Schedule Follow-Up */}
           {(isD4d || (property.workflow_stage && FOLLOWUP_ELIGIBLE_STAGES.includes(property.workflow_stage as any))) && (

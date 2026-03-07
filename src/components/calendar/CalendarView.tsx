@@ -136,6 +136,8 @@ export function CalendarView() {
         notes: dl.notes || '',
         latitude: dl.latitude,
         longitude: dl.longitude,
+        d4dStatus: dl.status,
+        metadata: dl.metadata || null,
       } as unknown as Property;
       setSelectedProperty(stub);
     } else if (followUp.propertyId && followUp.property) {
