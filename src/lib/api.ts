@@ -1598,6 +1598,14 @@ export async function getFollowUps(month: string) {
   return response.json();
 }
 
+export async function getD4dFollowUps() {
+  const response = await fetch(`${API_BASE_URL}/api/followups/d4d`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch D4$ follow-ups');
+  return response.json();
+}
+
 export async function createFollowUp(data: {
   date: string;
   note?: string;

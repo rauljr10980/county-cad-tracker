@@ -74,6 +74,27 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+// GET /api/followups/d4d - All follow-ups for D4$ leads (no month filter)
+router.get('/d4d', optionalAuth, async (req, res) => {
+  try {
+    const followUps = await prisma.followUp.findMany({
+      where: { drivingLeadId: { not: null } },
+      select: {
+        id: true,
+        date: true,
+        note: true,
+        completed: true,
+        drivingLeadId: true,
+      },
+      orderBy: { date: 'asc' },
+    });
+    res.json(followUps);
+  } catch (error) {
+    console.error('[FOLLOWUPS] D4$ fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch D4$ follow-ups' });
+  }
+});
+
 // POST /api/followups
 router.post('/', authenticateToken, async (req, res) => {
   try {

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getFollowUps, createFollowUp, updateFollowUp, deleteFollowUp } from '@/lib/api';
+import { getFollowUps, getD4dFollowUps, createFollowUp, updateFollowUp, deleteFollowUp } from '@/lib/api';
 import type { FollowUp } from '@/types/property';
 
 export function useFollowUps(month: string) {
@@ -7,6 +7,15 @@ export function useFollowUps(month: string) {
     queryKey: ['followups', month],
     queryFn: () => getFollowUps(month),
     enabled: !!month,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useD4dFollowUps() {
+  return useQuery<{ id: string; date: string; note?: string; completed: boolean; drivingLeadId: string }[]>({
+    queryKey: ['followups-d4d'],
+    queryFn: getD4dFollowUps,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
