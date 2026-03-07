@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Building2, AlertCircle, Clock, TrendingUp, Minus, ThumbsUp } from 'lucide-react';
+import { ChevronDown, Building2, AlertCircle, Clock, TrendingUp, Minus, ThumbsUp, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { updateDrivingLead } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ const PIPELINE_STAGES = [
   { key: 'UNDER_CONTRACT' as const, label: 'Under Contract', color: '#22C55E', num: 5 },
 ];
 
-export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
+export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]; onViewDetails?: (lead: DrivingLead) => void }) {
   const queryClient = useQueryClient();
   const [expandedStage, setExpandedStage] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -118,9 +118,23 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
     </button>
   );
 
+  const renderViewBtn = (lead: DrivingLead) =>
+    onViewDetails ? (
+      <button
+        className="ml-auto p-1 rounded hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+        title="View property details"
+        onClick={e => { e.stopPropagation(); onViewDetails(lead); }}
+      >
+        <Eye className="h-3.5 w-3.5" />
+      </button>
+    ) : null;
+
   const renderNewCard = (lead: DrivingLead) => (
     <div key={lead.id} className="bg-card border border-border rounded-lg p-3">
-      <p className="font-medium text-sm">{getAddress(lead)}</p>
+      <div className="flex items-start gap-1">
+        <p className="font-medium text-sm flex-1">{getAddress(lead)}</p>
+        {renderViewBtn(lead)}
+      </div>
       {lead.notes && <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{lead.notes}</p>}
       <p className="text-xs text-muted-foreground mt-1">
         Added {formatDistanceToNow(new Date(lead.createdAt), { addSuffix: true })}
@@ -133,7 +147,10 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
     const checks = wf.researchChecks || [];
     return (
       <div key={lead.id} className="bg-card border border-border rounded-lg p-3 space-y-1">
-        <p className="font-medium text-sm">{getAddress(lead)}</p>
+        <div className="flex items-start gap-1">
+          <p className="font-medium text-sm flex-1">{getAddress(lead)}</p>
+          {renderViewBtn(lead)}
+        </div>
         <div className="mt-2 space-y-0.5">
           {RESEARCH_ITEMS.map(item =>
             renderCheckbox(
@@ -150,7 +167,10 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
 
   const renderObitCard = (lead: DrivingLead) => (
     <div key={lead.id} className="bg-card border border-rose-500/20 rounded-lg p-3">
-      <p className="font-medium text-sm">{getAddress(lead)}</p>
+      <div className="flex items-start gap-1">
+        <p className="font-medium text-sm flex-1">{getAddress(lead)}</p>
+        {renderViewBtn(lead)}
+      </div>
       {lead.notes && <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{lead.notes}</p>}
       <p className="text-xs text-muted-foreground mt-1">
         {formatDistanceToNow(new Date(lead.updatedAt), { addSuffix: true })}
@@ -174,7 +194,10 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
     const checks = wf.contactChecks || [];
     return (
       <div key={lead.id} className="bg-card border border-border rounded-lg p-3 space-y-2">
-        <p className="font-medium text-sm">{getAddress(lead)}</p>
+        <div className="flex items-start gap-1">
+          <p className="font-medium text-sm flex-1">{getAddress(lead)}</p>
+          {renderViewBtn(lead)}
+        </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Clock className="h-3 w-3" />
           {wf.lastContactedAt
@@ -213,7 +236,10 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
     const wf = getWorkflow(lead);
     return (
       <div key={lead.id} className="bg-card border border-border rounded-lg p-3 space-y-2">
-        <p className="font-medium text-sm">{getAddress(lead)}</p>
+        <div className="flex items-start gap-1">
+          <p className="font-medium text-sm flex-1">{getAddress(lead)}</p>
+          {renderViewBtn(lead)}
+        </div>
         <p className="text-xs text-muted-foreground">Under Contract?</p>
         <div className="flex gap-2">
           <Button
@@ -249,7 +275,10 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
       : null;
     return (
       <div key={lead.id} className="bg-card border border-border rounded-lg p-3 space-y-2">
-        <p className="font-medium text-sm">{getAddress(lead)}</p>
+        <div className="flex items-start gap-1">
+          <p className="font-medium text-sm flex-1">{getAddress(lead)}</p>
+          {renderViewBtn(lead)}
+        </div>
         {!wf.deadReason && (
           <>
             <p className="text-xs text-muted-foreground">Why did this go dead?</p>

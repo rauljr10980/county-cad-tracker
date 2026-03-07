@@ -318,7 +318,7 @@ export function DrivingView() {
       </div>
 
       {/* D4$ Pipeline */}
-      {leads.length > 0 && <D4dPipelineView leads={leads as any} />}
+      {leads.length > 0 && <D4dPipelineView leads={leads as any} onViewDetails={handleViewDetails} />}
 
       {/* Count */}
       <div className="text-sm text-muted-foreground">
