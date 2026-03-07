@@ -22,7 +22,7 @@ const CONTACT_ITEMS = [
 ];
 
 const PIPELINE_STAGES = [
-  { key: 'NEW' as const, label: 'New', color: '#3B82F6', num: 1 },
+  { key: 'NEW' as const, label: 'Leads', color: '#3B82F6', num: 1 },
   { key: 'RESEARCHING' as const, label: 'Researching', color: '#EAB308', num: 2 },
   { key: 'FOUND_OBITUARY' as const, label: 'Found Obituary', color: '#F43F5E', num: 3 },
   { key: 'CONTACTED' as const, label: 'Contacted', color: '#A855F7', num: 4 },
@@ -80,7 +80,7 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
 
   // Stage counts
   const deadLeads = leads.filter(l => l.status === 'DEAD');
-  const stageCounts = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, leads.filter(l => l.status === s.key).length]));
+  const stageCounts = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, s.key === 'NEW' ? leads.length : leads.filter(l => l.status === s.key).length]));
   const maxCount = Math.max(1, ...Object.values(stageCounts), deadLeads.length);
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ export function D4dPipelineView({ leads }: { leads: DrivingLead[] }) {
                 </div>
                 {isExpanded && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 mb-1">
-                    {renderStageCards(stage.key, leads.filter(l => l.status === stage.key))}
+                    {renderStageCards(stage.key, stage.key === 'NEW' ? leads : leads.filter(l => l.status === stage.key))}
                   </div>
                 )}
               </div>
