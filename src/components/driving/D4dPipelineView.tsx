@@ -37,7 +37,9 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
   const [localMeta, setLocalMeta] = useState<Record<string, D4dWorkflow>>({});
 
   const getWorkflow = (lead: DrivingLead): D4dWorkflow =>
-    localMeta[lead.id] ?? (lead.metadata || {});
+    localMeta[lead.id] !== undefined
+      ? { ...(lead.metadata as D4dWorkflow || {}), ...localMeta[lead.id] }
+      : (lead.metadata as D4dWorkflow || {});
 
   const saveMeta = async (leadId: string, wf: D4dWorkflow) => {
     setLocalMeta(prev => ({ ...prev, [leadId]: wf }));
