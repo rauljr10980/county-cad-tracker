@@ -170,19 +170,10 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
     const wf = getWorkflow(lead);
     const checks = wf.researchChecks || [];
     return (
-      <div key={lead.id} className="bg-card border border-border rounded-lg p-3 space-y-1">
+      <div key={lead.id} className="bg-card border border-border rounded-lg p-3">
         <div className="flex items-start gap-1">
           <p className="font-medium text-sm flex-1">{getAddress(lead)}</p>
           {renderViewBtn(lead)}
-        </div>
-        <div className="mt-2 space-y-0.5">
-          {RESEARCH_ITEMS.map(item =>
-            renderCheckbox(
-              checks.includes(item.key),
-              item.label,
-              () => toggleCheck(lead, 'researchChecks', item.key)
-            )
-          )}
         </div>
         {renderProgressBar(checks.length, RESEARCH_ITEMS.length)}
       </div>
