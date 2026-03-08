@@ -2205,12 +2205,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               {/* Options */}
               <div className="px-6 py-4 space-y-2">
                 {([
-                  { key: 'wants_to_sell', label: 'Wants to Sell', bg: 'hover:bg-green-500/10 border-green-500/30 text-green-400' },
-                  { key: 'thinking_about_selling', label: 'Thinking About Selling', bg: 'hover:bg-yellow-500/10 border-yellow-500/30 text-yellow-400' },
-                  { key: 'doesnt_want_to_sell', label: "Doesn't Want to Sell", bg: 'hover:bg-red-500/10 border-red-500/30 text-red-400' },
+                  { key: 'wants_to_sell', label: 'Wants to Sell' },
+                  { key: 'thinking_about_selling', label: 'Thinking About Selling' },
+                  { key: 'doesnt_want_to_sell', label: "Doesn't Want to Sell" },
                 ] as const).map(o => (
                   <button key={o.key}
-                    className={cn('w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-colors', o.bg)}
+                    className="w-full text-left px-4 py-3 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors"
                     onClick={async () => {
                       try {
                         await updateDrivingLead(d4dLeadId, { status: 'CONTACTED' });
