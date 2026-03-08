@@ -547,7 +547,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 size="sm"
                 className="flex-1"
                 onClick={() => {
-                  const street = (property.propertyAddress || '').split(',')[0].trim();
+                  const street = (parsedAddress || property.propertyAddress || '').split(',')[0].trim();
                   const url = street
                     ? `https://bexar.tx.publicsearch.us/results?department=RP&keywordSearch=false&recordedDateRange=18000101%2C20260304&searchOcrText=false&searchType=quickSearch&searchValue=${encodeURIComponent(street)}`
                     : 'https://bexar.tx.publicsearch.us/';
