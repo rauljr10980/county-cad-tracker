@@ -547,7 +547,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 size="sm"
                 className="flex-1"
                 onClick={() => {
-                  window.open('https://bexar.tx.publicsearch.us/', '_blank');
+                  const street = displayPropertyAddress.split(',')[0].trim();
+                  const url = street
+                    ? `https://bexar.tx.publicsearch.us/results?department=RP&keywordSearch=false&recordedDateRange=18000101%2C20260304&searchOcrText=false&searchType=quickSearch&searchValue=${encodeURIComponent(street)}`
+                    : 'https://bexar.tx.publicsearch.us/';
+                  window.open(url, '_blank');
                 }}
                 title="Land Records"
               >
