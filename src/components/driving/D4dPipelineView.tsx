@@ -442,7 +442,12 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
                 </div>
                 {isExpanded && stage.key !== 'CONTACTED' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 mb-1">
-                    {renderStageCards(stage.key, leads.filter(l => l.status === stage.key))}
+                    {renderStageCards(stage.key, leads.filter(l => l.status === stage.key).sort((a, b) => {
+                      if (stage.key !== 'RESEARCHING') return 0;
+                      const aChecks = (getWorkflow(a).researchChecks || []).length;
+                      const bChecks = (getWorkflow(b).researchChecks || []).length;
+                      return bChecks - aChecks;
+                    }))}
                   </div>
                 )}
                 {isExpanded && stage.key === 'CONTACTED' && (
