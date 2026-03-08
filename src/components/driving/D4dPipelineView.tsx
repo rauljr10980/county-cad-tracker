@@ -36,6 +36,7 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
   const [collapsed, setCollapsed] = useState(false);
   // Optimistic local metadata overrides
   const [localMeta, setLocalMeta] = useState<Record<string, D4dWorkflow>>({});
+  const [collapsedBuckets, setCollapsedBuckets] = useState<Record<string, boolean>>({});
 
   const { data: d4dFollowUps = [] } = useD4dFollowUps();
 
@@ -446,12 +447,18 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
                       { leads: contactedUnset, icon: Clock, label: "Outcome Not Set", color: 'text-muted-foreground' },
                     ].map(({ leads: bucket, icon: Icon, label, color }) => bucket.length > 0 && (
                       <div key={label}>
-                        <p className={cn("text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5", color)}>
+                        <button
+                          className={cn("text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5 w-full hover:opacity-80 transition-opacity", color)}
+                          onClick={() => setCollapsedBuckets(prev => ({ ...prev, [label]: !prev[label] }))}
+                        >
                           <Icon className="h-3.5 w-3.5" />{label} ({bucket.length})
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {bucket.map(l => renderContactedCard(l))}
-                        </div>
+                          <ChevronDown className={cn('h-3.5 w-3.5 ml-auto transition-transform', collapsedBuckets[label] && '-rotate-90')} />
+                        </button>
+                        {!collapsedBuckets[label] && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {bucket.map(l => renderContactedCard(l))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
