@@ -106,6 +106,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   // D4$ Pipeline state
   const [d4dPipelineStage, setD4dPipelineStage] = useState<string>('NEW');
   const [d4dWorkflow, setD4dWorkflow] = useState<D4dWorkflow>({});
+  const [showContactedPicker, setShowContactedPicker] = useState(false);
 
   // Initialize notes and phone numbers from property when modal opens or property changes
   useEffect(() => {
@@ -1335,6 +1336,35 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   <GitBranch className="h-4 w-4 text-primary" />
                   <span className="text-sm font-medium">D4$ Pipeline Stage</span>
                 </div>
+
+                {/* Quick Contacted action */}
+                {!showContactedPicker ? (
+                  <Button size="sm" className="w-full h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                    onClick={() => setShowContactedPicker(true)}>
+                    Contacted — mark outcome
+                  </Button>
+                ) : (
+                  <div className="space-y-1.5 p-2 rounded-lg border border-purple-500/30 bg-purple-500/5">
+                    <p className="text-xs text-muted-foreground font-medium">How did it go?</p>
+                    {([
+                      { key: 'wants_to_sell', label: 'Wants to Sell', color: 'border-green-500/50 text-green-400 hover:bg-green-500/10' },
+                      { key: 'thinking_about_selling', label: 'Thinking About Selling', color: 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10' },
+                      { key: 'doesnt_want_to_sell', label: "Doesn't Want to Sell", color: 'border-red-500/50 text-red-400 hover:bg-red-500/10' },
+                    ] as const).map(o => (
+                      <Button key={o.key} size="sm" variant="outline"
+                        className={cn('h-7 text-xs w-full', o.color)}
+                        onClick={async () => {
+                          await saveStage('CONTACTED');
+                          await saveMeta({ ...d4dWorkflow, contactedOutcome: o.key, lastContactedAt: new Date().toISOString() });
+                          setShowContactedPicker(false);
+                        }}>
+                        {o.label}
+                      </Button>
+                    ))}
+                    <button className="text-[10px] text-muted-foreground underline w-full text-center mt-1"
+                      onClick={() => setShowContactedPicker(false)}>cancel</button>
+                  </div>
+                )}
 
                 {/* Stage selector */}
                 <Select value={d4dPipelineStage} onValueChange={saveStage}>
