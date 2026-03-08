@@ -230,14 +230,6 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
             ))}
           </div>
         )}
-        {wf.contactedOutcome && (
-          <div className="flex items-center justify-between">
-            {(() => { const o = CONTACTED_OUTCOMES.find(x => x.key === wf.contactedOutcome)!;
-              return <span className={cn('text-xs flex items-center gap-1', o.color)}><o.icon className="h-3 w-3" />{o.label}</span>; })()}
-            <button className="text-[10px] text-muted-foreground underline"
-              onClick={() => saveMeta(lead.id, { ...wf, contactedOutcome: undefined })}>change</button>
-          </div>
-        )}
         {/* Follow-up tracking */}
         {(() => {
           const { next: dbNext, lastDone: dbLastDone } = getNextFollowUp(lead.id);
@@ -285,11 +277,6 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
             </div>
           );
         })()}
-        <div className="space-y-0.5">
-          {CONTACT_ITEMS.map(item =>
-            renderCheckbox(checks.includes(item.key), item.label, () => toggleCheck(lead, 'contactChecks', item.key))
-          )}
-        </div>
         {renderProgressBar(checks.length, CONTACT_ITEMS.length)}
       </div>
     );
