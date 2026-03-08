@@ -24,7 +24,7 @@ import { updatePropertyWorkflowStage } from '@/lib/api';
 
 interface PhoneEntry {
   number: string;
-  status?: '' | 'rings' | 'not_working' | 'voicemail';
+  status?: '' | 'rings' | 'not_working' | 'voicemail' | 'contacted';
 }
 
 interface PhoneContactRow {
@@ -1644,6 +1644,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                 phone.status === 'not_working' && "border-red-500 bg-red-500/15 text-red-400 line-through",
                                 phone.status === 'rings' && "border-green-500 bg-green-500/10 text-green-400",
                                 phone.status === 'voicemail' && "border-yellow-500 bg-yellow-500/10 text-yellow-400",
+                                phone.status === 'contacted' && "border-blue-500 bg-blue-500/10 text-blue-400",
                               )}
                             />
                             <Popover>
@@ -1656,12 +1657,14 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                     phone.status === 'not_working' && "text-red-400",
                                     phone.status === 'rings' && "text-green-400",
                                     phone.status === 'voicemail' && "text-yellow-400",
+                                    phone.status === 'contacted' && "text-blue-400",
                                   )}
                                 >
                                   {!phone.status && <ChevronDown className="h-3 w-3" />}
                                   {phone.status === 'rings' && <span>✓</span>}
                                   {phone.status === 'not_working' && <span>✗</span>}
                                   {phone.status === 'voicemail' && <span>VM</span>}
+                                  {phone.status === 'contacted' && <span>C</span>}
                                 </button>
                               </PopoverTrigger>
                               <PopoverContent className="w-36 p-1" align="end" side="bottom">
@@ -1669,6 +1672,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                   { value: '', label: 'No Status', color: '' },
                                   { value: 'rings', label: 'Rings', color: 'text-green-400' },
                                   { value: 'not_working', label: 'Not Working', color: 'text-red-400' },
+                                  { value: 'contacted', label: 'Contacted', color: 'text-blue-400' },
                                 ].map((opt) => (
                                   <button
                                     key={opt.value}
