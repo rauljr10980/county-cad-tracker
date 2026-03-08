@@ -593,12 +593,16 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               </div>
             </div>
 
-            {!isD4d && (property.ownerName || parsedAddress || property.propertyAddress) && (
+            {(isD4d ? !!property.propertyAddress : !!(property.ownerName || parsedAddress || property.propertyAddress)) && (
               <div className="flex items-start gap-3">
                 <Building className="h-4 w-4 text-primary mt-1 shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Property Address</p>
-                  <p className="font-medium">{property.ownerName || parsedAddress || property.propertyAddress}</p>
+                  <p className="font-medium">
+                    {isD4d
+                      ? (property.propertyAddress.split(',')[0] || property.propertyAddress)
+                      : (property.ownerName || parsedAddress || property.propertyAddress)}
+                  </p>
                 </div>
               </div>
             )}
