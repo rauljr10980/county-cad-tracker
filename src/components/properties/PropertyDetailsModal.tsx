@@ -107,6 +107,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [d4dPipelineStage, setD4dPipelineStage] = useState<string>('NEW');
   const [d4dWorkflow, setD4dWorkflow] = useState<D4dWorkflow>({});
   const [showContactedPicker, setShowContactedPicker] = useState(false);
+  const [showPhoneContactedPrompt, setShowPhoneContactedPrompt] = useState(false);
 
   // Initialize notes and phone numbers from property when modal opens or property changes
   useEffect(() => {
@@ -1366,6 +1367,30 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   </div>
                 )}
 
+                {/* Phone Contacted prompt */}
+                {showPhoneContactedPrompt && (
+                  <div className="space-y-1.5 p-2 rounded-lg border border-blue-500/30 bg-blue-500/5">
+                    <p className="text-xs text-blue-300 font-medium">📞 You marked a number as Contacted — how did it go?</p>
+                    {([
+                      { key: 'wants_to_sell', label: 'Wants to Sell', color: 'border-green-500/50 text-green-400 hover:bg-green-500/10' },
+                      { key: 'thinking_about_selling', label: 'Thinking About Selling', color: 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10' },
+                      { key: 'doesnt_want_to_sell', label: "Doesn't Want to Sell", color: 'border-red-500/50 text-red-400 hover:bg-red-500/10' },
+                    ] as const).map(o => (
+                      <Button key={o.key} size="sm" variant="outline"
+                        className={cn('h-7 text-xs w-full', o.color)}
+                        onClick={async () => {
+                          await saveStage('CONTACTED');
+                          await saveMeta({ ...d4dWorkflow, contactedOutcome: o.key, lastContactedAt: new Date().toISOString() });
+                          setShowPhoneContactedPrompt(false);
+                        }}>
+                        {o.label}
+                      </Button>
+                    ))}
+                    <button className="text-[10px] text-muted-foreground underline w-full text-center mt-1"
+                      onClick={() => setShowPhoneContactedPrompt(false)}>skip</button>
+                  </div>
+                )}
+
                 {/* Stage selector */}
                 <Select value={d4dPipelineStage} onValueChange={saveStage}>
                   <SelectTrigger className="h-8 text-xs">
@@ -1695,11 +1720,15 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                           phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '' })) })),
                                           emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })),
                                         };
-                                        if (isD4d) {
+                                        if (isFromD4d) {
                                           await updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride);
+                                          if (!isD4d) await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts).catch(() => {});
                                           queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
                                         } else {
                                           await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts);
+                                        }
+                                        if (opt.value === 'contacted' && isFromD4d) {
+                                          setShowPhoneContactedPrompt(true);
                                         }
                                       } catch { /* silent — don't interrupt UX */ }
                                     }}
@@ -1709,6 +1738,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                       'bg-green-400': opt.value === 'rings',
                                       'bg-red-400': opt.value === 'not_working',
                                       'bg-yellow-400': opt.value === 'voicemail',
+                                      'bg-blue-400': opt.value === 'contacted',
                                     })} />
                                     <span className={opt.color}>{opt.label}</span>
                                   </button>
