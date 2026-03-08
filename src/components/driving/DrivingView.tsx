@@ -194,7 +194,7 @@ export function DrivingView() {
       } else {
         // No match — open modal with a stub so user can still view address & enter details
         setDbStatus(prev => ({ ...prev, [lead.id]: 'not_found' }));
-        const fullAddress = [lead.street, lead.city, lead.state, lead.zip].filter(Boolean).join(', ');
+        const fullAddress = [lead.street, lead.city, lead.state, lead.zip].filter(Boolean).join(', ') || lead.rawAddress || '';
         setSelectedProperty({
           id: `d4d-${lead.id}`,
           accountNumber: '',

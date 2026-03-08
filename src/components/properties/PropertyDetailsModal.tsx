@@ -308,7 +308,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const displayOwnerName = isD4d ? (property.ownerName || '') : (parsedOwnerName || '');
   const toTitleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   const emailAddress = toTitleCase(displayPropertyAddress);
-  const emailOwner = ownerOverride.trim() || toTitleCase(displayOwnerName);
+  const emailOwner = ownerOverride.trim() || toTitleCase(displayOwnerName) || 'Property Owner';
 
   const handleSaveNotes = async () => {
     setSavingNotes(true);
