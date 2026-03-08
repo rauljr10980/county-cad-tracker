@@ -108,6 +108,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [d4dWorkflow, setD4dWorkflow] = useState<D4dWorkflow>({});
   const [showContactedPicker, setShowContactedPicker] = useState(false);
   const [showPhoneContactedPrompt, setShowPhoneContactedPrompt] = useState(false);
+  const [openPhoneStatusKey, setOpenPhoneStatusKey] = useState<string | null>(null);
 
   // Initialize notes and phone numbers from property when modal opens or property changes
   useEffect(() => {
@@ -1651,7 +1652,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                 phone.status === 'contacted' && "border-blue-500 bg-blue-500/10 text-blue-400",
                               )}
                             />
-                            <Popover>
+                            <Popover open={openPhoneStatusKey === `${rowIndex}-${phoneIdx}`} onOpenChange={open => setOpenPhoneStatusKey(open ? `${rowIndex}-${phoneIdx}` : null)}>
                               <PopoverTrigger asChild>
                                 <button
                                   type="button"
@@ -1707,6 +1708,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                           await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts);
                                         }
                                         if (opt.value === 'contacted' && isFromD4d) {
+                                          setOpenPhoneStatusKey(null);
                                           setShowPhoneContactedPrompt(true);
                                         }
                                       } catch { /* silent — don't interrupt UX */ }
