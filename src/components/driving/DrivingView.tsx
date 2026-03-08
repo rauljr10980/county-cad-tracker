@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X, FileText, Search } from 'lucide-react';
+import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X, FileText, Search, ChevronDown } from 'lucide-react';
 import { D4dPipelineView } from './D4dPipelineView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,6 +106,7 @@ export function DrivingView() {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAddresses, setShowAddresses] = useState(false);
 
   const { data: leads = [], isLoading } = useDrivingLeads();
   const createMutation = useCreateDrivingLead();
@@ -320,13 +321,17 @@ export function DrivingView() {
       {/* D4$ Pipeline */}
       {leads.length > 0 && <D4dPipelineView leads={leads as any} onViewDetails={handleViewDetails} />}
 
-      {/* Count */}
-      <div className="text-sm text-muted-foreground">
-        {searchQuery ? `${filteredLeads.length} of ${leads.length}` : `${leads.length}`} address{leads.length !== 1 ? 'es' : ''} logged
-      </div>
+      {/* Count + collapsible addresses */}
+      <button
+        className="flex items-center justify-between w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+        onClick={() => setShowAddresses(prev => !prev)}
+      >
+        <span>{searchQuery ? `${filteredLeads.length} of ${leads.length}` : `${leads.length}`} address{leads.length !== 1 ? 'es' : ''} logged</span>
+        <ChevronDown className={cn('h-4 w-4 transition-transform', showAddresses && 'rotate-180')} />
+      </button>
 
       {/* Lead list */}
-      {isLoading ? (
+      {showAddresses && (isLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
@@ -456,7 +461,9 @@ export function DrivingView() {
             </div>
           ))}
         </div>
-      )}
+      ))}
+
+      {/* End collapsible addresses list */}
 
       {/* Photo Gallery Dialog */}
       <Dialog open={!!viewingPhotosLeadId} onOpenChange={() => setViewingPhotosLeadId(null)}>
