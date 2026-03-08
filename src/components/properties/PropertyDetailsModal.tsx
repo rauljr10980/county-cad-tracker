@@ -1367,29 +1367,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   </div>
                 )}
 
-                {/* Phone Contacted prompt */}
-                {showPhoneContactedPrompt && (
-                  <div className="space-y-1.5 p-2 rounded-lg border border-blue-500/30 bg-blue-500/5">
-                    <p className="text-xs text-blue-300 font-medium">📞 You marked a number as Contacted — how did it go?</p>
-                    {([
-                      { key: 'wants_to_sell', label: 'Wants to Sell', color: 'border-green-500/50 text-green-400 hover:bg-green-500/10' },
-                      { key: 'thinking_about_selling', label: 'Thinking About Selling', color: 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10' },
-                      { key: 'doesnt_want_to_sell', label: "Doesn't Want to Sell", color: 'border-red-500/50 text-red-400 hover:bg-red-500/10' },
-                    ] as const).map(o => (
-                      <Button key={o.key} size="sm" variant="outline"
-                        className={cn('h-7 text-xs w-full', o.color)}
-                        onClick={async () => {
-                          await saveStage('CONTACTED');
-                          await saveMeta({ ...d4dWorkflow, contactedOutcome: o.key, lastContactedAt: new Date().toISOString() });
-                          setShowPhoneContactedPrompt(false);
-                        }}>
-                        {o.label}
-                      </Button>
-                    ))}
-                    <button className="text-[10px] text-muted-foreground underline w-full text-center mt-1"
-                      onClick={() => setShowPhoneContactedPrompt(false)}>skip</button>
-                  </div>
-                )}
 
                 {/* Stage selector */}
                 <Select value={d4dPipelineStage} onValueChange={saveStage}>
@@ -2211,6 +2188,38 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             )}
           </div>
         </div>
+
+        {/* Phone Contacted outcome overlay */}
+        {showPhoneContactedPrompt && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-50 rounded-lg">
+            <div className="bg-card border border-blue-500/40 rounded-xl p-5 w-72 space-y-3 shadow-2xl">
+              <p className="text-sm font-semibold text-blue-300">📞 Contacted — how did it go?</p>
+              {([
+                { key: 'wants_to_sell', label: 'Wants to Sell', color: 'border-green-500/50 text-green-400 hover:bg-green-500/10' },
+                { key: 'thinking_about_selling', label: 'Thinking About Selling', color: 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10' },
+                { key: 'doesnt_want_to_sell', label: "Doesn't Want to Sell", color: 'border-red-500/50 text-red-400 hover:bg-red-500/10' },
+              ] as const).map(o => (
+                <Button key={o.key} size="sm" variant="outline"
+                  className={cn('h-9 text-sm w-full', o.color)}
+                  onClick={async () => {
+                    try {
+                      await updateDrivingLead(d4dLeadId, { status: 'CONTACTED' });
+                      setD4dPipelineStage('CONTACTED');
+                      const updated = { ...d4dWorkflow, contactedOutcome: o.key, lastContactedAt: new Date().toISOString() };
+                      setD4dWorkflow(updated);
+                      await updateDrivingLead(d4dLeadId, { metadata: updated as Record<string, unknown> });
+                      queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
+                    } catch { /* silent */ }
+                    setShowPhoneContactedPrompt(false);
+                  }}>
+                  {o.label}
+                </Button>
+              ))}
+              <button className="text-xs text-muted-foreground underline w-full text-center"
+                onClick={() => setShowPhoneContactedPrompt(false)}>skip</button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
