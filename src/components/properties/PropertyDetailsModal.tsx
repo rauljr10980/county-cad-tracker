@@ -462,7 +462,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-5xl max-h-[85vh] overflow-y-auto overflow-x-hidden bg-card border-border">
+      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-5xl max-h-[85vh] overflow-hidden bg-card border-border p-0">
+        <div className="overflow-y-auto overflow-x-hidden max-h-[85vh] p-6">
         <DialogHeader className="border-b border-border pb-4">
           <div className="flex items-start justify-between">
             <div>
@@ -2190,9 +2191,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
           </div>
         </div>
 
-        {/* Phone Contacted outcome overlay */}
+        </div>{/* end scrollable content */}
+
+        {/* Phone Contacted outcome overlay — sibling of scroll div, covers dialog only */}
         {showPhoneContactedPrompt && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[200]" onClick={() => setShowPhoneContactedPrompt(false)}>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 rounded-lg" onClick={() => setShowPhoneContactedPrompt(false)}>
             <div className="bg-card border border-border rounded-2xl shadow-2xl w-[340px] overflow-hidden" onClick={e => e.stopPropagation()}>
               {/* Header */}
               <div className="px-6 pt-6 pb-4 border-b border-border">
