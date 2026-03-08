@@ -104,7 +104,7 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
 
   // Stage counts
   const deadLeads = leads.filter(l => l.status === 'DEAD');
-  const stageCounts = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, s.key === 'NEW' ? leads.length : leads.filter(l => l.status === s.key).length]));
+  const stageCounts = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, leads.filter(l => l.status === s.key).length]));
   const maxCount = Math.max(1, ...Object.values(stageCounts), deadLeads.length);
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -451,7 +451,7 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
                 </div>
                 {isExpanded && stage.key !== 'CONTACTED' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 mb-1">
-                    {renderStageCards(stage.key, stage.key === 'NEW' ? leads : leads.filter(l => l.status === stage.key))}
+                    {renderStageCards(stage.key, leads.filter(l => l.status === stage.key))}
                   </div>
                 )}
                 {isExpanded && stage.key === 'CONTACTED' && (
