@@ -2192,32 +2192,44 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
         {/* Phone Contacted outcome overlay */}
         {showPhoneContactedPrompt && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[200]">
-            <div className="bg-card border border-blue-500/40 rounded-xl p-5 w-72 space-y-3 shadow-2xl">
-              <p className="text-sm font-semibold text-blue-300">📞 Contacted — how did it go?</p>
-              {([
-                { key: 'wants_to_sell', label: 'Wants to Sell', color: 'border-green-500/50 text-green-400 hover:bg-green-500/10' },
-                { key: 'thinking_about_selling', label: 'Thinking About Selling', color: 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10' },
-                { key: 'doesnt_want_to_sell', label: "Doesn't Want to Sell", color: 'border-red-500/50 text-red-400 hover:bg-red-500/10' },
-              ] as const).map(o => (
-                <Button key={o.key} size="sm" variant="outline"
-                  className={cn('h-9 text-sm w-full', o.color)}
-                  onClick={async () => {
-                    try {
-                      await updateDrivingLead(d4dLeadId, { status: 'CONTACTED' });
-                      setD4dPipelineStage('CONTACTED');
-                      const updated = { ...d4dWorkflow, contactedOutcome: o.key, lastContactedAt: new Date().toISOString() };
-                      setD4dWorkflow(updated);
-                      await updateDrivingLead(d4dLeadId, { metadata: updated as Record<string, unknown> });
-                      queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
-                    } catch { /* silent */ }
-                    setShowPhoneContactedPrompt(false);
-                  }}>
-                  {o.label}
-                </Button>
-              ))}
-              <button className="text-xs text-muted-foreground underline w-full text-center"
-                onClick={() => setShowPhoneContactedPrompt(false)}>skip</button>
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[200]" onClick={() => setShowPhoneContactedPrompt(false)}>
+            <div className="bg-card border border-border rounded-2xl shadow-2xl w-[340px] overflow-hidden" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4 border-b border-border">
+                <h3 className="text-base font-semibold text-foreground">Log Call Outcome</h3>
+                <p className="text-sm text-muted-foreground mt-1">How did the conversation go?</p>
+              </div>
+              {/* Options */}
+              <div className="px-6 py-4 space-y-2">
+                {([
+                  { key: 'wants_to_sell', label: 'Wants to Sell', bg: 'hover:bg-green-500/10 border-green-500/30 text-green-400' },
+                  { key: 'thinking_about_selling', label: 'Thinking About Selling', bg: 'hover:bg-yellow-500/10 border-yellow-500/30 text-yellow-400' },
+                  { key: 'doesnt_want_to_sell', label: "Doesn't Want to Sell", bg: 'hover:bg-red-500/10 border-red-500/30 text-red-400' },
+                ] as const).map(o => (
+                  <button key={o.key}
+                    className={cn('w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-colors', o.bg)}
+                    onClick={async () => {
+                      try {
+                        await updateDrivingLead(d4dLeadId, { status: 'CONTACTED' });
+                        setD4dPipelineStage('CONTACTED');
+                        const updated = { ...d4dWorkflow, contactedOutcome: o.key, lastContactedAt: new Date().toISOString() };
+                        setD4dWorkflow(updated);
+                        await updateDrivingLead(d4dLeadId, { metadata: updated as Record<string, unknown> });
+                        queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
+                      } catch { /* silent */ }
+                      setShowPhoneContactedPrompt(false);
+                    }}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              {/* Footer */}
+              <div className="px-6 pb-5">
+                <button className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+                  onClick={() => setShowPhoneContactedPrompt(false)}>
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}
