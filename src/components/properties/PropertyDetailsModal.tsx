@@ -114,6 +114,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
     if (property && isOpen) {
       setNotes(property.notes || '');
       setIsEditingNotes(false);
+      setShowPhoneContactedPrompt(false);
       // For d4d stubs, contacts come from the DrivingLead record (property.contacts loaded by DrivingView)
       const savedContacts = property.contacts;
       const mkEmpty = (): PhoneContactRow => ({ name: '', phones: [{ number: '', status: '' }] });
