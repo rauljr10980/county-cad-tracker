@@ -304,7 +304,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   // For DB properties, ownerName field often contains the street address (e.g. "WICKLOW DR")
   const displayPropertyAddress = isD4d
     ? (property.propertyAddress || '')
-    : (property.ownerName || parsedAddress || property.propertyAddress || '');
+    : isFromD4d
+      ? (parsedAddress || property.propertyAddress || '')
+      : (property.ownerName || parsedAddress || property.propertyAddress || '');
   const displayOwnerName = isD4d ? (property.ownerName || '') : (parsedOwnerName || '');
   const toTitleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   const emailAddress = toTitleCase(displayPropertyAddress);
@@ -355,9 +357,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
     try {
       const allPhones = phoneContacts.flatMap(row => row.phones.filter(p => p.number.trim() !== '').map(p => p.number));
       const contacts = buildContactsJson();
-      if (isD4d) {
+      if (isFromD4d) {
         await updateDrivingLeadPhones(d4dLeadId, allPhones, ownerPhoneIndex, contacts, ownerOverride);
         queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
+        if (!isD4d) await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex, contacts).catch(() => {});
       } else {
         await updatePropertyPhoneNumbers(property.id, allPhones, ownerPhoneIndex, contacts);
       }
@@ -618,8 +621,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   onBlur={async () => {
                     const contacts = buildContactsJson();
                     const allEmails = emailRecipients.flatMap(r => r.emails.filter(e => e.includes('@')));
-                    if (isD4d) {
+                    if (isFromD4d) {
                       await updateDrivingLeadEmails(d4dLeadId, allEmails, contacts, ownerOverride).catch(() => {});
+                      if (!isD4d) await updatePropertyEmails(property.id, allEmails, contacts).catch(() => {});
                     } else {
                       await updatePropertyEmails(property.id, allEmails, contacts);
                     }
