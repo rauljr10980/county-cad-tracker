@@ -473,6 +473,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 )}
               </DialogTitle>
               <p className="text-sm text-muted-foreground mt-1 font-mono">
+                {isD4d ? (property.propertyAddress || '') : (property.accountNumber || '')}
               </p>
             </div>
           </div>
