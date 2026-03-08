@@ -433,7 +433,7 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
                   </div>
                 </div>
                 {isExpanded && stage.key !== 'CONTACTED' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 mb-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mt-2 mb-1">
                     {renderStageCards(stage.key, leads.filter(l => l.status === stage.key).sort((a, b) => {
                       if (stage.key !== 'RESEARCHING') return 0;
                       const aChecks = (getWorkflow(a).researchChecks || []).length;
@@ -459,7 +459,7 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
                           <ChevronDown className={cn('h-3.5 w-3.5 ml-auto transition-transform', collapsedBuckets[label] && '-rotate-90')} />
                         </button>
                         {!collapsedBuckets[label] && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                             {bucket.map(l => renderContactedCard(l))}
                           </div>
                         )}
@@ -498,7 +498,7 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
                       <Building2 className="h-3.5 w-3.5" />
                       Real Estate Company Bought It ({deadRE.length})
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                       {deadRE.length > 0
                         ? deadRE.map(l => renderDeadCard(l))
                         : <p className="text-xs text-muted-foreground">None</p>}
@@ -511,7 +511,7 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
                       <AlertCircle className="h-3.5 w-3.5" />
                       Doesn't Want to Sell ({deadNS.length})
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                       {deadNS.length > 0
                         ? deadNS.map(l => renderDeadCard(l))
                         : <p className="text-xs text-muted-foreground">None</p>}
@@ -524,7 +524,7 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                         Reason Not Set ({deadUnset.length})
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                         {deadUnset.map(l => renderDeadCard(l))}
                       </div>
                     </div>

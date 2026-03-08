@@ -259,7 +259,7 @@ export function DrivingView() {
     : leads;
 
   return (
-    <div className="p-2 md:p-4 space-y-4 max-w-2xl mx-auto">
+    <div className="p-2 md:p-4 space-y-4 max-w-7xl mx-auto">
       {/* Quick-add form */}
       <form onSubmit={handleSubmit} className="space-y-2 bg-card rounded-lg p-3 border">
         <div className="flex gap-2">
