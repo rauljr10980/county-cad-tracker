@@ -2191,7 +2191,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
 
         {/* Phone Contacted outcome overlay */}
         {showPhoneContactedPrompt && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-50 rounded-lg">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-[200]">
             <div className="bg-card border border-blue-500/40 rounded-xl p-5 w-72 space-y-3 shadow-2xl">
               <p className="text-sm font-semibold text-blue-300">📞 Contacted — how did it go?</p>
               {([
