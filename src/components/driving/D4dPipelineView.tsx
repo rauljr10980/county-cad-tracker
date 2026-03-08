@@ -36,7 +36,11 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
   const [collapsed, setCollapsed] = useState(false);
   // Optimistic local metadata overrides
   const [localMeta, setLocalMeta] = useState<Record<string, D4dWorkflow>>({});
-  const [collapsedBuckets, setCollapsedBuckets] = useState<Record<string, boolean>>({});
+  const [collapsedBuckets, setCollapsedBuckets] = useState<Record<string, boolean>>({
+    'Thinking About Selling': true,
+    "Doesn't Want to Sell": true,
+    'Outcome Not Set': true,
+  });
 
   const { data: d4dFollowUps = [] } = useD4dFollowUps();
 
