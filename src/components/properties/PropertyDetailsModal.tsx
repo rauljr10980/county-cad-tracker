@@ -547,7 +547,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 size="sm"
                 className="flex-1"
                 onClick={() => {
-                  const street = (parsedAddress || property.propertyAddress || '').split(',')[0].trim();
+                  const raw = (parsedAddress || property.propertyAddress || '').split(',')[0].trim();
+                  const streetMatch = raw.match(/^.*?\b(AVE|DR|ST|BLVD|LN|CT|PL|RD|WAY|TRL|CIR|HWY|PKWY|LOOP|EXPY|PASS|ROW|SQ|TER|TERR|TRACE|VIA|WALK)\b/i);
+                  const street = streetMatch ? streetMatch[0].trim() : raw;
                   const url = street
                     ? `https://bexar.tx.publicsearch.us/results?department=RP&keywordSearch=false&recordedDateRange=18000101%2C20260304&searchOcrText=false&searchType=quickSearch&searchValue=${encodeURIComponent(street)}`
                     : 'https://bexar.tx.publicsearch.us/';
