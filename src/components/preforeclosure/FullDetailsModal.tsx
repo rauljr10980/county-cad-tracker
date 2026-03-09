@@ -47,6 +47,8 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [assignedTo, setAssignedTo] = useState<'Luciano' | 'Raul' | ''>('');
   const [savingAction, setSavingAction] = useState(false);
   const [propertyInfoExpanded, setPropertyInfoExpanded] = useState(false);
+  const [loanAmountLocal, setLoanAmountLocal] = useState<number | null>(null);
+  const [appraisedValueLocal, setAppraisedValueLocal] = useState<number | null>(null);
   const [actionsExpanded, setActionsExpanded] = useState(false);
   const [routeStatusExpanded, setRouteStatusExpanded] = useState(false);
   const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
@@ -93,6 +95,8 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
       setPriority(record.priority || 'med');
       setDueDateTime(record.dueTime ? new Date(record.dueTime) : undefined);
       setAssignedTo(record.assignedTo || '');
+      setLoanAmountLocal(record.loan_amount ?? null);
+      setAppraisedValueLocal(record.appraised_value ?? null);
     }
   }, [record]);
 
@@ -415,19 +419,17 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 <Label className="text-muted-foreground text-xs">Loan Amount</Label>
                 <Input
                   className="font-mono text-sm h-8 mt-1"
-                  type="number"
-                  step="any"
-                  placeholder="e.g. 150000"
-                  defaultValue={viewRecord.loan_amount != null ? viewRecord.loan_amount : ''}
+                  placeholder="e.g. $150,000"
                   key={`loan-${viewRecord.document_number}`}
+                  defaultValue={loanAmountLocal != null ? `$${loanAmountLocal.toLocaleString('en-US')}` : ''}
+                  onFocus={(e) => { e.target.value = loanAmountLocal != null ? String(loanAmountLocal) : ''; }}
                   onBlur={(e) => {
-                    const val = e.target.value.trim();
-                    const parsed = val ? parseFloat(val) : null;
+                    const raw = e.target.value.replace(/[$,]/g, '').trim();
+                    const parsed = raw ? parseFloat(raw) : null;
+                    e.target.value = parsed != null ? `$${parsed.toLocaleString('en-US')}` : '';
+                    setLoanAmountLocal(parsed);
                     if (parsed !== (viewRecord.loan_amount ?? null)) {
-                      updateMutation.mutateAsync({
-                        document_number: viewRecord.document_number,
-                        loan_amount: parsed,
-                      });
+                      updateMutation.mutateAsync({ document_number: viewRecord.document_number, loan_amount: parsed });
                     }
                   }}
                 />
@@ -436,27 +438,25 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 <Label className="text-muted-foreground text-xs">Appraised Market Value</Label>
                 <Input
                   className="font-mono text-sm h-8 mt-1"
-                  type="number"
-                  step="any"
-                  placeholder="e.g. 200000"
-                  defaultValue={viewRecord.appraised_value != null ? viewRecord.appraised_value : ''}
+                  placeholder="e.g. $200,000"
                   key={`appraised-${viewRecord.document_number}`}
+                  defaultValue={appraisedValueLocal != null ? `$${appraisedValueLocal.toLocaleString('en-US')}` : ''}
+                  onFocus={(e) => { e.target.value = appraisedValueLocal != null ? String(appraisedValueLocal) : ''; }}
                   onBlur={(e) => {
-                    const val = e.target.value.trim();
-                    const parsed = val ? parseFloat(val) : null;
+                    const raw = e.target.value.replace(/[$,]/g, '').trim();
+                    const parsed = raw ? parseFloat(raw) : null;
+                    e.target.value = parsed != null ? `$${parsed.toLocaleString('en-US')}` : '';
+                    setAppraisedValueLocal(parsed);
                     if (parsed !== (viewRecord.appraised_value ?? null)) {
-                      updateMutation.mutateAsync({
-                        document_number: viewRecord.document_number,
-                        appraised_value: parsed,
-                      });
+                      updateMutation.mutateAsync({ document_number: viewRecord.document_number, appraised_value: parsed });
                     }
                   }}
                 />
               </div>
-              {viewRecord.loan_amount != null && viewRecord.appraised_value != null && viewRecord.appraised_value > 0 && (() => {
-                const ratio = (viewRecord.loan_amount / viewRecord.appraised_value) * 100;
-                const equity = viewRecord.appraised_value - viewRecord.loan_amount;
-                const good = viewRecord.appraised_value > viewRecord.loan_amount;
+              {loanAmountLocal != null && appraisedValueLocal != null && appraisedValueLocal > 0 && (() => {
+                const ratio = (loanAmountLocal / appraisedValueLocal) * 100;
+                const equity = appraisedValueLocal - loanAmountLocal;
+                const good = appraisedValueLocal > loanAmountLocal;
                 return (
                   <div className="sm:col-span-2">
                     <Label className="text-muted-foreground text-xs">Loan-to-Value Ratio</Label>
