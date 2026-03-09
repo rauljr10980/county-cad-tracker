@@ -408,6 +408,10 @@ model PreForeclosure {
   workflowStage    String      @default("not_started")
   workflowLog      Json        @default("[]")
 
+  // Financial
+  loanAmount        Float?      // Original loan / mortgage amount
+  appraisedValue    Float?      // Appraised market value
+
   // Owner Lookup (auto-populated from tax assessor + people search)
   ownerName         String?
   ownerAddress      String?

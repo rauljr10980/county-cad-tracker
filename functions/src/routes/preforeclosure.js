@@ -81,6 +81,8 @@ router.get('/', optionalAuth, async (req, res) => {
       emails: record.emails || [],
       ownerLookupAt: record.ownerLookupAt ? record.ownerLookupAt.toISOString() : null,
       ownerLookupStatus: record.ownerLookupStatus,
+      loan_amount: record.loanAmount ?? null,
+      appraised_value: record.appraisedValue ?? null,
       created_at: record.createdAt.toISOString(),
       updated_at: record.updatedAt.toISOString(),
     }));
@@ -1235,6 +1237,12 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
     if (updates.workflow_log !== undefined) {
       dbUpdates.workflowLog = updates.workflow_log;
     }
+    if (updates.loan_amount !== undefined) {
+      dbUpdates.loanAmount = updates.loan_amount !== null ? parseFloat(updates.loan_amount) : null;
+    }
+    if (updates.appraised_value !== undefined) {
+      dbUpdates.appraisedValue = updates.appraised_value !== null ? parseFloat(updates.appraised_value) : null;
+    }
 
     // Action/Task fields
     if (updates.actionType !== undefined) {
@@ -1331,6 +1339,8 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
       emails: record.emails || [],
       ownerLookupAt: record.ownerLookupAt ? record.ownerLookupAt.toISOString() : null,
       ownerLookupStatus: record.ownerLookupStatus,
+      loan_amount: record.loanAmount ?? null,
+      appraised_value: record.appraisedValue ?? null,
       created_at: record.createdAt.toISOString(),
       updated_at: record.updatedAt.toISOString(),
     });

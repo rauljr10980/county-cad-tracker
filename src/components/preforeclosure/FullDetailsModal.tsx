@@ -412,6 +412,48 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 </div>
               </div>
               <div>
+                <Label className="text-muted-foreground text-xs">Loan Amount</Label>
+                <Input
+                  className="font-mono text-sm h-8 mt-1"
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 150000"
+                  defaultValue={viewRecord.loan_amount != null ? viewRecord.loan_amount : ''}
+                  key={`loan-${viewRecord.document_number}`}
+                  onBlur={(e) => {
+                    const val = e.target.value.trim();
+                    const parsed = val ? parseFloat(val) : null;
+                    if (parsed !== (viewRecord.loan_amount ?? null)) {
+                      updateMutation.mutateAsync({
+                        document_number: viewRecord.document_number,
+                        loan_amount: parsed,
+                      });
+                    }
+                  }}
+                />
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">Appraised Market Value</Label>
+                <Input
+                  className="font-mono text-sm h-8 mt-1"
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 200000"
+                  defaultValue={viewRecord.appraised_value != null ? viewRecord.appraised_value : ''}
+                  key={`appraised-${viewRecord.document_number}`}
+                  onBlur={(e) => {
+                    const val = e.target.value.trim();
+                    const parsed = val ? parseFloat(val) : null;
+                    if (parsed !== (viewRecord.appraised_value ?? null)) {
+                      updateMutation.mutateAsync({
+                        document_number: viewRecord.document_number,
+                        appraised_value: parsed,
+                      });
+                    }
+                  }}
+                />
+              </div>
+              <div>
                 <Label className="text-muted-foreground text-xs">Latitude</Label>
                 <Input
                   className="font-mono text-sm h-8 mt-1"
