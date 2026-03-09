@@ -453,6 +453,23 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   }}
                 />
               </div>
+              {viewRecord.loan_amount != null && viewRecord.appraised_value != null && viewRecord.appraised_value > 0 && (() => {
+                const ratio = (viewRecord.loan_amount / viewRecord.appraised_value) * 100;
+                const equity = viewRecord.appraised_value - viewRecord.loan_amount;
+                const good = viewRecord.appraised_value > viewRecord.loan_amount;
+                return (
+                  <div className="sm:col-span-2">
+                    <Label className="text-muted-foreground text-xs">Loan-to-Value Ratio</Label>
+                    <div className={`mt-1 flex items-center gap-3 px-3 py-2 rounded-lg border ${good ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                      <span className={`text-xl font-bold font-mono ${good ? 'text-green-400' : 'text-red-400'}`}>{ratio.toFixed(1)}%</span>
+                      <div className="text-xs text-muted-foreground">
+                        <p>{good ? '✓ Equity available' : '✗ Underwater'}</p>
+                        <p>Equity: <span className={`font-medium ${good ? 'text-green-400' : 'text-red-400'}`}>${equity.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
               <div>
                 <Label className="text-muted-foreground text-xs">Latitude</Label>
                 <Input
