@@ -344,7 +344,13 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 size="sm"
                 className="flex-1"
                 onClick={() => {
-                  window.open('https://bexar.tx.publicsearch.us/', '_blank');
+                  const raw = (viewRecord.address || '').split(',')[0].trim();
+                  const streetMatch = raw.match(/^.*?\b(AVE|DR|ST|BLVD|LN|CT|PL|RD|WAY|TRL|CIR|HWY|PKWY|LOOP|EXPY|PASS|ROW|SQ|TER|TERR|TRACE|VIA|WALK)\b/i);
+                  const street = streetMatch ? streetMatch[0].trim() : raw;
+                  const url = street
+                    ? `https://bexar.tx.publicsearch.us/results?department=RP&keywordSearch=false&recordedDateRange=18000101%2C20260304&searchOcrText=false&searchType=quickSearch&searchValue=${encodeURIComponent(street)}`
+                    : 'https://bexar.tx.publicsearch.us/';
+                  window.open(url, '_blank');
                 }}
                 title="Land Records"
               >
