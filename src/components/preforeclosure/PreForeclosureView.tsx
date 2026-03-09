@@ -2599,7 +2599,7 @@ export function PreForeclosureView() {
                     <td className="px-4 py-3">
                       {record.loan_amount && record.appraised_value ? (
                         record.loan_amount >= record.appraised_value ? (
-                          <Badge className="bg-purple-600 text-white border-0 text-xs">Underwater</Badge>
+                          <Badge className="bg-blue-600 text-white border-0 text-xs">Underwater</Badge>
                         ) : (
                           <span className="text-sm text-green-500 font-medium">
                             ${(record.appraised_value - record.loan_amount).toLocaleString()}
