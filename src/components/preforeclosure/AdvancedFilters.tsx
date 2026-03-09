@@ -33,6 +33,7 @@ export interface PreForeclosureAdvancedFilters {
   saleDateFrom: string;
   saleDateTo: string;
   workflowStage: WorkflowStage | 'all';
+  showUnderwater: boolean;
 }
 
 interface AdvancedFiltersProps {
@@ -324,6 +325,16 @@ export function AdvancedFiltersPanel({
               />
               <Label htmlFor="showNewOnly" className="cursor-pointer">
                 New Records Only
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="showUnderwater"
+                checked={filters.showUnderwater}
+                onCheckedChange={(checked) => updateFilter('showUnderwater', checked as boolean)}
+              />
+              <Label htmlFor="showUnderwater" className="cursor-pointer">
+                Underwater Only (loan ≥ value)
               </Label>
             </div>
           </div>

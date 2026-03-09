@@ -261,6 +261,7 @@ export function PreForeclosureView() {
     saleDateFrom: '',
     saleDateTo: '',
     workflowStage: 'all',
+    showUnderwater: false,
   });
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosureRecord | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -454,6 +455,13 @@ export function PreForeclosureView() {
     // Missing geocode filter
     if (advancedFilters.missingGeocode) {
       filtered = filtered.filter(r => r.latitude == null || r.longitude == null);
+    }
+
+    // Underwater filter — only show records where loan >= appraised value
+    if (advancedFilters.showUnderwater) {
+      filtered = filtered.filter(r =>
+        r.loan_amount != null && r.appraised_value != null && r.appraised_value > 0 && r.loan_amount >= r.appraised_value
+      );
     }
 
     // Recorded date range filter

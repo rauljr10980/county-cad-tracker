@@ -390,6 +390,8 @@ export interface PreForeclosureRecord {
   emails?: string[];
   ownerLookupAt?: string;
   ownerLookupStatus?: 'success' | 'partial' | 'failed' | 'pending';
+  loan_amount?: number | null;
+  appraised_value?: number | null;
 }
 
 // Type alias for backward compatibility
