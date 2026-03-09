@@ -2505,7 +2505,7 @@ export function PreForeclosureView() {
                     }}
                   >
                     <div className="flex items-center gap-1">
-                      Workflow
+                      LTV
                       {sortColumn === 'workflow' ? (
                         sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                       ) : (
@@ -2597,7 +2597,17 @@ export function PreForeclosureView() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <WorkflowStageBadge stage={record.workflow_stage || 'not_started'} isUnderwater={!!(record.loan_amount && record.appraised_value && record.loan_amount >= record.appraised_value)} />
+                      {record.loan_amount && record.appraised_value ? (
+                        record.loan_amount >= record.appraised_value ? (
+                          <Badge className="bg-purple-600 text-white border-0 text-xs">Underwater</Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            {Math.round((record.loan_amount / record.appraised_value) * 100)}%
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
