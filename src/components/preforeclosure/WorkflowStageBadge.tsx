@@ -5,10 +5,19 @@ import { WORKFLOW_STAGES } from '@/types/property';
 
 interface WorkflowStageBadgeProps {
   stage: WorkflowStage;
+  isUnderwater?: boolean;
   className?: string;
 }
 
-export function WorkflowStageBadge({ stage, className }: WorkflowStageBadgeProps) {
+export function WorkflowStageBadge({ stage, isUnderwater, className }: WorkflowStageBadgeProps) {
+  if (isUnderwater) {
+    return (
+      <Badge variant="outline" className={cn('bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs whitespace-nowrap', className)}>
+        Underwater
+      </Badge>
+    );
+  }
+
   const meta = WORKFLOW_STAGES[stage] || WORKFLOW_STAGES.not_started;
 
   const colorClass =

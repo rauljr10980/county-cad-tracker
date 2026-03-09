@@ -2597,7 +2597,7 @@ export function PreForeclosureView() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <WorkflowStageBadge stage={record.workflow_stage || 'not_started'} />
+                      <WorkflowStageBadge stage={record.workflow_stage || 'not_started'} isUnderwater={!!(record.loan_amount && record.appraised_value && record.loan_amount >= record.appraised_value)} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -2769,7 +2769,7 @@ export function PreForeclosureView() {
                       <Badge variant="outline" className={getTypeColor(record.type)}>
                         {record.type}
                       </Badge>
-                      <WorkflowStageBadge stage={record.workflow_stage || 'not_started'} />
+                      <WorkflowStageBadge stage={record.workflow_stage || 'not_started'} isUnderwater={!!(record.loan_amount && record.appraised_value && record.loan_amount >= record.appraised_value)} />
               </div>
 
               {/* Document Number and Date - Hidden */}
