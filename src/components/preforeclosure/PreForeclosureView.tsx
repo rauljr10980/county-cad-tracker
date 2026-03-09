@@ -2505,7 +2505,7 @@ export function PreForeclosureView() {
                     }}
                   >
                     <div className="flex items-center gap-1">
-                      LTV
+                      Equity
                       {sortColumn === 'workflow' ? (
                         sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                       ) : (
@@ -2601,8 +2601,8 @@ export function PreForeclosureView() {
                         record.loan_amount >= record.appraised_value ? (
                           <Badge className="bg-purple-600 text-white border-0 text-xs">Underwater</Badge>
                         ) : (
-                          <span className="text-sm text-muted-foreground">
-                            {Math.round((record.loan_amount / record.appraised_value) * 100)}%
+                          <span className="text-sm text-green-500 font-medium">
+                            ${(record.appraised_value - record.loan_amount).toLocaleString()}
                           </span>
                         )
                       ) : (
