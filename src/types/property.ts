@@ -392,6 +392,7 @@ export interface PreForeclosureRecord {
   ownerLookupStatus?: 'success' | 'partial' | 'failed' | 'pending';
   loan_amount?: number | null;
   appraised_value?: number | null;
+  land_type?: 'Home' | 'Vacant Land' | null;
 }
 
 // Type alias for backward compatibility

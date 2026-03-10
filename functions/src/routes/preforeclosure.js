@@ -83,6 +83,7 @@ router.get('/', optionalAuth, async (req, res) => {
       ownerLookupStatus: record.ownerLookupStatus,
       loan_amount: record.loanAmount ?? null,
       appraised_value: record.appraisedValue ?? null,
+      land_type: record.landType ?? null,
       created_at: record.createdAt.toISOString(),
       updated_at: record.updatedAt.toISOString(),
     }));
@@ -1243,6 +1244,9 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
     if (updates.appraised_value !== undefined) {
       dbUpdates.appraisedValue = updates.appraised_value !== null ? parseFloat(updates.appraised_value) : null;
     }
+    if (updates.land_type !== undefined) {
+      dbUpdates.landType = updates.land_type;
+    }
 
     // Action/Task fields
     if (updates.actionType !== undefined) {
@@ -1341,6 +1345,7 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
       ownerLookupStatus: record.ownerLookupStatus,
       loan_amount: record.loanAmount ?? null,
       appraised_value: record.appraisedValue ?? null,
+      land_type: record.landType ?? null,
       created_at: record.createdAt.toISOString(),
       updated_at: record.updatedAt.toISOString(),
     });

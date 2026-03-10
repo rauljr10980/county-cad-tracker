@@ -411,6 +411,7 @@ model PreForeclosure {
   // Financial
   loanAmount        Float?      // Original loan / mortgage amount
   appraisedValue    Float?      // Appraised market value
+  landType          String?     // "Home" or "Vacant Land"
 
   // Owner Lookup (auto-populated from tax assessor + people search)
   ownerName         String?

@@ -453,6 +453,25 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   }}
                 />
               </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">Property Type</Label>
+                <Select
+                  value={viewRecord.land_type ?? 'unset'}
+                  onValueChange={(val) => {
+                    const landType = val === 'unset' ? null : val as 'Home' | 'Vacant Land';
+                    updateMutation.mutateAsync({ document_number: viewRecord.document_number, land_type: landType });
+                  }}
+                >
+                  <SelectTrigger className="h-8 mt-1 text-sm">
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unset">— Not set —</SelectItem>
+                    <SelectItem value="Home">Home</SelectItem>
+                    <SelectItem value="Vacant Land">Vacant Land</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {loanAmountLocal != null && appraisedValueLocal != null && appraisedValueLocal > 0 && (() => {
                 const ratio = (loanAmountLocal / appraisedValueLocal) * 100;
                 const equity = appraisedValueLocal - loanAmountLocal;

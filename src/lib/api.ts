@@ -833,6 +833,9 @@ export async function updatePreForeclosure(updates: {
   longitude?: number | null;
   workflow_stage?: string;
   workflow_log?: any[];
+  loan_amount?: number | null;
+  appraised_value?: number | null;
+  land_type?: 'Home' | 'Vacant Land' | null;
 }) {
   const response = await fetch(`${API_BASE_URL}/api/preforeclosure/${updates.document_number}`, {
     method: 'PUT',
