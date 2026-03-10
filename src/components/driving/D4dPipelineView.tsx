@@ -174,6 +174,8 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
   const renderResearchCard = (lead: DrivingLead) => {
     const wf = getWorkflow(lead);
     const checks = wf.researchChecks || [];
+    const unchecked = RESEARCH_ITEMS.filter(item => !checks.includes(item.key));
+    const onlyObitRemaining = unchecked.length === 1 && unchecked[0].key === 'obituary';
     return (
       <div key={lead.id} className="bg-card border border-border rounded-lg p-3">
         <div className="flex items-start gap-1">
@@ -181,6 +183,9 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
           {renderViewBtn(lead)}
         </div>
         {lead.notes && <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{lead.notes}</p>}
+        {onlyObitRemaining && (
+          <p className="text-xs font-semibold text-red-500 mt-1">obituary</p>
+        )}
         {renderProgressBar(checks.length, RESEARCH_ITEMS.length)}
       </div>
     );
