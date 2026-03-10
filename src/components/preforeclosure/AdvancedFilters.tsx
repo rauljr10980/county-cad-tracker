@@ -34,6 +34,8 @@ export interface PreForeclosureAdvancedFilters {
   saleDateTo: string;
   workflowStage: WorkflowStage | 'all';
   showUnderwater: boolean;
+  equityMin: string;
+  equityMax: string;
 }
 
 interface AdvancedFiltersProps {
@@ -337,6 +339,34 @@ export function AdvancedFiltersPanel({
                 Underwater Only (loan ≥ value)
               </Label>
             </div>
+          </div>
+
+          {/* Equity Range Filter */}
+          <div className="space-y-3">
+            <Label>Equity Range ($)</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">Min</Label>
+                <Input
+                  type="number"
+                  className="h-9 text-sm"
+                  placeholder="0"
+                  value={filters.equityMin}
+                  onChange={(e) => updateFilter('equityMin', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Max</Label>
+                <Input
+                  type="number"
+                  className="h-9 text-sm"
+                  placeholder="1,000,000"
+                  value={filters.equityMax}
+                  onChange={(e) => updateFilter('equityMax', e.target.value)}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Only shows records that have both loan amount and appraised value set.</p>
           </div>
 
           {/* Missing Geocode Filter */}

@@ -262,6 +262,8 @@ export function PreForeclosureView() {
     saleDateTo: '',
     workflowStage: 'all',
     showUnderwater: false,
+    equityMin: '',
+    equityMax: '',
   });
   const [selectedRecord, setSelectedRecord] = useState<PreForeclosureRecord | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -464,6 +466,20 @@ export function PreForeclosureView() {
       );
     }
 
+    // Equity range filter
+    if (advancedFilters.equityMin !== '') {
+      const min = parseFloat(advancedFilters.equityMin);
+      filtered = filtered.filter(r =>
+        r.loan_amount != null && r.appraised_value != null && (r.appraised_value - r.loan_amount) >= min
+      );
+    }
+    if (advancedFilters.equityMax !== '') {
+      const max = parseFloat(advancedFilters.equityMax);
+      filtered = filtered.filter(r =>
+        r.loan_amount != null && r.appraised_value != null && (r.appraised_value - r.loan_amount) <= max
+      );
+    }
+
     // Recorded date range filter
     if (advancedFilters.recordedDateFrom) {
       const from = new Date(advancedFilters.recordedDateFrom);
@@ -549,6 +565,7 @@ export function PreForeclosureView() {
     if (advancedFilters.recordedDateFrom || advancedFilters.recordedDateTo) count++;
     if (advancedFilters.saleDateFrom || advancedFilters.saleDateTo) count++;
     if (advancedFilters.workflowStage !== 'all') count++;
+    if (advancedFilters.equityMin !== '' || advancedFilters.equityMax !== '') count++;
     return count;
   }, [advancedFilters]);
 
@@ -576,6 +593,9 @@ export function PreForeclosureView() {
       saleDateFrom: '',
       saleDateTo: '',
       workflowStage: 'all',
+      showUnderwater: false,
+      equityMin: '',
+      equityMax: '',
     });
     setSearchQuery('');
   };
