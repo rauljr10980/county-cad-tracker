@@ -459,6 +459,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   value={viewRecord.land_type ?? 'unset'}
                   onValueChange={(val) => {
                     const landType = val === 'unset' ? null : val as 'Home' | 'Vacant Land';
+                    setViewRecord(prev => prev ? { ...prev, land_type: landType } : prev);
                     updateMutation.mutateAsync({ document_number: viewRecord.document_number, land_type: landType });
                   }}
                 >
