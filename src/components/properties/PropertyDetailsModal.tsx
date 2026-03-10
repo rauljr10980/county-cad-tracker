@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ExternalLink, MapPin, DollarSign, Calendar, CalendarDays, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown, Loader2, Mail, ClipboardPaste, Clock, GitBranch } from 'lucide-react';
+import { ExternalLink, MapPin, DollarSign, Calendar, CalendarDays, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown, Loader2, Mail, ClipboardPaste, Clock, GitBranch, Copy } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -607,13 +607,29 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             {(isD4d ? !!property.propertyAddress : !!(property.ownerName || parsedAddress || property.propertyAddress)) && (
               <div className="flex items-start gap-3">
                 <Building className="h-4 w-4 text-primary mt-1 shrink-0" />
-                <div>
+                <div className="flex-1">
                   <p className="text-xs text-muted-foreground">Property Address</p>
-                  <p className="font-medium">
-                    {isD4d
-                      ? (property.propertyAddress.split(',')[0] || property.propertyAddress)
-                      : (property.ownerName || parsedAddress || property.propertyAddress)}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">
+                      {isD4d
+                        ? (property.propertyAddress.split(',')[0] || property.propertyAddress)
+                        : (property.ownerName || parsedAddress || property.propertyAddress)}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 flex-shrink-0"
+                      onClick={() => {
+                        const addr = isD4d
+                          ? (property.propertyAddress.split(',')[0] || property.propertyAddress)
+                          : (property.ownerName || parsedAddress || property.propertyAddress);
+                        navigator.clipboard.writeText(addr || '');
+                      }}
+                      title="Copy address"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
