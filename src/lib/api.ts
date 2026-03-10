@@ -1650,6 +1650,14 @@ export async function deleteFollowUp(id: string) {
   if (!response.ok) throw new Error('Failed to delete follow-up');
 }
 
+export async function getFollowUpsByProperty(propertyId: string) {
+  const response = await fetch(`${API_BASE_URL}/api/followups/by-property/${propertyId}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch follow-ups');
+  return response.json() as Promise<{ id: string; date: string; note?: string; completed: boolean; completedAt?: string; createdBy: { id: string; username: string } }[]>;
+}
+
 // ============================================================================
 // EMAIL
 // ============================================================================

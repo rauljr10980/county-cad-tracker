@@ -15,6 +15,7 @@ import { format, formatDistanceToNow, addYears } from 'date-fns';
 import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail, updateDrivingLeadPhones, updateDrivingLeadEmails, updateDrivingLead } from '@/lib/api';
 import { extractContacts } from '@/lib/contactParser';
 import { toast } from '@/hooks/use-toast';
+import { usePropertyFollowUps } from '@/hooks/useFollowUps';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { PreForeclosureRecord } from '@/types/property';
@@ -99,6 +100,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [activeAction, setActiveAction] = useState<'view' | 'send' | 'external'>('view');
 
   const isD4d = !!property?.id?.startsWith('d4d-');
+  const { data: existingFollowUps = [], refetch: refetchFollowUps } = usePropertyFollowUps(
+    !isD4d ? property?.id : undefined
+  );
   // d4dLeadId works for both red-dot stubs (id = 'd4d-...') and green-dot found properties (d4dLeadId injected on stub)
   const d4dLeadId = isD4d ? property!.id.replace('d4d-', '') : ((property as any)?.d4dLeadId || '');
   const isFromD4d = isD4d || !!d4dLeadId;
@@ -1541,6 +1545,32 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
             );
           })()}
 
+          {/* Existing Follow-Ups */}
+          {existingFollowUps.length > 0 && (
+            <div className="bg-secondary/30 rounded-lg p-3 sm:p-4 space-y-2">
+              <div className="flex items-center gap-2 mb-1">
+                <CalendarDays className="h-4 w-4 text-blue-400" />
+                <span className="text-sm font-medium">Scheduled Follow-Ups</span>
+              </div>
+              {existingFollowUps.map((fu) => {
+                const fuDate = new Date(fu.date);
+                const isPast = fuDate < new Date();
+                return (
+                  <div key={fu.id} className={`flex items-start gap-3 px-3 py-2 rounded-lg border ${fu.completed ? 'border-green-500/20 bg-green-500/5' : isPast ? 'border-red-500/20 bg-red-500/5' : 'border-blue-500/20 bg-blue-500/5'}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${fu.completed ? 'text-green-400' : isPast ? 'text-red-400' : 'text-blue-400'}`}>
+                        {format(fuDate, 'MMM d, yyyy')}
+                        {fu.completed && <span className="ml-2 text-xs font-normal text-muted-foreground">✓ Done</span>}
+                        {!fu.completed && isPast && <span className="ml-2 text-xs font-normal text-red-400">Overdue</span>}
+                      </p>
+                      {fu.note && <p className="text-xs text-muted-foreground mt-0.5 break-words">{fu.note}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Schedule Follow-Up */}
           {(isFromD4d || (property.workflow_stage && FOLLOWUP_ELIGIBLE_STAGES.includes(property.workflow_stage as any))) && (
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 sm:p-4">
@@ -1586,6 +1616,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     toast({ title: 'Follow-up scheduled', description: format(followUpDate, 'PPP') });
                     setFollowUpDate(undefined);
                     setFollowUpNote('');
+                    refetchFollowUps();
                   } catch {
                     toast({ title: 'Error', description: 'Failed to schedule follow-up', variant: 'destructive' });
                   } finally {

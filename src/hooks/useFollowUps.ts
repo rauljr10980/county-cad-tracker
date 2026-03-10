@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getFollowUps, getD4dFollowUps, createFollowUp, updateFollowUp, deleteFollowUp } from '@/lib/api';
+import { getFollowUps, getD4dFollowUps, createFollowUp, updateFollowUp, deleteFollowUp, getFollowUpsByProperty } from '@/lib/api';
 import type { FollowUp } from '@/types/property';
 
 export function useFollowUps(month: string) {
@@ -58,5 +58,14 @@ export function useDeleteFollowUp() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['followups'] });
     },
+  });
+}
+
+export function usePropertyFollowUps(propertyId: string | undefined) {
+  return useQuery({
+    queryKey: ['followups-property', propertyId],
+    queryFn: () => getFollowUpsByProperty(propertyId!),
+    enabled: !!propertyId,
+    refetchOnWindowFocus: false,
   });
 }

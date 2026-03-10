@@ -95,6 +95,29 @@ router.get('/d4d', optionalAuth, async (req, res) => {
   }
 });
 
+// GET /api/followups/by-property/:propertyId - All follow-ups for a specific property
+router.get('/by-property/:propertyId', optionalAuth, async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const followUps = await prisma.followUp.findMany({
+      where: { propertyId },
+      select: {
+        id: true,
+        date: true,
+        note: true,
+        completed: true,
+        completedAt: true,
+        createdBy: { select: { id: true, username: true } },
+      },
+      orderBy: { date: 'asc' },
+    });
+    res.json(followUps);
+  } catch (error) {
+    console.error('[FOLLOWUPS] By-property fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch follow-ups' });
+  }
+});
+
 // POST /api/followups
 router.post('/', authenticateToken, async (req, res) => {
   try {
