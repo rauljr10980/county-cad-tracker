@@ -182,7 +182,7 @@ export interface ProcessingStatus {
 
 // Pre-Foreclosure Data Model (Strict - No Enrichment)
 export type PreForeclosureType = 'Mortgage' | 'Tax';
-export type PreForeclosureStatus = 'New' | 'Contact Attempted' | 'Monitoring' | 'Dead';
+export type PreForeclosureStatus = 'New' | 'Contact Attempted' | 'Monitoring' | 'Dead' | 'Wants to Make a Deal';
 
 // Workflow Decision Tree
 export type WorkflowStage =

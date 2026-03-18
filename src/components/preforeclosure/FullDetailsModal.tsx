@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useUpdatePreForeclosure, useOwnerLookup } from '@/hooks/usePreForeclosure';
-import { PreForeclosureRecord, PreForeclosureType, WORKFLOW_STAGES, FOLLOWUP_ELIGIBLE_STAGES } from '@/types/property';
+import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus, WORKFLOW_STAGES, FOLLOWUP_ELIGIBLE_STAGES } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -735,6 +735,48 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               </Button>
             </div>
           )}
+
+          {/* Status Quick-Actions */}
+          <div className="bg-secondary/30 rounded-lg p-3">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-2 block">Contact Status</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { label: 'Contacted', value: 'Contact Attempted', color: 'bg-blue-600 hover:bg-blue-700' },
+                { label: 'Not Contacted', value: 'New', color: 'bg-zinc-600 hover:bg-zinc-700' },
+                { label: 'Wants to Make a Deal', value: 'Wants to Make a Deal', color: 'bg-green-600 hover:bg-green-700' },
+                { label: 'Dead', value: 'Dead', color: 'bg-red-700 hover:bg-red-800' },
+              ] as { label: string; value: PreForeclosureStatus; color: string }[]).map(({ label, value, color }) => {
+                const isActive = viewRecord.internal_status === value;
+                return (
+                  <Button
+                    key={value}
+                    size="sm"
+                    className={cn(
+                      'text-white text-xs h-9',
+                      isActive ? color : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                    )}
+                    onClick={async () => {
+                      setViewRecord(prev => prev ? { ...prev, internal_status: value } : prev);
+                      try {
+                        await updateMutation.mutateAsync({
+                          document_number: viewRecord.document_number,
+                          internal_status: value,
+                        });
+                        queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                        toast({ title: 'Status updated', description: label });
+                      } catch {
+                        toast({ title: 'Error saving status', variant: 'destructive' });
+                      }
+                    }}
+                    disabled={updateMutation.isPending}
+                  >
+                    {isActive && <CheckCircle className="h-3.5 w-3.5 mr-1.5" />}
+                    {label}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Owner Information - hidden */}
 
