@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, CalendarDays, ChevronDown, Home, Building, AlertTriangle, Copy, Search, User, Mail } from 'lucide-react';
+import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, CalendarDays, ChevronDown, Home, Building, AlertTriangle, Copy, Search, User, Mail, ClipboardPaste } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { markPreForeclosureVisited, createFollowUp } from '@/lib/api';
 import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
+import { extractContacts } from '@/lib/contactParser';
 import { WorkflowTracker } from './WorkflowTracker';
 import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
 
@@ -59,6 +60,8 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
   const [followUpNote, setFollowUpNote] = useState('');
   const [savingFollowUp, setSavingFollowUp] = useState(false);
+  const [contactExtractorExpanded, setContactExtractorExpanded] = useState(false);
+  const [rawContactText, setRawContactText] = useState('');
   const lookupMutation = useOwnerLookup();
 
   // Parse visit details from workflow log
@@ -855,6 +858,71 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 </Button>
               </div>
             </div>
+          </div>
+
+          {/* Contact Extractor Section */}
+          <div className="bg-secondary/30 rounded-lg p-3">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setContactExtractorExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <ClipboardPaste className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Contact Extractor</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !contactExtractorExpanded && "-rotate-90"
+              )} />
+            </div>
+            {contactExtractorExpanded && (
+              <div className="space-y-3 mt-3">
+                <Textarea
+                  value={rawContactText}
+                  onChange={(e) => setRawContactText(e.target.value)}
+                  placeholder="Paste raw text from TruePeopleSearch or similar site..."
+                  className="min-h-[120px] text-xs font-mono"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!rawContactText.trim()}
+                  onClick={async () => {
+                    if (!viewRecord) return;
+                    const result = extractContacts(rawContactText);
+                    const existingDigits = new Set(
+                      (viewRecord.phoneNumbers || []).map(p => p.replace(/\D/g, '').slice(-10))
+                    );
+                    const newPhones = result.phones.filter(p => !existingDigits.has(p.replace(/\D/g, '').slice(-10)));
+                    const merged = [...(viewRecord.phoneNumbers || []).filter(p => p.trim()), ...newPhones];
+                    setViewRecord(prev => prev ? { ...prev, phoneNumbers: merged } : prev);
+                    try {
+                      await updateMutation.mutateAsync({
+                        document_number: viewRecord.document_number,
+                        phoneNumbers: merged,
+                        ownerPhoneIndex: viewRecord.ownerPhoneIndex,
+                      });
+                      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                      const parts: string[] = [];
+                      if (result.name) parts.push(`Name: ${result.name}`);
+                      if (newPhones.length > 0) parts.push(`${newPhones.length} phone(s) added`);
+                      const dupes = result.phones.length - newPhones.length;
+                      if (dupes > 0) parts.push(`${dupes} duplicate(s) skipped`);
+                      toast({
+                        title: parts.length > 0 ? 'Contacts Extracted' : 'No new contacts found',
+                        description: parts.join(', ') || 'Try pasting more text',
+                        variant: parts.length > 0 ? 'default' : 'destructive',
+                      });
+                    } catch {
+                      toast({ title: 'Error saving contacts', variant: 'destructive' });
+                    }
+                    setRawContactText('');
+                  }}
+                >
+                  Extract Contacts
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Tasks Section */}
