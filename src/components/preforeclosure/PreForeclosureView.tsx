@@ -2553,6 +2553,9 @@ export function PreForeclosureView() {
                       )}
                     </div>
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                    Status
+                  </th>
                   <th
                     className="px-4 py-3 text-left text-xs font-medium text-muted-foreground cursor-pointer hover:bg-secondary/70 select-none"
                     onClick={() => {
@@ -2642,6 +2645,24 @@ export function PreForeclosureView() {
                           <div className="text-xs text-muted-foreground">{record.city}, TX {record.zip}</div>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {record.internal_status && record.internal_status !== 'New' ? (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs whitespace-nowrap",
+                            record.internal_status === 'Contact Attempted' && "bg-blue-500/20 text-blue-400 border-blue-500/30",
+                            record.internal_status === 'Wants to Make a Deal' && "bg-green-500/20 text-green-400 border-green-500/30",
+                            record.internal_status === 'Dead' && "bg-red-500/20 text-red-400 border-red-500/30",
+                            record.internal_status === 'Monitoring' && "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+                          )}
+                        >
+                          {record.internal_status === 'Contact Attempted' ? 'Contacted' : record.internal_status}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
                       {record.recorded_date ? (() => {
