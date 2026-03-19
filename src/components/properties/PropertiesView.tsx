@@ -344,6 +344,8 @@ export function PropertiesView() {
     amountDueMax: undefined,
     marketValueMin: undefined,
     marketValueMax: undefined,
+    improvementValueMin: undefined,
+    improvementValueMax: undefined,
     ratioMin: undefined,
     ratioMax: undefined,
     taxYear: undefined,
@@ -416,6 +418,8 @@ export function PropertiesView() {
       (advancedFilters.amountDueMax !== undefined) ||
       (advancedFilters.marketValueMin !== undefined) ||
       (advancedFilters.marketValueMax !== undefined) ||
+      (advancedFilters.improvementValueMin !== undefined) ||
+      (advancedFilters.improvementValueMax !== undefined) ||
       (advancedFilters.ratioMin !== undefined) ||
       (advancedFilters.ratioMax !== undefined) ||
       (advancedFilters.taxYear !== undefined) ||
@@ -751,7 +755,21 @@ export function PropertiesView() {
           return false;
         }
       }
-      
+
+      // Improvement value range
+      if (advancedFilters.improvementValueMin !== undefined && advancedFilters.improvementValueMin !== null) {
+        const minValue = typeof advancedFilters.improvementValueMin === 'number' ? advancedFilters.improvementValueMin : parseFloat(String(advancedFilters.improvementValueMin));
+        if (!isNaN(minValue) && (p.improvementValue === undefined || p.improvementValue < minValue)) {
+          return false;
+        }
+      }
+      if (advancedFilters.improvementValueMax !== undefined && advancedFilters.improvementValueMax !== null) {
+        const maxValue = typeof advancedFilters.improvementValueMax === 'number' ? advancedFilters.improvementValueMax : parseFloat(String(advancedFilters.improvementValueMax));
+        if (!isNaN(maxValue) && (p.improvementValue === undefined || p.improvementValue > maxValue)) {
+          return false;
+        }
+      }
+
       // Ratio range (calculated as: amountDue / marketValue * 100)
       if (advancedFilters.ratioMin !== undefined || advancedFilters.ratioMax !== undefined) {
         // Calculate ratio
@@ -1128,6 +1146,8 @@ export function PropertiesView() {
     if (advancedFilters.amountDueMax !== undefined) count++;
     if (advancedFilters.marketValueMin !== undefined) count++;
     if (advancedFilters.marketValueMax !== undefined) count++;
+    if (advancedFilters.improvementValueMin !== undefined) count++;
+    if (advancedFilters.improvementValueMax !== undefined) count++;
     if (advancedFilters.ratioMin !== undefined) count++;
     if (advancedFilters.ratioMax !== undefined) count++;
     if (advancedFilters.taxYear) count++;
@@ -1171,6 +1191,8 @@ export function PropertiesView() {
       amountDueMax: undefined,
       marketValueMin: undefined,
       marketValueMax: undefined,
+      improvementValueMin: undefined,
+      improvementValueMax: undefined,
       ratioMin: undefined,
       ratioMax: undefined,
       taxYear: undefined,

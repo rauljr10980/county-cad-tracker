@@ -40,6 +40,8 @@ export interface AdvancedFilters {
   followUpDateTo?: string;
   lastPaymentDateFrom?: string;
   lastPaymentDateTo?: string;
+  improvementValueMin?: number;
+  improvementValueMax?: number;
 }
 
 interface AdvancedFiltersProps {
@@ -324,6 +326,53 @@ export function AdvancedFiltersPanel({
                     if (!isNaN(value) && value >= 0) {
                       updateFilter('marketValueMax', value);
                     }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Improvement Value Range */}
+          <div className="space-y-3">
+            <Label>Improvement Value ($)</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="improvementValueMin" className="text-xs text-muted-foreground">
+                  Min ($)
+                </Label>
+                <Input
+                  className="mobile-input w-full"
+                  id="improvementValueMin"
+                  type="number"
+                  placeholder="0"
+                  min="0"
+                  step="1"
+                  value={filters.improvementValueMin !== undefined ? filters.improvementValueMin.toString() : ''}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    if (v === '') { updateFilter('improvementValueMin', undefined); return; }
+                    const n = parseFloat(v);
+                    if (!isNaN(n) && n >= 0) updateFilter('improvementValueMin', n);
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="improvementValueMax" className="text-xs text-muted-foreground">
+                  Max ($)
+                </Label>
+                <Input
+                  className="mobile-input w-full"
+                  id="improvementValueMax"
+                  type="number"
+                  placeholder="No limit"
+                  min="0"
+                  step="1"
+                  value={filters.improvementValueMax !== undefined ? filters.improvementValueMax.toString() : ''}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    if (v === '') { updateFilter('improvementValueMax', undefined); return; }
+                    const n = parseFloat(v);
+                    if (!isNaN(n) && n >= 0) updateFilter('improvementValueMax', n);
                   }}
                 />
               </div>
