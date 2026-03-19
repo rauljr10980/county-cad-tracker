@@ -652,7 +652,7 @@ export function PropertiesView() {
     }
     
     // If no filters at all, return raw properties
-    if (!hasActiveFilters && !needsFrontendStatusFilter && !workflowStageFilter) {
+    if (!hasActiveFilters && !needsFrontendStatusFilter && !workflowStageFilter && !debouncedSearchQuery) {
       return rawProperties;
     }
 
