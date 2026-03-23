@@ -406,155 +406,54 @@ export function PropertiesView() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Always use frontend filtering for status filters to ensure consistency
-  // This ensures properties are always displayed correctly whether 1 or multiple statuses are selected
-  // Backend filtering can be unreliable, so we fetch all properties and filter on frontend
-  const apiStatusFilter = undefined; // Always use frontend filtering for status
-  
-  // Helper function to check if any advanced filters are active (excluding status)
-  const hasActiveAdvancedFilters = useMemo(() => {
-    return (
-      (advancedFilters.amountDueMin !== undefined) ||
-      (advancedFilters.amountDueMax !== undefined) ||
-      (advancedFilters.marketValueMin !== undefined) ||
-      (advancedFilters.marketValueMax !== undefined) ||
-      (advancedFilters.improvementValueMin !== undefined) ||
-      (advancedFilters.improvementValueMax !== undefined) ||
-      (advancedFilters.ratioMin !== undefined) ||
-      (advancedFilters.ratioMax !== undefined) ||
-      (advancedFilters.taxYear !== undefined) ||
-      (advancedFilters.hasNotes !== 'any') ||
-      (advancedFilters.hasLink !== 'any') ||
-      (advancedFilters.hasExemptions !== 'any') ||
-      (advancedFilters.hasVisited !== 'any') ||
-      (advancedFilters.propertyType !== 'any' && advancedFilters.propertyType !== undefined) ||
-      (advancedFilters.followUpDateFrom !== undefined) ||
-      (advancedFilters.followUpDateTo !== undefined) ||
-      (advancedFilters.lastPaymentDateFrom !== undefined) ||
-      (advancedFilters.lastPaymentDateTo !== undefined)
-    );
-  }, [advancedFilters]);
-  
-  // Check if sorting is active (not default state)
-  const isSortingActive = sortField !== 'totalAmountDue' || sortDirection !== 'asc';
-  
-  // Check if search query is active
-  const hasSearchQuery = debouncedSearchQuery && typeof debouncedSearchQuery === 'string' && debouncedSearchQuery.trim().length > 0;
-  
-  // When any filter is active (single or multiple statuses, advanced filters, search, or sorting)
-  const hasAnyFilter = selectedStatuses.length > 0 || (hasActiveAdvancedFilters ?? false) || hasSearchQuery || isSortingActive;
-  
-  // Fetch strategy:
-  // - ANY filter or sorting active: ALWAYS fetch all properties (50000) to search/filter/sort from all 33k properties
-  // - No filters: Fetch all properties (50000) to show all at once
-  // Always fetch all properties when filtering/sorting/searching to ensure accuracy across all 33k properties
-  const fetchLimit = hasAnyFilter
-    ? 50000  // ANY filter or sorting active - fetch all properties to search/filter/sort from all 33k
-    : 50000; // No filters - fetch all properties (up to 50k) to show all at once
-  
-  // Fetch properties from API with status filter and search
-  // When no filters: fetch all and paginate on frontend
-  // When any filter is active: fetch all and paginate on frontend
-  const shouldUseApiPagination = false; // Always use frontend pagination to show all properties
+  // ── Server-side fetch: all filtering/sorting/pagination done by backend ──
   const { data, isLoading, error } = useProperties({
-    status: apiStatusFilter,
-    search: debouncedSearchQuery,
-    page: 1, // Always use page 1, pagination is handled on frontend
-    limit: fetchLimit,
+    page,
+    limit: 100,
+    search: debouncedSearchQuery || undefined,
+    statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
+    sortBy: sortField === 'ratio' ? 'totalDue' : (sortField as string),
+    sortOrder: sortDirection,
+    amountDueMin: advancedFilters.amountDueMin,
+    amountDueMax: advancedFilters.amountDueMax,
+    marketValueMin: advancedFilters.marketValueMin,
+    marketValueMax: advancedFilters.marketValueMax,
+    improvementValueMin: advancedFilters.improvementValueMin,
+    improvementValueMax: advancedFilters.improvementValueMax,
+    ratioMin: advancedFilters.ratioMin,
+    ratioMax: advancedFilters.ratioMax,
+    taxYear: advancedFilters.taxYear,
+    hasNotes: advancedFilters.hasNotes !== 'any' ? advancedFilters.hasNotes : undefined,
+    hasLink: advancedFilters.hasLink !== 'any' ? advancedFilters.hasLink : undefined,
+    hasExemptions: advancedFilters.hasExemptions !== 'any' ? advancedFilters.hasExemptions : undefined,
+    hasVisited: advancedFilters.hasVisited !== 'any' ? advancedFilters.hasVisited : undefined,
+    workflowStage: workflowStageFilter ?? undefined,
   });
-  
-  // Debug: Log query state
-  useEffect(() => {
-    console.log('[PropertiesView] Query state changed:', {
-      isLoading,
-      hasError: !!error,
-      hasData: !!data,
-      dataType: Array.isArray(data) ? 'array' : typeof data,
-      dataKeys: data && typeof data === 'object' ? Object.keys(data) : null,
-    });
-  }, [data, isLoading, error]);
-  
-  // Safely extract properties with fallbacks
-  const rawProperties: Property[] = useMemo(() => {
-    try {
-      console.log('[PropertiesView] Processing data:', { 
-        hasData: !!data, 
-        isArray: Array.isArray(data),
-        dataType: typeof data,
-        hasProperties: data && typeof data === 'object' && 'properties' in data,
-        dataKeys: data && typeof data === 'object' ? Object.keys(data) : [],
-        selectedStatuses: selectedStatuses,
-        apiStatusFilter
-      });
-      
-      if (data) {
-        // Handle both array and object response formats
-        if (Array.isArray(data)) {
-          console.log('[PropertiesView] Data is array, returning', data.length, 'properties');
-          return data;
-        } else if (data && typeof data === 'object' && 'properties' in data && Array.isArray(data.properties)) {
-          console.log('[PropertiesView] Data has properties array, returning', data.properties.length, 'properties');
-          console.log('[PropertiesView] Sample properties:', data.properties.slice(0, 3).map(p => ({ id: p.id, status: p.status, accountNumber: p.accountNumber })));
-          return data.properties;
-        } else {
-          console.warn('[PropertiesView] Data format not recognized:', {
-            keys: Object.keys(data || {}),
-            hasTotal: 'total' in (data || {}),
-            hasStatusCounts: 'statusCounts' in (data || {}),
-            dataSample: data
-          });
-        }
-      } else {
-        console.log('[PropertiesView] No data available');
-      }
-    } catch (e) {
-      console.error('[PropertiesView] Error parsing data:', e);
-    }
-    console.log('[PropertiesView] Returning empty array');
-    return [];
-  }, [data, selectedStatuses, apiStatusFilter]);
-  
-  const statusCounts = useMemo(() => {
-    try {
-      if (data && !Array.isArray(data) && 'statusCounts' in data) {
-        const apiCounts = data.statusCounts || {};
-        console.log('[PropertiesView] Raw statusCounts from API:', apiCounts);
 
-        // API returns single letters (J, A, P, U) - use them directly
-        const counts = {
-          J: typeof apiCounts.J === 'number' ? apiCounts.J : 0,
-          A: typeof apiCounts.A === 'number' ? apiCounts.A : 0,
-          P: typeof apiCounts.P === 'number' ? apiCounts.P : 0,
-          U: typeof apiCounts.U === 'number' ? apiCounts.U : (typeof apiCounts.other === 'number' ? apiCounts.other : 0),
-        };
-        
-        console.log('[PropertiesView] Mapped statusCounts:', counts);
-        return counts;
-      }
-    } catch (e) {
-      console.error('[PropertiesView] Error parsing statusCounts:', e);
-    }
-    return { J: 0, A: 0, P: 0, U: 0 };
-  }, [data]);
+  // Keep for components that still reference these
+  const hasActiveAdvancedFilters = !!(
+    advancedFilters.amountDueMin !== undefined || advancedFilters.amountDueMax !== undefined ||
+    advancedFilters.marketValueMin !== undefined || advancedFilters.marketValueMax !== undefined ||
+    advancedFilters.improvementValueMin !== undefined || advancedFilters.improvementValueMax !== undefined ||
+    advancedFilters.ratioMin !== undefined || advancedFilters.ratioMax !== undefined ||
+    advancedFilters.taxYear !== undefined || advancedFilters.hasNotes !== 'any' ||
+    advancedFilters.hasLink !== 'any' || advancedFilters.hasExemptions !== 'any' ||
+    advancedFilters.hasVisited !== 'any' ||
+    (advancedFilters.propertyType !== 'any' && advancedFilters.propertyType !== undefined)
+  );
   
-  const totalUnfiltered = useMemo(() => {
-    try {
-      if (data) {
-        if (Array.isArray(data)) {
-          return data.length || 0;
-        } else if (data && typeof data === 'object' && 'totalUnfiltered' in data) {
-          const value = data.totalUnfiltered;
-          return (typeof value === 'number' && !isNaN(value)) ? value : 0;
-        } else if (data && typeof data === 'object' && 'total' in data) {
-          const value = data.total;
-          return (typeof value === 'number' && !isNaN(value)) ? value : 0;
-        }
-      }
-    } catch (e) {
-      console.error('[PropertiesView] Error parsing totalUnfiltered:', e);
-    }
-    return 0;
+  // Extract data from server response (backend handles all filtering/sorting)
+  const rawProperties: Property[] = data?.properties ?? [];
+  const statusCounts = useMemo(() => {
+    const c = data?.statusCounts || {};
+    return {
+      J: (c.J ?? 0) as number,
+      A: (c.A ?? 0) as number,
+      P: (c.P ?? 0) as number,
+      U: (c.U ?? c.other ?? 0) as number,
+    };
   }, [data]);
+  const totalUnfiltered: number = data?.totalUnfiltered ?? 0;
   
   // Workflow stage funnel data (same system as pre-foreclosure)
   const WORKFLOW_FUNNEL_STAGES: { key: WorkflowStage; label: string; color: string }[] = [
@@ -571,16 +470,13 @@ export function PropertiesView() {
   ];
 
   const workflowStageCounts = useMemo(() => {
-    const counts: Record<WorkflowStage, number> = {
+    const base: Record<WorkflowStage, number> = {
       not_started: 0, initial_visit: 0, waiting_to_be_contacted: 0, people_search: 0, call_owner: 0,
       land_records: 0, visit_heirs: 0, call_heirs: 0, negotiating: 0, comps: 0, sent_offer: 0, dead_end: 0,
     };
-    for (const p of rawProperties) {
-      const stage = (p.workflow_stage as WorkflowStage) || 'not_started';
-      if (stage in counts) counts[stage]++;
-    }
-    return counts;
-  }, [rawProperties]);
+    const backendCounts = data?.workflowStageCounts || {};
+    return { ...base, ...backendCounts } as Record<WorkflowStage, number>;
+  }, [data]);
 
   const maxWorkflowStageCount = useMemo(() => {
     const activeCounts = WORKFLOW_FUNNEL_STAGES.map(s => workflowStageCounts[s.key]);
@@ -622,14 +518,13 @@ export function PropertiesView() {
     return null;
   };
 
-  // Apply advanced filtering logic - optimized to combine filters in single pass
+  // Backend handles all filtering — filteredProperties is just the current page from the API
   const filteredProperties = useMemo(() => {
-    // Early return if no filters
+    // All filtering done server-side; rawProperties is already the filtered+paginated result
+    return rawProperties;
+    // eslint-disable-next-line no-unreachable
     const hasActiveFilters = hasActiveAdvancedFilters ?? false;
     const searchStatus = debouncedSearchQuery ? getStatusFromSearch(debouncedSearchQuery) : null;
-    
-    // Always use frontend filtering when statuses are selected (since apiStatusFilter is always undefined)
-    // This ensures we properly normalize database enum names (PENDING, ACTIVE, JUDGMENT) to single letters (P, A, J)
     const needsFrontendStatusFilter = advancedFilters.statuses.length > 0 || searchStatus !== null;
     
     // Debug: Log filter state
@@ -637,7 +532,6 @@ export function PropertiesView() {
       console.log('[FILTER] Filtering properties:', {
         totalProperties: rawProperties.length,
         selectedStatuses: advancedFilters.statuses,
-        apiStatusFilter,
         needsFrontendStatusFilter,
         searchStatus,
         hasActiveFilters,
@@ -947,8 +841,14 @@ export function PropertiesView() {
     return filtered;
   }, [rawProperties, advancedFilters, hasActiveAdvancedFilters, debouncedSearchQuery, propertiesInRoutes, workflowStageFilter]);
   
+  // Kept so downstream components compile; backend handles sorting
+  const isSortingActive = sortField !== 'totalAmountDue' || sortDirection !== 'asc';
+
   // Apply sorting to all properties before pagination (only for filtered cases)
   const sortedProperties = useMemo(() => {
+    // Backend now handles all sorting — return rawProperties directly
+    return rawProperties;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let propertiesToSort: Property[] = [];
 
     if (selectedStatuses.length > 0 || hasActiveAdvancedFilters || workflowStageFilter) {
@@ -1019,83 +919,11 @@ export function PropertiesView() {
     return sorted;
   }, [selectedStatuses, hasActiveAdvancedFilters, filteredProperties, rawProperties, sortField, sortDirection, isSortingActive, workflowStageFilter]);
   
-  // Calculate totals and pagination
-  const { properties, total, totalPages, allFilteredPropertyIds } = useMemo(() => {
-    try {
-      console.log('[PropertiesView] Calculating pagination:', {
-        selectedStatuses: selectedStatuses.length,
-        selectedStatusesValues: selectedStatuses,
-        hasActiveAdvancedFilters,
-        isSortingActive,
-        rawPropertiesCount: rawProperties.length,
-        sortedPropertiesCount: sortedProperties.length,
-        filteredPropertiesCount: filteredProperties.length,
-        page
-      });
-      
-      let finalProperties: Property[] = [];
-      let finalTotal = 0;
-      let finalTotalPages = 1;
-    
-    // All properties are now fetched and paginated on frontend
-    // Use sorted properties if filters or sorting are active, otherwise use raw properties
-    // sortedProperties already contains filtered properties when filters are active
-    const hasAnyFilterOrSort = selectedStatuses.length > 0 || hasActiveAdvancedFilters || isSortingActive || !!workflowStageFilter;
-    const propertiesToPaginate = hasAnyFilterOrSort ? sortedProperties : rawProperties;
-    finalTotal = propertiesToPaginate.length || totalUnfiltered;
-    finalTotalPages = Math.ceil(finalTotal / ITEMS_PER_PAGE);
-    
-    // Apply pagination
-    const startIndex = (page - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    finalProperties = propertiesToPaginate.slice(startIndex, endIndex);
-    
-      console.log('[PropertiesView] Pagination result:', {
-        propertiesCount: finalProperties.length,
-        total: finalTotal,
-        totalPages: finalTotalPages,
-        page,
-        selectedStatuses: selectedStatuses.length,
-        hasActiveAdvancedFilters,
-        sortedPropertiesCount: sortedProperties.length,
-        filteredPropertiesCount: filteredProperties.length,
-        rawPropertiesCount: rawProperties.length,
-        sampleFinalProperties: finalProperties.slice(0, 3).map(p => ({ id: p.id, status: p.status, accountNumber: p.accountNumber }))
-      });
-      
-    const result = {
-      properties: finalProperties || [],
-      total: finalTotal || 0,
-      totalPages: finalTotalPages || 1,
-      allFilteredPropertyIds: propertiesToPaginate.map(p => p.id),
-    };
-    
-    // Ensure all values are numbers, not undefined
-    if (typeof result.total !== 'number') result.total = 0;
-    if (typeof result.totalPages !== 'number') result.totalPages = 1;
-    
-    // Final safety check - if we have a total but no properties, log a warning
-    if (result.total > 0 && result.properties.length === 0) {
-      console.error('[PropertiesView] WARNING: Total is', result.total, 'but properties array is empty!', {
-        sortedPropertiesLength: sortedProperties.length,
-        filteredPropertiesLength: filteredProperties.length,
-        rawPropertiesLength: rawProperties.length,
-        selectedStatuses,
-        hasActiveAdvancedFilters
-      });
-    }
-    
-    return result;
-    } catch (err) {
-      console.error('[PropertiesView] Error in pagination calculation:', err);
-      return {
-        properties: [],
-        total: 0,
-        totalPages: 1,
-        allFilteredPropertyIds: [],
-      };
-    }
-  }, [selectedStatuses, hasActiveAdvancedFilters, sortedProperties, statusCounts, totalUnfiltered, rawProperties, page, data, isSortingActive, workflowStageFilter]);
+  // Pagination now fully driven by backend response
+  const properties = rawProperties;
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+  const allFilteredPropertyIds = rawProperties.map(p => p.id); // current page only
   
   // Helper function to generate page numbers for pagination
   const getPageNumbers = (currentPage: number, totalPages: number): (number | string)[] => {
@@ -1179,10 +1007,10 @@ export function PropertiesView() {
     setPage(1); // Reset to first page when filters change
   };
 
-  // Reset page when filters change
+  // Reset page when filters or workflow stage change
   useEffect(() => {
     setPage(1);
-  }, [advancedFilters]);
+  }, [advancedFilters, workflowStageFilter]);
 
   const clearAllFilters = () => {
     setAdvancedFilters({

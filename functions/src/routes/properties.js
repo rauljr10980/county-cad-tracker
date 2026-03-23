@@ -30,19 +30,28 @@ const router = express.Router();
 // GET ALL PROPERTIES (with filtering and pagination)
 // ============================================================================
 
+// Helper: normalize status letter/enum to DB enum string
+function normalizeStatusToEnum(s) {
+  if (!s) return null;
+  const u = String(s).toUpperCase().trim();
+  if (u === 'J' || u === 'JUDGMENT' || u.startsWith('JUDG')) return 'JUDGMENT';
+  if (u === 'A' || u === 'ACTIVE' || u.startsWith('ACTI')) return 'ACTIVE';
+  if (u === 'P' || u === 'PENDING' || u.startsWith('PEND')) return 'PENDING';
+  if (u === 'U' || u === 'UNKNOWN' || u.startsWith('UNKN')) return 'UNKNOWN';
+  if (u === 'PAID') return 'PAID';
+  if (u === 'REMOVED') return 'REMOVED';
+  return null;
+}
+
 router.get('/',
   optionalAuth,
   [
     query('page').optional().isInt({ min: 1 }).toInt(),
-    query('limit').optional().isInt({ min: 1, max: 50000 }).toInt(), // Increased max to allow fetching all properties
-    query('status').optional().custom((value) => {
-      // Accept both single letters (P, A, J, U) and full enum names
-      const validValues = ['J', 'A', 'P', 'U', 'JUDGMENT', 'ACTIVE', 'PENDING', 'PAID', 'REMOVED', 'UNKNOWN'];
-      const upperValue = String(value).toUpperCase().trim();
-      return validValues.includes(upperValue) || upperValue.startsWith('JUDG') || upperValue.startsWith('ACTI') || upperValue.startsWith('PEND') || upperValue.startsWith('UNKN');
-    }),
+    query('limit').optional().isInt({ min: 1, max: 500 }).toInt(),
     query('dealStage').optional().isIn(['NEW_LEAD', 'CONTACTED', 'INTERESTED', 'OFFER_SENT', 'NEGOTIATING', 'UNDER_CONTRACT', 'CLOSED', 'DEAD']),
-    query('search').optional().isString()
+    query('search').optional().isString(),
+    query('sortBy').optional().isString(),
+    query('sortOrder').optional().isIn(['asc', 'desc']),
   ],
   async (req, res) => {
     try {
@@ -53,115 +62,192 @@ router.get('/',
 
       const {
         page = 1,
-        limit: limitParam,
+        limit: limitParam = 100,
+        // Status filters (single legacy or multi new)
         status: statusParam,
+        statuses: statusesParam,
         dealStage,
         search,
-        sortBy = 'createdAt',
-        sortOrder = 'desc'
+        sortBy = 'totalDue',
+        sortOrder = 'asc',
+        // Advanced filters
+        amountDueMin, amountDueMax,
+        marketValueMin, marketValueMax,
+        improvementValueMin, improvementValueMax,
+        ratioMin, ratioMax,
+        taxYear,
+        hasNotes,
+        hasLink,
+        hasExemptions,
+        hasVisited,
+        workflowStage,
       } = req.query;
 
-      // Normalize status parameter: convert single letters (P, A, J, U) to full enum names
-      let normalizedStatus = null;
+      const limit = Math.min(parseInt(limitParam) || 100, 500);
+      const pageNum = Math.max(1, parseInt(page) || 1);
+
+      // ── Build status list ──────────────────────────────────────────────────
+      const statusEnums = [];
+      // New multi-status param: ?statuses[]=J&statuses[]=A  OR  ?statuses=J,A
+      if (statusesParam) {
+        const raw = Array.isArray(statusesParam) ? statusesParam : String(statusesParam).split(',');
+        raw.forEach(s => { const n = normalizeStatusToEnum(s); if (n) statusEnums.push(n); });
+      }
+      // Legacy single-status param
       if (statusParam) {
-        const upperStatus = String(statusParam).toUpperCase().trim();
-        if (upperStatus === 'J' || upperStatus === 'JUDGMENT' || upperStatus.startsWith('JUDG')) {
-          normalizedStatus = 'JUDGMENT';
-        } else if (upperStatus === 'A' || upperStatus === 'ACTIVE' || upperStatus.startsWith('ACTI')) {
-          normalizedStatus = 'ACTIVE';
-        } else if (upperStatus === 'P' || upperStatus === 'PENDING' || upperStatus.startsWith('PEND')) {
-          normalizedStatus = 'PENDING';
-        } else if (upperStatus === 'U' || upperStatus === 'UNKNOWN' || upperStatus.startsWith('UNKN')) {
-          normalizedStatus = 'UNKNOWN';
-        } else if (upperStatus === 'PAID') {
-          normalizedStatus = 'PAID';
-        } else if (upperStatus === 'REMOVED') {
-          normalizedStatus = 'REMOVED';
+        const n = normalizeStatusToEnum(statusParam);
+        if (n && !statusEnums.includes(n)) statusEnums.push(n);
+      }
+
+      // ── Build WHERE clause ─────────────────────────────────────────────────
+      const andConditions = [];
+
+      // Status
+      if (statusEnums.length === 1) andConditions.push({ status: statusEnums[0] });
+      else if (statusEnums.length > 1) andConditions.push({ status: { in: statusEnums } });
+
+      // Deal stage
+      if (dealStage) andConditions.push({ dealStage });
+
+      // Search: ownerName, accountNumber, propertyAddress, notes
+      if (search && search.trim()) {
+        andConditions.push({
+          OR: [
+            { ownerName: { contains: search.trim(), mode: 'insensitive' } },
+            { accountNumber: { contains: search.trim(), mode: 'insensitive' } },
+            { propertyAddress: { contains: search.trim(), mode: 'insensitive' } },
+            { notes: { contains: search.trim(), mode: 'insensitive' } },
+          ]
+        });
+      }
+
+      // Amount Due range → maps to totalDue in DB
+      if (amountDueMin !== undefined && amountDueMin !== '') {
+        const v = parseFloat(amountDueMin);
+        if (!isNaN(v)) andConditions.push({ totalDue: { gte: v } });
+      }
+      if (amountDueMax !== undefined && amountDueMax !== '') {
+        const v = parseFloat(amountDueMax);
+        if (!isNaN(v)) andConditions.push({ totalDue: { lte: v } });
+      }
+
+      // Market Value range
+      if (marketValueMin !== undefined && marketValueMin !== '') {
+        const v = parseFloat(marketValueMin);
+        if (!isNaN(v)) andConditions.push({ marketValue: { gte: v } });
+      }
+      if (marketValueMax !== undefined && marketValueMax !== '') {
+        const v = parseFloat(marketValueMax);
+        if (!isNaN(v)) andConditions.push({ marketValue: { lte: v } });
+      }
+
+      // Improvement Value range
+      if (improvementValueMin !== undefined && improvementValueMin !== '') {
+        const v = parseFloat(improvementValueMin);
+        if (!isNaN(v)) andConditions.push({ improvementValue: { gte: v } });
+      }
+      if (improvementValueMax !== undefined && improvementValueMax !== '') {
+        const v = parseFloat(improvementValueMax);
+        if (!isNaN(v)) andConditions.push({ improvementValue: { lte: v } });
+      }
+
+      // Tax Year
+      if (taxYear && taxYear !== '') {
+        const y = parseInt(taxYear);
+        if (!isNaN(y)) andConditions.push({ taxYear: y });
+      }
+
+      // Has Notes
+      if (hasNotes === 'yes') andConditions.push({ notes: { gt: '' } });
+      else if (hasNotes === 'no') andConditions.push({ OR: [{ notes: null }, { notes: '' }] });
+
+      // Has Link
+      if (hasLink === 'yes') andConditions.push({ link: { gt: '' } });
+      else if (hasLink === 'no') andConditions.push({ OR: [{ link: null }, { link: '' }] });
+
+      // Has Exemptions
+      if (hasExemptions === 'yes') andConditions.push({ exemptions: { isEmpty: false } });
+      else if (hasExemptions === 'no') andConditions.push({ exemptions: { isEmpty: true } });
+
+      // Has Visited
+      if (hasVisited === 'yes') andConditions.push({ visited: true });
+      else if (hasVisited === 'no') andConditions.push({ visited: false });
+
+      // Workflow Stage
+      if (workflowStage && workflowStage !== '') {
+        andConditions.push({ workflowStage });
+      }
+
+      const where = andConditions.length > 0 ? { AND: andConditions } : {};
+
+      // ── Ratio filter: two-pass approach ───────────────────────────────────
+      // ratio = (totalDue / marketValue) * 100
+      // Can't express as a Prisma WHERE, so: get matching IDs from a lightweight
+      // query, then restrict the main query to those IDs.
+      const ratioMinVal = ratioMin !== undefined && ratioMin !== '' ? parseFloat(ratioMin) : null;
+      const ratioMaxVal = ratioMax !== undefined && ratioMax !== '' ? parseFloat(ratioMax) : null;
+      if (ratioMinVal !== null || ratioMaxVal !== null) {
+        const candidates = await prisma.property.findMany({
+          where,
+          select: { id: true, totalDue: true, marketValue: true },
+        });
+        const matchingIds = candidates
+          .filter(p => {
+            if (!p.marketValue || p.marketValue === 0) return ratioMinVal === null; // no market value: exclude if min set
+            const ratio = (p.totalDue / p.marketValue) * 100;
+            if (ratioMinVal !== null && ratio < ratioMinVal) return false;
+            if (ratioMaxVal !== null && ratio > ratioMaxVal) return false;
+            return true;
+          })
+          .map(p => p.id);
+        // Narrow the where clause to only matching IDs
+        const ratioWhere = { AND: [...(where.AND || []), { id: { in: matchingIds } }] };
+        Object.assign(where, ratioWhere);
+        // Remove the previous AND to avoid duplication
+        if (where.AND) {
+          // already handled above via Object.assign
         }
       }
 
-      // When a status filter is provided, fetch ALL properties (no limit)
-      // When no status filter but limit is provided, use that limit (for frontend filtering)
-      // Otherwise use pagination with default limit of 100
-      const isSingleStatusFilter = normalizedStatus !== null && !dealStage && !search;
-      const limit = isSingleStatusFilter 
-        ? undefined // No limit - fetch all properties with this status
-        : (limitParam ? parseInt(limitParam) : 100); // Use provided limit (can be 50000 for frontend filtering) or default to 100
-
-      // Build where clause
-      const where = {};
-      if (normalizedStatus) where.status = normalizedStatus;
-      if (dealStage) where.dealStage = dealStage;
-
-      if (search) {
-        where.OR = [
-          { ownerName: { contains: search, mode: 'insensitive' } },
-          { accountNumber: { contains: search, mode: 'insensitive' } },
-          { propertyAddress: { contains: search, mode: 'insensitive' } }
-        ];
-      }
-
-      // Get total count and status counts in parallel for better performance
-      const [total, statusCountsResult] = await Promise.all([
-        prisma.property.count({ where }),
-        prisma.property.groupBy({
-          by: ['status'],
-          _count: { status: true }
-        })
+      // ── Normalize sort field ───────────────────────────────────────────────
+      const VALID_SORT_FIELDS = new Set([
+        'totalDue', 'totalAmountDue', 'marketValue', 'improvementValue',
+        'ownerName', 'propertyAddress', 'accountNumber', 'status',
+        'createdAt', 'updatedAt', 'taxYear', 'workflowStage'
       ]);
+      const rawSortBy = VALID_SORT_FIELDS.has(sortBy) ? sortBy : 'totalDue';
+      const normalizedSortBy = rawSortBy === 'totalAmountDue' ? 'totalDue' : rawSortBy;
+      const validSortOrder = sortOrder === 'desc' ? 'desc' : 'asc';
 
-      // Normalize sortBy field: map frontend field names to database field names
-      // Frontend uses totalAmountDue, but database uses totalDue
-      const normalizedSortBy = sortBy === 'totalAmountDue' ? 'totalDue' : sortBy;
-
-      // Get properties
-      // When single status filter is active, fetch ALL properties (no pagination)
-      // Otherwise use pagination
-      const queryOptions = {
-        where,
-        include: {
-          _count: {
-            select: {
-              noteRecords: true,  // Count of Note relation records
-              tasks: true
-            }
-          }
-        },
-        orderBy: { [normalizedSortBy]: sortOrder }
-      };
-
-      // Only apply pagination if not fetching all properties for single status filter
-      // When limit is large (>= 10000), assume frontend filtering and return all (no pagination)
-      // Otherwise use pagination
-      if (!isSingleStatusFilter && limit) {
-        if (limit >= 10000) {
-          // Large limit means frontend filtering - return all properties without pagination
-          // Don't set skip/take to get all matching properties
-        } else {
-          // Normal pagination for smaller limits
-          queryOptions.skip = (page - 1) * limit;
-          queryOptions.take = limit;
-        }
-      }
-
-      const properties = await prisma.property.findMany(queryOptions);
-
-      // Map database fields to frontend format
-      // Map totalDue (database) to totalAmountDue (frontend)
-      // Map percentageDue (database) to totalPercentage (frontend)
-      // Map dealStage from uppercase (NEW_LEAD) to lowercase (new_lead) for frontend
-      // Strip street suffixes for fuzzy address matching
+      // ── Run queries in parallel ────────────────────────────────────────────
       const STREET_SUFFIXES = /\b(ST|DR|LN|AVE|BLVD|CT|CIR|PL|WAY|RD|TRL|PKWY|HWY|LOOP|COVE|RUN|PASS|PATH|WALK|XING|CV|TER|SQ)\b/g;
       const stripSuffix = (s) => s.replace(STREET_SUFFIXES, '').replace(/\s+/g, ' ').trim();
 
+      const [total, totalUnfiltered, statusCountsResult, workflowCountsResult, properties] = await Promise.all([
+        prisma.property.count({ where }),
+        prisma.property.count({}),
+        // statusCounts always global (for the status tabs)
+        prisma.property.groupBy({ by: ['status'], _count: { status: true } }),
+        // workflowStageCounts filtered by current where (for the funnel bars)
+        prisma.property.groupBy({ by: ['workflowStage'], _count: { workflowStage: true }, where }),
+        prisma.property.findMany({
+          where,
+          include: {
+            _count: { select: { noteRecords: true, tasks: true } }
+          },
+          orderBy: { [normalizedSortBy]: validSortOrder },
+          skip: (pageNum - 1) * limit,
+          take: limit,
+        }),
+      ]);
+
+      // ── Map DB fields → frontend fields ───────────────────────────────────
       const mappedProperties = properties.map(prop => {
         const ownerUpper = (prop.ownerName || '').toUpperCase().trim();
         const addressUpper = (prop.propertyAddress || '').toUpperCase().trim();
-        // Compare street names without suffixes (DR vs LN vs ST etc.)
         const ownerStripped = stripSuffix(ownerUpper);
         const addressStripped = stripSuffix(addressUpper);
         const autoDetected = !!(ownerStripped && addressStripped && addressStripped.includes(ownerStripped));
-        // Manual override takes precedence over auto-detection
         const isPrimaryProperty = prop.isPrimaryOverride !== null && prop.isPrimaryOverride !== undefined
           ? prop.isPrimaryOverride
           : autoDetected;
@@ -170,62 +256,38 @@ router.get('/',
           totalAmountDue: prop.totalDue || 0,
           totalPercentage: prop.percentageDue || 0,
           isPrimaryProperty,
-          // Convert dealStage from uppercase enum to lowercase for frontend
           dealStage: prop.dealStage ? prop.dealStage.toLowerCase() : null,
-          // Workflow decision tree fields
           workflow_stage: prop.workflowStage || 'not_started',
           workflow_log: prop.workflowLog || [],
         };
       });
 
-      // Format status counts to match BOTH old and new frontend (backward compatible)
-      const statusCounts = {
-        // Old format for cached frontend
-        J: 0,
-        A: 0,
-        P: 0,
-        other: 0,
-        // New format for updated frontend
-        JUDGMENT: 0,
-        ACTIVE: 0,
-        PENDING: 0,
-        UNKNOWN: 0,
-        PAID: 0,
-        REMOVED: 0
-      };
+      // ── Status counts (global, for tabs) ──────────────────────────────────
+      const statusCounts = { J: 0, A: 0, P: 0, other: 0, JUDGMENT: 0, ACTIVE: 0, PENDING: 0, UNKNOWN: 0, PAID: 0, REMOVED: 0 };
       statusCountsResult.forEach(item => {
         const status = item.status?.toUpperCase();
-        if (status === 'JUDGMENT') {
-          statusCounts.JUDGMENT = item._count.status;
-          statusCounts.J = item._count.status; // Backward compat
-        } else if (status === 'ACTIVE') {
-          statusCounts.ACTIVE = item._count.status;
-          statusCounts.A = item._count.status; // Backward compat
-        } else if (status === 'PENDING') {
-          statusCounts.PENDING = item._count.status;
-          statusCounts.P = item._count.status; // Backward compat
-        } else if (status === 'UNKNOWN') {
-          statusCounts.UNKNOWN = item._count.status;
-          statusCounts.other += item._count.status; // Backward compat
-        } else if (status === 'PAID') {
-          statusCounts.PAID = item._count.status;
-          statusCounts.other += item._count.status; // Backward compat
-        } else if (status === 'REMOVED') {
-          statusCounts.REMOVED = item._count.status;
-          statusCounts.other += item._count.status; // Backward compat
-        }
+        if (status === 'JUDGMENT') { statusCounts.JUDGMENT = item._count.status; statusCounts.J = item._count.status; }
+        else if (status === 'ACTIVE') { statusCounts.ACTIVE = item._count.status; statusCounts.A = item._count.status; }
+        else if (status === 'PENDING') { statusCounts.PENDING = item._count.status; statusCounts.P = item._count.status; }
+        else if (status === 'UNKNOWN') { statusCounts.UNKNOWN = item._count.status; statusCounts.other += item._count.status; }
+        else if (status === 'PAID') { statusCounts.PAID = item._count.status; statusCounts.other += item._count.status; }
+        else if (status === 'REMOVED') { statusCounts.REMOVED = item._count.status; statusCounts.other += item._count.status; }
       });
 
-      // Calculate total pages - if fetching all properties, totalPages is 1
-      const totalPages = isSingleStatusFilter ? 1 : (limit ? Math.ceil(total / limit) : 1);
+      // ── Workflow stage counts (filtered, for funnel bars) ─────────────────
+      const workflowStageCounts = {};
+      workflowCountsResult.forEach(item => {
+        workflowStageCounts[item.workflowStage || 'not_started'] = item._count.workflowStage;
+      });
 
       res.json({
-        properties: mappedProperties, // Use mapped properties with totalAmountDue
+        properties: mappedProperties,
         total,
-        totalUnfiltered: total, // For now, same as total (can be optimized later)
-        totalPages,
-        page: isSingleStatusFilter ? 1 : page, // Always page 1 when fetching all
-        statusCounts
+        totalUnfiltered,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        page: pageNum,
+        statusCounts,
+        workflowStageCounts,
       });
     } catch (error) {
       console.error('[PROPERTIES] Fetch error:', error);

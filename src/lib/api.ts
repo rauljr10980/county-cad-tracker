@@ -302,55 +302,81 @@ export async function reprocessFile(fileId: string) {
 /**
  * Get properties from latest completed file
  */
-export async function getProperties(page = 1, limit = 100, status?: string, search?: string) {
+export interface PropertyFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+  statuses?: string[];        // multiple statuses: ['J','A','P']
+  dealStage?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  // Advanced filters
+  amountDueMin?: number;
+  amountDueMax?: number;
+  marketValueMin?: number;
+  marketValueMax?: number;
+  improvementValueMin?: number;
+  improvementValueMax?: number;
+  ratioMin?: number;
+  ratioMax?: number;
+  taxYear?: string;
+  hasNotes?: 'yes' | 'no' | 'any';
+  hasLink?: 'yes' | 'no' | 'any';
+  hasExemptions?: 'yes' | 'no' | 'any';
+  hasVisited?: 'yes' | 'no' | 'any';
+  workflowStage?: string;
+}
+
+export async function getProperties(filters: PropertyFilters = {}) {
   try {
-    // Ensure page and limit are valid numbers
+    const {
+      page = 1, limit = 100, search, statuses, dealStage,
+      sortBy = 'totalDue', sortOrder = 'asc',
+      amountDueMin, amountDueMax, marketValueMin, marketValueMax,
+      improvementValueMin, improvementValueMax, ratioMin, ratioMax,
+      taxYear, hasNotes, hasLink, hasExemptions, hasVisited, workflowStage,
+    } = filters;
+
     const validPage = Math.max(1, Math.floor(Number(page)) || 1);
-    // When a single status is provided (no search), allow larger limits to fetch ALL properties
-    // Otherwise cap at 10000 for performance
-    const maxLimit = (status && !search) ? 50000 : 10000;
-    const validLimit = Math.max(1, Math.min(maxLimit, Math.floor(Number(limit)) || 100));
-    
-    console.log(`[API] Fetching properties: page=${validPage}, limit=${validLimit}, status=${status}, search=${search}`);
-    let url = `${API_BASE_URL}/api/properties?page=${validPage}&limit=${validLimit}`;
-    if (status) {
-      url += `&status=${encodeURIComponent(status)}`;
-    }
-    if (search && search.trim()) {
-      url += `&search=${encodeURIComponent(search.trim())}`;
-    }
-    
-    console.log(`[API] Properties URL: ${url}`);
+    const validLimit = Math.max(1, Math.min(500, Math.floor(Number(limit)) || 100));
+
+    const params = new URLSearchParams();
+    params.set('page', String(validPage));
+    params.set('limit', String(validLimit));
+    params.set('sortBy', sortBy);
+    params.set('sortOrder', sortOrder);
+    if (search && search.trim()) params.set('search', search.trim());
+    if (dealStage) params.set('dealStage', dealStage);
+    if (statuses && statuses.length > 0) params.set('statuses', statuses.join(','));
+    if (amountDueMin !== undefined) params.set('amountDueMin', String(amountDueMin));
+    if (amountDueMax !== undefined) params.set('amountDueMax', String(amountDueMax));
+    if (marketValueMin !== undefined) params.set('marketValueMin', String(marketValueMin));
+    if (marketValueMax !== undefined) params.set('marketValueMax', String(marketValueMax));
+    if (improvementValueMin !== undefined) params.set('improvementValueMin', String(improvementValueMin));
+    if (improvementValueMax !== undefined) params.set('improvementValueMax', String(improvementValueMax));
+    if (ratioMin !== undefined) params.set('ratioMin', String(ratioMin));
+    if (ratioMax !== undefined) params.set('ratioMax', String(ratioMax));
+    if (taxYear) params.set('taxYear', taxYear);
+    if (hasNotes && hasNotes !== 'any') params.set('hasNotes', hasNotes);
+    if (hasLink && hasLink !== 'any') params.set('hasLink', hasLink);
+    if (hasExemptions && hasExemptions !== 'any') params.set('hasExemptions', hasExemptions);
+    if (hasVisited && hasVisited !== 'any') params.set('hasVisited', hasVisited);
+    if (workflowStage) params.set('workflowStage', workflowStage);
+
+    const url = `${API_BASE_URL}/api/properties?${params.toString()}`;
     const response = await fetch(url);
-    
-    console.log(`[API] Properties response status: ${response.status}`);
-    
+
     if (!response.ok) {
-      // Try to extract error message from response
       let errorMessage = 'Failed to fetch properties';
       try {
         const errorData = await response.json();
-        console.error(`[API] Properties error data:`, errorData);
-        if (errorData.error) {
-          errorMessage = errorData.error;
-        } else if (errorData.message) {
-          errorMessage = errorData.message;
-        }
-      } catch (parseError) {
-        // If response is not JSON, use status text
-        console.error(`[API] Failed to parse error response:`, parseError);
-        errorMessage = response.statusText || errorMessage;
-      }
+        if (errorData.error) errorMessage = errorData.error;
+        else if (errorData.message) errorMessage = errorData.message;
+      } catch { errorMessage = response.statusText || errorMessage; }
       throw new Error(errorMessage);
     }
-    
-    const result = await response.json();
-    console.log(`[API] Properties response:`, {
-      propertiesCount: Array.isArray(result) ? result.length : result.properties?.length || 0,
-      total: result.total || (Array.isArray(result) ? result.length : 0),
-      hasStatusCounts: !!(result.statusCounts)
-    });
-    return result;
+
+    return await response.json();
   } catch (error) {
     console.error(`[API] Properties fetch error:`, error);
     throw error;

@@ -73,6 +73,7 @@ export interface PropertiesResponse {
   total: number;
   totalUnfiltered: number;
   totalPages: number;
+  page: number;
   statusCounts: {
     J?: number;
     A?: number;
@@ -85,30 +86,19 @@ export interface PropertiesResponse {
     PAID?: number;
     REMOVED?: number;
     other?: number;
-    [key: string]: number | undefined; // Allow any status key
+    [key: string]: number | undefined;
   };
+  workflowStageCounts?: Record<string, number>;
 }
 
-export function useProperties(filters?: {
-  status?: string;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  page?: number;
-  limit?: number;
-}) {
-  return useQuery<PropertiesResponse | Property[]>({
+export function useProperties(filters?: import('../lib/api').PropertyFilters) {
+  return useQuery<PropertiesResponse>({
     queryKey: ['properties', filters],
-    queryFn: () => getProperties(
-      filters?.page || 1,
-      filters?.limit || 100,
-      filters?.status,
-      filters?.search
-    ),
-    refetchOnMount: false, // Don't refetch on mount if we have cached data
+    queryFn: () => getProperties(filters || {}),
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchInterval: false,
-    staleTime: 30000, // Consider data fresh for 30 seconds
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes (React Query v5)
+    staleTime: 30000,
+    gcTime: 5 * 60 * 1000,
   });
 }
