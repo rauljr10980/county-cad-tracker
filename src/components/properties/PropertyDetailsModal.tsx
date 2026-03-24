@@ -1760,6 +1760,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                         } else {
                                           await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts);
                                         }
+                                        property.contacts = contacts; // Update in-memory so reopening modal shows correct status
                                         toast({ title: "Status saved", description: opt.label || 'No Status', duration: 1500 });
                                         if (opt.value === 'contacted' && isFromD4d) {
                                           setOpenPhoneStatusKey(null);
