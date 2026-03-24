@@ -42,7 +42,7 @@ export interface AdvancedFilters {
   lastPaymentDateTo?: string;
   improvementValueMin?: number;
   improvementValueMax?: number;
-  availableToContact?: boolean;
+  availableToContact?: 'yes' | 'no' | 'any';
 }
 
 interface AdvancedFiltersProps {
@@ -454,23 +454,31 @@ export function AdvancedFiltersPanel({
           {/* Available to Contact */}
           <div className="space-y-3">
             <Label>Available to Contact</Label>
-            <p className="text-xs text-muted-foreground -mt-1">Phone number found &amp; no notes</p>
+            <p className="text-xs text-muted-foreground -mt-1">Yes: has phone &amp; no notes &nbsp;|&nbsp; No: no phone number</p>
             <div className="flex gap-2">
               <Button
-                variant={!filters.availableToContact ? 'default' : 'outline'}
+                variant={!filters.availableToContact || filters.availableToContact === 'any' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => updateFilter('availableToContact', false)}
+                onClick={() => updateFilter('availableToContact', 'any')}
                 className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 Any
               </Button>
               <Button
-                variant={filters.availableToContact ? 'default' : 'outline'}
+                variant={filters.availableToContact === 'yes' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => updateFilter('availableToContact', true)}
+                onClick={() => updateFilter('availableToContact', 'yes')}
                 className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 Yes
+              </Button>
+              <Button
+                variant={filters.availableToContact === 'no' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('availableToContact', 'no')}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                No
               </Button>
             </div>
           </div>

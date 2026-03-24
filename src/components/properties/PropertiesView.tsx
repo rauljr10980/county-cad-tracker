@@ -432,7 +432,7 @@ export function PropertiesView() {
       (advancedFilters.followUpDateTo !== undefined) ||
       (advancedFilters.lastPaymentDateFrom !== undefined) ||
       (advancedFilters.lastPaymentDateTo !== undefined) ||
-      (advancedFilters.availableToContact === true)
+      (advancedFilters.availableToContact === 'yes' || advancedFilters.availableToContact === 'no')
     );
   }, [advancedFilters]);
   
@@ -887,11 +887,16 @@ export function PropertiesView() {
         if (paymentDate > toDate) return false;
       }
       
-      // Available to Contact: has phone number AND no notes
-      if (advancedFilters.availableToContact === true) {
+      // Available to Contact
+      if (advancedFilters.availableToContact === 'yes') {
+        // Yes: has phone number AND no notes
         const hasPhone = Array.isArray(p.phoneNumbers) && p.phoneNumbers.some(n => n && n.trim());
         const hasNotes = p.notes && typeof p.notes === 'string' && p.notes.trim() !== '';
         if (!hasPhone || hasNotes) return false;
+      } else if (advancedFilters.availableToContact === 'no') {
+        // No: no phone number at all
+        const hasPhone = Array.isArray(p.phoneNumbers) && p.phoneNumbers.some(n => n && n.trim());
+        if (hasPhone) return false;
       }
 
       // Search query filter (if not already handled by status matching above)
