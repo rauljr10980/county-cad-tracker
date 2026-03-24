@@ -1745,7 +1745,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                       newPhones[phoneIdx] = { ...newPhones[phoneIdx], status: opt.value as PhoneEntry['status'] };
                                       updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
                                       setPhoneContacts(updated);
-                                      setOpenPhoneStatusKey(null); // Close popover immediately
                                       // Auto-save immediately using locally computed values
                                       try {
                                         const allPhoneNumbers = updated.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
@@ -1761,6 +1760,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                         } else {
                                           await updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts);
                                         }
+                                        toast({ title: "Status saved", description: opt.label || 'No Status', duration: 1500 });
                                         if (opt.value === 'contacted' && isFromD4d) {
                                           setOpenPhoneStatusKey(null);
                                           setShowPhoneContactedPrompt(true);
