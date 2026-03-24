@@ -1745,6 +1745,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                       newPhones[phoneIdx] = { ...newPhones[phoneIdx], status: opt.value as PhoneEntry['status'] };
                                       updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
                                       setPhoneContacts(updated);
+                                      setOpenPhoneStatusKey(null); // Close popover immediately
                                       // Auto-save immediately using locally computed values
                                       try {
                                         const allPhoneNumbers = updated.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
