@@ -668,6 +668,10 @@ export function PropertiesView() {
       if (workflowStageFilter) {
         const stage = (p.workflow_stage as WorkflowStage) || 'not_started';
         if (stage !== workflowStageFilter) return false;
+      } else {
+        // When any filter is active, exclude dead-end properties
+        const stage = (p.workflow_stage as WorkflowStage) || 'not_started';
+        if (stage === 'dead_end') return false;
       }
       // Status filter - ALWAYS apply when statuses are selected (database uses PENDING/ACTIVE/JUDGMENT, filter uses P/A/J)
       if (needsFrontendStatusFilter) {
