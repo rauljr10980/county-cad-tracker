@@ -42,6 +42,7 @@ export interface AdvancedFilters {
   lastPaymentDateTo?: string;
   improvementValueMin?: number;
   improvementValueMax?: number;
+  availableToContact?: boolean;
 }
 
 interface AdvancedFiltersProps {
@@ -448,6 +449,30 @@ export function AdvancedFiltersPanel({
               value={filters.taxYear || ''}
               onChange={(e) => updateFilter('taxYear', e.target.value || undefined)}
             />
+          </div>
+
+          {/* Available to Contact */}
+          <div className="space-y-3">
+            <Label>Available to Contact</Label>
+            <p className="text-xs text-muted-foreground -mt-1">Phone number found &amp; no notes</p>
+            <div className="flex gap-2">
+              <Button
+                variant={!filters.availableToContact ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('availableToContact', false)}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                Any
+              </Button>
+              <Button
+                variant={filters.availableToContact ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('availableToContact', true)}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                Yes
+              </Button>
+            </div>
           </div>
 
           {/* Has Notes */}
