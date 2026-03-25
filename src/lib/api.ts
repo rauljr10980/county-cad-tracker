@@ -358,6 +358,17 @@ export async function getProperties(page = 1, limit = 100, status?: string, sear
 }
 
 /**
+ * Fetch a single property by ID (always fresh from DB)
+ */
+export async function getPropertyById(propertyId: string): Promise<Property> {
+  const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch property');
+  return response.json();
+}
+
+/**
  * Update property follow-up date
  */
 export async function updatePropertyFollowUp(propertyId: string, followUpDate: string) {
