@@ -14,6 +14,9 @@ import { LoginModal } from '@/components/auth/LoginModal';
 import { SignupModal } from '@/components/auth/SignupModal';
 import { Building2, LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PhoneSearchModal } from '@/components/phone/PhoneSearchModal';
+import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
+import { Property } from '@/lib/api';
 
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
@@ -28,6 +31,8 @@ const Index = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isSignupOpen, setIsSignupOpen] = useState(false);
+  const [isPhoneSearchOpen, setIsPhoneSearchOpen] = useState(false);
+  const [phoneSearchResult, setPhoneSearchResult] = useState<Property | null>(null);
 
   // Update URL hash when tab changes
   useEffect(() => {
@@ -43,6 +48,18 @@ const Index = () => {
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Global Shift+P → phone search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key === 'P' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        setIsPhoneSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const handleRefresh = async () => {
@@ -148,6 +165,19 @@ const Index = () => {
       <main className="container mx-auto animate-fade-in overflow-x-hidden">
         {renderContent()}
       </main>
+      <PhoneSearchModal
+        isOpen={isPhoneSearchOpen}
+        onClose={() => setIsPhoneSearchOpen(false)}
+        onSelectProperty={(p) => {
+          setPhoneSearchResult(p);
+          setIsPhoneSearchOpen(false);
+        }}
+      />
+      <PropertyDetailsModal
+        property={phoneSearchResult}
+        isOpen={!!phoneSearchResult}
+        onClose={() => setPhoneSearchResult(null)}
+      />
     </div>
   );
 };
