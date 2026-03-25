@@ -1684,7 +1684,10 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     />
                     <div className="flex-1 overflow-x-auto">
                       <div className="flex items-center gap-1.5">
-                        {contact.phones.map((phone, phoneIdx) => (
+                        {[...contact.phones.map((phone, phoneIdx) => ({ phone, phoneIdx }))].sort((a, b) => {
+                          const order = (s?: string) => s === 'rings' ? 0 : (!s || s === '') ? 1 : 2; // green first, no status second, red last
+                          return order(a.phone.status) - order(b.phone.status);
+                        }).map(({ phone, phoneIdx }) => (
                           <div key={phoneIdx} className="flex items-center gap-1 shrink-0">
                           <div className="relative">
                             <Input
