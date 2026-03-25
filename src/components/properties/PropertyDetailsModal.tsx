@@ -1788,7 +1788,6 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           </div>
                           {phone.number.trim() && (
                             <div className="flex items-center gap-1 shrink-0">
-make 
                               {/* Up/down call counter — hidden for not_working */}
                               {phone.status !== 'not_working' && (
                                 <div className="flex flex-col items-center shrink-0">
