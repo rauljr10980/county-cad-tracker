@@ -1685,7 +1685,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     <div className="flex-1 overflow-x-auto">
                       <div className="flex items-center gap-1.5">
                         {[...contact.phones.map((phone, phoneIdx) => ({ phone, phoneIdx }))].sort((a, b) => {
-                          const order = (s?: string) => s === 'rings' ? 0 : (!s || s === '') ? 1 : 2; // green first, no status second, red last
+                          const order = (s?: string) => s === 'contacted' ? 0 : s === 'rings' ? 1 : (!s || s === '') ? 2 : 3; // contacted first, green second, no status third, red last
                           return order(a.phone.status) - order(b.phone.status);
                         }).map(({ phone, phoneIdx }) => (
                           <div key={phoneIdx} className="flex items-center gap-1 shrink-0">
@@ -1809,41 +1809,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                   <Phone className="h-3.5 w-3.5" />
                                 </a>
                               )}
-                              {/* Up/down call counter — hidden for not_working */}
-                              {phone.status !== 'not_working' && (
-                                <div className="flex flex-col items-center shrink-0">
-                                  <button
-                                    type="button"
-                                    className="h-3.5 w-6 flex items-center justify-center text-muted-foreground hover:text-primary leading-none"
-                                    onClick={() => {
-                                      const updated = [...phoneContacts];
-                                      const newPhones = [...updated[rowIndex].phones];
-                                      newPhones[phoneIdx] = { ...newPhones[phoneIdx], callCount: (newPhones[phoneIdx].callCount || 0) + 1 };
-                                      updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
-                                      setPhoneContacts(updated);
-                                      const allPhoneNumbers = updated.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
-                                      const contacts = { ownerOverride: ownerOverride.trim(), phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0 })) })), emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })) };
-                                      property.contacts = contacts;
-                                      if (isD4d) updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride).catch(() => {}); else updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts).catch(() => {});
-                                    }}
-                                  >▲</button>
-                                  <span className="text-xs font-medium w-6 text-center leading-none">{phone.callCount || 0}</span>
-                                  <button
-                                    type="button"
-                                    className="h-3.5 w-6 flex items-center justify-center text-muted-foreground hover:text-primary leading-none"
-                                    onClick={() => {
-                                      const updated = [...phoneContacts];
-                                      const newPhones = [...updated[rowIndex].phones];
-                                      newPhones[phoneIdx] = { ...newPhones[phoneIdx], callCount: Math.max(0, (newPhones[phoneIdx].callCount || 0) - 1) };
-                                      updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
-                                      setPhoneContacts(updated);
-                                      const allPhoneNumbers = updated.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
-                                      const contacts = { ownerOverride: ownerOverride.trim(), phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0 })) })), emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })) };
-                                      property.contacts = contacts;
-                                      if (isD4d) updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride).catch(() => {}); else updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts).catch(() => {});
-                                    }}
-                                  >▼</button>
-                                </div>
+                              {/* Call count badge */}
+                              {phone.status !== 'not_working' && (phone.callCount || 0) > 0 && (
+                                <span className="text-xs font-medium text-muted-foreground min-w-[1rem] text-center">{phone.callCount}</span>
                               )}
                             </div>
                           )}
