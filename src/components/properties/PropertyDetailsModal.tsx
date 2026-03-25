@@ -354,7 +354,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       .filter(r => r.name.trim() || r.phones.some(p => p.number.trim()))
       .map(r => ({
         name: r.name,
-        phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '' })),
+        phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0 })),
       })),
     emailRows: emailRecipients
       .filter(r => r.name.trim() || r.emails.some(e => e.trim()))
@@ -1788,16 +1788,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           </div>
                           {phone.number.trim() && (
                             <div className="flex items-center gap-1 shrink-0">
-                              {/* Call button — hidden for not_working */}
-                              {phone.status !== 'not_working' && (
-                                <a
-                                  href={`tel:+${phone.number.replace(/\D/g, '').length === 10 ? '1' + phone.number.replace(/\D/g, '') : phone.number.replace(/\D/g, '')}`}
-                                  title={`Call ${phone.number}`}
-                                  className="h-7 w-7 flex items-center justify-center rounded text-green-400 hover:bg-green-400/10 shrink-0"
-                                >
-                                  <Phone className="h-3.5 w-3.5" />
-                                </a>
-                              )}
+make 
                               {/* Up/down call counter — hidden for not_working */}
                               {phone.status !== 'not_working' && (
                                 <div className="flex flex-col items-center shrink-0">
