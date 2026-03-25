@@ -1788,14 +1788,16 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                           </div>
                           {phone.number.trim() && (
                             <div className="flex items-center gap-1 shrink-0">
-                              {/* Call button — always shown */}
-                              <a
-                                href={`tel:+${phone.number.replace(/\D/g, '').length === 10 ? '1' + phone.number.replace(/\D/g, '') : phone.number.replace(/\D/g, '')}`}
-                                title={`Call ${phone.number}`}
-                                className="h-7 w-7 flex items-center justify-center rounded text-green-400 hover:bg-green-400/10 shrink-0"
-                              >
-                                <Phone className="h-3.5 w-3.5" />
-                              </a>
+                              {/* Call button — hidden for not_working */}
+                              {phone.status !== 'not_working' && (
+                                <a
+                                  href={`tel:+${phone.number.replace(/\D/g, '').length === 10 ? '1' + phone.number.replace(/\D/g, '') : phone.number.replace(/\D/g, '')}`}
+                                  title={`Call ${phone.number}`}
+                                  className="h-7 w-7 flex items-center justify-center rounded text-green-400 hover:bg-green-400/10 shrink-0"
+                                >
+                                  <Phone className="h-3.5 w-3.5" />
+                                </a>
+                              )}
                               {/* Up/down call counter — hidden for not_working */}
                               {phone.status !== 'not_working' && (
                                 <div className="flex flex-col items-center shrink-0">
