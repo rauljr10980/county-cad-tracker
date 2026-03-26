@@ -205,6 +205,26 @@ export async function getComparison(fileId: string) {
 }
 
 /**
+ * Log a phone call click
+ */
+export async function logCall(propertyId?: string, drivingLeadId?: string, phoneNumber?: string) {
+  await fetch(`${API_BASE_URL}/api/call-logs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ propertyId, drivingLeadId, phoneNumber }),
+  }).catch(() => {}); // fire-and-forget, never block the call
+}
+
+/**
+ * Get call stats (daily / weekly / monthly)
+ */
+export async function getCallStats(): Promise<{ daily: number; weekly: number; monthly: number }> {
+  const response = await fetch(`${API_BASE_URL}/api/call-logs/stats`, { headers: getAuthHeaders() });
+  if (!response.ok) return { daily: 0, weekly: 0, monthly: 0 };
+  return response.json();
+}
+
+/**
  * Get dashboard statistics
  */
 export async function getDashboardStats() {

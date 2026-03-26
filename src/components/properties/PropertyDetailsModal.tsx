@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, formatDistanceToNow, addYears } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail, updateDrivingLeadPhones, updateDrivingLeadEmails, updateDrivingLead } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail, updateDrivingLeadPhones, updateDrivingLeadEmails, updateDrivingLead, logCall } from '@/lib/api';
 import { extractContacts } from '@/lib/contactParser';
 import { toast } from '@/hooks/use-toast';
 import { usePropertyFollowUps } from '@/hooks/useFollowUps';
@@ -1806,6 +1806,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                   onClick={() => {
                                     const now = new Date().toISOString();
                                     setLastCallTime(now);
+                                    // Log this call for dashboard stats
+                                    logCall(
+                                      isD4d ? undefined : property.id,
+                                      isD4d ? d4dLeadId : undefined,
+                                      phone.number
+                                    );
                                     const updated = [...phoneContacts];
                                     const newPhones = [...updated[rowIndex].phones];
                                     newPhones[phoneIdx] = { ...newPhones[phoneIdx], callCount: (newPhones[phoneIdx].callCount || 0) + 1 };

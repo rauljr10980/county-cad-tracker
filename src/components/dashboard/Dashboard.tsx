@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2, Users, DollarSign, Package, ShoppingCart, Target, TrendingUp as Pipeline } from 'lucide-react';
+import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2, Users, DollarSign, Package, ShoppingCart, Target, TrendingUp as Pipeline, Phone } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyStatus } from '@/types/property';
-import { useDashboardStats } from '@/hooks/useFiles';
+import { useDashboardStats, useCallStats } from '@/hooks/useFiles';
 import { usePreForeclosures } from '@/hooks/usePreForeclosure';
 import type { WorkflowStage, PreForeclosureRecord } from '@/types/property';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ interface DashboardProps {
 export function Dashboard({ onFilterChange }: DashboardProps) {
   const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats();
   const { data: preForeclosureRecords, isLoading: isLoadingPreForeclosures } = usePreForeclosures();
+  const { data: callStats } = useCallStats();
 
   const isLoading = statsLoading;
   const error = statsError;
@@ -125,6 +126,33 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+      {/* Call Activity */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Phone className="h-4 w-4 text-green-400" />
+            Call Activity
+          </CardTitle>
+          <CardDescription>Phone call button clicks</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="text-3xl font-bold text-green-400">{callStats?.daily ?? 0}</div>
+              <div className="text-xs text-muted-foreground mt-1">Today</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold">{callStats?.weekly ?? 0}</div>
+              <div className="text-xs text-muted-foreground mt-1">This Week</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold">{callStats?.monthly ?? 0}</div>
+              <div className="text-xs text-muted-foreground mt-1">This Month</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Top Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card>

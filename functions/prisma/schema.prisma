@@ -740,3 +740,19 @@ model FollowUp {
   @@index([date, completed])
   @@map("follow_ups")
 }
+
+// ============================================================================
+// CALL LOG — tracks every phone call button press
+// ============================================================================
+model CallLog {
+  id           String   @id @default(cuid())
+  calledAt     DateTime @default(now())
+  propertyId   String?
+  drivingLeadId String?
+  phoneNumber  String?
+
+  @@index([calledAt])
+  @@index([propertyId])
+  @@index([drivingLeadId])
+  @@map("call_logs")
+}

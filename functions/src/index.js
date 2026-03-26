@@ -36,6 +36,7 @@ const zonesRoutes = require('./routes/zones');
 const drivingRoutes = require('./routes/driving');
 const followupRoutes = require('./routes/followups');
 const emailRoutes = require('./routes/email');
+const callLogsRoutes = require('./routes/callLogs');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -171,6 +172,7 @@ app.use('/api/zones', zonesRoutes);
 app.use('/api/driving', drivingRoutes);
 app.use('/api/followups', followupRoutes);
 app.use('/api/email', emailRoutes);
+app.use('/api/call-logs', callLogsRoutes);
 
 // ============================================================================
 // ERROR HANDLING
