@@ -422,7 +422,7 @@ export function PropertyTable({
                   </td>
                   <td className="text-right text-xs text-muted-foreground whitespace-nowrap">
                     {(() => {
-                      const t = (property as any).contacts?.lastCallTime;
+                      const t = (property as any).lastCallTime;
                       if (!t) return <span className="text-muted-foreground/40">—</span>;
                       const d = new Date(t);
                       return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;

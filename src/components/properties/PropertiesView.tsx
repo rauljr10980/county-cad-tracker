@@ -1007,9 +1007,8 @@ export function PropertiesView() {
           ? (b.totalAmountDue / b.marketValue) * 100
           : null;
       } else if (sortField === 'lastCallTime') {
-        // lastCallTime lives inside contacts JSON
-        aVal = (a as any).contacts?.lastCallTime ?? null;
-        bVal = (b as any).contacts?.lastCallTime ?? null;
+        aVal = (a as any).lastCallTime ?? null;
+        bVal = (b as any).lastCallTime ?? null;
       } else {
         // Normal field access
         aVal = a[sortField as keyof Property];

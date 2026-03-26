@@ -92,6 +92,7 @@ model Property {
   ownerPhoneIndex Int? // Index of owner's primary phone
   emails          String[] @default([]) // Array of email addresses (flat, for backward compat)
   contacts        Json?    // Structured contacts: {phoneRows: [{name, phones}], emailRows: [{name, emails}]}
+  lastCallTime    DateTime? // Last time a call button was pressed for this property
 
   // Notes (simple string field for quick notes, separate from Note relation for detailed notes)
   notes String? @db.Text
@@ -663,6 +664,7 @@ model DrivingLead {
   emails         String[]  @default([])
   contacts       Json?
   ownerName      String?
+  lastCallTime   DateTime?
 
   // Workflow metadata (research/contact checklists, dead reason, last contacted)
   metadata   Json?

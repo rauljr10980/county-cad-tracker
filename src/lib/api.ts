@@ -407,14 +407,14 @@ export async function updatePropertyNotes(propertyId: string, notes: string) {
 /**
  * Update property phone numbers
  */
-export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumbers: string[], ownerPhoneIndex?: number, contacts?: Record<string, unknown>) {
+export async function updatePropertyPhoneNumbers(propertyId: string, phoneNumbers: string[], ownerPhoneIndex?: number, contacts?: Record<string, unknown>, lastCallTime?: string | null) {
   const response = await fetch(`${API_BASE_URL}/api/properties/${propertyId}/phones`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders(),
     },
-    body: JSON.stringify({ phoneNumbers, ownerPhoneIndex, contacts }),
+    body: JSON.stringify({ phoneNumbers, ownerPhoneIndex, contacts, lastCallTime }),
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -444,11 +444,11 @@ export async function updatePropertyEmails(propertyId: string, emails: string[],
 /**
  * Update driving lead phone numbers + contacts
  */
-export async function updateDrivingLeadPhones(leadId: string, phoneNumbers: string[], ownerPhoneIndex?: number, contacts?: Record<string, unknown>, ownerName?: string) {
+export async function updateDrivingLeadPhones(leadId: string, phoneNumbers: string[], ownerPhoneIndex?: number, contacts?: Record<string, unknown>, ownerName?: string, lastCallTime?: string | null) {
   const response = await fetch(`${API_BASE_URL}/api/driving/${leadId}/phones`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    body: JSON.stringify({ phoneNumbers, ownerPhoneIndex, contacts, ownerName }),
+    body: JSON.stringify({ phoneNumbers, ownerPhoneIndex, contacts, ownerName, lastCallTime }),
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));

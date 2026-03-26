@@ -1116,7 +1116,7 @@ router.put('/:id/notes', optionalAuth, async (req, res) => {
 router.put('/:id/phones', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { phoneNumbers, ownerPhoneIndex, contacts } = req.body;
+    const { phoneNumbers, ownerPhoneIndex, contacts, lastCallTime } = req.body;
 
     if (!Array.isArray(phoneNumbers)) {
       return res.status(400).json({ error: 'phoneNumbers must be an array' });
@@ -1132,9 +1132,12 @@ router.put('/:id/phones', optionalAuth, async (req, res) => {
         : null;
     }
 
-    // Also persist structured contacts JSON if provided
     if (contacts !== undefined) {
       updateData.contacts = contacts;
+    }
+
+    if (lastCallTime !== undefined) {
+      updateData.lastCallTime = lastCallTime ? new Date(lastCallTime) : null;
     }
 
     const property = await prisma.property.update({
@@ -1146,6 +1149,7 @@ router.put('/:id/phones', optionalAuth, async (req, res) => {
         phoneNumbers: true,
         ownerPhoneIndex: true,
         contacts: true,
+        lastCallTime: true,
       }
     });
 

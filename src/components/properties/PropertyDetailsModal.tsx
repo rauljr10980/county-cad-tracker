@@ -178,7 +178,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setEmailBody(`Hi Ms./Mr. {{LastName}},\n\nMy name is Raul. I'm reaching out regarding the property at {{PropertyAddress}}, which is listed under {{Owner}}.\n\nIf you're connected to the property, could you please let me know the best person to speak with? If the home is vacant, I would be interested in discussing a possible purchase.\n\nWe also work with real estate attorneys to help streamline the process, and you wouldn't have to pay out of pocket for those legal services.\n\nIf I've reached you by mistake, please disregard this message and accept my apologies.\n\nThank you,\nRaul\n210-425-7584`);
 
       setOwnerOverride(savedContacts?.ownerOverride || '');
-      setLastCallTime((savedContacts as any)?.lastCallTime || null);
+      // Prefer dedicated column, fall back to contacts JSON for old data
+      setLastCallTime((property as any).lastCallTime || (savedContacts as any)?.lastCallTime || null);
 
       // Initialize D4$ pipeline state (works for both red-dot stubs and green-dot found properties)
       if (isFromD4d) {
@@ -1813,7 +1814,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                     const allPhoneNumbers = updated.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
                                     const contacts = { ownerOverride: ownerOverride.trim(), lastCallTime: now, phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0 })) })), emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })) };
                                     property.contacts = contacts;
-                                    if (isD4d) updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride).catch(() => {}); else updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts).catch(() => {});
+                                    property.lastCallTime = now;
+                                    if (isD4d) updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride, now).catch(() => {}); else updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts, now).catch(() => {});
                                   }}
                                 >
                                   <Phone className="h-3.5 w-3.5" />

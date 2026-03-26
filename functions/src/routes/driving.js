@@ -156,7 +156,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 router.put('/:id/phones', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { phoneNumbers, ownerPhoneIndex, contacts, ownerName } = req.body;
+    const { phoneNumbers, ownerPhoneIndex, contacts, ownerName, lastCallTime } = req.body;
 
     if (!Array.isArray(phoneNumbers)) {
       return res.status(400).json({ error: 'phoneNumbers must be an array' });
@@ -168,11 +168,12 @@ router.put('/:id/phones', optionalAuth, async (req, res) => {
     if (ownerPhoneIndex !== undefined) updateData.ownerPhoneIndex = ownerPhoneIndex ?? null;
     if (contacts !== undefined) updateData.contacts = contacts;
     if (ownerName !== undefined) updateData.ownerName = ownerName;
+    if (lastCallTime !== undefined) updateData.lastCallTime = lastCallTime ? new Date(lastCallTime) : null;
 
     const updated = await prisma.drivingLead.update({
       where: { id },
       data: updateData,
-      select: { id: true, phoneNumbers: true, ownerPhoneIndex: true, contacts: true, ownerName: true },
+      select: { id: true, phoneNumbers: true, ownerPhoneIndex: true, contacts: true, ownerName: true, lastCallTime: true },
     });
 
     res.json(updated);
