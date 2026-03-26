@@ -43,6 +43,7 @@ export interface AdvancedFilters {
   improvementValueMin?: number;
   improvementValueMax?: number;
   availableToContact?: 'yes' | 'no' | 'any';
+  excludeDeadEnd?: boolean;
 }
 
 interface AdvancedFiltersProps {
@@ -479,6 +480,30 @@ export function AdvancedFiltersPanel({
                 className="flex-1 mobile-touch-target text-xs sm:text-sm"
               >
                 No
+              </Button>
+            </div>
+          </div>
+
+          {/* Exclude Dead End */}
+          <div className="space-y-3">
+            <Label>Workflow</Label>
+            <p className="text-xs text-muted-foreground -mt-1">Hide properties marked as Dead End</p>
+            <div className="flex gap-2">
+              <Button
+                variant={!filters.excludeDeadEnd ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('excludeDeadEnd', false)}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                Show All
+              </Button>
+              <Button
+                variant={filters.excludeDeadEnd ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateFilter('excludeDeadEnd', true)}
+                className="flex-1 mobile-touch-target text-xs sm:text-sm"
+              >
+                Exclude Dead End
               </Button>
             </div>
           </div>

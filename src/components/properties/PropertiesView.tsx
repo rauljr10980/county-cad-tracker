@@ -432,7 +432,8 @@ export function PropertiesView() {
       (advancedFilters.followUpDateTo !== undefined) ||
       (advancedFilters.lastPaymentDateFrom !== undefined) ||
       (advancedFilters.lastPaymentDateTo !== undefined) ||
-      (advancedFilters.availableToContact === 'yes' || advancedFilters.availableToContact === 'no')
+      (advancedFilters.availableToContact === 'yes' || advancedFilters.availableToContact === 'no') ||
+      (advancedFilters.excludeDeadEnd === true)
     );
   }, [advancedFilters]);
   
@@ -897,6 +898,11 @@ export function PropertiesView() {
         // No: no phone number at all
         const hasPhone = Array.isArray(p.phoneNumbers) && p.phoneNumbers.some(n => n && n.trim());
         if (hasPhone) return false;
+      }
+
+      // Exclude Dead End workflow
+      if (advancedFilters.excludeDeadEnd) {
+        if ((p.workflow_stage || 'not_started') === 'dead_end') return false;
       }
 
       // Search query filter (if not already handled by status matching above)
