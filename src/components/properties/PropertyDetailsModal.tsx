@@ -71,6 +71,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [visitQuestionsExpanded, setVisitQuestionsExpanded] = useState(true);
   const [actionsTasksExpanded, setActionsTasksExpanded] = useState(false);
   const [phoneExpanded, setPhoneExpanded] = useState(false);
+  const [lastCallTime, setLastCallTime] = useState<string | null>(null);
   const [contactExtractorExpanded, setContactExtractorExpanded] = useState(false);
   const [rawContactText, setRawContactText] = useState('');
   const [emails, setEmails] = useState<string[]>([]);
@@ -177,6 +178,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       setEmailBody(`Hi Ms./Mr. {{LastName}},\n\nMy name is Raul. I'm reaching out regarding the property at {{PropertyAddress}}, which is listed under {{Owner}}.\n\nIf you're connected to the property, could you please let me know the best person to speak with? If the home is vacant, I would be interested in discussing a possible purchase.\n\nWe also work with real estate attorneys to help streamline the process, and you wouldn't have to pay out of pocket for those legal services.\n\nIf I've reached you by mistake, please disregard this message and accept my apologies.\n\nThank you,\nRaul\n210-425-7584`);
 
       setOwnerOverride(savedContacts?.ownerOverride || '');
+      setLastCallTime((savedContacts as any)?.lastCallTime || null);
 
       // Initialize D4$ pipeline state (works for both red-dot stubs and green-dot found properties)
       if (isFromD4d) {
@@ -1640,6 +1642,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">Phone Numbers</span>
+                {lastCallTime && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Last call: {new Date(lastCallTime).toLocaleDateString([], { month: 'short', day: 'numeric' })} {new Date(lastCallTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
               </div>
               <ChevronDown className={cn(
                 "h-4 w-4 text-muted-foreground transition-transform duration-200",
@@ -1795,13 +1802,15 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                   title={`Call ${phone.number}`}
                                   className="h-7 w-7 flex items-center justify-center rounded text-green-400 hover:bg-green-400/10 shrink-0"
                                   onClick={() => {
+                                    const now = new Date().toISOString();
+                                    setLastCallTime(now);
                                     const updated = [...phoneContacts];
                                     const newPhones = [...updated[rowIndex].phones];
                                     newPhones[phoneIdx] = { ...newPhones[phoneIdx], callCount: (newPhones[phoneIdx].callCount || 0) + 1 };
                                     updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
                                     setPhoneContacts(updated);
                                     const allPhoneNumbers = updated.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
-                                    const contacts = { ownerOverride: ownerOverride.trim(), phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0 })) })), emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })) };
+                                    const contacts = { ownerOverride: ownerOverride.trim(), lastCallTime: now, phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0 })) })), emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })) };
                                     property.contacts = contacts;
                                     if (isD4d) updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride).catch(() => {}); else updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts).catch(() => {});
                                   }}
