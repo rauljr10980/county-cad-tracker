@@ -363,7 +363,7 @@ export function PropertiesView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [workflowStageFilter, setWorkflowStageFilter] = useState<WorkflowStage | null>(null);
-  const [sortField, setSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
+  const [sortField, setSortField] = useState<keyof Property | 'ratio' | 'lastCallTime'>('totalAmountDue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
   // Pre-foreclosure records for AreaSelectorMap toggle
@@ -994,17 +994,20 @@ export function PropertiesView() {
       
       // Handle special case: ratio is calculated (totalAmountDue / marketValue * 100)
       if (sortField === 'ratio') {
-        // Calculate ratio: (amountDue / marketValue) * 100
-        aVal = (a.marketValue && a.marketValue !== 0) 
-          ? (a.totalAmountDue / a.marketValue) * 100 
+        aVal = (a.marketValue && a.marketValue !== 0)
+          ? (a.totalAmountDue / a.marketValue) * 100
           : null;
-        bVal = (b.marketValue && b.marketValue !== 0) 
-          ? (b.totalAmountDue / b.marketValue) * 100 
+        bVal = (b.marketValue && b.marketValue !== 0)
+          ? (b.totalAmountDue / b.marketValue) * 100
           : null;
+      } else if (sortField === 'lastCallTime') {
+        // lastCallTime lives inside contacts JSON
+        aVal = (a as any).contacts?.lastCallTime ?? null;
+        bVal = (b as any).contacts?.lastCallTime ?? null;
       } else {
         // Normal field access
-        aVal = a[sortField];
-        bVal = b[sortField];
+        aVal = a[sortField as keyof Property];
+        bVal = b[sortField as keyof Property];
       }
       
       // Handle null/undefined values - put them at the end
@@ -1231,7 +1234,7 @@ export function PropertiesView() {
     setDebouncedSearchQuery('');
   };
 
-  const handleSort = (field: keyof Property | 'ratio') => {
+  const handleSort = (field: keyof Property | 'ratio' | 'lastCallTime') => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {

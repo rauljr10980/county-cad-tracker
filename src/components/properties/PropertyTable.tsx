@@ -18,9 +18,9 @@ interface PropertyTableProps {
   onFollowUp?: (property: Property) => void;
   statusFilter?: PropertyStatus;
   onStatusFilterChange?: (status: PropertyStatus | undefined) => void;
-  sortField?: keyof Property | 'ratio';
+  sortField?: keyof Property | 'ratio' | 'lastCallTime';
   sortDirection?: 'asc' | 'desc';
-  onSort?: (field: keyof Property | 'ratio') => void;
+  onSort?: (field: keyof Property | 'ratio' | 'lastCallTime') => void;
   selectedPropertyIds?: Set<string>;
   onPropertySelect?: (propertyId: string, selected: boolean) => void;
   allFilteredPropertyIds?: string[];
@@ -45,7 +45,7 @@ export function PropertyTable({
   onDeleteProperty
 }: PropertyTableProps) {
   // Use external sort state if provided, otherwise use internal state (fallback)
-  const [internalSortField, setInternalSortField] = useState<keyof Property | 'ratio'>('totalAmountDue');
+  const [internalSortField, setInternalSortField] = useState<keyof Property | 'ratio' | 'lastCallTime'>('totalAmountDue');
   const [internalSortDirection, setInternalSortDirection] = useState<'asc' | 'desc'>('asc');
   
   const sortField = onSort ? externalSortField : internalSortField;
@@ -82,7 +82,7 @@ export function PropertyTable({
   // (Database uses PENDING/ACTIVE/JUDGMENT, but filters use P/A/J, so PropertiesView normalizes them)
   const displayProperties = properties;
   
-  const handleSort = (field: keyof Property | 'ratio') => {
+  const handleSort = (field: keyof Property | 'ratio' | 'lastCallTime') => {
     if (onSort) {
       // Use external sort handler (from PropertiesView)
       onSort(field);
@@ -314,6 +314,21 @@ export function PropertyTable({
                 </div>
               </th>
               <th>Phone Number</th>
+              <th
+                className="cursor-pointer hover:bg-secondary text-right whitespace-nowrap"
+                onClick={() => handleSort('lastCallTime')}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Last Called
+                  {sortField === 'lastCallTime' && (
+                    sortDirection === 'asc' ? (
+                      <ArrowUp className="h-3 w-3" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3" />
+                    )
+                  )}
+                </div>
+              </th>
               <th className="w-28">Actions</th>
             </tr>
           </thead>
@@ -404,6 +419,14 @@ export function PropertyTable({
                     ) : (
                       <span className="text-red-500 text-sm font-medium">No</span>
                     )}
+                  </td>
+                  <td className="text-right text-xs text-muted-foreground whitespace-nowrap">
+                    {(() => {
+                      const t = (property as any).contacts?.lastCallTime;
+                      if (!t) return <span className="text-muted-foreground/40">—</span>;
+                      const d = new Date(t);
+                      return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                    })()}
                   </td>
                   <td>
                     <div className="flex items-center gap-1">
