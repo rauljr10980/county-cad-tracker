@@ -352,6 +352,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   // Build current contacts JSON from both phone and email rows
   const buildContactsJson = () => ({
     ownerOverride: ownerOverride.trim(),
+    ...(lastCallTime ? { lastCallTime } : {}),
     phoneRows: phoneContacts
       .filter(r => r.name.trim() || r.phones.some(p => p.number.trim()))
       .map(r => ({
