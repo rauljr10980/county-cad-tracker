@@ -435,159 +435,132 @@ export function DrivingView() {
           <p className="text-sm">No results for "{searchQuery}"</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filteredLeads.map((lead) => (
-            <div key={lead.id} className={cn(
-              "bg-card rounded-lg border p-3 space-y-2",
-              lead.status === 'DEAD' && 'opacity-50'
-            )}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    {dbStatus[lead.id] && (
-                      <span
-                        className={cn(
-                          "h-2.5 w-2.5 rounded-full flex-shrink-0",
-                          dbStatus[lead.id] === 'found' ? 'bg-green-500' : 'bg-red-500'
-                        )}
-                        title={dbStatus[lead.id] === 'found' ? 'Found in database' : 'Not in database'}
-                      />
+        <div className="rounded-lg border overflow-hidden">
+          {/* Table header */}
+          <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 px-3 py-2 bg-muted/40 border-b text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <span>Status</span>
+            <span>Address</span>
+            <span className="text-right">Last Called</span>
+            <span>Actions</span>
+          </div>
+          {/* Rows */}
+          <div className="divide-y divide-border/50">
+          {filteredLeads.map((lead) => {
+            const heirRows = ((lead as any).contacts?.phoneRows || []).filter(
+              (r: any) => r.phones?.some((p: any) => p.number?.trim())
+            );
+            const lastCallT = (lead as any).lastCallTime;
+
+            function fmtTime(iso: string) {
+              const d = new Date(iso);
+              const diffH = (Date.now() - d.getTime()) / 3600000;
+              if (diffH < 24) return `Today ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+              if (diffH < 48) return `Yesterday ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+              return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            }
+
+            return (
+              <div key={lead.id} className={cn(lead.status === 'DEAD' && 'opacity-40')}>
+                {/* Main row */}
+                <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 px-3 py-2.5 items-center hover:bg-muted/20 transition-colors">
+                  {/* Status */}
+                  <Select
+                    value={lead.status}
+                    onValueChange={(v) => handleStatusChange(lead.id, v as DrivingLeadStatus)}
+                  >
+                    <SelectTrigger className={cn("h-6 w-[120px] text-[11px] border px-2", STATUS_CONFIG[lead.status].color)}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.entries(STATUS_CONFIG) as [DrivingLeadStatus, { label: string }][]).map(([value, { label }]) => (
+                        <SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Address + notes */}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      {dbStatus[lead.id] && (
+                        <span className={cn("h-2 w-2 rounded-full shrink-0", dbStatus[lead.id] === 'found' ? 'bg-green-500' : 'bg-red-500')} />
+                      )}
+                      <span className="text-sm font-medium truncate">{lead.street}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">{lead.city}, {lead.state}</span>
+                    </div>
+                    {lead.notes && (
+                      <p className="text-xs text-muted-foreground italic truncate mt-0.5">{lead.notes}</p>
                     )}
-                    <p className="font-medium text-sm truncate">{lead.street}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {lead.city}, {lead.state} {lead.zip}
-                  </p>
-                  {lead.notes && (
-                    <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{lead.notes}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {/* Property Details button */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-primary"
-                    onClick={() => handleViewDetails(lead)}
-                    disabled={loadingDetailsId === lead.id}
-                  >
-                    {loadingDetailsId === lead.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <FileText className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                  {/* Camera button */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-primary relative"
-                    onClick={() => fileInputRefs.current[lead.id]?.click()}
-                    disabled={uploadingLeadId === lead.id}
-                  >
-                    {uploadingLeadId === lead.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Camera className="h-3.5 w-3.5" />
-                        {(lead.photoCount ?? 0) > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[9px] rounded-full h-3.5 min-w-[14px] flex items-center justify-center px-0.5 leading-none">
-                            {lead.photoCount}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </Button>
-                  <input
-                    ref={(el) => { fileInputRefs.current[lead.id] = el; }}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => handlePhotoCapture(lead.id, e)}
-                  />
-                  {/* Delete button */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(lead.id)}
-                    disabled={deletingId === lead.id}
-                  >
-                    {deletingId === lead.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                </div>
-              </div>
 
-              {/* Photo thumbnails */}
-              {(lead.photoCount ?? 0) > 0 && (
-                <PhotoThumbnails leadId={lead.id} onViewAll={() => setViewingPhotosLeadId(lead.id)} />
-              )}
+                  {/* Last called */}
+                  <span className={cn('text-xs whitespace-nowrap', lastCallT ? 'text-muted-foreground' : 'text-orange-400')}>
+                    {lastCallT ? fmtTime(lastCallT) : '—'}
+                  </span>
 
-              {/* Heir subsections — name + last called */}
-              {(() => {
-                const rows: any[] = (lead as any).contacts?.phoneRows || [];
-                const heirRows = rows.filter((r: any) => r.phones?.some((p: any) => p.number?.trim()));
-                if (heirRows.length === 0) return null;
-                return (
-                  <div className="border-t pt-2 space-y-1">
+                  {/* Actions */}
+                  <div className="flex items-center gap-0.5">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
+                      onClick={() => handleViewDetails(lead)} disabled={loadingDetailsId === lead.id}>
+                      {loadingDetailsId === lead.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary relative"
+                      onClick={() => fileInputRefs.current[lead.id]?.click()} disabled={uploadingLeadId === lead.id}>
+                      {uploadingLeadId === lead.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (
+                        <>
+                          <Camera className="h-3.5 w-3.5" />
+                          {(lead.photoCount ?? 0) > 0 && (
+                            <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[9px] rounded-full h-3.5 min-w-[14px] flex items-center justify-center px-0.5 leading-none">
+                              {lead.photoCount}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </Button>
+                    <input ref={(el) => { fileInputRefs.current[lead.id] = el; }} type="file"
+                      accept="image/*" capture="environment" className="hidden"
+                      onChange={(e) => handlePhotoCapture(lead.id, e)} />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDelete(lead.id)} disabled={deletingId === lead.id}>
+                      {deletingId === lead.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Photo thumbnails */}
+                {(lead.photoCount ?? 0) > 0 && (
+                  <div className="px-3 pb-2">
+                    <PhotoThumbnails leadId={lead.id} onViewAll={() => setViewingPhotosLeadId(lead.id)} />
+                  </div>
+                )}
+
+                {/* Heir sub-rows */}
+                {heirRows.length > 0 && (
+                  <div className="border-t border-dashed border-border/40 divide-y divide-border/20">
                     {heirRows.map((row: any, i: number) => {
                       const phones: any[] = row.phones?.filter((p: any) => p.number?.trim()) || [];
                       const lastCall = phones.reduce((latest: string | null, p: any) => {
                         if (!p.lastCallTime) return latest;
-                        if (!latest || p.lastCallTime > latest) return p.lastCallTime;
-                        return latest;
+                        return !latest || p.lastCallTime > latest ? p.lastCallTime : latest;
                       }, null);
                       return (
-                        <div key={i} className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-foreground/80 truncate">
-                            {row.name?.trim() || `Contact ${i + 1}`}
+                        <div key={i} className="grid grid-cols-[auto_1fr_auto_auto] gap-3 px-3 py-1.5 items-center bg-muted/10">
+                          <div /> {/* align under Status */}
+                          <span className="text-xs text-foreground/70 pl-3 truncate">
+                            ↳ {row.name?.trim() || `Contact ${i + 1}`}
                           </span>
-                          <span className={cn(
-                            'text-[10px] shrink-0',
-                            lastCall ? 'text-muted-foreground' : 'text-orange-400'
-                          )}>
-                            {lastCall
-                              ? (() => {
-                                  const d = new Date(lastCall);
-                                  const diffH = (Date.now() - d.getTime()) / 3600000;
-                                  if (diffH < 24) return `Today ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-                                  if (diffH < 48) return `Yesterday ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-                                  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-                                })()
-                              : 'Never called'}
+                          <span className={cn('text-[10px] whitespace-nowrap', lastCall ? 'text-muted-foreground' : 'text-orange-400')}>
+                            {lastCall ? fmtTime(lastCall) : 'Never called'}
                           </span>
+                          <div className="w-[88px]" /> {/* align under Actions */}
                         </div>
                       );
                     })}
                   </div>
-                );
-              })()}
-
-              <div className="flex items-center justify-between">
-                <Select
-                  value={lead.status}
-                  onValueChange={(v) => handleStatusChange(lead.id, v as DrivingLeadStatus)}
-                >
-                  <SelectTrigger className={cn("h-7 w-[150px] text-xs border", STATUS_CONFIG[lead.status].color)}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.entries(STATUS_CONFIG) as [DrivingLeadStatus, { label: string }][]).map(([value, { label }]) => (
-                      <SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <span className="text-[11px] text-muted-foreground">
-                  {formatDistanceToNow(new Date(lead.createdAt), { addSuffix: true })}
-                </span>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
+          </div>
         </div>
       ))}
 
