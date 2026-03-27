@@ -433,6 +433,7 @@ export interface DrivingLead {
   phoneNumbers?: string[];
   emails?: string[];
   contacts?: Record<string, unknown> | null;
+  lastCallTime?: string | null;
   metadata?: D4dWorkflow;
   createdAt: string;
   updatedAt: string;

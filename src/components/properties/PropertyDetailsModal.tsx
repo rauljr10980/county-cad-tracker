@@ -358,7 +358,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
       .filter(r => r.name.trim() || r.phones.some(p => p.number.trim()))
       .map(r => ({
         name: r.name,
-        phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0 })),
+        phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0, ...(p.lastCallTime ? { lastCallTime: p.lastCallTime } : {}) })),
       })),
     emailRows: emailRecipients
       .filter(r => r.name.trim() || r.emails.some(e => e.trim()))
@@ -471,7 +471,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   })).reverse() || [];
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { if (isD4d) queryClient.invalidateQueries({ queryKey: ['driving-leads'] }); onClose(); } }}>
       <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl lg:max-w-5xl max-h-[85vh] overflow-hidden bg-card border-border p-0">
         <div className="overflow-y-auto overflow-x-hidden max-h-[85vh] p-6">
         <DialogHeader className="border-b border-border pb-4">
@@ -1814,11 +1814,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                     );
                                     const updated = [...phoneContacts];
                                     const newPhones = [...updated[rowIndex].phones];
-                                    newPhones[phoneIdx] = { ...newPhones[phoneIdx], callCount: (newPhones[phoneIdx].callCount || 0) + 1 };
+                                    newPhones[phoneIdx] = { ...newPhones[phoneIdx], callCount: (newPhones[phoneIdx].callCount || 0) + 1, lastCallTime: now };
                                     updated[rowIndex] = { ...updated[rowIndex], phones: newPhones };
                                     setPhoneContacts(updated);
                                     const allPhoneNumbers = updated.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
-                                    const contacts = { ownerOverride: ownerOverride.trim(), lastCallTime: now, phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0 })) })), emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })) };
+                                    const contacts = { ownerOverride: ownerOverride.trim(), lastCallTime: now, phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0, ...(p.lastCallTime ? { lastCallTime: p.lastCallTime } : {}) })) })), emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })) };
                                     property.contacts = contacts;
                                     property.lastCallTime = now;
                                     if (isD4d) updateDrivingLeadPhones(d4dLeadId, allPhoneNumbers, ownerPhoneIndex, contacts, ownerOverride, now).catch(() => {}); else updatePropertyPhoneNumbers(property.id, allPhoneNumbers, ownerPhoneIndex, contacts, now).catch(() => {});

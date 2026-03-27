@@ -14,8 +14,9 @@ export function useDrivingLeads() {
   return useQuery<DrivingLead[]>({
     queryKey: ['driving-leads'],
     queryFn: getDrivingLeads,
+    staleTime: 0,          // always re-fetch fresh data on mount/login
     refetchOnMount: true,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
   });
 }
 
