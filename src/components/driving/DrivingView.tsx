@@ -109,6 +109,7 @@ export function DrivingView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddresses, setShowAddresses] = useState(false);
   const [activeTab, setActiveTab] = useState<'pipeline' | 'heirs'>('pipeline');
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   const { data: leads = [], isLoading } = useDrivingLeads();
   const createMutation = useCreateDrivingLead();
@@ -246,19 +247,19 @@ export function DrivingView() {
     e.target.value = '';
   };
 
-  const filteredLeads = searchQuery.trim()
-    ? leads.filter(lead => {
-        const q = searchQuery.toLowerCase().trim();
-        return (
-          (lead.rawAddress && lead.rawAddress.toLowerCase().includes(q)) ||
-          (lead.street && lead.street.toLowerCase().includes(q)) ||
-          ((lead as any).ownerName && (lead as any).ownerName.toLowerCase().includes(q)) ||
-          ((lead as any).notes && (lead as any).notes.toLowerCase().includes(q)) ||
-          ((lead as any).phoneNumbers && Array.isArray((lead as any).phoneNumbers) &&
-            (lead as any).phoneNumbers.some((p: string) => p && p.toLowerCase().includes(q)))
-        );
-      })
-    : leads;
+  const filteredLeads = leads.filter(lead => {
+    if (statusFilter && lead.status !== statusFilter) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      (lead.rawAddress && lead.rawAddress.toLowerCase().includes(q)) ||
+      (lead.street && lead.street.toLowerCase().includes(q)) ||
+      ((lead as any).ownerName && (lead as any).ownerName.toLowerCase().includes(q)) ||
+      ((lead as any).notes && (lead as any).notes.toLowerCase().includes(q)) ||
+      ((lead as any).phoneNumbers && Array.isArray((lead as any).phoneNumbers) &&
+        (lead as any).phoneNumbers.some((p: string) => p && p.toLowerCase().includes(q)))
+    );
+  });
 
   return (
     <div className="p-2 md:p-4 space-y-4 max-w-7xl mx-auto">
@@ -354,16 +355,39 @@ export function DrivingView() {
       {activeTab === 'pipeline' && (
         <>
           {/* D4$ Pipeline */}
-          {leads.length > 0 && <D4dPipelineView leads={leads as any} onViewDetails={handleViewDetails} />}
+          {leads.length > 0 && <D4dPipelineView
+            leads={leads as any}
+            onViewDetails={handleViewDetails}
+            activeFilter={statusFilter}
+            onStageFilter={(s) => {
+              setStatusFilter(s);
+              if (s) setShowAddresses(true);
+            }}
+          />}
 
           {/* Count + collapsible addresses */}
-          <button
-            className="flex items-center justify-between w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-            onClick={() => setShowAddresses(prev => !prev)}
-          >
-            <span>{searchQuery ? `${filteredLeads.length} of ${leads.length}` : `${leads.length}`} address{leads.length !== 1 ? 'es' : ''} logged</span>
-            <ChevronDown className={cn('h-4 w-4 transition-transform', showAddresses && 'rotate-180')} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="flex items-center justify-between flex-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setShowAddresses(prev => !prev)}
+            >
+              <span>
+                {statusFilter || searchQuery
+                  ? `${filteredLeads.length} of ${leads.length}`
+                  : leads.length} address{leads.length !== 1 ? 'es' : ''} logged
+                {statusFilter && <span className="ml-1.5 text-xs text-primary font-medium">· filtered</span>}
+              </span>
+              <ChevronDown className={cn('h-4 w-4 transition-transform', showAddresses && 'rotate-180')} />
+            </button>
+            {statusFilter && (
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+                onClick={() => setStatusFilter(null)}
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
 
       {/* Lead list */}
       {showAddresses && (isLoading ? (

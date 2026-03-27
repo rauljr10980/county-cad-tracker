@@ -30,7 +30,7 @@ const PIPELINE_STAGES = [
   { key: 'UNDER_CONTRACT' as const, label: 'Under Contract', color: '#22C55E', num: 5 },
 ];
 
-export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]; onViewDetails?: (lead: DrivingLead) => void }) {
+export function D4dPipelineView({ leads, onViewDetails, onStageFilter, activeFilter }: { leads: DrivingLead[]; onViewDetails?: (lead: DrivingLead) => void; onStageFilter?: (status: string | null) => void; activeFilter?: string | null }) {
   const queryClient = useQueryClient();
   const [expandedStage, setExpandedStage] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -420,9 +420,14 @@ export function D4dPipelineView({ leads, onViewDetails }: { leads: DrivingLead[]
                 <div
                   className={cn(
                     'cursor-pointer rounded-lg p-1.5 -mx-1.5 transition-colors',
-                    isExpanded ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-secondary/30'
+                    isExpanded ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-secondary/30',
+                    activeFilter === stage.key && 'ring-2 ring-offset-1 ring-offset-card'
                   )}
-                  onClick={() => setExpandedStage(prev => prev === stage.key ? null : stage.key)}
+                  style={activeFilter === stage.key ? { ringColor: stage.color } : undefined}
+                  onClick={() => {
+                    setExpandedStage(prev => prev === stage.key ? null : stage.key);
+                    if (onStageFilter) onStageFilter(activeFilter === stage.key ? null : stage.key);
+                  }}
                 >
                   <div className="flex items-center justify-between text-sm mb-1">
                     <span className="font-medium">{stage.num}. {stage.label}</span>
