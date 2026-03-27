@@ -192,6 +192,12 @@ export function DrivingView() {
         setDbStatus(prev => ({ ...prev, [lead.id]: 'found' }));
         setSelectedProperty({
           ...found,
+          // Always use driving lead's contacts — that's where heir phones/lastCallTime are saved
+          contacts: (lead as any).contacts || found.contacts || null,
+          phoneNumbers: (lead as any).phoneNumbers?.length ? (lead as any).phoneNumbers : found.phoneNumbers,
+          ownerPhoneIndex: (lead as any).ownerPhoneIndex ?? found.ownerPhoneIndex,
+          emails: (lead as any).emails?.length ? (lead as any).emails : found.emails,
+          lastCallTime: (lead as any).lastCallTime || null,
           d4dLeadId: lead.id,
           d4dStatus: lead.status,
           metadata: (lead as any).metadata || null,
