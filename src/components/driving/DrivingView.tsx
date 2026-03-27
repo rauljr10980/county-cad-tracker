@@ -544,6 +544,7 @@ export function DrivingView() {
                   <div className="border-t border-dashed border-border/40 divide-y divide-border/20">
                     {heirRows.map((row: any, i: number) => {
                       const phones: any[] = row.phones?.filter((p: any) => p.number?.trim()) || [];
+                      const allNotWorking = phones.length > 0 && phones.every((p: any) => p.status === 'not_working');
                       const lastCall = phones.reduce((latest: string | null, p: any) => {
                         if (!p.lastCallTime) return latest;
                         return !latest || p.lastCallTime > latest ? p.lastCallTime : latest;
@@ -554,8 +555,11 @@ export function DrivingView() {
                           <span className="text-xs text-foreground/70 pl-3 truncate">
                             ↳ {row.name?.trim() || `Contact ${i + 1}`}
                           </span>
-                          <span className={cn('text-[10px] whitespace-nowrap', lastCall ? 'text-muted-foreground' : 'text-orange-400')}>
-                            {lastCall ? fmtTime(lastCall) : 'Never called'}
+                          <span className={cn('text-[10px] whitespace-nowrap',
+                            allNotWorking ? 'text-muted-foreground/50' :
+                            lastCall ? 'text-muted-foreground' : 'text-orange-400'
+                          )}>
+                            {allNotWorking ? 'Not available' : lastCall ? fmtTime(lastCall) : 'Never called'}
                           </span>
                           <div className="w-[88px]" /> {/* align under Actions */}
                         </div>
