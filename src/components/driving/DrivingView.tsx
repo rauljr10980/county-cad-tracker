@@ -110,6 +110,7 @@ export function DrivingView() {
   const [showAddresses, setShowAddresses] = useState(false);
   const [activeTab, setActiveTab] = useState<'pipeline' | 'heirs'>('pipeline');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [callSort, setCallSort] = useState<'latest' | 'earliest' | null>(null);
 
   const { data: leads = [], isLoading } = useDrivingLeads();
   const createMutation = useCreateDrivingLead();
@@ -247,19 +248,30 @@ export function DrivingView() {
     e.target.value = '';
   };
 
-  const filteredLeads = leads.filter(lead => {
-    if (statusFilter && lead.status !== statusFilter) return false;
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      (lead.rawAddress && lead.rawAddress.toLowerCase().includes(q)) ||
-      (lead.street && lead.street.toLowerCase().includes(q)) ||
-      ((lead as any).ownerName && (lead as any).ownerName.toLowerCase().includes(q)) ||
-      ((lead as any).notes && (lead as any).notes.toLowerCase().includes(q)) ||
-      ((lead as any).phoneNumbers && Array.isArray((lead as any).phoneNumbers) &&
-        (lead as any).phoneNumbers.some((p: string) => p && p.toLowerCase().includes(q)))
-    );
-  });
+  const filteredLeads = leads
+    .filter(lead => {
+      if (statusFilter && lead.status !== statusFilter) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        (lead.rawAddress && lead.rawAddress.toLowerCase().includes(q)) ||
+        (lead.street && lead.street.toLowerCase().includes(q)) ||
+        ((lead as any).ownerName && (lead as any).ownerName.toLowerCase().includes(q)) ||
+        ((lead as any).notes && (lead as any).notes.toLowerCase().includes(q)) ||
+        ((lead as any).phoneNumbers && Array.isArray((lead as any).phoneNumbers) &&
+          (lead as any).phoneNumbers.some((p: string) => p && p.toLowerCase().includes(q)))
+      );
+    })
+    .sort((a, b) => {
+      if (!callSort) return 0;
+      const aT = (a as any).lastCallTime ? new Date((a as any).lastCallTime).getTime() : null;
+      const bT = (b as any).lastCallTime ? new Date((b as any).lastCallTime).getTime() : null;
+      // Never-called always goes to the end regardless of sort direction
+      if (aT === null && bT === null) return 0;
+      if (aT === null) return 1;
+      if (bT === null) return -1;
+      return callSort === 'latest' ? bT - aT : aT - bT;
+    });
 
   return (
     <div className="p-2 md:p-4 space-y-4 max-w-7xl mx-auto">
@@ -366,22 +378,39 @@ export function DrivingView() {
           />}
 
           {/* Count + collapsible addresses */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              className="flex items-center justify-between flex-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center justify-between flex-1 text-sm text-muted-foreground hover:text-foreground transition-colors min-w-0"
               onClick={() => setShowAddresses(prev => !prev)}
             >
-              <span>
+              <span className="truncate">
                 {statusFilter || searchQuery
                   ? `${filteredLeads.length} of ${leads.length}`
                   : leads.length} address{leads.length !== 1 ? 'es' : ''} logged
                 {statusFilter && <span className="ml-1.5 text-xs text-primary font-medium">· filtered</span>}
               </span>
-              <ChevronDown className={cn('h-4 w-4 transition-transform', showAddresses && 'rotate-180')} />
+              <ChevronDown className={cn('h-4 w-4 transition-transform shrink-0 ml-1', showAddresses && 'rotate-180')} />
             </button>
+            {/* Sort by last call */}
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                className={cn('text-[11px] px-2 py-0.5 rounded border transition-colors',
+                  callSort === 'latest' ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground hover:text-foreground')}
+                onClick={() => setCallSort(prev => prev === 'latest' ? null : 'latest')}
+              >
+                Latest call
+              </button>
+              <button
+                className={cn('text-[11px] px-2 py-0.5 rounded border transition-colors',
+                  callSort === 'earliest' ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground hover:text-foreground')}
+                onClick={() => setCallSort(prev => prev === 'earliest' ? null : 'earliest')}
+              >
+                Earliest call
+              </button>
+            </div>
             {statusFilter && (
               <button
-                className="text-xs text-muted-foreground hover:text-foreground underline"
+                className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
                 onClick={() => setStatusFilter(null)}
               >
                 Clear filter
