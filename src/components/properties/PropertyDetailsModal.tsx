@@ -27,6 +27,7 @@ interface PhoneEntry {
   number: string;
   status?: '' | 'rings' | 'not_working' | 'voicemail' | 'contacted';
   callCount?: number;
+  lastCallTime?: string;
 }
 
 interface PhoneContactRow {
@@ -132,7 +133,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
           phones: (r.phones && r.phones.length > 0)
             ? r.phones.map((p: any) => typeof p === 'string'
               ? { number: p, status: '' as const }
-              : { number: p.number || '', status: p.status || '', callCount: p.callCount || 0 })
+              : { number: p.number || '', status: p.status || '', callCount: p.callCount || 0, ...(p.lastCallTime ? { lastCallTime: p.lastCallTime } : {}) })
             : [{ number: '', status: '' as const }],
         }));
         while (restored.length < 6) restored.push(mkEmpty());
