@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X, FileText, Search, ChevronDown } from 'lucide-react';
+import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X, FileText, Search, ChevronDown, Phone } from 'lucide-react';
 import { D4dPipelineView } from './D4dPipelineView';
+import { HeirsCallTrackerView } from './HeirsCallTrackerView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -107,6 +108,7 @@ export function DrivingView() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddresses, setShowAddresses] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'heirs'>('pipeline');
 
   const { data: leads = [], isLoading } = useDrivingLeads();
   const createMutation = useCreateDrivingLead();
@@ -318,17 +320,50 @@ export function DrivingView() {
         )}
       </div>
 
-      {/* D4$ Pipeline */}
-      {leads.length > 0 && <D4dPipelineView leads={leads as any} onViewDetails={handleViewDetails} />}
+      {/* Tab switcher */}
+      {leads.length > 0 && (
+        <div className="flex gap-1 bg-muted/40 rounded-lg p-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab('pipeline')}
+            className={cn(
+              'flex-1 text-xs py-1.5 rounded-md font-medium transition-colors',
+              activeTab === 'pipeline' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Pipeline
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('heirs')}
+            className={cn(
+              'flex-1 text-xs py-1.5 rounded-md font-medium transition-colors flex items-center justify-center gap-1.5',
+              activeTab === 'heirs' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Phone className="h-3 w-3" />
+            Heirs Call Tracker
+          </button>
+        </div>
+      )}
 
-      {/* Count + collapsible addresses */}
-      <button
-        className="flex items-center justify-between w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-        onClick={() => setShowAddresses(prev => !prev)}
-      >
-        <span>{searchQuery ? `${filteredLeads.length} of ${leads.length}` : `${leads.length}`} address{leads.length !== 1 ? 'es' : ''} logged</span>
-        <ChevronDown className={cn('h-4 w-4 transition-transform', showAddresses && 'rotate-180')} />
-      </button>
+      {/* Heirs Call Tracker tab */}
+      {activeTab === 'heirs' && leads.length > 0 && <HeirsCallTrackerView />}
+
+      {/* Pipeline + addresses (hidden when heirs tab is active) */}
+      {activeTab === 'pipeline' && (
+        <>
+          {/* D4$ Pipeline */}
+          {leads.length > 0 && <D4dPipelineView leads={leads as any} onViewDetails={handleViewDetails} />}
+
+          {/* Count + collapsible addresses */}
+          <button
+            className="flex items-center justify-between w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setShowAddresses(prev => !prev)}
+          >
+            <span>{searchQuery ? `${filteredLeads.length} of ${leads.length}` : `${leads.length}`} address{leads.length !== 1 ? 'es' : ''} logged</span>
+            <ChevronDown className={cn('h-4 w-4 transition-transform', showAddresses && 'rotate-180')} />
+          </button>
 
       {/* Lead list */}
       {showAddresses && (isLoading ? (
@@ -463,7 +498,9 @@ export function DrivingView() {
         </div>
       ))}
 
-      {/* End collapsible addresses list */}
+        {/* End collapsible addresses list */}
+        </>
+      )}
 
       {/* Photo Gallery Dialog */}
       <Dialog open={!!viewingPhotosLeadId} onOpenChange={() => setViewingPhotosLeadId(null)}>
