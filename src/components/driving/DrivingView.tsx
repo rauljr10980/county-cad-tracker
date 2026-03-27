@@ -475,6 +475,46 @@ export function DrivingView() {
                 <PhotoThumbnails leadId={lead.id} onViewAll={() => setViewingPhotosLeadId(lead.id)} />
               )}
 
+              {/* Heir subsections — name + last called */}
+              {(() => {
+                const rows: any[] = (lead as any).contacts?.phoneRows || [];
+                const heirRows = rows.filter((r: any) => r.phones?.some((p: any) => p.number?.trim()));
+                if (heirRows.length === 0) return null;
+                return (
+                  <div className="border-t pt-2 space-y-1">
+                    {heirRows.map((row: any, i: number) => {
+                      const phones: any[] = row.phones?.filter((p: any) => p.number?.trim()) || [];
+                      const lastCall = phones.reduce((latest: string | null, p: any) => {
+                        if (!p.lastCallTime) return latest;
+                        if (!latest || p.lastCallTime > latest) return p.lastCallTime;
+                        return latest;
+                      }, null);
+                      return (
+                        <div key={i} className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-foreground/80 truncate">
+                            {row.name?.trim() || `Contact ${i + 1}`}
+                          </span>
+                          <span className={cn(
+                            'text-[10px] shrink-0',
+                            lastCall ? 'text-muted-foreground' : 'text-orange-400'
+                          )}>
+                            {lastCall
+                              ? (() => {
+                                  const d = new Date(lastCall);
+                                  const diffH = (Date.now() - d.getTime()) / 3600000;
+                                  if (diffH < 24) return `Today ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                                  if (diffH < 48) return `Yesterday ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                                  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                                })()
+                              : 'Never called'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
               <div className="flex items-center justify-between">
                 <Select
                   value={lead.status}
