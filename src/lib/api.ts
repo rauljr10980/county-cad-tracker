@@ -1620,6 +1620,23 @@ export async function deleteDrivingPhoto(leadId: string, photoId: string) {
   return response.json();
 }
 
+export interface TeamMemberStats {
+  id: string;
+  username: string;
+  role: string;
+  calls: { today: number; week: number; month: number };
+  d4dLeads: { week: number; month: number };
+  pipeline: Record<string, number>;
+}
+
+export async function getTeamStats(): Promise<TeamMemberStats[]> {
+  const response = await fetch(`${API_BASE_URL}/api/team-stats`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch team stats');
+  return response.json();
+}
+
 // ============================================================================
 // FOLLOW-UP CALENDAR
 // ============================================================================

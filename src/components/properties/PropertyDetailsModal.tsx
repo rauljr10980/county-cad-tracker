@@ -1764,7 +1764,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                                         const allPhoneNumbers = updated.flatMap(r => r.phones.filter(p => p.number.trim()).map(p => p.number));
                                         const contacts = {
                                           ownerOverride: ownerOverride.trim(),
-                                          phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '' })) })),
+                                          phoneRows: updated.filter(r => r.name.trim() || r.phones.some(p => p.number.trim())).map(r => ({ name: r.name, phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0, ...(p.lastCallTime ? { lastCallTime: p.lastCallTime } : {}) })) })),
                                           emailRows: emailRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: (r as any).sent || false })),
                                         };
                                         if (isFromD4d) {

@@ -109,6 +109,7 @@ router.post('/', authenticateToken, async (req, res) => {
         zip: parsed.zip,
         notes: notes || null,
         loggedBy: loggedBy || null,
+        createdById: req.user?.id || null,
       },
     });
 

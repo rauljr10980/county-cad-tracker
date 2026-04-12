@@ -3,7 +3,7 @@ import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel,
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyStatus } from '@/types/property';
-import { useDashboardStats, useCallStats } from '@/hooks/useFiles';
+import { useDashboardStats, useCallStats, useTeamStats } from '@/hooks/useFiles';
 import { usePreForeclosures } from '@/hooks/usePreForeclosure';
 import type { WorkflowStage, PreForeclosureRecord } from '@/types/property';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,17 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats();
   const { data: preForeclosureRecords, isLoading: isLoadingPreForeclosures } = usePreForeclosures();
   const { data: callStats } = useCallStats();
+  const { data: teamStatsRaw } = useTeamStats();
+
+  // Use mock data if real data has no activity yet (all zeros) — remove once team starts logging calls
+  const MOCK_TEAM: typeof teamStatsRaw = [
+    { id: 'm1', username: 'Raul', role: 'ADMIN',    calls: { today: 14, week: 67, month: 210 }, d4dLeads: { week: 12, month: 38 }, pipeline: { NEW: 15, RESEARCHING: 10, CONTACTED: 6, DEAD: 4 } },
+    { id: 'm2', username: 'Luciano', role: 'OPERATOR', calls: { today: 9,  week: 44, month: 130 }, d4dLeads: { week: 7,  month: 22 }, pipeline: { NEW: 8,  RESEARCHING: 7,  CONTACTED: 3, DEAD: 2 } },
+    { id: 'm3', username: 'Maria',   role: 'OPERATOR', calls: { today: 3,  week: 21, month: 74  }, d4dLeads: { week: 4,  month: 15 }, pipeline: { NEW: 5,  RESEARCHING: 4,  CONTACTED: 2, DEAD: 1 } },
+  ];
+  const allZeros = !teamStatsRaw || teamStatsRaw.every(m => m.calls.today === 0 && m.calls.week === 0 && m.d4dLeads.week === 0);
+  const teamStats = allZeros ? MOCK_TEAM : teamStatsRaw;
+  const isMockData = allZeros;
 
   const isLoading = statsLoading;
   const error = statsError;
@@ -152,6 +163,70 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Team Activity */}
+      {teamStats && teamStats.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              Team Activity
+              {isMockData && (
+                <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">
+                  sample data
+                </span>
+              )}
+            </CardTitle>
+            <CardDescription>Calls made &amp; D4D leads added per team member</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-4 py-2">Member</th>
+                    <th className="text-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">Calls Today</th>
+                    <th className="text-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">Calls / Week</th>
+                    <th className="text-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">Calls / Month</th>
+                    <th className="text-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">D4D This Week</th>
+                    <th className="text-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">D4D This Month</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {[...teamStats]
+                    .sort((a, b) => b.calls.today - a.calls.today)
+                    .map((member, i) => (
+                    <tr key={member.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          {i === 0 && teamStats.some(m => m.calls.today > 0) && (
+                            <span className="text-yellow-400 text-xs">★</span>
+                          )}
+                          <span className="font-medium">{member.username}</span>
+                          <span className="text-[10px] text-muted-foreground capitalize">{member.role.toLowerCase()}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <span className={member.calls.today > 0 ? 'text-green-400 font-semibold' : 'text-muted-foreground'}>
+                          {member.calls.today}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-medium">{member.calls.week}</td>
+                      <td className="px-3 py-2.5 text-center text-muted-foreground">{member.calls.month}</td>
+                      <td className="px-3 py-2.5 text-center">
+                        <span className={member.d4dLeads.week > 0 ? 'text-primary font-semibold' : 'text-muted-foreground'}>
+                          {member.d4dLeads.week}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-muted-foreground">{member.d4dLeads.month}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">

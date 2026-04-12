@@ -31,6 +31,8 @@ model User {
   notes          Note[]
   taskActivities TaskActivity[]
   followUps      FollowUp[]
+  callLogs       CallLog[]
+  drivingLeads   DrivingLead[]
 
   @@index([email])
   @@index([username])
@@ -670,7 +672,9 @@ model DrivingLead {
   metadata   Json?
 
   // Who logged it
-  loggedBy String?
+  loggedBy    String?
+  createdById String?
+  createdByUser User? @relation(fields: [createdById], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -745,14 +749,17 @@ model FollowUp {
 // CALL LOG — tracks every phone call button press
 // ============================================================================
 model CallLog {
-  id           String   @id @default(cuid())
-  calledAt     DateTime @default(now())
-  propertyId   String?
+  id            String   @id @default(cuid())
+  calledAt      DateTime @default(now())
+  propertyId    String?
   drivingLeadId String?
-  phoneNumber  String?
+  phoneNumber   String?
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
 
   @@index([calledAt])
   @@index([propertyId])
   @@index([drivingLeadId])
+  @@index([userId])
   @@map("call_logs")
 }

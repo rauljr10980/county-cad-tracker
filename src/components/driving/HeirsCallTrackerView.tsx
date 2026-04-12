@@ -90,6 +90,13 @@ export function HeirsCallTrackerView() {
       );
       await updateDrivingLeadPhones(lead.id, allPhones, lead.ownerPhoneIndex, contacts, lead.ownerName, now);
       logCall(undefined, lead.id, phoneNumber);
+      // Optimistically update the cache immediately so the next call in this session
+      // reads the already-updated contacts (prevents stale data from erasing prior lastCallTime)
+      queryClient.setQueryData(['driving-leads'], (old: any) =>
+        Array.isArray(old)
+          ? old.map((l: any) => l.id === lead.id ? { ...l, contacts, lastCallTime: now } : l)
+          : old
+      );
       queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
       queryClient.invalidateQueries({ queryKey: ['call-stats'] });
     } finally {

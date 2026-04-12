@@ -12,6 +12,7 @@ router.post('/', optionalAuth, async (req, res) => {
         propertyId: propertyId || null,
         drivingLeadId: drivingLeadId || null,
         phoneNumber: phoneNumber || null,
+        userId: req.user?.id || null,
       },
     });
     res.json(log);
