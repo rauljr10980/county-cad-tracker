@@ -1625,7 +1625,11 @@ export interface TeamMemberStats {
   username: string;
   role: string;
   calls: { today: number; week: number; month: number };
-  d4dLeads: { week: number; month: number };
+  d4dLeads: { week: number; month: number; total: number };
+  followUps: { createdWeek: number; createdMonth: number; completedWeek: number; completedMonth: number };
+  notes: { week: number; month: number };
+  propertiesAssigned: number;
+  conversionRate: number;
   pipeline: Record<string, number>;
 }
 

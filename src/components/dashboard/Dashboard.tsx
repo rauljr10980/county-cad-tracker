@@ -21,9 +21,9 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
 
   // Use mock data if real data has no activity yet (all zeros) — remove once team starts logging calls
   const MOCK_TEAM: typeof teamStatsRaw = [
-    { id: 'm1', username: 'Raul', role: 'ADMIN',    calls: { today: 14, week: 67, month: 210 }, d4dLeads: { week: 12, month: 38 }, pipeline: { NEW: 15, RESEARCHING: 10, CONTACTED: 6, DEAD: 4 } },
-    { id: 'm2', username: 'Luciano', role: 'OPERATOR', calls: { today: 9,  week: 44, month: 130 }, d4dLeads: { week: 7,  month: 22 }, pipeline: { NEW: 8,  RESEARCHING: 7,  CONTACTED: 3, DEAD: 2 } },
-    { id: 'm3', username: 'Maria',   role: 'OPERATOR', calls: { today: 3,  week: 21, month: 74  }, d4dLeads: { week: 4,  month: 15 }, pipeline: { NEW: 5,  RESEARCHING: 4,  CONTACTED: 2, DEAD: 1 } },
+    { id: 'm1', username: 'Raul',    role: 'ADMIN',    calls: { today: 14, week: 67, month: 210 }, d4dLeads: { week: 12, month: 38, total: 95 }, followUps: { createdWeek: 5, createdMonth: 18, completedWeek: 4, completedMonth: 14 }, notes: { week: 9, month: 31 }, propertiesAssigned: 24, conversionRate: 18, pipeline: { NEW: 15, RESEARCHING: 10, CONTACTED: 6, UNDER_CONTRACT: 2, DEAD: 4 } },
+    { id: 'm2', username: 'Luciano', role: 'OPERATOR', calls: { today: 9,  week: 44, month: 130 }, d4dLeads: { week: 7,  month: 22, total: 54 }, followUps: { createdWeek: 3, createdMonth: 11, completedWeek: 2, completedMonth: 8  }, notes: { week: 5, month: 17 }, propertiesAssigned: 15, conversionRate: 13, pipeline: { NEW: 8,  RESEARCHING: 7,  CONTACTED: 3, UNDER_CONTRACT: 1, DEAD: 2 } },
+    { id: 'm3', username: 'Maria',   role: 'OPERATOR', calls: { today: 3,  week: 21, month: 74  }, d4dLeads: { week: 4,  month: 15, total: 32 }, followUps: { createdWeek: 2, createdMonth: 7,  completedWeek: 2, completedMonth: 6  }, notes: { week: 3, month: 10 }, propertiesAssigned: 9,  conversionRate: 9,  pipeline: { NEW: 5,  RESEARCHING: 4,  CONTACTED: 2, UNDER_CONTRACT: 0, DEAD: 1 } },
   ];
   const allZeros = !teamStatsRaw || teamStatsRaw.every(m => m.calls.today === 0 && m.calls.week === 0 && m.d4dLeads.week === 0);
   const teamStats = allZeros ? MOCK_TEAM : teamStatsRaw;
@@ -166,66 +166,120 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
 
       {/* Team Activity */}
       {teamStats && teamStats.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary" />
-              Team Activity
-              {isMockData && (
-                <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">
-                  sample data
-                </span>
-              )}
-            </CardTitle>
-            <CardDescription>Calls made &amp; D4D leads added per team member</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/40">
-                    <th className="text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-4 py-2">Member</th>
-                    <th className="text-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">Calls Today</th>
-                    <th className="text-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">Calls / Week</th>
-                    <th className="text-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">Calls / Month</th>
-                    <th className="text-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">D4D This Week</th>
-                    <th className="text-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-3 py-2">D4D This Month</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {[...teamStats]
-                    .sort((a, b) => b.calls.today - a.calls.today)
-                    .map((member, i) => (
-                    <tr key={member.id} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          {i === 0 && teamStats.some(m => m.calls.today > 0) && (
-                            <span className="text-yellow-400 text-xs">★</span>
-                          )}
-                          <span className="font-medium">{member.username}</span>
-                          <span className="text-[10px] text-muted-foreground capitalize">{member.role.toLowerCase()}</span>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">Team Activity</h2>
+            {isMockData && (
+              <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">
+                sample data
+              </span>
+            )}
+          </div>
+
+          {/* Per-member cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {[...teamStats].sort((a, b) => b.calls.today - a.calls.today).map((m, i) => {
+              const isTopCaller = i === 0 && m.calls.today > 0;
+              const totalPipeline = Object.values(m.pipeline).reduce((s: number, n) => s + (n as number), 0);
+              return (
+                <Card key={m.id} className={isTopCaller ? 'border-yellow-400/30' : ''}>
+                  <CardHeader className="pb-2 pt-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isTopCaller && <span className="text-yellow-400">★</span>}
+                        <span className="font-semibold">{m.username}</span>
+                        <span className="text-[10px] text-muted-foreground capitalize bg-muted px-1.5 py-0.5 rounded">{m.role.toLowerCase()}</span>
+                      </div>
+                      {m.conversionRate > 0 && (
+                        <span className="text-[10px] text-green-400 font-medium">{m.conversionRate}% conversion</span>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-3 space-y-3">
+                    {/* Calls */}
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5">Calls</p>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-muted/40 rounded p-1.5">
+                          <div className={`text-lg font-bold ${m.calls.today > 0 ? 'text-green-400' : ''}`}>{m.calls.today}</div>
+                          <div className="text-[10px] text-muted-foreground">Today</div>
                         </div>
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <span className={member.calls.today > 0 ? 'text-green-400 font-semibold' : 'text-muted-foreground'}>
-                          {member.calls.today}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-center font-medium">{member.calls.week}</td>
-                      <td className="px-3 py-2.5 text-center text-muted-foreground">{member.calls.month}</td>
-                      <td className="px-3 py-2.5 text-center">
-                        <span className={member.d4dLeads.week > 0 ? 'text-primary font-semibold' : 'text-muted-foreground'}>
-                          {member.d4dLeads.week}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-center text-muted-foreground">{member.d4dLeads.month}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                        <div className="bg-muted/40 rounded p-1.5">
+                          <div className="text-lg font-bold">{m.calls.week}</div>
+                          <div className="text-[10px] text-muted-foreground">Week</div>
+                        </div>
+                        <div className="bg-muted/40 rounded p-1.5">
+                          <div className="text-lg font-bold">{m.calls.month}</div>
+                          <div className="text-[10px] text-muted-foreground">Month</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* D4D Leads + Follow-ups + Notes row */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <div className="text-xs font-semibold text-primary">{m.d4dLeads.week}</div>
+                        <div className="text-[10px] text-muted-foreground">D4D / wk</div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold">{m.followUps.completedWeek}<span className="text-muted-foreground font-normal">/{m.followUps.createdWeek}</span></div>
+                        <div className="text-[10px] text-muted-foreground">F/U done</div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold">{m.notes.week}</div>
+                        <div className="text-[10px] text-muted-foreground">Notes</div>
+                      </div>
+                    </div>
+
+                    {/* D4D Pipeline mini-bar */}
+                    {totalPipeline > 0 && (
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Pipeline ({totalPipeline} leads)</p>
+                        <div className="flex h-2 rounded overflow-hidden gap-px">
+                          {[
+                            { key: 'NEW',            color: 'bg-gray-500' },
+                            { key: 'RESEARCHING',    color: 'bg-blue-500' },
+                            { key: 'CONTACTED',      color: 'bg-yellow-500' },
+                            { key: 'UNDER_CONTRACT', color: 'bg-green-500' },
+                            { key: 'DEAD',           color: 'bg-red-800' },
+                          ].map(({ key, color }) => {
+                            const count = (m.pipeline[key] as number) || 0;
+                            const pct = totalPipeline > 0 ? (count / totalPipeline) * 100 : 0;
+                            return pct > 0 ? (
+                              <div key={key} className={`${color} transition-all`} style={{ width: `${pct}%` }} title={`${key}: ${count}`} />
+                            ) : null;
+                          })}
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                          {[
+                            { key: 'NEW',            label: 'New',         color: 'bg-gray-500' },
+                            { key: 'RESEARCHING',    label: 'Researching', color: 'bg-blue-500' },
+                            { key: 'CONTACTED',      label: 'Contacted',   color: 'bg-yellow-500' },
+                            { key: 'UNDER_CONTRACT', label: 'Under Ctr',   color: 'bg-green-500' },
+                            { key: 'DEAD',           label: 'Dead',        color: 'bg-red-800' },
+                          ].filter(s => (m.pipeline[s.key] || 0) > 0).map(s => (
+                            <div key={s.key} className="flex items-center gap-1">
+                              <div className={`w-1.5 h-1.5 rounded-full ${s.color}`} />
+                              <span className="text-[9px] text-muted-foreground">{s.label} {m.pipeline[s.key]}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Properties assigned */}
+                    {m.propertiesAssigned > 0 && (
+                      <div className="text-[10px] text-muted-foreground border-t border-border/40 pt-2">
+                        {m.propertiesAssigned} properties assigned
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* Top Metrics Row */}
