@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, CalendarDays, List, Upload, FileText, CheckSquare, Home, Car } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, List, Upload, FileText, Home, Car } from 'lucide-react';
 
 export type TabType = 'dashboard' | 'calendar' | 'properties' | 'tasks' | 'upload' | 'files' | 'preforeclosure' | 'driving';
 
@@ -12,7 +12,6 @@ const tabs = [
   { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard, shortLabel: 'Dash' },
   { id: 'calendar' as TabType, label: 'Calendar', icon: CalendarDays, shortLabel: 'Cal' },
   { id: 'properties' as TabType, label: 'Properties', icon: List, shortLabel: 'Props' },
-  { id: 'tasks' as TabType, label: 'Tasks', icon: CheckSquare, shortLabel: 'Tasks' },
   { id: 'preforeclosure' as TabType, label: 'Pre-Foreclosure', icon: Home, shortLabel: 'Pre-FC' },
   { id: 'driving' as TabType, label: 'Driving 4$', icon: Car, shortLabel: 'D4$' },
 ];
