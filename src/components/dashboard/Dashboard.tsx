@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2, Users, DollarSign, Package, ShoppingCart, Target, TrendingUp as Pipeline, Phone } from 'lucide-react';
+import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2, Users, DollarSign, Package, ShoppingCart, Target, TrendingUp as Pipeline, Phone, X } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyStatus } from '@/types/property';
@@ -7,6 +7,7 @@ import { useDashboardStats, useCallStats, useCallActivity, useTeamStats } from '
 import { usePreForeclosures } from '@/hooks/usePreForeclosure';
 import type { WorkflowStage, PreForeclosureRecord } from '@/types/property';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 interface DashboardProps {
@@ -239,126 +240,155 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       {teamStats && teamStats.length > 0 && (() => {
         const sorted = [...teamStats].sort((a, b) => b.calls.today - a.calls.today);
 
-        // ── Mock previous-week values for trend indicators ──
-        // In production the backend will return these; for now we derive them from mock
-        const PREV: Record<string, { callsToday: number; callsWeek: number; d4dWeek: number; fuCompleted: number; notes: number; visits: number; contacts: number; appts: number; contracts: number; overdue: number }> = {
-          Raul:    { callsToday: 10, callsWeek: 55, d4dWeek: 9,  fuCompleted: 3, notes: 7,  visits: 5, contacts: 13, appts: 4, contracts: 1, overdue: 4 },
-          Luciano: { callsToday: 12, callsWeek: 50, d4dWeek: 8,  fuCompleted: 2, notes: 4,  visits: 6, contacts: 9,  appts: 2, contracts: 2, overdue: 3 },
-          Maria:   { callsToday: 4,  callsWeek: 24, d4dWeek: 5,  fuCompleted: 1, notes: 4,  visits: 3, contacts: 5,  appts: 1, contracts: 0, overdue: 2 },
-          Carlos:  { callsToday: 8,  callsWeek: 45, d4dWeek: 7,  fuCompleted: 4, notes: 5,  visits: 4, contacts: 10, appts: 3, contracts: 0, overdue: 1 },
-          Sofia:   { callsToday: 9,  callsWeek: 40, d4dWeek: 6,  fuCompleted: 3, notes: 3,  visits: 4, contacts: 7,  appts: 2, contracts: 1, overdue: 5 },
-          Diego:   { callsToday: 3,  callsWeek: 22, d4dWeek: 2,  fuCompleted: 2, notes: 1,  visits: 1, contacts: 3,  appts: 1, contracts: 0, overdue: 1 },
+        const PREV: Record<string, { callsToday: number; d4dWeek: number; fuCompleted: number; notes: number; visits: number; contacts: number; overdue: number }> = {
+          Raul:    { callsToday: 10, d4dWeek: 9,  fuCompleted: 3, notes: 7,  visits: 5, contacts: 13, overdue: 4 },
+          Luciano: { callsToday: 12, d4dWeek: 8,  fuCompleted: 2, notes: 4,  visits: 6, contacts: 9,  overdue: 3 },
+          Maria:   { callsToday: 4,  d4dWeek: 5,  fuCompleted: 1, notes: 4,  visits: 3, contacts: 5,  overdue: 2 },
+          Carlos:  { callsToday: 8,  d4dWeek: 7,  fuCompleted: 4, notes: 5,  visits: 4, contacts: 10, overdue: 1 },
+          Sofia:   { callsToday: 9,  d4dWeek: 6,  fuCompleted: 3, notes: 3,  visits: 4, contacts: 7,  overdue: 5 },
+          Diego:   { callsToday: 3,  d4dWeek: 2,  fuCompleted: 2, notes: 1,  visits: 1, contacts: 3,  overdue: 1 },
         };
-        const prev = (m: typeof sorted[0]) => PREV[m.username] ?? { callsToday: 0, callsWeek: 0, d4dWeek: 0, fuCompleted: 0, notes: 0, visits: 0, contacts: 0, appts: 0, contracts: 0, overdue: 0 };
+        const prev = (m: typeof sorted[0]) => PREV[m.username] ?? { callsToday: 0, d4dWeek: 0, fuCompleted: 0, notes: 0, visits: 0, contacts: 0, overdue: 0 };
 
-        // ── Trend badge helper ──
-        const trend = (cur: number, prv: number, invert = false) => {
-          if (prv === 0) return null;
+        const calcTrend = (cur: number, prv: number, invert = false) => {
+          if (!prv) return null;
           const pct = Math.round(((cur - prv) / prv) * 100);
           const isGood = invert ? pct < 0 : pct > 0;
-          if (Math.abs(pct) < 2) return { pct, label: '─ flat', color: '#6b7280', bg: 'rgba(107,114,128,0.12)' };
-          return {
-            pct,
-            label: `${isGood ? '▲' : '▼'} ${Math.abs(pct)}% vs last week`,
-            color: isGood ? '#22c55e' : '#ef4444',
-            bg: isGood ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-          };
+          if (Math.abs(pct) < 2) return { label: '─ flat', color: '#6b7280', bg: 'rgba(107,114,128,0.12)' };
+          return { label: `${isGood ? '▲' : '▼'} ${Math.abs(pct)}% vs last week`, color: isGood ? '#22c55e' : '#ef4444', bg: isGood ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)' };
         };
 
-        const callsData   = sorted.map(m => ({ name: m.username, Today: m.calls.today, Week: m.calls.week, Month: m.calls.month }));
-        const d4dData     = sorted.map(m => ({ name: m.username, 'This Week': m.d4dLeads.week, 'This Month': m.d4dLeads.month }));
-        const fuData      = sorted.map(m => ({ name: m.username, Completed: m.followUps.completedWeek, Created: m.followUps.createdWeek }));
-        const notesData   = sorted.map(m => ({ name: m.username, Notes: m.notes.week }));
-        const overdueData = sorted.map(m => ({ name: m.username, Overdue: m.overdueFollowUps }));
-        const visitsData  = sorted.map(m => ({ name: m.username, Visits: m.visitsThisWeek }));
-        const salesData   = sorted.map(m => ({ name: m.username, Contacts: m.contactsMade ?? 0, Appointments: m.appointmentsSet ?? 0, Contracts: m.contractsSigned ?? 0 }));
-        const pfData      = sorted.map(m => ({ name: m.username, 'Has Equity': m.preForeclosure.withEquity, Underwater: m.preForeclosure.underwater, Pending: m.preForeclosure.total - m.preForeclosure.researched }));
-        const pipeData    = sorted.map(m => ({ name: m.username, New: m.pipeline['NEW'] || 0, Researching: m.pipeline['RESEARCHING'] || 0, Contacted: m.pipeline['CONTACTED'] || 0, 'Under Contract': m.pipeline['UNDER_CONTRACT'] || 0, Dead: m.pipeline['DEAD'] || 0 }));
+        const sumF = (fn: (m: typeof sorted[0]) => number) => sorted.reduce((s, m) => s + fn(m), 0);
 
-        const TOOLTIP_STYLE = {
-          contentStyle: { background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.35)' },
-          labelStyle: { color: 'hsl(var(--foreground))', fontWeight: 700, marginBottom: 6, fontSize: 13 },
-          cursor: { fill: 'hsl(var(--muted))', opacity: 0.2 },
-        };
-
-        const CHART_H = 260;
+        const totalCallsToday = sumF(m => m.calls.today);
+        const totalOverdue    = sumF(m => m.overdueFollowUps);
+        const totalContracts  = sumF(m => m.contractsSigned ?? 0);
 
         type BarDef = { key: string; color: string; gradId: string };
         type ChartConfig = {
           title: string; subtitle: string; data: any[]; bars: BarDef[]; accent: string;
-          teamTotal: number; prevTotal: number;
+          teamTotal: number; prevTotal: number; invert?: boolean;
           alertMsg?: string; celebrateMsg?: string;
-          invert?: boolean; // true = lower is better (overdue)
+          perPerson: { name: string; values: { label: string; value: number }[] }[];
         };
-
-        const sumF = (fn: (m: typeof sorted[0]) => number) => sorted.reduce((s, m) => s + fn(m), 0);
-        const sumP = (fn: (m: typeof sorted[0]) => number) => sorted.reduce((s, m) => s + fn(m), 0);
-
-        const totalCallsToday   = sumF(m => m.calls.today);
-        const prevCallsToday    = sumP(m => prev(m).callsToday);
-        const totalOverdue      = sumF(m => m.overdueFollowUps);
-        const totalContracts    = sumF(m => m.contractsSigned ?? 0);
 
         const charts: ChartConfig[] = [
           {
             title: 'Calls Made', subtitle: 'Today · Week · Month', accent: '#10b981',
-            data: callsData,
+            data: sorted.map(m => ({ name: m.username, Today: m.calls.today, Week: m.calls.week, Month: m.calls.month })),
             bars: [{ key: 'Today', color: '#10b981', gradId: 'g-calls-today' }, { key: 'Week', color: '#3b82f6', gradId: 'g-calls-week' }, { key: 'Month', color: '#6366f1', gradId: 'g-calls-month' }],
-            teamTotal: totalCallsToday, prevTotal: prevCallsToday,
+            teamTotal: totalCallsToday, prevTotal: sumF(m => prev(m).callsToday),
             alertMsg: totalCallsToday < 20 ? `Team below 20 calls today (${totalCallsToday})` : undefined,
+            perPerson: sorted.map(m => ({ name: m.username, values: [{ label: 'Today', value: m.calls.today }, { label: 'Week', value: m.calls.week }, { label: 'Month', value: m.calls.month }] })),
           },
           {
             title: 'D4D Leads Added', subtitle: 'This week vs this month', accent: '#f59e0b',
-            data: d4dData,
+            data: sorted.map(m => ({ name: m.username, 'This Week': m.d4dLeads.week, 'This Month': m.d4dLeads.month })),
             bars: [{ key: 'This Week', color: '#f59e0b', gradId: 'g-d4d-wk' }, { key: 'This Month', color: '#f97316', gradId: 'g-d4d-mo' }],
-            teamTotal: sumF(m => m.d4dLeads.week), prevTotal: sumP(m => prev(m).d4dWeek),
+            teamTotal: sumF(m => m.d4dLeads.week), prevTotal: sumF(m => prev(m).d4dWeek),
+            perPerson: sorted.map(m => ({ name: m.username, values: [{ label: 'Week', value: m.d4dLeads.week }, { label: 'Month', value: m.d4dLeads.month }, { label: 'Total', value: m.d4dLeads.total }] })),
           },
           {
             title: 'Follow-ups', subtitle: 'Completed vs created this week', accent: '#10b981',
-            data: fuData,
+            data: sorted.map(m => ({ name: m.username, Completed: m.followUps.completedWeek, Created: m.followUps.createdWeek })),
             bars: [{ key: 'Completed', color: '#10b981', gradId: 'g-fu-done' }, { key: 'Created', color: '#475569', gradId: 'g-fu-all' }],
-            teamTotal: sumF(m => m.followUps.completedWeek), prevTotal: sumP(m => prev(m).fuCompleted),
+            teamTotal: sumF(m => m.followUps.completedWeek), prevTotal: sumF(m => prev(m).fuCompleted),
+            perPerson: sorted.map(m => ({ name: m.username, values: [{ label: 'Completed', value: m.followUps.completedWeek }, { label: 'Created', value: m.followUps.createdWeek }] })),
           },
           {
-            title: 'Sales Activity', subtitle: 'Contacts · Appointments · Contracts this month', accent: '#22c55e',
-            data: salesData,
+            title: 'Sales Activity', subtitle: 'Contacts · Appointments · Contracts', accent: '#22c55e',
+            data: sorted.map(m => ({ name: m.username, Contacts: m.contactsMade ?? 0, Appointments: m.appointmentsSet ?? 0, Contracts: m.contractsSigned ?? 0 })),
             bars: [{ key: 'Contacts', color: '#3b82f6', gradId: 'g-sa-cont' }, { key: 'Appointments', color: '#f59e0b', gradId: 'g-sa-appt' }, { key: 'Contracts', color: '#22c55e', gradId: 'g-sa-ctr' }],
-            teamTotal: sumF(m => m.contactsMade ?? 0), prevTotal: sumP(m => prev(m).contacts),
+            teamTotal: sumF(m => m.contactsMade ?? 0), prevTotal: sumF(m => prev(m).contacts),
             celebrateMsg: totalContracts > 0 ? `🏆 ${totalContracts} contract${totalContracts > 1 ? 's' : ''} signed this month!` : undefined,
+            perPerson: sorted.map(m => ({ name: m.username, values: [{ label: 'Contacts', value: m.contactsMade ?? 0 }, { label: 'Appts', value: m.appointmentsSet ?? 0 }, { label: 'Contracts', value: m.contractsSigned ?? 0 }] })),
           },
           {
             title: 'Pre-Foreclosure Research', subtitle: 'Equity status of assigned records', accent: '#10b981',
-            data: pfData,
+            data: sorted.map(m => ({ name: m.username, 'Has Equity': m.preForeclosure.withEquity, Underwater: m.preForeclosure.underwater, Pending: m.preForeclosure.total - m.preForeclosure.researched })),
             bars: [{ key: 'Has Equity', color: '#10b981', gradId: 'g-pf-eq' }, { key: 'Underwater', color: '#ef4444', gradId: 'g-pf-uw' }, { key: 'Pending', color: '#374151', gradId: 'g-pf-pend' }],
             teamTotal: sumF(m => m.preForeclosure.withEquity), prevTotal: 0,
+            perPerson: sorted.map(m => ({ name: m.username, values: [{ label: 'With Equity', value: m.preForeclosure.withEquity }, { label: 'Underwater', value: m.preForeclosure.underwater }, { label: 'Pending', value: m.preForeclosure.total - m.preForeclosure.researched }] })),
           },
           {
             title: 'Overdue Follow-ups', subtitle: 'Unresolved past-due tasks', accent: '#ef4444',
-            data: overdueData,
+            data: sorted.map(m => ({ name: m.username, Overdue: m.overdueFollowUps })),
             bars: [{ key: 'Overdue', color: '#ef4444', gradId: 'g-overdue' }],
-            teamTotal: totalOverdue, prevTotal: sumP(m => prev(m).overdue),
-            invert: true,
-            alertMsg: totalOverdue > 8 ? `⚠ ${totalOverdue} overdue tasks need attention` : undefined,
+            teamTotal: totalOverdue, prevTotal: sumF(m => prev(m).overdue), invert: true,
+            alertMsg: totalOverdue > 8 ? `⚠ ${totalOverdue} overdue tasks across the team` : undefined,
+            perPerson: sorted.map(m => ({ name: m.username, values: [{ label: 'Overdue', value: m.overdueFollowUps }] })),
           },
           {
             title: 'Property Visits', subtitle: 'Drive-bys logged this week', accent: '#06b6d4',
-            data: visitsData,
+            data: sorted.map(m => ({ name: m.username, Visits: m.visitsThisWeek })),
             bars: [{ key: 'Visits', color: '#06b6d4', gradId: 'g-visits' }],
-            teamTotal: sumF(m => m.visitsThisWeek), prevTotal: sumP(m => prev(m).visits),
+            teamTotal: sumF(m => m.visitsThisWeek), prevTotal: sumF(m => prev(m).visits),
+            perPerson: sorted.map(m => ({ name: m.username, values: [{ label: 'Visits', value: m.visitsThisWeek }] })),
           },
           {
             title: 'Notes Written', subtitle: 'This week', accent: '#8b5cf6',
-            data: notesData,
+            data: sorted.map(m => ({ name: m.username, Notes: m.notes.week })),
             bars: [{ key: 'Notes', color: '#8b5cf6', gradId: 'g-notes' }],
-            teamTotal: sumF(m => m.notes.week), prevTotal: sumP(m => prev(m).notes),
+            teamTotal: sumF(m => m.notes.week), prevTotal: sumF(m => prev(m).notes),
+            perPerson: sorted.map(m => ({ name: m.username, values: [{ label: 'This Week', value: m.notes.week }, { label: 'This Month', value: m.notes.month }] })),
           },
           {
             title: 'D4D Pipeline', subtitle: 'Lead stages across team', accent: '#3b82f6',
-            data: pipeData,
+            data: sorted.map(m => ({ name: m.username, New: m.pipeline['NEW'] || 0, Researching: m.pipeline['RESEARCHING'] || 0, Contacted: m.pipeline['CONTACTED'] || 0, 'Under Contract': m.pipeline['UNDER_CONTRACT'] || 0, Dead: m.pipeline['DEAD'] || 0 })),
             bars: [{ key: 'New', color: '#64748b', gradId: 'g-pipe-new' }, { key: 'Researching', color: '#3b82f6', gradId: 'g-pipe-res' }, { key: 'Contacted', color: '#eab308', gradId: 'g-pipe-con' }, { key: 'Under Contract', color: '#10b981', gradId: 'g-pipe-uc' }, { key: 'Dead', color: '#7f1d1d', gradId: 'g-pipe-dead' }],
             teamTotal: sumF(m => (m.pipeline['CONTACTED'] || 0) + (m.pipeline['UNDER_CONTRACT'] || 0)), prevTotal: 0,
+            perPerson: sorted.map(m => ({ name: m.username, values: [{ label: 'New', value: m.pipeline['NEW'] || 0 }, { label: 'Contacted', value: m.pipeline['CONTACTED'] || 0 }, { label: 'Under Contract', value: m.pipeline['UNDER_CONTRACT'] || 0 }, { label: 'Dead', value: m.pipeline['DEAD'] || 0 }] })),
           },
         ];
+
+        const TOOLTIP_STYLE = {
+          contentStyle: { background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.35)' },
+          labelStyle: { color: 'hsl(var(--foreground))', fontWeight: 700, marginBottom: 4 },
+          cursor: { fill: 'hsl(var(--muted))', opacity: 0.2 },
+        };
+
+        const MiniChart = ({ data, bars, gradId }: { data: any[]; bars: BarDef[]; gradId: string }) => (
+          <ResponsiveContainer width="100%" height={110}>
+            <BarChart data={data} margin={{ left: 0, right: 0, top: 2, bottom: 0 }} barCategoryGap="30%">
+              <defs>
+                {bars.map(b => (
+                  <linearGradient key={b.gradId + gradId} id={b.gradId + gradId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={b.color} stopOpacity={0.95} />
+                    <stop offset="100%" stopColor={b.color} stopOpacity={0.5} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit' }} />
+              <YAxis hide />
+              <Tooltip {...TOOLTIP_STYLE} />
+              {bars.map(b => <Bar key={b.key} dataKey={b.key} fill={`url(#${b.gradId + gradId})`} radius={[3, 3, 0, 0]} maxBarSize={28} />)}
+            </BarChart>
+          </ResponsiveContainer>
+        );
+
+        const FullChart = ({ data, bars }: { data: any[]; bars: BarDef[] }) => (
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={data} margin={{ left: 0, right: 0, top: 4, bottom: 0 }} barCategoryGap="28%">
+              <defs>
+                {bars.map(b => (
+                  <linearGradient key={b.gradId + 'full'} id={b.gradId + 'full'} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={b.color} stopOpacity={1} />
+                    <stop offset="100%" stopColor={b.color} stopOpacity={0.55} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 6" stroke="hsl(var(--border))" vertical={false} strokeOpacity={0.4} />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--foreground))', fontWeight: 600, fontFamily: 'inherit' }} />
+              <YAxis axisLine={false} tickLine={false} allowDecimals={false} width={28} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit' }} />
+              <Tooltip {...TOOLTIP_STYLE} />
+              {bars.map(b => <Bar key={b.key} dataKey={b.key} fill={`url(#${b.gradId + 'full'})`} radius={[5, 5, 0, 0]} maxBarSize={40} />)}
+            </BarChart>
+          </ResponsiveContainer>
+        );
+
+        // State for which card is open — moved outside of map via index
+        const [openIdx, setOpenIdx] = useState<number | null>(null);
+        const openChart = openIdx !== null ? charts[openIdx] : null;
 
         return (
           <div className="space-y-4">
@@ -366,112 +396,136 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
               <Users className="h-4 w-4 text-primary" />
               <h2 className="text-base font-semibold">Team Activity</h2>
               {isMockData && <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">sample data</span>}
+              <span className="text-[10px] text-muted-foreground/50 ml-1">click any card for details</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {charts.map(({ title, subtitle, data, bars, accent, teamTotal, prevTotal, alertMsg, celebrateMsg, invert }) => {
-                const t = trend(teamTotal, prevTotal, invert);
+            {/* ── Compact card grid ── */}
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+              {charts.map((chart, idx) => {
+                const { title, teamTotal, prevTotal, accent, bars, data, alertMsg, celebrateMsg, invert } = chart;
+                const t = calcTrend(teamTotal, prevTotal, invert);
                 const isAlert     = !!alertMsg;
                 const isCelebrate = !!celebrateMsg;
-
                 return (
-                  <Card key={title} className={[
-                    'overflow-hidden relative transition-shadow',
-                    isAlert     ? 'border-red-500/60 shadow-[0_0_0_1px_rgba(239,68,68,0.25),0_4px_24px_rgba(239,68,68,0.08)]' : '',
-                    isCelebrate ? 'border-green-500/50 shadow-[0_0_0_1px_rgba(34,197,94,0.25),0_4px_24px_rgba(34,197,94,0.08)]' : '',
-                    !isAlert && !isCelebrate ? 'border-border/60' : '',
-                  ].join(' ')}>
-
-                    {/* Pulse ring for alerts */}
-                    {isAlert && <div className="absolute inset-0 rounded-lg border border-red-500/30 animate-pulse pointer-events-none z-10" />}
-
-                    {/* Accent top line */}
-                    <div className="h-[3px] w-full" style={{ background: `linear-gradient(90deg, ${accent}, ${accent}44, transparent)` }} />
-
-                    <CardHeader className="pb-2 pt-4 px-5">
-                      {/* Title row */}
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <CardTitle className="text-sm font-semibold text-foreground/90 leading-tight">{title}</CardTitle>
-                        {isAlert && (
-                          <span className="shrink-0 text-[10px] font-medium bg-red-500/15 text-red-400 border border-red-500/30 rounded-full px-2 py-0.5 leading-tight">Alert</span>
-                        )}
-                        {isCelebrate && (
-                          <span className="shrink-0 text-[10px] font-medium bg-green-500/15 text-green-400 border border-green-500/30 rounded-full px-2 py-0.5 leading-tight">Win</span>
+                  <button key={title} onClick={() => setOpenIdx(idx)}
+                    className={[
+                      'text-left w-full rounded-xl border overflow-hidden transition-all duration-150',
+                      'hover:scale-[1.02] hover:shadow-lg active:scale-[0.99] cursor-pointer',
+                      isAlert     ? 'border-red-500/50 shadow-[0_0_0_1px_rgba(239,68,68,0.2)]' : '',
+                      isCelebrate ? 'border-green-500/40 shadow-[0_0_0_1px_rgba(34,197,94,0.2)]' : '',
+                      !isAlert && !isCelebrate ? 'border-border/60 bg-card' : 'bg-card',
+                    ].join(' ')}>
+                    {/* Alert pulse */}
+                    {isAlert && <div className="absolute inset-0 rounded-xl border border-red-500/20 animate-pulse pointer-events-none" />}
+                    {/* Accent line */}
+                    <div className="h-[2px]" style={{ background: `linear-gradient(90deg, ${accent}, ${accent}33)` }} />
+                    <div className="px-3 pt-2.5 pb-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <p className="text-[11px] font-semibold text-foreground/80 truncate">{title}</p>
+                        {isAlert     && <span className="text-[9px] bg-red-500/15 text-red-400 rounded-full px-1.5 py-0.5 shrink-0 ml-1">!</span>}
+                        {isCelebrate && <span className="text-[9px] bg-green-500/15 text-green-400 rounded-full px-1.5 py-0.5 shrink-0 ml-1">★</span>}
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-2xl font-bold text-foreground">{teamTotal}</span>
+                        {t && (
+                          <span className="text-[10px] font-medium rounded px-1 py-0.5" style={{ color: t.color, background: t.bg }}>
+                            {t.label.split(' ').slice(0, 2).join(' ')}
+                          </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-muted-foreground/60">{subtitle}</p>
+                    </div>
+                    <div className="px-1 pb-1">
+                      <MiniChart data={data} bars={bars} gradId={`mini-${idx}`} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
-                      {/* Alert / celebrate message */}
-                      {(alertMsg || celebrateMsg) && (
-                        <p className={`text-[11px] font-medium mt-1 ${isAlert ? 'text-red-400' : 'text-green-400'}`}>
-                          {alertMsg ?? celebrateMsg}
-                        </p>
-                      )}
+            {/* ── Full detail modal ── */}
+            <Dialog open={openIdx !== null} onOpenChange={open => !open && setOpenIdx(null)}>
+              <DialogContent className="max-w-2xl w-full">
+                {openChart && (() => {
+                  const { title, subtitle, data, bars, accent, teamTotal, prevTotal, alertMsg, celebrateMsg, invert, perPerson } = openChart;
+                  const t = calcTrend(teamTotal, prevTotal, invert);
+                  const isAlert     = !!alertMsg;
+                  const isCelebrate = !!celebrateMsg;
+                  return (
+                    <>
+                      <DialogHeader className="pb-0">
+                        {/* Accent strip */}
+                        <div className="h-[3px] -mx-6 -mt-6 mb-4 rounded-t-lg" style={{ background: `linear-gradient(90deg, ${accent}, ${accent}44, transparent)` }} />
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <DialogTitle className="text-lg font-bold">{title}</DialogTitle>
+                            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isAlert     && <span className="text-[11px] bg-red-500/15 text-red-400 border border-red-500/30 rounded-full px-2 py-0.5">⚠ Alert</span>}
+                            {isCelebrate && <span className="text-[11px] bg-green-500/15 text-green-400 border border-green-500/30 rounded-full px-2 py-0.5">★ Win</span>}
+                          </div>
+                        </div>
+                      </DialogHeader>
 
-                      {/* Big total + trend */}
-                      <div className="flex items-end gap-3 pt-2 pb-1">
-                        <span className="text-4xl font-bold tracking-tight text-foreground">{teamTotal}</span>
+                      {/* Total + trend */}
+                      <div className="flex items-end gap-3 pt-1 pb-2">
+                        <span className="text-5xl font-bold tracking-tight">{teamTotal}</span>
                         {t && (
-                          <span className="mb-1 inline-flex items-center text-[12px] font-semibold rounded-full px-2 py-0.5"
-                            style={{ color: t.color, background: t.bg }}>
+                          <span className="mb-1 text-sm font-semibold rounded-full px-3 py-1" style={{ color: t.color, background: t.bg }}>
                             {t.label}
                           </span>
                         )}
                       </div>
 
-                      {/* Per-person mini row */}
-                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 pt-0.5">
-                        {sorted.map(m => {
-                          const val = (data.find((d: any) => d.name === m.username) as any)?.[bars[0].key] ?? 0;
-                          return (
-                            <span key={m.username} className="text-[11px]">
-                              <span className="text-muted-foreground/50">{m.username}</span>
-                              <span className="text-foreground font-semibold ml-1">{val}</span>
-                            </span>
-                          );
-                        })}
-                      </div>
+                      {(alertMsg || celebrateMsg) && (
+                        <p className={`text-sm font-medium mb-3 ${isAlert ? 'text-red-400' : 'text-green-400'}`}>
+                          {alertMsg ?? celebrateMsg}
+                        </p>
+                      )}
 
-                      {/* Legend for multi-bar */}
+                      {/* Full chart */}
+                      <FullChart data={data} bars={bars} />
+
+                      {/* Legend */}
                       {bars.length > 1 && (
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 pt-2">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 pt-2">
                           {bars.map(b => (
-                            <div key={b.key} className="flex items-center gap-1">
-                              <div className="w-2 h-2 rounded-sm" style={{ background: b.color }} />
-                              <span className="text-[10px] text-muted-foreground/60">{b.key}</span>
+                            <div key={b.key} className="flex items-center gap-1.5">
+                              <div className="w-2.5 h-2.5 rounded-sm" style={{ background: b.color }} />
+                              <span className="text-xs text-muted-foreground">{b.key}</span>
                             </div>
                           ))}
                         </div>
                       )}
-                    </CardHeader>
 
-                    <CardContent className="px-3 pb-4">
-                      <ResponsiveContainer width="100%" height={CHART_H}>
-                        <BarChart data={data} margin={{ left: 0, right: 0, top: 4, bottom: 0 }} barCategoryGap="30%">
-                          <defs>
-                            {bars.map(b => (
-                              <linearGradient key={b.gradId} id={b.gradId} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor={b.color} stopOpacity={1} />
-                                <stop offset="100%" stopColor={b.color} stopOpacity={0.55} />
-                              </linearGradient>
+                      {/* Per-person breakdown table */}
+                      <div className="mt-4 border border-border/60 rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border/60 bg-muted/30">
+                              <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Member</th>
+                              {perPerson[0]?.values.map(v => (
+                                <th key={v.label} className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">{v.label}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {perPerson.map((row, i) => (
+                              <tr key={row.name} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/10'}>
+                                <td className="px-3 py-2 font-medium text-foreground">{row.name}</td>
+                                {row.values.map(v => (
+                                  <td key={v.label} className="px-3 py-2 text-right font-bold tabular-nums" style={{ color: accent }}>{v.value}</td>
+                                ))}
+                              </tr>
                             ))}
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 6" stroke="hsl(var(--border))" vertical={false} strokeOpacity={0.4} />
-                          <XAxis dataKey="name" axisLine={false} tickLine={false}
-                            tick={{ fontSize: 11, fill: 'hsl(var(--foreground))', fontWeight: 600, fontFamily: 'inherit' }} />
-                          <YAxis axisLine={false} tickLine={false} allowDecimals={false} width={22}
-                            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit', opacity: 0.6 }} />
-                          <Tooltip {...TOOLTIP_STYLE} />
-                          {bars.map(b => (
-                            <Bar key={b.key} dataKey={b.key} fill={`url(#${b.gradId})`} radius={[5, 5, 0, 0]} maxBarSize={36} />
-                          ))}
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()}
+              </DialogContent>
+            </Dialog>
           </div>
         );
       })()}
