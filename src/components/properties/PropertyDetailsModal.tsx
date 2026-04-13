@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, formatDistanceToNow, addYears } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail, updateDrivingLeadPhones, updateDrivingLeadEmails, updateDrivingLead, logCall } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail, updateDrivingLeadPhones, updateDrivingLeadEmails, updateDrivingLead, logCall, logActivity } from '@/lib/api';
 import { extractContacts } from '@/lib/contactParser';
 import { toast } from '@/hooks/use-toast';
 import { usePropertyFollowUps } from '@/hooks/useFollowUps';
@@ -1490,6 +1490,27 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                     {CONTACT_ITEMS.map(item => renderCheck(contactChecks.includes(item.key), item.label, () => toggleCheck('contactChecks', item.key)))}
                   </div>
                   {renderProgress(contactChecks.length, CONTACT_ITEMS.length)}
+                </div>
+
+                {/* Sales Activity Logging */}
+                <div className="space-y-2 pt-1 border-t border-border">
+                  <p className="text-xs text-muted-foreground font-medium mt-1">Log Sales Activity</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([
+                      { type: 'CONTACT_MADE'    as const, label: 'Contact Made',    color: 'border-blue-500/50 text-blue-400 hover:bg-blue-500/10' },
+                      { type: 'APPOINTMENT_SET' as const, label: 'Appointment Set', color: 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10' },
+                      { type: 'CONTRACT_SIGNED' as const, label: 'Contract Signed', color: 'border-green-500/50 text-green-400 hover:bg-green-500/10' },
+                    ]).map(({ type, label, color }) => (
+                      <Button key={type} size="sm" variant="outline"
+                        className={`h-8 text-[11px] px-1 ${color}`}
+                        onClick={async () => {
+                          await logActivity(type, { propertyId: property?.id });
+                          toast({ title: label + ' logged', description: 'Saved to team stats.' });
+                        }}>
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Under Contract */}

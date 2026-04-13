@@ -15,7 +15,7 @@ import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus, WORKFLO
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { markPreForeclosureVisited, createFollowUp } from '@/lib/api';
+import { markPreForeclosureVisited, createFollowUp, logActivity } from '@/lib/api';
 import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
 import { extractContacts } from '@/lib/contactParser';
 import { WorkflowTracker } from './WorkflowTracker';
@@ -677,6 +677,27 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
             record={viewRecord}
             onRecordUpdate={(updates) => setViewRecord(prev => prev ? { ...prev, ...updates } : prev)}
           />
+
+          {/* Sales Activity Logging */}
+          <div className="bg-card border border-border/60 rounded-lg p-3 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Log Sales Activity</p>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { type: 'CONTACT_MADE'    as const, label: 'Contact Made',    color: 'border-blue-500/50 text-blue-400 hover:bg-blue-500/10' },
+                { type: 'APPOINTMENT_SET' as const, label: 'Appt Set',        color: 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10' },
+                { type: 'CONTRACT_SIGNED' as const, label: 'Contract Signed', color: 'border-green-500/50 text-green-400 hover:bg-green-500/10' },
+              ]).map(({ type, label, color }) => (
+                <Button key={type} size="sm" variant="outline"
+                  className={`h-9 text-xs ${color}`}
+                  onClick={async () => {
+                    await logActivity(type, { drivingLeadId: undefined });
+                    toast({ title: label + ' logged', description: 'Saved to team stats.' });
+                  }}>
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </div>
 
           {/* Schedule Follow-Up */}
           {viewRecord.workflow_stage && FOLLOWUP_ELIGIBLE_STAGES.includes(viewRecord.workflow_stage as any) && (
