@@ -34,6 +34,7 @@ router.get('/', optionalAuth, async (req, res) => {
       allPreForeclosures,
       overdueFollowUps,
       visitsThisWeek,
+      activityLogsMonth,
     ] = await Promise.all([
       // Call logs this month with userId
       prisma.callLog.findMany({
@@ -98,6 +99,12 @@ router.get('/', optionalAuth, async (req, res) => {
         where: { visited: true, visited_at: { gte: startOfWeek } },
         select: { visited_by: true },
       }),
+
+      // Activity logs this month (contacts, appointments, contracts)
+      prisma.activityLog.findMany({
+        where: { createdAt: { gte: startOfMonth }, userId: { not: null } },
+        select: { userId: true, type: true, createdAt: true },
+      }),
     ]);
 
     // Build username → id map for properties assigned (assignedTo is a string username)
@@ -144,6 +151,12 @@ router.get('/', optionalAuth, async (req, res) => {
       // Overdue follow-ups
       const overdueCount = overdueFollowUps.filter(f => f.createdById === user.id).length;
 
+      // Activity logs
+      const userActivity = activityLogsMonth.filter(a => a.userId === user.id);
+      const contactsMade      = userActivity.filter(a => a.type === 'CONTACT_MADE').length;
+      const appointmentsSet   = userActivity.filter(a => a.type === 'APPOINTMENT_SET').length;
+      const contractsSigned   = userActivity.filter(a => a.type === 'CONTRACT_SIGNED').length;
+
       // Visits this week (visitedBy is username string)
       const visitsWeek = visitsThisWeek.filter(v =>
         v.visited_by && v.visited_by.toLowerCase() === user.username.toLowerCase()
@@ -187,6 +200,9 @@ router.get('/', optionalAuth, async (req, res) => {
         propertiesAssigned: propertiesCount,
         overdueFollowUps: overdueCount,
         visitsThisWeek: visitsWeek,
+        contactsMade,
+        appointmentsSet,
+        contractsSigned,
         conversionRate,
         pipeline,
         preForeclosure: {

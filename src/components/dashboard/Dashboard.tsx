@@ -22,12 +22,12 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
 
   // Use mock data if real data has no activity yet (all zeros) — remove once team starts logging calls
   const MOCK_TEAM: typeof teamStatsRaw = [
-    { id: 'm1', username: 'Raul',    role: 'ADMIN',    calls: { today: 14, week: 67, month: 210 }, d4dLeads: { week: 12, month: 38, total: 95 }, followUps: { createdWeek: 5, createdMonth: 18, completedWeek: 4, completedMonth: 14 }, notes: { week: 9, month: 31 }, propertiesAssigned: 24, conversionRate: 18, pipeline: { NEW: 15, RESEARCHING: 10, CONTACTED: 6, UNDER_CONTRACT: 2, DEAD: 4 }, preForeclosure: { total: 42, researched: 31, withEquity: 22, underwater: 9 }, overdueFollowUps: 3, visitsThisWeek: 7 },
-    { id: 'm2', username: 'Luciano', role: 'OPERATOR', calls: { today: 9,  week: 44, month: 130 }, d4dLeads: { week: 7,  month: 22, total: 54 }, followUps: { createdWeek: 3, createdMonth: 11, completedWeek: 2, completedMonth: 8  }, notes: { week: 5, month: 17 }, propertiesAssigned: 15, conversionRate: 13, pipeline: { NEW: 8,  RESEARCHING: 7,  CONTACTED: 3, UNDER_CONTRACT: 1, DEAD: 2 }, preForeclosure: { total: 28, researched: 18, withEquity: 11, underwater: 7 }, overdueFollowUps: 5, visitsThisWeek: 4 },
-    { id: 'm3', username: 'Maria',   role: 'OPERATOR', calls: { today: 3,  week: 21, month: 74  }, d4dLeads: { week: 4,  month: 15, total: 32 }, followUps: { createdWeek: 2, createdMonth: 7,  completedWeek: 2, completedMonth: 6  }, notes: { week: 3, month: 10 }, propertiesAssigned: 9,  conversionRate: 9,  pipeline: { NEW: 5,  RESEARCHING: 4,  CONTACTED: 2, UNDER_CONTRACT: 0, DEAD: 1 }, preForeclosure: { total: 15, researched: 7,  withEquity: 5,  underwater: 2 }, overdueFollowUps: 1, visitsThisWeek: 2 },
-    { id: 'm4', username: 'Carlos',  role: 'OPERATOR', calls: { today: 11, week: 53, month: 165 }, d4dLeads: { week: 9,  month: 28, total: 70 }, followUps: { createdWeek: 4, createdMonth: 13, completedWeek: 3, completedMonth: 10 }, notes: { week: 6, month: 22 }, propertiesAssigned: 18, conversionRate: 15, pipeline: { NEW: 11, RESEARCHING: 8,  CONTACTED: 5, UNDER_CONTRACT: 1, DEAD: 3 }, preForeclosure: { total: 33, researched: 22, withEquity: 16, underwater: 6 }, overdueFollowUps: 2, visitsThisWeek: 5 },
-    { id: 'm5', username: 'Sofia',   role: 'OPERATOR', calls: { today: 7,  week: 35, month: 98  }, d4dLeads: { week: 5,  month: 18, total: 41 }, followUps: { createdWeek: 3, createdMonth: 9,  completedWeek: 2, completedMonth: 7  }, notes: { week: 4, month: 14 }, propertiesAssigned: 12, conversionRate: 11, pipeline: { NEW: 7,  RESEARCHING: 5,  CONTACTED: 3, UNDER_CONTRACT: 1, DEAD: 2 }, preForeclosure: { total: 20, researched: 13, withEquity: 9,  underwater: 4 }, overdueFollowUps: 4, visitsThisWeek: 3 },
-    { id: 'm6', username: 'Diego',   role: 'OPERATOR', calls: { today: 5,  week: 28, month: 82  }, d4dLeads: { week: 3,  month: 12, total: 27 }, followUps: { createdWeek: 2, createdMonth: 6,  completedWeek: 1, completedMonth: 5  }, notes: { week: 2, month: 8  }, propertiesAssigned: 8,  conversionRate: 7,  pipeline: { NEW: 4,  RESEARCHING: 3,  CONTACTED: 1, UNDER_CONTRACT: 0, DEAD: 1 }, preForeclosure: { total: 12, researched: 5,  withEquity: 3,  underwater: 2 }, overdueFollowUps: 2, visitsThisWeek: 1 },
+    { id: 'm1', username: 'Raul',    role: 'ADMIN',    calls: { today: 14, week: 67, month: 210 }, d4dLeads: { week: 12, month: 38, total: 95 }, followUps: { createdWeek: 5, createdMonth: 18, completedWeek: 4, completedMonth: 14 }, notes: { week: 9, month: 31 }, propertiesAssigned: 24, conversionRate: 18, pipeline: { NEW: 15, RESEARCHING: 10, CONTACTED: 6, UNDER_CONTRACT: 2, DEAD: 4 }, preForeclosure: { total: 42, researched: 31, withEquity: 22, underwater: 9 }, overdueFollowUps: 3, visitsThisWeek: 7, contactsMade: 18, appointmentsSet: 5, contractsSigned: 2 },
+    { id: 'm2', username: 'Luciano', role: 'OPERATOR', calls: { today: 9,  week: 44, month: 130 }, d4dLeads: { week: 7,  month: 22, total: 54 }, followUps: { createdWeek: 3, createdMonth: 11, completedWeek: 2, completedMonth: 8  }, notes: { week: 5, month: 17 }, propertiesAssigned: 15, conversionRate: 13, pipeline: { NEW: 8,  RESEARCHING: 7,  CONTACTED: 3, UNDER_CONTRACT: 1, DEAD: 2 }, preForeclosure: { total: 28, researched: 18, withEquity: 11, underwater: 7 }, overdueFollowUps: 5, visitsThisWeek: 4, contactsMade: 11, appointmentsSet: 3, contractsSigned: 1 },
+    { id: 'm3', username: 'Maria',   role: 'OPERATOR', calls: { today: 3,  week: 21, month: 74  }, d4dLeads: { week: 4,  month: 15, total: 32 }, followUps: { createdWeek: 2, createdMonth: 7,  completedWeek: 2, completedMonth: 6  }, notes: { week: 3, month: 10 }, propertiesAssigned: 9,  conversionRate: 9,  pipeline: { NEW: 5,  RESEARCHING: 4,  CONTACTED: 2, UNDER_CONTRACT: 0, DEAD: 1 }, preForeclosure: { total: 15, researched: 7,  withEquity: 5,  underwater: 2 }, overdueFollowUps: 1, visitsThisWeek: 2, contactsMade: 7,  appointmentsSet: 2, contractsSigned: 0 },
+    { id: 'm4', username: 'Carlos',  role: 'OPERATOR', calls: { today: 11, week: 53, month: 165 }, d4dLeads: { week: 9,  month: 28, total: 70 }, followUps: { createdWeek: 4, createdMonth: 13, completedWeek: 3, completedMonth: 10 }, notes: { week: 6, month: 22 }, propertiesAssigned: 18, conversionRate: 15, pipeline: { NEW: 11, RESEARCHING: 8,  CONTACTED: 5, UNDER_CONTRACT: 1, DEAD: 3 }, preForeclosure: { total: 33, researched: 22, withEquity: 16, underwater: 6 }, overdueFollowUps: 2, visitsThisWeek: 5, contactsMade: 14, appointmentsSet: 4, contractsSigned: 1 },
+    { id: 'm5', username: 'Sofia',   role: 'OPERATOR', calls: { today: 7,  week: 35, month: 98  }, d4dLeads: { week: 5,  month: 18, total: 41 }, followUps: { createdWeek: 3, createdMonth: 9,  completedWeek: 2, completedMonth: 7  }, notes: { week: 4, month: 14 }, propertiesAssigned: 12, conversionRate: 11, pipeline: { NEW: 7,  RESEARCHING: 5,  CONTACTED: 3, UNDER_CONTRACT: 1, DEAD: 2 }, preForeclosure: { total: 20, researched: 13, withEquity: 9,  underwater: 4 }, overdueFollowUps: 4, visitsThisWeek: 3, contactsMade: 9,  appointmentsSet: 2, contractsSigned: 1 },
+    { id: 'm6', username: 'Diego',   role: 'OPERATOR', calls: { today: 5,  week: 28, month: 82  }, d4dLeads: { week: 3,  month: 12, total: 27 }, followUps: { createdWeek: 2, createdMonth: 6,  completedWeek: 1, completedMonth: 5  }, notes: { week: 2, month: 8  }, propertiesAssigned: 8,  conversionRate: 7,  pipeline: { NEW: 4,  RESEARCHING: 3,  CONTACTED: 1, UNDER_CONTRACT: 0, DEAD: 1 }, preForeclosure: { total: 12, researched: 5,  withEquity: 3,  underwater: 2 }, overdueFollowUps: 2, visitsThisWeek: 1, contactsMade: 5,  appointmentsSet: 1, contractsSigned: 0 },
   ];
   const allZeros = !teamStatsRaw || teamStatsRaw.every(m => m.calls.today === 0 && m.calls.week === 0 && m.d4dLeads.week === 0);
   const teamStats = allZeros ? MOCK_TEAM : teamStatsRaw;
@@ -239,12 +239,13 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       {teamStats && teamStats.length > 0 && (() => {
         const sorted = [...teamStats].sort((a, b) => b.calls.today - a.calls.today);
 
-        const callsData   = sorted.map(m => ({ name: m.username, Today: m.calls.today, Week: m.calls.week, Month: m.calls.month }));
-        const d4dData     = sorted.map(m => ({ name: m.username, 'This Week': m.d4dLeads.week, 'This Month': m.d4dLeads.month }));
-        const fuData      = sorted.map(m => ({ name: m.username, Completed: m.followUps.completedWeek, Created: m.followUps.createdWeek }));
-        const notesData   = sorted.map(m => ({ name: m.username, Notes: m.notes.week }));
-        const overdueData = sorted.map(m => ({ name: m.username, Overdue: m.overdueFollowUps }));
-        const visitsData  = sorted.map(m => ({ name: m.username, Visits: m.visitsThisWeek }));
+        const callsData      = sorted.map(m => ({ name: m.username, Today: m.calls.today, Week: m.calls.week, Month: m.calls.month }));
+        const d4dData        = sorted.map(m => ({ name: m.username, 'This Week': m.d4dLeads.week, 'This Month': m.d4dLeads.month }));
+        const fuData         = sorted.map(m => ({ name: m.username, Completed: m.followUps.completedWeek, Created: m.followUps.createdWeek }));
+        const notesData      = sorted.map(m => ({ name: m.username, Notes: m.notes.week }));
+        const overdueData    = sorted.map(m => ({ name: m.username, Overdue: m.overdueFollowUps }));
+        const visitsData     = sorted.map(m => ({ name: m.username, Visits: m.visitsThisWeek }));
+        const salesData      = sorted.map(m => ({ name: m.username, Contacts: m.contactsMade ?? 0, Appointments: m.appointmentsSet ?? 0, Contracts: m.contractsSigned ?? 0 }));
         const pfData      = sorted.map(m => ({
           name: m.username,
           'Has Equity': m.preForeclosure.withEquity,
@@ -323,6 +324,15 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             title: 'Property Visits', subtitle: 'Drive-bys logged this week',
             data: visitsData, accent: '#06b6d4',
             bars: [{ key: 'Visits', color: '#06b6d4', gradId: 'g-visits' }],
+          },
+          {
+            title: 'Sales Activity', subtitle: 'Contacts · Appointments · Contracts this month',
+            data: salesData, accent: '#22c55e',
+            bars: [
+              { key: 'Contacts',     color: '#3b82f6', gradId: 'g-sa-cont' },
+              { key: 'Appointments', color: '#f59e0b', gradId: 'g-sa-appt' },
+              { key: 'Contracts',    color: '#22c55e', gradId: 'g-sa-ctr'  },
+            ],
           },
           {
             title: 'D4D Pipeline', subtitle: 'Lead stages across team',

@@ -33,6 +33,7 @@ model User {
   followUps      FollowUp[]
   callLogs       CallLog[]
   drivingLeads   DrivingLead[]
+  activityLogs   ActivityLog[]
 
   @@index([email])
   @@index([username])
@@ -743,6 +744,25 @@ model FollowUp {
   @@index([completed])
   @@index([date, completed])
   @@map("follow_ups")
+}
+
+// ============================================================================
+// ACTIVITY LOG — contacts made, appointments set, contracts signed
+// ============================================================================
+model ActivityLog {
+  id            String   @id @default(cuid())
+  type          String   // CONTACT_MADE | APPOINTMENT_SET | CONTRACT_SIGNED
+  createdAt     DateTime @default(now())
+  propertyId    String?
+  drivingLeadId String?
+  notes         String?  @db.Text
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+
+  @@index([type])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activity_logs")
 }
 
 // ============================================================================

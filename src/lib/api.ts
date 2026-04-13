@@ -1667,6 +1667,17 @@ export interface TeamMemberStats {
   preForeclosure: { total: number; researched: number; withEquity: number; underwater: number };
   overdueFollowUps: number;
   visitsThisWeek: number;
+  contactsMade: number;
+  appointmentsSet: number;
+  contractsSigned: number;
+}
+
+export async function logActivity(type: 'CONTACT_MADE' | 'APPOINTMENT_SET' | 'CONTRACT_SIGNED', opts?: { propertyId?: string; drivingLeadId?: string; notes?: string }): Promise<void> {
+  await fetch(`${API_BASE_URL}/api/activity-logs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ type, ...opts }),
+  });
 }
 
 export async function getTeamStats(): Promise<TeamMemberStats[]> {
