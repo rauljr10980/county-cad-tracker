@@ -22,9 +22,9 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
 
   // Use mock data if real data has no activity yet (all zeros) — remove once team starts logging calls
   const MOCK_TEAM: typeof teamStatsRaw = [
-    { id: 'm1', username: 'Raul',    role: 'ADMIN',    calls: { today: 14, week: 67, month: 210 }, d4dLeads: { week: 12, month: 38, total: 95 }, followUps: { createdWeek: 5, createdMonth: 18, completedWeek: 4, completedMonth: 14 }, notes: { week: 9, month: 31 }, propertiesAssigned: 24, conversionRate: 18, pipeline: { NEW: 15, RESEARCHING: 10, CONTACTED: 6, UNDER_CONTRACT: 2, DEAD: 4 }, preForeclosure: { total: 42, researched: 31, withEquity: 22, underwater: 9 } },
-    { id: 'm2', username: 'Luciano', role: 'OPERATOR', calls: { today: 9,  week: 44, month: 130 }, d4dLeads: { week: 7,  month: 22, total: 54 }, followUps: { createdWeek: 3, createdMonth: 11, completedWeek: 2, completedMonth: 8  }, notes: { week: 5, month: 17 }, propertiesAssigned: 15, conversionRate: 13, pipeline: { NEW: 8,  RESEARCHING: 7,  CONTACTED: 3, UNDER_CONTRACT: 1, DEAD: 2 }, preForeclosure: { total: 28, researched: 18, withEquity: 11, underwater: 7 } },
-    { id: 'm3', username: 'Maria',   role: 'OPERATOR', calls: { today: 3,  week: 21, month: 74  }, d4dLeads: { week: 4,  month: 15, total: 32 }, followUps: { createdWeek: 2, createdMonth: 7,  completedWeek: 2, completedMonth: 6  }, notes: { week: 3, month: 10 }, propertiesAssigned: 9,  conversionRate: 9,  pipeline: { NEW: 5,  RESEARCHING: 4,  CONTACTED: 2, UNDER_CONTRACT: 0, DEAD: 1 }, preForeclosure: { total: 15, researched: 7,  withEquity: 5,  underwater: 2 } },
+    { id: 'm1', username: 'Raul',    role: 'ADMIN',    calls: { today: 14, week: 67, month: 210 }, d4dLeads: { week: 12, month: 38, total: 95 }, followUps: { createdWeek: 5, createdMonth: 18, completedWeek: 4, completedMonth: 14 }, notes: { week: 9, month: 31 }, propertiesAssigned: 24, conversionRate: 18, pipeline: { NEW: 15, RESEARCHING: 10, CONTACTED: 6, UNDER_CONTRACT: 2, DEAD: 4 }, preForeclosure: { total: 42, researched: 31, withEquity: 22, underwater: 9 }, overdueFollowUps: 3, visitsThisWeek: 7 },
+    { id: 'm2', username: 'Luciano', role: 'OPERATOR', calls: { today: 9,  week: 44, month: 130 }, d4dLeads: { week: 7,  month: 22, total: 54 }, followUps: { createdWeek: 3, createdMonth: 11, completedWeek: 2, completedMonth: 8  }, notes: { week: 5, month: 17 }, propertiesAssigned: 15, conversionRate: 13, pipeline: { NEW: 8,  RESEARCHING: 7,  CONTACTED: 3, UNDER_CONTRACT: 1, DEAD: 2 }, preForeclosure: { total: 28, researched: 18, withEquity: 11, underwater: 7 }, overdueFollowUps: 5, visitsThisWeek: 4 },
+    { id: 'm3', username: 'Maria',   role: 'OPERATOR', calls: { today: 3,  week: 21, month: 74  }, d4dLeads: { week: 4,  month: 15, total: 32 }, followUps: { createdWeek: 2, createdMonth: 7,  completedWeek: 2, completedMonth: 6  }, notes: { week: 3, month: 10 }, propertiesAssigned: 9,  conversionRate: 9,  pipeline: { NEW: 5,  RESEARCHING: 4,  CONTACTED: 2, UNDER_CONTRACT: 0, DEAD: 1 }, preForeclosure: { total: 15, researched: 7,  withEquity: 5,  underwater: 2 }, overdueFollowUps: 1, visitsThisWeek: 2 },
   ];
   const allZeros = !teamStatsRaw || teamStatsRaw.every(m => m.calls.today === 0 && m.calls.week === 0 && m.d4dLeads.week === 0);
   const teamStats = allZeros ? MOCK_TEAM : teamStatsRaw;
@@ -226,6 +226,8 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         const d4dData   = sorted.map(m => ({ name: m.username, 'D4D / wk': m.d4dLeads.week, 'D4D / mo': m.d4dLeads.month }));
         const fuData    = sorted.map(m => ({ name: m.username, Completed: m.followUps.completedWeek, Created: m.followUps.createdWeek }));
         const notesData = sorted.map(m => ({ name: m.username, 'Notes / wk': m.notes.week }));
+        const overdueData = sorted.map(m => ({ name: m.username, Overdue: m.overdueFollowUps }));
+        const visitsData  = sorted.map(m => ({ name: m.username, 'Visits / wk': m.visitsThisWeek }));
         const pfData    = sorted.map(m => ({
           name: m.username,
           'Has Equity': m.preForeclosure.withEquity,
@@ -303,6 +305,12 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                 { key: 'Underwater',     color: '#ef4444' },
                 { key: 'Not Researched', color: '#374151' },
               ]} />
+              <MiniChart title="Overdue Follow-ups" data={overdueData} bars={[
+                { key: 'Overdue', color: '#ef4444' },
+              ]} />
+              <MiniChart title="Property Visits (this week)" data={visitsData} bars={[
+                { key: 'Visits / wk', color: '#06b6d4' },
+              ]} />
               <MiniChart title="D4D Pipeline" data={pipeData} bars={[
                 { key: 'New',        color: '#6b7280' },
                 { key: 'Researching',color: '#3b82f6' },
@@ -315,8 +323,8 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         );
       })()}
 
-      {/* Top Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      {/* ---- everything below is removed — dashboard is team-only ---- */}
+      {false && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -658,6 +666,8 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           </CardContent>
         </Card>
       </div>
+
+      </div>}
 
     </div>
   );

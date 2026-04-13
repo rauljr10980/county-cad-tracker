@@ -32,6 +32,8 @@ router.get('/', optionalAuth, async (req, res) => {
       notesThisMonth,
       propertiesAssigned,
       allPreForeclosures,
+      overdueFollowUps,
+      visitsThisWeek,
     ] = await Promise.all([
       // Call logs this month with userId
       prisma.callLog.findMany({
@@ -84,6 +86,18 @@ router.get('/', optionalAuth, async (req, res) => {
           appraisedValue: true,
         },
       }),
+
+      // Overdue follow-ups (past due, not completed) per user
+      prisma.followUp.findMany({
+        where: { completed: false, date: { lt: now } },
+        select: { createdById: true },
+      }),
+
+      // Properties visited this week per user (visited_by is a string username)
+      prisma.preForeclosure.findMany({
+        where: { visited: true, visited_at: { gte: startOfWeek } },
+        select: { visited_by: true },
+      }),
     ]);
 
     // Build username → id map for properties assigned (assignedTo is a string username)
@@ -127,6 +141,14 @@ router.get('/', optionalAuth, async (req, res) => {
       // Properties assigned (all time, current)
       const propertiesCount = propertiesPerUser[user.id] || 0;
 
+      // Overdue follow-ups
+      const overdueCount = overdueFollowUps.filter(f => f.createdById === user.id).length;
+
+      // Visits this week (visitedBy is username string)
+      const visitsWeek = visitsThisWeek.filter(v =>
+        v.visited_by && v.visited_by.toLowerCase() === user.username.toLowerCase()
+      ).length;
+
       // Pre-foreclosure research (matched by username string in assignedTo)
       const userPreFc = allPreForeclosures.filter(r =>
         r.assignedTo && r.assignedTo.toLowerCase() === user.username.toLowerCase()
@@ -163,6 +185,8 @@ router.get('/', optionalAuth, async (req, res) => {
         },
         notes: { week: notesWeek, month: notesMonth },
         propertiesAssigned: propertiesCount,
+        overdueFollowUps: overdueCount,
+        visitsThisWeek: visitsWeek,
         conversionRate,
         pipeline,
         preForeclosure: {
