@@ -208,7 +208,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
               </div>
             </CardHeader>
             <CardContent className="px-2 pb-4">
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={chartData} margin={{ left: 4, right: 4, top: 4, bottom: 0 }} barCategoryGap="30%">
                   <defs>
                     {userNames.map((n, i) => (
@@ -349,7 +349,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         };
 
         const MiniChart = ({ data, bars, gradId }: { data: any[]; bars: BarDef[]; gradId: string }) => (
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={280}>
             <BarChart data={data} margin={{ left: -4, right: 4, top: 4, bottom: 0 }} barCategoryGap="28%">
               <defs>
                 {bars.map(b => (
