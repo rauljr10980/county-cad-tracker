@@ -165,9 +165,8 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         </CardContent>
       </Card>
 
-      {/* Call Activity Chart — 14-day daily breakdown */}
+      {/* ── Call Activity — 14-day stacked bar chart ── */}
       {(() => {
-        // Use real data or mock 14-day sample
         const MOCK_ACTIVITY = Array.from({ length: 14 }, (_, i) => {
           const d = new Date(); d.setDate(d.getDate() - (13 - i));
           const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -176,38 +175,55 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         });
         const hasRealActivity = callActivity?.some(d => (d.total as number) > 0);
         const chartData = hasRealActivity ? callActivity! : MOCK_ACTIVITY;
-
-        // Collect all user names present in the data
-        const userNames = Array.from(new Set(
-          chartData.flatMap(d => Object.keys(d).filter(k => k !== 'date' && k !== 'total'))
-        ));
-        const USER_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6', '#f97316', '#ec4899'];
+        const userNames = Array.from(new Set(chartData.flatMap(d => Object.keys(d).filter(k => k !== 'date' && k !== 'total'))));
+        const USER_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#f97316', '#ec4899'];
 
         return (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Phone className="h-4 w-4 text-green-400" />
-                Call Activity — Last 14 Days
-                {!hasRealActivity && isMockData && (
-                  <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">sample data</span>
-                )}
-              </CardTitle>
-              <CardDescription>Daily calls per team member</CardDescription>
+          <Card className="border-border/60">
+            <CardHeader className="pb-3 pt-4 px-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-emerald-400" />
+                    Call Activity
+                    {!hasRealActivity && isMockData && (
+                      <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">sample</span>
+                    )}
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">Daily calls per team member — last 14 days</p>
+                </div>
+                <div className="flex items-center gap-4 text-xs">
+                  {userNames.map((n, i) => (
+                    <div key={n} className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full" style={{ background: USER_COLORS[i % USER_COLORS.length] }} />
+                      <span className="text-muted-foreground">{n}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={chartData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <CardContent className="px-2 pb-4">
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={chartData} margin={{ left: 4, right: 4, top: 4, bottom: 0 }} barCategoryGap="30%">
+                  <defs>
+                    {userNames.map((n, i) => (
+                      <linearGradient key={n} id={`grad-activity-${i}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={USER_COLORS[i % USER_COLORS.length]} stopOpacity={0.95} />
+                        <stop offset="100%" stopColor={USER_COLORS[i % USER_COLORS.length]} stopOpacity={0.65} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" vertical={false} strokeOpacity={0.5} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit' }} axisLine={false} tickLine={false} allowDecimals={false} width={24} />
                   <Tooltip
-                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 6, fontSize: 11 }}
-                    cursor={{ fill: 'hsl(var(--muted)/0.4)' }}
+                    contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}
+                    labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600, marginBottom: 4 }}
+                    cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3, radius: 4 }}
                   />
-                  <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
                   {userNames.map((name, i) => (
-                    <Bar key={name} dataKey={name} stackId="calls" fill={USER_COLORS[i % USER_COLORS.length]} radius={i === userNames.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} maxBarSize={32} />
+                    <Bar key={name} dataKey={name} stackId="calls" fill={`url(#grad-activity-${i})`}
+                      radius={i === userNames.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} maxBarSize={40} />
                   ))}
                 </BarChart>
               </ResponsiveContainer>
@@ -216,108 +232,173 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         );
       })()}
 
-      {/* Team Activity */}
+      {/* ── Team Activity Charts ── */}
       {teamStats && teamStats.length > 0 && (() => {
         const sorted = [...teamStats].sort((a, b) => b.calls.today - a.calls.today);
-        const BAR_H = sorted.length * 32 + 16;
+        const BAR_H = Math.max(sorted.length * 44 + 24, 100);
+        const NAME_W = Math.max(...sorted.map(m => m.username.length)) * 7 + 8;
 
-        // Build chart datasets
-        const callsData = sorted.map(m => ({ name: m.username, Today: m.calls.today, Week: m.calls.week, Month: m.calls.month }));
-        const d4dData   = sorted.map(m => ({ name: m.username, 'D4D / wk': m.d4dLeads.week, 'D4D / mo': m.d4dLeads.month }));
-        const fuData    = sorted.map(m => ({ name: m.username, Completed: m.followUps.completedWeek, Created: m.followUps.createdWeek }));
-        const notesData = sorted.map(m => ({ name: m.username, 'Notes / wk': m.notes.week }));
+        const callsData   = sorted.map(m => ({ name: m.username, Today: m.calls.today, Week: m.calls.week, Month: m.calls.month }));
+        const d4dData     = sorted.map(m => ({ name: m.username, 'This Week': m.d4dLeads.week, 'This Month': m.d4dLeads.month }));
+        const fuData      = sorted.map(m => ({ name: m.username, Completed: m.followUps.completedWeek, Created: m.followUps.createdWeek }));
+        const notesData   = sorted.map(m => ({ name: m.username, Notes: m.notes.week }));
         const overdueData = sorted.map(m => ({ name: m.username, Overdue: m.overdueFollowUps }));
-        const visitsData  = sorted.map(m => ({ name: m.username, 'Visits / wk': m.visitsThisWeek }));
-        const pfData    = sorted.map(m => ({
+        const visitsData  = sorted.map(m => ({ name: m.username, Visits: m.visitsThisWeek }));
+        const pfData      = sorted.map(m => ({
           name: m.username,
           'Has Equity': m.preForeclosure.withEquity,
           Underwater: m.preForeclosure.underwater,
-          'Not Researched': m.preForeclosure.total - m.preForeclosure.researched,
+          Pending: m.preForeclosure.total - m.preForeclosure.researched,
         }));
-        const pipeData  = sorted.map(m => ({
+        const pipeData = sorted.map(m => ({
           name: m.username,
           New: m.pipeline['NEW'] || 0,
           Researching: m.pipeline['RESEARCHING'] || 0,
           Contacted: m.pipeline['CONTACTED'] || 0,
-          'Under Ctr': m.pipeline['UNDER_CONTRACT'] || 0,
+          'Under Contract': m.pipeline['UNDER_CONTRACT'] || 0,
           Dead: m.pipeline['DEAD'] || 0,
         }));
 
-        const MiniChart = ({ title, data, bars }: {
+        const TOOLTIP_STYLE = {
+          contentStyle: { background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.3)' },
+          labelStyle: { color: 'hsl(var(--foreground))', fontWeight: 600, marginBottom: 4 },
+          cursor: { fill: 'hsl(var(--muted))', opacity: 0.25 },
+        };
+
+        type ChartConfig = {
           title: string;
+          subtitle: string;
           data: any[];
-          bars: { key: string; color: string }[];
-        }) => (
-          <Card>
-            <CardHeader className="pb-1 pt-3 px-4">
-              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</CardTitle>
-            </CardHeader>
-            <CardContent className="px-2 pb-3">
-              <ResponsiveContainer width="100%" height={BAR_H}>
-                <BarChart data={data} layout="vertical" margin={{ left: 4, right: 24, top: 4, bottom: 4 }}>
-                  <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }} width={60} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 6, fontSize: 11 }}
-                    cursor={{ fill: 'hsl(var(--muted))' }}
-                  />
-                  {bars.length > 1 && <Legend iconSize={8} wrapperStyle={{ fontSize: 10, paddingTop: 4 }} />}
-                  {bars.map(b => (
-                    <Bar key={b.key} dataKey={b.key} fill={b.color} radius={[0, 3, 3, 0]} maxBarSize={20} label={{ position: 'right', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        );
+          bars: { key: string; color: string; gradId: string }[];
+          accent: string;
+        };
+
+        const charts: ChartConfig[] = [
+          {
+            title: 'Calls Made', subtitle: 'Today · Week · Month',
+            data: callsData, accent: '#10b981',
+            bars: [
+              { key: 'Today', color: '#10b981', gradId: 'g-calls-today' },
+              { key: 'Week',  color: '#3b82f6', gradId: 'g-calls-week' },
+              { key: 'Month', color: '#6366f1', gradId: 'g-calls-month' },
+            ],
+          },
+          {
+            title: 'D4D Leads Added', subtitle: 'This week vs this month',
+            data: d4dData, accent: '#f59e0b',
+            bars: [
+              { key: 'This Week',  color: '#f59e0b', gradId: 'g-d4d-wk' },
+              { key: 'This Month', color: '#f97316', gradId: 'g-d4d-mo' },
+            ],
+          },
+          {
+            title: 'Follow-ups', subtitle: 'Completed vs created this week',
+            data: fuData, accent: '#10b981',
+            bars: [
+              { key: 'Completed', color: '#10b981', gradId: 'g-fu-done' },
+              { key: 'Created',   color: '#475569', gradId: 'g-fu-all'  },
+            ],
+          },
+          {
+            title: 'Notes Written', subtitle: 'This week',
+            data: notesData, accent: '#8b5cf6',
+            bars: [{ key: 'Notes', color: '#8b5cf6', gradId: 'g-notes' }],
+          },
+          {
+            title: 'Pre-Foreclosure Research', subtitle: 'Equity status of assigned records',
+            data: pfData, accent: '#10b981',
+            bars: [
+              { key: 'Has Equity', color: '#10b981', gradId: 'g-pf-eq'  },
+              { key: 'Underwater', color: '#ef4444', gradId: 'g-pf-uw'  },
+              { key: 'Pending',    color: '#374151', gradId: 'g-pf-pend' },
+            ],
+          },
+          {
+            title: 'Overdue Follow-ups', subtitle: 'Unresolved past-due tasks',
+            data: overdueData, accent: '#ef4444',
+            bars: [{ key: 'Overdue', color: '#ef4444', gradId: 'g-overdue' }],
+          },
+          {
+            title: 'Property Visits', subtitle: 'Drive-bys logged this week',
+            data: visitsData, accent: '#06b6d4',
+            bars: [{ key: 'Visits', color: '#06b6d4', gradId: 'g-visits' }],
+          },
+          {
+            title: 'D4D Pipeline', subtitle: 'Lead stages across team',
+            data: pipeData, accent: '#3b82f6',
+            bars: [
+              { key: 'New',           color: '#64748b', gradId: 'g-pipe-new'  },
+              { key: 'Researching',   color: '#3b82f6', gradId: 'g-pipe-res'  },
+              { key: 'Contacted',     color: '#eab308', gradId: 'g-pipe-con'  },
+              { key: 'Under Contract',color: '#10b981', gradId: 'g-pipe-uc'   },
+              { key: 'Dead',          color: '#7f1d1d', gradId: 'g-pipe-dead' },
+            ],
+          },
+        ];
 
         return (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">Team Activity</h2>
-              {isMockData && (
-                <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">
-                  sample data
-                </span>
-              )}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                <h2 className="text-base font-semibold">Team Activity</h2>
+                {isMockData && (
+                  <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">sample data</span>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              <MiniChart title="Calls" data={callsData} bars={[
-                { key: 'Today', color: '#22c55e' },
-                { key: 'Week',  color: '#3b82f6' },
-                { key: 'Month', color: '#6366f1' },
-              ]} />
-              <MiniChart title="D4D Leads Added" data={d4dData} bars={[
-                { key: 'D4D / wk', color: '#f59e0b' },
-                { key: 'D4D / mo', color: '#f97316' },
-              ]} />
-              <MiniChart title="Follow-ups (this week)" data={fuData} bars={[
-                { key: 'Completed', color: '#22c55e' },
-                { key: 'Created',   color: '#6b7280' },
-              ]} />
-              <MiniChart title="Notes Written (this week)" data={notesData} bars={[
-                { key: 'Notes / wk', color: '#8b5cf6' },
-              ]} />
-              <MiniChart title="Pre-Foreclosure Research" data={pfData} bars={[
-                { key: 'Has Equity',     color: '#22c55e' },
-                { key: 'Underwater',     color: '#ef4444' },
-                { key: 'Not Researched', color: '#374151' },
-              ]} />
-              <MiniChart title="Overdue Follow-ups" data={overdueData} bars={[
-                { key: 'Overdue', color: '#ef4444' },
-              ]} />
-              <MiniChart title="Property Visits (this week)" data={visitsData} bars={[
-                { key: 'Visits / wk', color: '#06b6d4' },
-              ]} />
-              <MiniChart title="D4D Pipeline" data={pipeData} bars={[
-                { key: 'New',        color: '#6b7280' },
-                { key: 'Researching',color: '#3b82f6' },
-                { key: 'Contacted',  color: '#eab308' },
-                { key: 'Under Ctr',  color: '#22c55e' },
-                { key: 'Dead',       color: '#7f1d1d' },
-              ]} />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {charts.map(({ title, subtitle, data, bars, accent }) => (
+                <Card key={title} className="border-border/60 overflow-hidden">
+                  {/* Accent top bar */}
+                  <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${accent}99, transparent)` }} />
+                  <CardHeader className="pb-2 pt-3 px-4">
+                    <CardTitle className="text-sm font-semibold text-foreground">{title}</CardTitle>
+                    <p className="text-[11px] text-muted-foreground">{subtitle}</p>
+                    {bars.length > 1 && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
+                        {bars.map(b => (
+                          <div key={b.key} className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-sm" style={{ background: b.color }} />
+                            <span className="text-[10px] text-muted-foreground">{b.key}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardHeader>
+                  <CardContent className="px-2 pb-3">
+                    <svg width="0" height="0" style={{ position: 'absolute' }}>
+                      <defs>
+                        {bars.map(b => (
+                          <linearGradient key={b.gradId} id={b.gradId} x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor={b.color} stopOpacity={0.9} />
+                            <stop offset="100%" stopColor={b.color} stopOpacity={0.65} />
+                          </linearGradient>
+                        ))}
+                      </defs>
+                    </svg>
+                    <ResponsiveContainer width="100%" height={BAR_H}>
+                      <BarChart data={data} layout="vertical" margin={{ left: 4, right: 36, top: 2, bottom: 2 }} barCategoryGap="28%">
+                        <XAxis type="number" hide domain={[0, 'dataMax']} />
+                        <YAxis
+                          type="category" dataKey="name" width={NAME_W} axisLine={false} tickLine={false}
+                          tick={{ fontSize: 12, fill: 'hsl(var(--foreground))', fontWeight: 500, fontFamily: 'inherit' }}
+                        />
+                        <Tooltip {...TOOLTIP_STYLE} />
+                        {bars.map((b, bi) => (
+                          <Bar key={b.key} dataKey={b.key} fill={`url(#${b.gradId})`}
+                            radius={[0, 4, 4, 0]} maxBarSize={18}
+                            label={bi === bars.length - 1
+                              ? { position: 'right', fontSize: 11, fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit', formatter: (v: number) => v > 0 ? v : '' }
+                              : false}
+                          />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
         );
