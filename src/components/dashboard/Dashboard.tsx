@@ -349,7 +349,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         };
 
         const MiniChart = ({ data, bars, gradId }: { data: any[]; bars: BarDef[]; gradId: string }) => (
-          <ResponsiveContainer width="100%" height={110}>
+          <ResponsiveContainer width="100%" height={150}>
             <BarChart data={data} margin={{ left: 0, right: 0, top: 2, bottom: 0 }} barCategoryGap="30%">
               <defs>
                 {bars.map(b => (
