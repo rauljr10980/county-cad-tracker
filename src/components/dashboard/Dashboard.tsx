@@ -349,8 +349,8 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         };
 
         const MiniChart = ({ data, bars, gradId }: { data: any[]; bars: BarDef[]; gradId: string }) => (
-          <ResponsiveContainer width="100%" height={150}>
-            <BarChart data={data} margin={{ left: 0, right: 0, top: 2, bottom: 0 }} barCategoryGap="30%">
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={data} margin={{ left: -4, right: 4, top: 4, bottom: 0 }} barCategoryGap="28%">
               <defs>
                 {bars.map(b => (
                   <linearGradient key={b.gradId + gradId} id={b.gradId + gradId} x1="0" y1="0" x2="0" y2="1">
@@ -359,10 +359,12 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                   </linearGradient>
                 ))}
               </defs>
+              <CartesianGrid strokeDasharray="3 6" stroke="hsl(var(--border))" vertical={false} strokeOpacity={0.35} />
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit' }} />
-              <YAxis hide />
+              <YAxis axisLine={false} tickLine={false} allowDecimals={false} width={26}
+                tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit' }} />
               <Tooltip {...TOOLTIP_STYLE} />
-              {bars.map(b => <Bar key={b.key} dataKey={b.key} fill={`url(#${b.gradId + gradId})`} radius={[3, 3, 0, 0]} maxBarSize={28} />)}
+              {bars.map(b => <Bar key={b.key} dataKey={b.key} fill={`url(#${b.gradId + gradId})`} radius={[3, 3, 0, 0]} maxBarSize={32} />)}
             </BarChart>
           </ResponsiveContainer>
         );
