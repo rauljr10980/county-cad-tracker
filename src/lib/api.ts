@@ -943,6 +943,31 @@ export async function batchOwnerLookup(): Promise<{
 }
 
 /**
+ * Equity lookup — fetches appraised value from BCAD + cross-refs tax debt from our DB
+ */
+export async function lookupEquity(documentNumber: string): Promise<{
+  success: boolean;
+  appraisedValue: number | null;
+  loanAmount: number | null;
+  taxAmountDue: number | null;
+  equity: number | null;
+  ltv: number | null;
+  source: string | null;
+  matchedAddress: string | null;
+  accountNumber: string | null;
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/preforeclosure/${encodeURIComponent(documentNumber)}/equity-lookup`,
+    { method: 'POST', headers: getAuthHeaders() }
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Equity lookup failed');
+  }
+  return response.json();
+}
+
+/**
  * Geocode pre-foreclosure records via backend (Census → Nominatim → ArcGIS)
  */
 export async function geocodePreForeclosureRecords(documentNumbers: string[]): Promise<{

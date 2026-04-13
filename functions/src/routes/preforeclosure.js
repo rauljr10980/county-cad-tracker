@@ -1080,6 +1080,163 @@ router.post('/:documentNumber/owner-lookup', optionalAuth, async (req, res) => {
 });
 
 // ============================================================================
+// EQUITY LOOKUP — fetches appraised value from BCAD + cross-refs tax debt
+// ============================================================================
+
+// Helper: search BCAD esearch for appraised value by address
+async function lookupBCADValue(address) {
+  try {
+    // BCAD public search API
+    const searchUrl = `https://esearch.bcad.org/api/property/search?q=${encodeURIComponent(address)}&page=0&pageSize=5`;
+    const resp = await fetch(searchUrl, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; research-tool)',
+        'Referer': 'https://esearch.bcad.org/',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+
+    // BCAD returns { results: [{ accountNumber, siteAddress, totalAppraisedValue, ... }] }
+    const results = data?.results || data?.data || (Array.isArray(data) ? data : []);
+    if (!results.length) return null;
+
+    // Pick best match — first result is usually closest
+    const best = results[0];
+    const appraisedValue =
+      best.totalAppraisedValue ?? best.appraisedValue ?? best.marketValue ??
+      best.totalValue ?? best.value ?? null;
+
+    return {
+      appraisedValue: appraisedValue ? parseFloat(String(appraisedValue).replace(/[^0-9.]/g, '')) : null,
+      accountNumber: best.accountNumber || best.acctNo || null,
+      siteAddress: best.siteAddress || best.propertyAddress || null,
+      source: 'bcad',
+    };
+  } catch (err) {
+    console.warn('[EQUITY-LOOKUP] BCAD fetch failed:', err.message);
+    return null;
+  }
+}
+
+// Helper: also try bexar.acttax.com showdetail for market value
+async function lookupActTaxValue(address) {
+  try {
+    // First hit showlist to get account number
+    const listResp = await fetch('https://bexar.acttax.com/act_webdev/bexar/showlist.jsp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `searchby=6&criteria=${encodeURIComponent(address.toUpperCase())}&subcriteria=`,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!listResp.ok) return null;
+    const listHtml = await listResp.text();
+
+    // Extract account number link: showdetail.jsp?accountno=XXXXXX
+    const acctMatch = listHtml.match(/showdetail\.jsp\?accountno=([0-9]+)/);
+    if (!acctMatch) return null;
+    const accountNo = acctMatch[1];
+
+    // Fetch detail page
+    const detailResp = await fetch(`https://bexar.acttax.com/act_webdev/bexar/showdetail.jsp?accountno=${accountNo}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible)' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!detailResp.ok) return null;
+    const detailHtml = await detailResp.text();
+
+    // Parse market/appraised value from detail page
+    // Typical pattern: <td>Market Value</td><td>$123,456</td> or Appraised Value
+    const valueMatch = detailHtml.match(/(?:market|appraised)\s+value[^<]*<\/td>\s*<td[^>]*>\s*\$?([\d,]+)/i);
+    const rawValue = valueMatch ? valueMatch[1].replace(/,/g, '') : null;
+    const appraisedValue = rawValue ? parseFloat(rawValue) : null;
+
+    // Parse tax amount due
+    const taxMatch = detailHtml.match(/(?:total\s+)?(?:amount\s+due|taxes\s+due|balance\s+due)[^<]*<\/td>\s*<td[^>]*>\s*\$?([\d,]+\.?\d*)/i);
+    const rawTax = taxMatch ? taxMatch[1].replace(/,/g, '') : null;
+    const taxAmountDue = rawTax ? parseFloat(rawTax) : null;
+
+    return {
+      appraisedValue,
+      taxAmountDue,
+      accountNumber: accountNo,
+      source: 'acttax',
+    };
+  } catch (err) {
+    console.warn('[EQUITY-LOOKUP] ActTax fetch failed:', err.message);
+    return null;
+  }
+}
+
+router.post('/:documentNumber/equity-lookup', optionalAuth, async (req, res) => {
+  try {
+    const { documentNumber } = req.params;
+    const record = await prisma.preForeclosure.findUnique({ where: { documentNumber } });
+    if (!record) return res.status(404).json({ error: 'Record not found' });
+
+    const address = record.address;
+    console.log(`[EQUITY-LOOKUP] Looking up equity for: "${address}"`);
+
+    // Try BCAD first, fall back to ActTax detail page
+    const [bcadResult, actTaxResult] = await Promise.all([
+      lookupBCADValue(address),
+      lookupActTaxValue(address),
+    ]);
+
+    const appraisedValue =
+      bcadResult?.appraisedValue || actTaxResult?.appraisedValue || null;
+    const taxFromLookup = actTaxResult?.taxAmountDue || null;
+
+    // Cross-reference our own properties table by address for tax debt
+    const addressSearch = address.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    const matchedProperty = await prisma.property.findFirst({
+      where: {
+        propertyAddress: { contains: addressSearch.split(' ').slice(0, 3).join(' '), mode: 'insensitive' },
+      },
+      select: { totalAmountDue: true, marketValue: true, propertyAddress: true },
+    });
+
+    const taxAmountDue = taxFromLookup || matchedProperty?.totalAmountDue || null;
+    const marketValueFromDB = matchedProperty?.marketValue || null;
+    const finalAppraisedValue = appraisedValue || marketValueFromDB || null;
+
+    // Save appraised value to record if we found one
+    if (finalAppraisedValue && finalAppraisedValue !== record.appraisedValue) {
+      await prisma.preForeclosure.update({
+        where: { documentNumber },
+        data: { appraisedValue: finalAppraisedValue },
+      });
+    }
+
+    // Calculate equity components
+    const loanAmount = record.loanAmount || null;
+    const equity = finalAppraisedValue && loanAmount
+      ? finalAppraisedValue - loanAmount - (taxAmountDue || 0)
+      : null;
+    const ltv = finalAppraisedValue && loanAmount
+      ? (loanAmount / finalAppraisedValue) * 100
+      : null;
+
+    res.json({
+      success: true,
+      appraisedValue: finalAppraisedValue,
+      loanAmount,
+      taxAmountDue,
+      equity,
+      ltv,
+      source: bcadResult?.source || actTaxResult?.source || (marketValueFromDB ? 'db' : null),
+      matchedAddress: matchedProperty?.propertyAddress || null,
+      accountNumber: bcadResult?.accountNumber || actTaxResult?.accountNumber || null,
+    });
+  } catch (error) {
+    console.error('[EQUITY-LOOKUP] Error:', error);
+    res.status(500).json({ error: 'Equity lookup failed', details: error.message });
+  }
+});
+
+// ============================================================================
 // BATCH OWNER LOOKUP (runs sequentially for all records without owner)
 // ============================================================================
 

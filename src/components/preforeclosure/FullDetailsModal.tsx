@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, CalendarDays, ChevronDown, Home, Building, AlertTriangle, Copy, Search, User, Mail, ClipboardPaste } from 'lucide-react';
+import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, CalendarDays, ChevronDown, Home, Building, AlertTriangle, Copy, Search, User, Mail, ClipboardPaste, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,7 +15,7 @@ import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus, WORKFLO
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { markPreForeclosureVisited, createFollowUp } from '@/lib/api';
+import { markPreForeclosureVisited, createFollowUp, lookupEquity } from '@/lib/api';
 import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
 import { extractContacts } from '@/lib/contactParser';
 import { WorkflowTracker } from './WorkflowTracker';
@@ -62,6 +62,16 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [savingFollowUp, setSavingFollowUp] = useState(false);
   const [contactExtractorExpanded, setContactExtractorExpanded] = useState(false);
   const [rawContactText, setRawContactText] = useState('');
+  const [equityData, setEquityData] = useState<{
+    appraisedValue: number | null;
+    loanAmount: number | null;
+    taxAmountDue: number | null;
+    equity: number | null;
+    ltv: number | null;
+    source: string | null;
+    matchedAddress: string | null;
+  } | null>(null);
+  const [lookingUpEquity, setLookingUpEquity] = useState(false);
   const lookupMutation = useOwnerLookup();
 
   // Parse visit details from workflow log
@@ -476,23 +486,123 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   </SelectContent>
                 </Select>
               </div>
-              {loanAmountLocal != null && appraisedValueLocal != null && appraisedValueLocal > 0 && (() => {
-                const ratio = (loanAmountLocal / appraisedValueLocal) * 100;
-                const equity = appraisedValueLocal - loanAmountLocal;
-                const good = appraisedValueLocal > loanAmountLocal;
-                return (
-                  <div className="sm:col-span-2">
-                    <Label className="text-muted-foreground text-xs">Loan-to-Value Ratio</Label>
-                    <div className={`mt-1 flex items-center gap-3 px-3 py-2 rounded-lg border ${good ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
-                      <span className={`text-xl font-bold font-mono ${good ? 'text-green-400' : 'text-red-400'}`}>{ratio.toFixed(1)}%</span>
-                      <div className="text-xs text-muted-foreground">
-                        <p>{good ? '✓ Equity available' : '✗ Underwater'}</p>
-                        <p>Equity: <span className={`font-medium ${good ? 'text-green-400' : 'text-red-400'}`}>${equity.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></p>
+              {/* Equity Research Panel */}
+              <div className="sm:col-span-2">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    Equity Research
+                  </Label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-xs px-2"
+                    disabled={lookingUpEquity}
+                    onClick={async () => {
+                      if (!viewRecord) return;
+                      setLookingUpEquity(true);
+                      try {
+                        const result = await lookupEquity(viewRecord.document_number);
+                        setEquityData(result);
+                        if (result.appraisedValue && result.appraisedValue !== appraisedValueLocal) {
+                          setAppraisedValueLocal(result.appraisedValue);
+                          toast({ title: 'Appraised value updated', description: `$${result.appraisedValue.toLocaleString()} from ${result.source?.toUpperCase() || 'lookup'}`, duration: 3000 });
+                        }
+                      } catch (err: any) {
+                        toast({ title: 'Lookup failed', description: err.message, variant: 'destructive', duration: 3000 });
+                      } finally {
+                        setLookingUpEquity(false);
+                      }
+                    }}
+                  >
+                    {lookingUpEquity ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                    {lookingUpEquity ? 'Looking up...' : 'Auto-Lookup'}
+                  </Button>
+                </div>
+
+                {/* Equity Breakdown */}
+                {(() => {
+                  const appraised = equityData?.appraisedValue ?? appraisedValueLocal;
+                  const loan = equityData?.loanAmount ?? loanAmountLocal;
+                  const tax = equityData?.taxAmountDue ?? null;
+                  if (!appraised || appraised <= 0) return (
+                    <p className="text-xs text-muted-foreground italic">Enter appraised value or click Auto-Lookup to research equity.</p>
+                  );
+
+                  const netEquity = appraised - (loan || 0) - (tax || 0);
+                  const ltv = loan ? (loan / appraised) * 100 : null;
+                  const equityPct = (netEquity / appraised) * 100;
+                  const isGood = netEquity > 0;
+                  const isGreat = equityPct >= 30;
+
+                  const fmt = (n: number) => `$${Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+
+                  return (
+                    <div className={`rounded-lg border p-3 space-y-2 ${isGreat ? 'border-green-500/40 bg-green-500/5' : isGood ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                      {/* Net equity headline */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className={`text-2xl font-bold font-mono ${isGreat ? 'text-green-400' : isGood ? 'text-yellow-400' : 'text-red-400'}`}>
+                            {isGood ? '+' : '-'}{fmt(netEquity)}
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-2">net equity ({equityPct.toFixed(1)}%)</span>
+                        </div>
+                        {ltv != null && (
+                          <div className="text-right">
+                            <div className="text-sm font-mono font-semibold">{ltv.toFixed(1)}% LTV</div>
+                            <div className="text-[10px] text-muted-foreground">loan-to-value</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Equity bar */}
+                      <div className="w-full h-2 bg-muted rounded overflow-hidden">
+                        <div
+                          className={`h-full rounded transition-all ${isGreat ? 'bg-green-500' : isGood ? 'bg-yellow-500' : 'bg-red-500'}`}
+                          style={{ width: `${Math.min(100, Math.max(0, equityPct))}%` }}
+                        />
+                      </div>
+
+                      {/* Breakdown */}
+                      <div className="text-xs space-y-1 pt-1">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Appraised Value</span>
+                          <span className="font-medium">{fmt(appraised)}</span>
+                        </div>
+                        {loan != null && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">− Loan Balance</span>
+                            <span className="text-red-400">−{fmt(loan)}</span>
+                          </div>
+                        )}
+                        {tax != null && tax > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">− Tax Owed</span>
+                            <span className="text-orange-400">−{fmt(tax)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between border-t border-border/50 pt-1 font-medium">
+                          <span>= Net Equity</span>
+                          <span className={isGood ? 'text-green-400' : 'text-red-400'}>{isGood ? '' : '-'}{fmt(netEquity)}</span>
+                        </div>
+                      </div>
+
+                      {/* Source label */}
+                      {equityData?.source && (
+                        <p className="text-[10px] text-muted-foreground">
+                          Source: {equityData.source.toUpperCase()}
+                          {equityData.matchedAddress ? ` · matched: ${equityData.matchedAddress}` : ''}
+                        </p>
+                      )}
+
+                      {/* Deal quality badge */}
+                      <div className={`text-[10px] font-medium px-2 py-0.5 rounded inline-block ${isGreat ? 'bg-green-500/20 text-green-400' : isGood ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {isGreat ? '✓ Strong equity — good lead' : isGood ? '~ Marginal equity — dig deeper' : '✗ Underwater or negative equity'}
                       </div>
                     </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
+              </div>
               <div>
                 <Label className="text-muted-foreground text-xs">Latitude</Label>
                 <Input
