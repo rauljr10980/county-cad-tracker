@@ -20,6 +20,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   const { data: callStats } = useCallStats();
   const { data: callActivity } = useCallActivity();
   const { data: teamStatsRaw } = useTeamStats();
+  const [openChartIdx, setOpenChartIdx] = useState<number | null>(null);
 
   // Use mock data if real data has no activity yet (all zeros) — remove once team starts logging calls
   const MOCK_TEAM: typeof teamStatsRaw = [
@@ -386,9 +387,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           </ResponsiveContainer>
         );
 
-        // State for which card is open — moved outside of map via index
-        const [openIdx, setOpenIdx] = useState<number | null>(null);
-        const openChart = openIdx !== null ? charts[openIdx] : null;
+        const openChart = openChartIdx !== null ? charts[openChartIdx] : null;
 
         return (
           <div className="space-y-4">
@@ -407,7 +406,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                 const isAlert     = !!alertMsg;
                 const isCelebrate = !!celebrateMsg;
                 return (
-                  <button key={title} onClick={() => setOpenIdx(idx)}
+                  <button key={title} onClick={() => setOpenChartIdx(idx)}
                     className={[
                       'text-left w-full rounded-xl border overflow-hidden transition-all duration-150',
                       'hover:scale-[1.02] hover:shadow-lg active:scale-[0.99] cursor-pointer',
@@ -443,7 +442,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
             </div>
 
             {/* ── Full detail modal ── */}
-            <Dialog open={openIdx !== null} onOpenChange={open => !open && setOpenIdx(null)}>
+            <Dialog open={openChartIdx !== null} onOpenChange={open => !open && setOpenChartIdx(null)}>
               <DialogContent className="max-w-2xl w-full">
                 {openChart && (() => {
                   const { title, subtitle, data, bars, accent, teamTotal, prevTotal, alertMsg, celebrateMsg, invert, perPerson } = openChart;
