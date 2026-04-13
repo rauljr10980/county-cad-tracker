@@ -21,9 +21,9 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
 
   // Use mock data if real data has no activity yet (all zeros) — remove once team starts logging calls
   const MOCK_TEAM: typeof teamStatsRaw = [
-    { id: 'm1', username: 'Raul',    role: 'ADMIN',    calls: { today: 14, week: 67, month: 210 }, d4dLeads: { week: 12, month: 38, total: 95 }, followUps: { createdWeek: 5, createdMonth: 18, completedWeek: 4, completedMonth: 14 }, notes: { week: 9, month: 31 }, propertiesAssigned: 24, conversionRate: 18, pipeline: { NEW: 15, RESEARCHING: 10, CONTACTED: 6, UNDER_CONTRACT: 2, DEAD: 4 } },
-    { id: 'm2', username: 'Luciano', role: 'OPERATOR', calls: { today: 9,  week: 44, month: 130 }, d4dLeads: { week: 7,  month: 22, total: 54 }, followUps: { createdWeek: 3, createdMonth: 11, completedWeek: 2, completedMonth: 8  }, notes: { week: 5, month: 17 }, propertiesAssigned: 15, conversionRate: 13, pipeline: { NEW: 8,  RESEARCHING: 7,  CONTACTED: 3, UNDER_CONTRACT: 1, DEAD: 2 } },
-    { id: 'm3', username: 'Maria',   role: 'OPERATOR', calls: { today: 3,  week: 21, month: 74  }, d4dLeads: { week: 4,  month: 15, total: 32 }, followUps: { createdWeek: 2, createdMonth: 7,  completedWeek: 2, completedMonth: 6  }, notes: { week: 3, month: 10 }, propertiesAssigned: 9,  conversionRate: 9,  pipeline: { NEW: 5,  RESEARCHING: 4,  CONTACTED: 2, UNDER_CONTRACT: 0, DEAD: 1 } },
+    { id: 'm1', username: 'Raul',    role: 'ADMIN',    calls: { today: 14, week: 67, month: 210 }, d4dLeads: { week: 12, month: 38, total: 95 }, followUps: { createdWeek: 5, createdMonth: 18, completedWeek: 4, completedMonth: 14 }, notes: { week: 9, month: 31 }, propertiesAssigned: 24, conversionRate: 18, pipeline: { NEW: 15, RESEARCHING: 10, CONTACTED: 6, UNDER_CONTRACT: 2, DEAD: 4 }, preForeclosure: { total: 42, researched: 31, withEquity: 22, underwater: 9 } },
+    { id: 'm2', username: 'Luciano', role: 'OPERATOR', calls: { today: 9,  week: 44, month: 130 }, d4dLeads: { week: 7,  month: 22, total: 54 }, followUps: { createdWeek: 3, createdMonth: 11, completedWeek: 2, completedMonth: 8  }, notes: { week: 5, month: 17 }, propertiesAssigned: 15, conversionRate: 13, pipeline: { NEW: 8,  RESEARCHING: 7,  CONTACTED: 3, UNDER_CONTRACT: 1, DEAD: 2 }, preForeclosure: { total: 28, researched: 18, withEquity: 11, underwater: 7 } },
+    { id: 'm3', username: 'Maria',   role: 'OPERATOR', calls: { today: 3,  week: 21, month: 74  }, d4dLeads: { week: 4,  month: 15, total: 32 }, followUps: { createdWeek: 2, createdMonth: 7,  completedWeek: 2, completedMonth: 6  }, notes: { week: 3, month: 10 }, propertiesAssigned: 9,  conversionRate: 9,  pipeline: { NEW: 5,  RESEARCHING: 4,  CONTACTED: 2, UNDER_CONTRACT: 0, DEAD: 1 }, preForeclosure: { total: 15, researched: 7,  withEquity: 5,  underwater: 2 } },
   ];
   const allZeros = !teamStatsRaw || teamStatsRaw.every(m => m.calls.today === 0 && m.calls.week === 0 && m.d4dLeads.week === 0);
   const teamStats = allZeros ? MOCK_TEAM : teamStatsRaw;
@@ -265,6 +265,30 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Pre-Foreclosure Research */}
+                    {m.preForeclosure.total > 0 && (
+                      <div className="border-t border-border/40 pt-2 space-y-1.5">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Pre-Foreclosure Research</p>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Researched</span>
+                          <span className="font-medium">{m.preForeclosure.researched} <span className="text-muted-foreground font-normal">/ {m.preForeclosure.total}</span></span>
+                        </div>
+                        {/* Research progress bar */}
+                        <div className="w-full h-1.5 bg-muted rounded overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded transition-all"
+                            style={{ width: `${m.preForeclosure.total > 0 ? (m.preForeclosure.researched / m.preForeclosure.total) * 100 : 0}%` }}
+                          />
+                        </div>
+                        {m.preForeclosure.researched > 0 && (
+                          <div className="flex gap-3 text-[10px]">
+                            <span className="text-green-400">✓ {m.preForeclosure.withEquity} have equity</span>
+                            <span className="text-red-400">✗ {m.preForeclosure.underwater} underwater</span>
+                          </div>
+                        )}
                       </div>
                     )}
 

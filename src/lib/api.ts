@@ -1656,6 +1656,7 @@ export interface TeamMemberStats {
   propertiesAssigned: number;
   conversionRate: number;
   pipeline: Record<string, number>;
+  preForeclosure: { total: number; researched: number; withEquity: number; underwater: number };
 }
 
 export async function getTeamStats(): Promise<TeamMemberStats[]> {

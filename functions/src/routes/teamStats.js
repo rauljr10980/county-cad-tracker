@@ -31,6 +31,7 @@ router.get('/', optionalAuth, async (req, res) => {
       followUpsThisMonth,
       notesThisMonth,
       propertiesAssigned,
+      allPreForeclosures,
     ] = await Promise.all([
       // Call logs this month with userId
       prisma.callLog.findMany({
@@ -72,6 +73,16 @@ router.get('/', optionalAuth, async (req, res) => {
       prisma.property.findMany({
         where: { assignedTo: { not: null } },
         select: { assignedTo: true },
+      }),
+
+      // Pre-foreclosure records with assignedTo + equity fields
+      prisma.preForeclosure.findMany({
+        where: { inactive: false, assignedTo: { not: null } },
+        select: {
+          assignedTo: true,
+          loanAmount: true,
+          appraisedValue: true,
+        },
       }),
     ]);
 
@@ -116,6 +127,17 @@ router.get('/', optionalAuth, async (req, res) => {
       // Properties assigned (all time, current)
       const propertiesCount = propertiesPerUser[user.id] || 0;
 
+      // Pre-foreclosure research (matched by username string in assignedTo)
+      const userPreFc = allPreForeclosures.filter(r =>
+        r.assignedTo && r.assignedTo.toLowerCase() === user.username.toLowerCase()
+      );
+      const preForeclosureTotal = userPreFc.length;
+      // Researched = has both loan amount AND appraised value filled in
+      const researched = userPreFc.filter(r => r.loanAmount != null && r.appraisedValue != null);
+      const preForeclosureResearched = researched.length;
+      const preForeclosureWithEquity = researched.filter(r => r.appraisedValue > r.loanAmount).length;
+      const preForeclosureUnderwater = researched.filter(r => r.loanAmount >= r.appraisedValue).length;
+
       // D4D pipeline (all time)
       const pipeline = {};
       allLeadsByUser
@@ -143,6 +165,12 @@ router.get('/', optionalAuth, async (req, res) => {
         propertiesAssigned: propertiesCount,
         conversionRate,
         pipeline,
+        preForeclosure: {
+          total: preForeclosureTotal,
+          researched: preForeclosureResearched,
+          withEquity: preForeclosureWithEquity,
+          underwater: preForeclosureUnderwater,
+        },
       };
     });
 
