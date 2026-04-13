@@ -165,146 +165,103 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       </Card>
 
       {/* Team Activity */}
-      {teamStats && teamStats.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold">Team Activity</h2>
-            {isMockData && (
-              <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">
-                sample data
-              </span>
-            )}
+      {teamStats && teamStats.length > 0 && (() => {
+        const sorted = [...teamStats].sort((a, b) => b.calls.today - a.calls.today);
+        const BAR_H = sorted.length * 32 + 16;
+
+        // Build chart datasets
+        const callsData = sorted.map(m => ({ name: m.username, Today: m.calls.today, Week: m.calls.week, Month: m.calls.month }));
+        const d4dData   = sorted.map(m => ({ name: m.username, 'D4D / wk': m.d4dLeads.week, 'D4D / mo': m.d4dLeads.month }));
+        const fuData    = sorted.map(m => ({ name: m.username, Completed: m.followUps.completedWeek, Created: m.followUps.createdWeek }));
+        const notesData = sorted.map(m => ({ name: m.username, 'Notes / wk': m.notes.week }));
+        const pfData    = sorted.map(m => ({
+          name: m.username,
+          'Has Equity': m.preForeclosure.withEquity,
+          Underwater: m.preForeclosure.underwater,
+          'Not Researched': m.preForeclosure.total - m.preForeclosure.researched,
+        }));
+        const pipeData  = sorted.map(m => ({
+          name: m.username,
+          New: m.pipeline['NEW'] || 0,
+          Researching: m.pipeline['RESEARCHING'] || 0,
+          Contacted: m.pipeline['CONTACTED'] || 0,
+          'Under Ctr': m.pipeline['UNDER_CONTRACT'] || 0,
+          Dead: m.pipeline['DEAD'] || 0,
+        }));
+
+        const MiniChart = ({ title, data, bars }: {
+          title: string;
+          data: any[];
+          bars: { key: string; color: string }[];
+        }) => (
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 pb-3">
+              <ResponsiveContainer width="100%" height={BAR_H}>
+                <BarChart data={data} layout="vertical" margin={{ left: 4, right: 24, top: 4, bottom: 4 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }} width={60} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 6, fontSize: 11 }}
+                    cursor={{ fill: 'hsl(var(--muted))' }}
+                  />
+                  {bars.length > 1 && <Legend iconSize={8} wrapperStyle={{ fontSize: 10, paddingTop: 4 }} />}
+                  {bars.map(b => (
+                    <Bar key={b.key} dataKey={b.key} fill={b.color} radius={[0, 3, 3, 0]} maxBarSize={20} label={{ position: 'right', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        );
+
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold">Team Activity</h2>
+              {isMockData && (
+                <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">
+                  sample data
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              <MiniChart title="Calls" data={callsData} bars={[
+                { key: 'Today', color: '#22c55e' },
+                { key: 'Week',  color: '#3b82f6' },
+                { key: 'Month', color: '#6366f1' },
+              ]} />
+              <MiniChart title="D4D Leads Added" data={d4dData} bars={[
+                { key: 'D4D / wk', color: '#f59e0b' },
+                { key: 'D4D / mo', color: '#f97316' },
+              ]} />
+              <MiniChart title="Follow-ups (this week)" data={fuData} bars={[
+                { key: 'Completed', color: '#22c55e' },
+                { key: 'Created',   color: '#6b7280' },
+              ]} />
+              <MiniChart title="Notes Written (this week)" data={notesData} bars={[
+                { key: 'Notes / wk', color: '#8b5cf6' },
+              ]} />
+              <MiniChart title="Pre-Foreclosure Research" data={pfData} bars={[
+                { key: 'Has Equity',     color: '#22c55e' },
+                { key: 'Underwater',     color: '#ef4444' },
+                { key: 'Not Researched', color: '#374151' },
+              ]} />
+              <MiniChart title="D4D Pipeline" data={pipeData} bars={[
+                { key: 'New',        color: '#6b7280' },
+                { key: 'Researching',color: '#3b82f6' },
+                { key: 'Contacted',  color: '#eab308' },
+                { key: 'Under Ctr',  color: '#22c55e' },
+                { key: 'Dead',       color: '#7f1d1d' },
+              ]} />
+            </div>
           </div>
-
-          {/* Per-member cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {[...teamStats].sort((a, b) => b.calls.today - a.calls.today).map((m, i) => {
-              const isTopCaller = i === 0 && m.calls.today > 0;
-              const totalPipeline = Object.values(m.pipeline).reduce((s: number, n) => s + (n as number), 0);
-              return (
-                <Card key={m.id} className={isTopCaller ? 'border-yellow-400/30' : ''}>
-                  <CardHeader className="pb-2 pt-3 px-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {isTopCaller && <span className="text-yellow-400">★</span>}
-                        <span className="font-semibold">{m.username}</span>
-                        <span className="text-[10px] text-muted-foreground capitalize bg-muted px-1.5 py-0.5 rounded">{m.role.toLowerCase()}</span>
-                      </div>
-                      {m.conversionRate > 0 && (
-                        <span className="text-[10px] text-green-400 font-medium">{m.conversionRate}% conversion</span>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="px-4 pb-3 space-y-3">
-                    {/* Calls */}
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5">Calls</p>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-muted/40 rounded p-1.5">
-                          <div className={`text-lg font-bold ${m.calls.today > 0 ? 'text-green-400' : ''}`}>{m.calls.today}</div>
-                          <div className="text-[10px] text-muted-foreground">Today</div>
-                        </div>
-                        <div className="bg-muted/40 rounded p-1.5">
-                          <div className="text-lg font-bold">{m.calls.week}</div>
-                          <div className="text-[10px] text-muted-foreground">Week</div>
-                        </div>
-                        <div className="bg-muted/40 rounded p-1.5">
-                          <div className="text-lg font-bold">{m.calls.month}</div>
-                          <div className="text-[10px] text-muted-foreground">Month</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* D4D Leads + Follow-ups + Notes row */}
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div>
-                        <div className="text-xs font-semibold text-primary">{m.d4dLeads.week}</div>
-                        <div className="text-[10px] text-muted-foreground">D4D / wk</div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold">{m.followUps.completedWeek}<span className="text-muted-foreground font-normal">/{m.followUps.createdWeek}</span></div>
-                        <div className="text-[10px] text-muted-foreground">F/U done</div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold">{m.notes.week}</div>
-                        <div className="text-[10px] text-muted-foreground">Notes</div>
-                      </div>
-                    </div>
-
-                    {/* D4D Pipeline mini-bar */}
-                    {totalPipeline > 0 && (
-                      <div>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Pipeline ({totalPipeline} leads)</p>
-                        <div className="flex h-2 rounded overflow-hidden gap-px">
-                          {[
-                            { key: 'NEW',            color: 'bg-gray-500' },
-                            { key: 'RESEARCHING',    color: 'bg-blue-500' },
-                            { key: 'CONTACTED',      color: 'bg-yellow-500' },
-                            { key: 'UNDER_CONTRACT', color: 'bg-green-500' },
-                            { key: 'DEAD',           color: 'bg-red-800' },
-                          ].map(({ key, color }) => {
-                            const count = (m.pipeline[key] as number) || 0;
-                            const pct = totalPipeline > 0 ? (count / totalPipeline) * 100 : 0;
-                            return pct > 0 ? (
-                              <div key={key} className={`${color} transition-all`} style={{ width: `${pct}%` }} title={`${key}: ${count}`} />
-                            ) : null;
-                          })}
-                        </div>
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                          {[
-                            { key: 'NEW',            label: 'New',         color: 'bg-gray-500' },
-                            { key: 'RESEARCHING',    label: 'Researching', color: 'bg-blue-500' },
-                            { key: 'CONTACTED',      label: 'Contacted',   color: 'bg-yellow-500' },
-                            { key: 'UNDER_CONTRACT', label: 'Under Ctr',   color: 'bg-green-500' },
-                            { key: 'DEAD',           label: 'Dead',        color: 'bg-red-800' },
-                          ].filter(s => (m.pipeline[s.key] || 0) > 0).map(s => (
-                            <div key={s.key} className="flex items-center gap-1">
-                              <div className={`w-1.5 h-1.5 rounded-full ${s.color}`} />
-                              <span className="text-[9px] text-muted-foreground">{s.label} {m.pipeline[s.key]}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Pre-Foreclosure Research */}
-                    {m.preForeclosure.total > 0 && (
-                      <div className="border-t border-border/40 pt-2 space-y-1.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Pre-Foreclosure Research</p>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Researched</span>
-                          <span className="font-medium">{m.preForeclosure.researched} <span className="text-muted-foreground font-normal">/ {m.preForeclosure.total}</span></span>
-                        </div>
-                        {/* Research progress bar */}
-                        <div className="w-full h-1.5 bg-muted rounded overflow-hidden">
-                          <div
-                            className="h-full bg-primary rounded transition-all"
-                            style={{ width: `${m.preForeclosure.total > 0 ? (m.preForeclosure.researched / m.preForeclosure.total) * 100 : 0}%` }}
-                          />
-                        </div>
-                        {m.preForeclosure.researched > 0 && (
-                          <div className="flex gap-3 text-[10px]">
-                            <span className="text-green-400">✓ {m.preForeclosure.withEquity} have equity</span>
-                            <span className="text-red-400">✗ {m.preForeclosure.underwater} underwater</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Properties assigned */}
-                    {m.propertiesAssigned > 0 && (
-                      <div className="text-[10px] text-muted-foreground border-t border-border/40 pt-2">
-                        {m.propertiesAssigned} properties assigned
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Top Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
