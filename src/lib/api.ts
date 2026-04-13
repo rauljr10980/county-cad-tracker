@@ -218,6 +218,14 @@ export async function logCall(propertyId?: string, drivingLeadId?: string, phone
 /**
  * Get call stats (daily / weekly / monthly)
  */
+export async function getCallActivity(): Promise<Array<Record<string, string | number>>> {
+  const response = await fetch(`${API_BASE_URL}/api/call-logs/activity`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch call activity');
+  return response.json();
+}
+
 export async function getCallStats(): Promise<{ daily: number; weekly: number; monthly: number }> {
   const response = await fetch(`${API_BASE_URL}/api/call-logs/stats`, { headers: getAuthHeaders() });
   if (!response.ok) return { daily: 0, weekly: 0, monthly: 0 };

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getFiles, uploadFile, deleteFile, reprocessFile, getDashboardStats, getProperties, getCallStats, getTeamStats, type TeamMemberStats } from '@/lib/api';
+import { getFiles, uploadFile, deleteFile, reprocessFile, getDashboardStats, getProperties, getCallStats, getCallActivity, getTeamStats, type TeamMemberStats } from '@/lib/api';
 import type { UploadedFile, DashboardStats, Property } from '@/types/property';
 
 export function useFiles() {
@@ -75,6 +75,15 @@ export function useCallStats() {
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     refetchInterval: 30000, // refresh every 30s so it stays current
+  });
+}
+
+export function useCallActivity() {
+  return useQuery<Array<Record<string, string | number>>>({
+    queryKey: ['call-activity'],
+    queryFn: getCallActivity,
+    refetchOnMount: true,
+    refetchInterval: 60000,
   });
 }
 

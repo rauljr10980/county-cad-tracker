@@ -3,7 +3,7 @@ import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel,
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyStatus } from '@/types/property';
-import { useDashboardStats, useCallStats, useTeamStats } from '@/hooks/useFiles';
+import { useDashboardStats, useCallStats, useCallActivity, useTeamStats } from '@/hooks/useFiles';
 import { usePreForeclosures } from '@/hooks/usePreForeclosure';
 import type { WorkflowStage, PreForeclosureRecord } from '@/types/property';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,7 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats();
   const { data: preForeclosureRecords, isLoading: isLoadingPreForeclosures } = usePreForeclosures();
   const { data: callStats } = useCallStats();
+  const { data: callActivity } = useCallActivity();
   const { data: teamStatsRaw } = useTeamStats();
 
   // Use mock data if real data has no activity yet (all zeros) — remove once team starts logging calls
@@ -163,6 +164,57 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Call Activity Chart — 14-day daily breakdown */}
+      {(() => {
+        // Use real data or mock 14-day sample
+        const MOCK_ACTIVITY = Array.from({ length: 14 }, (_, i) => {
+          const d = new Date(); d.setDate(d.getDate() - (13 - i));
+          const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+          return { date: label, Raul: isWeekend ? 0 : Math.floor(Math.random() * 18) + 4, Luciano: isWeekend ? 0 : Math.floor(Math.random() * 12) + 2, Maria: isWeekend ? 0 : Math.floor(Math.random() * 8) + 1 };
+        });
+        const hasRealActivity = callActivity?.some(d => (d.total as number) > 0);
+        const chartData = hasRealActivity ? callActivity! : MOCK_ACTIVITY;
+
+        // Collect all user names present in the data
+        const userNames = Array.from(new Set(
+          chartData.flatMap(d => Object.keys(d).filter(k => k !== 'date' && k !== 'total'))
+        ));
+        const USER_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6', '#f97316', '#ec4899'];
+
+        return (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Phone className="h-4 w-4 text-green-400" />
+                Call Activity — Last 14 Days
+                {!hasRealActivity && isMockData && (
+                  <span className="text-[10px] font-normal bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 rounded px-1.5 py-0.5">sample data</span>
+                )}
+              </CardTitle>
+              <CardDescription>Daily calls per team member</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={chartData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 6, fontSize: 11 }}
+                    cursor={{ fill: 'hsl(var(--muted)/0.4)' }}
+                  />
+                  <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                  {userNames.map((name, i) => (
+                    <Bar key={name} dataKey={name} stackId="calls" fill={USER_COLORS[i % USER_COLORS.length]} radius={i === userNames.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} maxBarSize={32} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Team Activity */}
       {teamStats && teamStats.length > 0 && (() => {
