@@ -235,8 +235,6 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
       {/* ── Team Activity Charts ── */}
       {teamStats && teamStats.length > 0 && (() => {
         const sorted = [...teamStats].sort((a, b) => b.calls.today - a.calls.today);
-        const BAR_H = Math.max(sorted.length * 44 + 24, 100);
-        const NAME_W = Math.max(...sorted.map(m => m.username.length)) * 7 + 8;
 
         const callsData   = sorted.map(m => ({ name: m.username, Today: m.calls.today, Week: m.calls.week, Month: m.calls.month }));
         const d4dData     = sorted.map(m => ({ name: m.username, 'This Week': m.d4dLeads.week, 'This Month': m.d4dLeads.month }));
@@ -336,6 +334,8 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
           },
         ];
 
+        const CHART_H = 180;
+
         return (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -368,30 +368,25 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
                     )}
                   </CardHeader>
                   <CardContent className="px-2 pb-3">
-                    <svg width="0" height="0" style={{ position: 'absolute' }}>
-                      <defs>
-                        {bars.map(b => (
-                          <linearGradient key={b.gradId} id={b.gradId} x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0%" stopColor={b.color} stopOpacity={0.9} />
-                            <stop offset="100%" stopColor={b.color} stopOpacity={0.65} />
-                          </linearGradient>
-                        ))}
-                      </defs>
-                    </svg>
-                    <ResponsiveContainer width="100%" height={BAR_H}>
-                      <BarChart data={data} layout="vertical" margin={{ left: 4, right: 36, top: 2, bottom: 2 }} barCategoryGap="28%">
-                        <XAxis type="number" hide domain={[0, 'dataMax']} />
-                        <YAxis
-                          type="category" dataKey="name" width={NAME_W} axisLine={false} tickLine={false}
-                          tick={{ fontSize: 12, fill: 'hsl(var(--foreground))', fontWeight: 500, fontFamily: 'inherit' }}
-                        />
+                    <ResponsiveContainer width="100%" height={CHART_H}>
+                      <BarChart data={data} margin={{ left: 4, right: 4, top: 4, bottom: 0 }} barCategoryGap="28%">
+                        <defs>
+                          {bars.map(b => (
+                            <linearGradient key={b.gradId} id={b.gradId} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={b.color} stopOpacity={0.95} />
+                              <stop offset="100%" stopColor={b.color} stopOpacity={0.65} />
+                            </linearGradient>
+                          ))}
+                        </defs>
+                        <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" vertical={false} strokeOpacity={0.5} />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false}
+                          tick={{ fontSize: 11, fill: 'hsl(var(--foreground))', fontWeight: 500, fontFamily: 'inherit' }} />
+                        <YAxis axisLine={false} tickLine={false} allowDecimals={false} width={24}
+                          tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit' }} />
                         <Tooltip {...TOOLTIP_STYLE} />
-                        {bars.map((b, bi) => (
+                        {bars.map((b) => (
                           <Bar key={b.key} dataKey={b.key} fill={`url(#${b.gradId})`}
-                            radius={[0, 4, 4, 0]} maxBarSize={18}
-                            label={bi === bars.length - 1
-                              ? { position: 'right', fontSize: 11, fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit', formatter: (v: number) => v > 0 ? v : '' }
-                              : false}
+                            radius={[4, 4, 0, 0]} maxBarSize={32}
                           />
                         ))}
                       </BarChart>
