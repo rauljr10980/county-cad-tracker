@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { optionalAuth } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
+const { createCalendarEvent } = require('../lib/googleCalendar');
 
 const VALID_TYPES = ['CONTACT_MADE', 'APPOINTMENT_SET', 'CONTRACT_SIGNED'];
 
@@ -21,6 +22,16 @@ router.post('/', optionalAuth, async (req, res) => {
         userId: req.user?.id || null,
       },
     });
+    // Create calendar event for appointments and contracts
+    if (type === 'APPOINTMENT_SET' || type === 'CONTRACT_SIGNED') {
+      const label = type === 'CONTRACT_SIGNED' ? 'Contract Signed' : 'Appointment';
+      createCalendarEvent({
+        title: `${label}${notes ? `: ${notes}` : ''}`,
+        description: notes || '',
+        start: new Date(),
+      });
+    }
+
     res.json(log);
   } catch (error) {
     console.error('[ACTIVITY_LOGS] Error logging activity:', error);

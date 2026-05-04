@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
+const { createCalendarEvent } = require('../lib/googleCalendar');
 
 // GET /api/followups?month=2026-02
 router.get('/', optionalAuth, async (req, res) => {
@@ -167,6 +168,20 @@ router.post('/', authenticateToken, async (req, res) => {
         drivingLead: { select: { id: true, rawAddress: true, street: true, city: true, state: true, zip: true, ownerName: true, status: true, notes: true, phoneNumbers: true, ownerPhoneIndex: true, emails: true, contacts: true, latitude: true, longitude: true } },
         createdBy: { select: { id: true, username: true } },
       },
+    });
+
+    // Fire-and-forget: create Google Calendar event for the follow-up
+    const label =
+      followUp.property?.ownerName ||
+      followUp.property?.propertyAddress ||
+      followUp.preForeclosure?.address ||
+      followUp.drivingLead?.rawAddress ||
+      followUp.drivingLead?.street ||
+      'Property';
+    createCalendarEvent({
+      title: `Follow-up: ${label}`,
+      description: note || '',
+      start: new Date(date),
     });
 
     res.status(201).json(followUp);
