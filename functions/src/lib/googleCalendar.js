@@ -1,22 +1,29 @@
 const { google } = require('googleapis');
 
-const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
-const CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
-const PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-
+// Read env vars fresh each call so Railway var changes take effect without redeploy
 function getCalendar() {
-  if (!CLIENT_EMAIL || !PRIVATE_KEY || !CALENDAR_ID) {
-    throw new Error('Google Calendar env vars not set (GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_CALENDAR_ID)');
+  const calendarId   = process.env.GOOGLE_CALENDAR_ID;
+  const clientEmail  = process.env.GOOGLE_CLIENT_EMAIL;
+  // Railway may store newlines as literal \n — normalise either way
+  const privateKey   = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+
+  if (!clientEmail || !privateKey || !calendarId) {
+    const missing = [
+      !clientEmail  && 'GOOGLE_CLIENT_EMAIL',
+      !privateKey   && 'GOOGLE_PRIVATE_KEY',
+      !calendarId   && 'GOOGLE_CALENDAR_ID',
+    ].filter(Boolean).join(', ');
+    throw new Error(`Missing Google Calendar env vars: ${missing}`);
   }
 
   const auth = new google.auth.JWT(
-    CLIENT_EMAIL,
+    clientEmail,
     null,
-    PRIVATE_KEY,
+    privateKey,
     ['https://www.googleapis.com/auth/calendar']
   );
 
-  return google.calendar({ version: 'v3', auth });
+  return { calendar: google.calendar({ version: 'v3', auth }), calendarId };
 }
 
 /**
@@ -30,7 +37,7 @@ function getCalendar() {
  */
 async function createCalendarEvent({ title, description, start, end, location }) {
   try {
-    const calendar = getCalendar();
+    const { calendar, calendarId } = getCalendar();
 
     const startDate = new Date(start);
     const endDate   = end ? new Date(end) : new Date(startDate.getTime() + 60 * 60 * 1000);
@@ -44,16 +51,43 @@ async function createCalendarEvent({ title, description, start, end, location })
     };
 
     const response = await calendar.events.insert({
-      calendarId: CALENDAR_ID,
+      calendarId,
       resource: event,
     });
 
-    console.log(`[GCAL] Event created: ${response.data.htmlLink}`);
+    console.log(`[GCAL] ✅ Event created: ${response.data.htmlLink}`);
     return response.data;
   } catch (err) {
-    console.error('[GCAL] Failed to create event:', err.message);
+    console.error('[GCAL] ❌ Failed to create event:', err.message);
+    if (err.errors) console.error('[GCAL] Details:', JSON.stringify(err.errors));
     return null; // non-fatal — don't break the main flow
   }
 }
 
-module.exports = { createCalendarEvent };
+/**
+ * Test the Google Calendar connection — returns { ok, message, link? }
+ */
+async function testCalendarConnection() {
+  try {
+    const { calendar, calendarId } = getCalendar();
+    const testStart = new Date();
+    testStart.setMinutes(testStart.getMinutes() + 5); // 5 min from now
+    const testEnd = new Date(testStart.getTime() + 30 * 60 * 1000);
+
+    const response = await calendar.events.insert({
+      calendarId,
+      resource: {
+        summary: '✅ CAD Tracker — Calendar Connected!',
+        description: 'This test event confirms Google Calendar integration is working.',
+        start: { dateTime: testStart.toISOString(), timeZone: 'America/Chicago' },
+        end:   { dateTime: testEnd.toISOString(),   timeZone: 'America/Chicago' },
+      },
+    });
+
+    return { ok: true, message: 'Event created successfully', link: response.data.htmlLink };
+  } catch (err) {
+    return { ok: false, message: err.message, details: err.errors || null };
+  }
+}
+
+module.exports = { createCalendarEvent, testCalendarConnection };

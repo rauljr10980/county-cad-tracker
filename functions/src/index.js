@@ -158,6 +158,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+// Google Calendar test endpoint
+app.get('/api/test-gcal', async (req, res) => {
+  const { testCalendarConnection } = require('./lib/googleCalendar');
+  const result = await testCalendarConnection();
+  res.status(result.ok ? 200 : 500).json(result);
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
