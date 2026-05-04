@@ -86,6 +86,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [sendingAllEmails, setSendingAllEmails] = useState(false);
   const [ownerOverride, setOwnerOverride] = useState('');
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
+  const [followUpTime, setFollowUpTime] = useState('09:00');
   const [followUpNote, setFollowUpNote] = useState('');
   const [savingFollowUp, setSavingFollowUp] = useState(false);
 
@@ -1621,6 +1622,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   />
                 </PopoverContent>
               </Popover>
+              <input
+                type="time"
+                value={followUpTime}
+                onChange={(e) => setFollowUpTime(e.target.value)}
+                className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+              />
               <Input
                 className="mt-2"
                 placeholder="Optional note... (e.g. Call back Monday)"
@@ -1635,13 +1642,17 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   if (!followUpDate || !property) return;
                   setSavingFollowUp(true);
                   try {
+                    const [hrs, mins] = followUpTime.split(':').map(Number);
+                    const combined = new Date(followUpDate);
+                    combined.setHours(hrs, mins, 0, 0);
                     await createFollowUp({
-                      date: followUpDate.toISOString(),
+                      date: combined.toISOString(),
                       note: followUpNote || undefined,
                       ...(isFromD4d ? { drivingLeadId: d4dLeadId } : { propertyId: property.id }),
                     });
-                    toast({ title: 'Follow-up scheduled', description: format(followUpDate, 'PPP') });
+                    toast({ title: 'Follow-up scheduled', description: format(combined, 'PPP p') });
                     setFollowUpDate(undefined);
+                    setFollowUpTime('09:00');
                     setFollowUpNote('');
                     refetchFollowUps();
                   } catch {
