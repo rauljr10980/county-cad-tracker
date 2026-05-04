@@ -68,6 +68,20 @@ async function createCalendarEvent({ title, description, start, end, location })
  * Test the Google Calendar connection — returns { ok, message, link? }
  */
 async function testCalendarConnection() {
+  // Diagnostic: check what the private key looks like without exposing it
+  const rawKey = process.env.GOOGLE_PRIVATE_KEY || '';
+  const normalised = rawKey.replace(/\\n/g, '\n');
+  const keyDiag = {
+    rawLength: rawKey.length,
+    normalisedLength: normalised.length,
+    startsCorrectly: normalised.startsWith('-----BEGIN'),
+    endsCorrectly: normalised.trimEnd().endsWith('-----'),
+    containsNewlines: normalised.includes('\n'),
+    clientEmail: process.env.GOOGLE_CLIENT_EMAIL || '(not set)',
+    calendarId: process.env.GOOGLE_CALENDAR_ID || '(not set)',
+  };
+  console.log('[GCAL] Key diagnostic:', JSON.stringify(keyDiag));
+
   try {
     const { calendar, calendarId } = getCalendar();
     const testStart = new Date();
@@ -84,9 +98,9 @@ async function testCalendarConnection() {
       },
     });
 
-    return { ok: true, message: 'Event created successfully', link: response.data.htmlLink };
+    return { ok: true, message: 'Event created successfully', link: response.data.htmlLink, keyDiag };
   } catch (err) {
-    return { ok: false, message: err.message, details: err.errors || null };
+    return { ok: false, message: err.message, details: err.errors || null, keyDiag };
   }
 }
 
