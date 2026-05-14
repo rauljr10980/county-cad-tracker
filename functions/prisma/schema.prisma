@@ -783,3 +783,89 @@ model CallLog {
   @@index([userId])
   @@map("call_logs")
 }
+
+// ============================================================================
+// CORPORATE REALTY CRM
+// ============================================================================
+
+model CrmLead {
+  id                    String    @id @default(cuid())
+  businessName          String    @default("")
+  ownerName             String
+  jobTitleIndustry      String    @default("")
+  firm                  String    @default("")
+  phone                 String    @default("")
+  email                 String    @default("")
+  industry              String    @default("Other")
+  city                  String    @default("")
+  asset                 String    @default("")
+  specialization        String    @default("")
+  metPersonally         String    @default("")
+  source                String    @default("Referral")
+  websiteStatus         String    @default("This Month")
+  connectionRating      String    @default("none")
+  lastConversationNotes String    @default("") @db.Text
+  notes                 String    @default("") @db.Text
+  kind                  String    @default("industry")
+  ageRange              String?
+  letterCadenceDays     Int?
+  lastContactedAt       DateTime?
+  createdAt             DateTime  @default(now())
+
+  deals      CrmDeal[]
+  tasks      CrmTask[]
+  activities CrmActivity[]
+
+  @@index([kind])
+  @@index([industry])
+  @@index([createdAt])
+  @@map("crm_leads")
+}
+
+model CrmDeal {
+  id                String   @id @default(cuid())
+  leadId            String   @unique
+  stage             String   @default("New Prospect")
+  value             Float    @default(0)
+  expectedCloseDate String
+  probability       Int      @default(20)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  lead CrmLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([stage])
+  @@map("crm_deals")
+}
+
+model CrmTask {
+  id          String    @id @default(cuid())
+  leadId      String
+  type        String
+  dueAt       DateTime
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  notes       String    @default("")
+  createdAt   DateTime  @default(now())
+
+  lead CrmLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([completed])
+  @@index([dueAt])
+  @@map("crm_tasks")
+}
+
+model CrmActivity {
+  id        String   @id @default(cuid())
+  leadId    String
+  kind      String
+  body      String   @db.Text
+  timestamp DateTime @default(now())
+
+  lead CrmLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([timestamp])
+  @@map("crm_activities")
+}
