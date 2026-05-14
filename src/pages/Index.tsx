@@ -7,6 +7,7 @@ import { TasksView } from '@/components/tasks/TasksView';
 import { UploadView } from '@/components/upload/UploadView';
 import { FileHistory } from '@/components/files/FileHistory';
 import { PreForeclosureView } from '@/components/preforeclosure/PreForeclosureView';
+import { ForeclosureView } from '@/components/foreclosure/ForeclosureView';
 import { DrivingView } from '@/components/driving/DrivingView';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,12 +17,12 @@ import { Building2, LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PhoneSearchModal } from '@/components/phone/PhoneSearchModal';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
-import { Property } from '@/lib/api';
+import { Property } from '@/types/property';
 
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
   const hash = window.location.hash.slice(1); // Remove the #
-  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'driving'];
+  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'foreclosure', 'driving'];
   return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
 };
 
@@ -85,6 +86,8 @@ const Index = () => {
         return <FileHistory />;
       case 'preforeclosure':
         return <PreForeclosureView />;
+      case 'foreclosure':
+        return <ForeclosureView />;
       case 'driving':
         return <DrivingView />;
       default:

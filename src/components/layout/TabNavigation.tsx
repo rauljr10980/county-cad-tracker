@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, CalendarDays, List, Upload, FileText, Home, Car } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, List, Upload, FileText, Home, Car, Gavel } from 'lucide-react';
 
-export type TabType = 'dashboard' | 'calendar' | 'properties' | 'tasks' | 'upload' | 'files' | 'preforeclosure' | 'driving';
+export type TabType = 'dashboard' | 'calendar' | 'properties' | 'tasks' | 'upload' | 'files' | 'preforeclosure' | 'driving' | 'foreclosure';
 
 interface TabNavigationProps {
   activeTab: TabType;
@@ -13,6 +13,7 @@ const tabs = [
   { id: 'calendar' as TabType, label: 'Calendar', icon: CalendarDays, shortLabel: 'Cal' },
   { id: 'properties' as TabType, label: 'Properties', icon: List, shortLabel: 'Props' },
   { id: 'preforeclosure' as TabType, label: 'Pre-Foreclosure', icon: Home, shortLabel: 'Pre-FC' },
+  { id: 'foreclosure' as TabType, label: 'Foreclosure', icon: Gavel, shortLabel: 'FC' },
   { id: 'driving' as TabType, label: 'Driving 4$', icon: Car, shortLabel: 'D4$' },
 ];
 
