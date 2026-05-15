@@ -214,3 +214,71 @@
     }
   }
 }
+
+/* ── react-big-calendar dark theme overrides ─────────────────────────────── */
+.rbc-calendar {
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-family: inherit;
+}
+.rbc-toolbar { display: none; } /* we use our own toolbar */
+.rbc-header {
+  background: hsl(var(--secondary) / 0.5);
+  border-color: hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  padding: 6px 4px;
+}
+.rbc-month-view,
+.rbc-time-view,
+.rbc-agenda-view {
+  border-color: hsl(var(--border));
+}
+.rbc-day-bg,
+.rbc-time-slot {
+  background: hsl(var(--card));
+}
+.rbc-off-range-bg { background: hsl(var(--secondary) / 0.3); }
+.rbc-today { background: hsl(var(--primary) / 0.07) !important; }
+.rbc-selected-cell { background: hsl(var(--primary) / 0.12) !important; }
+.rbc-event { border-radius: 4px !important; }
+.rbc-event:focus { outline: 2px solid hsl(var(--primary)); }
+.rbc-slot-selection { background: hsl(var(--primary) / 0.15); }
+.rbc-current-time-indicator { background: hsl(var(--primary)); }
+.rbc-month-row,
+.rbc-day-slot .rbc-time-slot,
+.rbc-timeslot-group {
+  border-color: hsl(var(--border));
+}
+.rbc-date-cell { color: hsl(var(--foreground)); font-size: 0.8rem; padding: 4px 8px; }
+.rbc-date-cell.rbc-off-range { color: hsl(var(--muted-foreground)); }
+.rbc-button-link { color: hsl(var(--foreground)); }
+.rbc-agenda-date-cell,
+.rbc-agenda-time-cell,
+.rbc-agenda-event-cell {
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+}
+.rbc-agenda-table thead tr th {
+  background: hsl(var(--secondary) / 0.5);
+  color: hsl(var(--muted-foreground));
+  border-color: hsl(var(--border));
+}
+.rbc-show-more { color: hsl(var(--primary)); font-size: 0.7rem; }
+.rbc-overlay {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.rbc-overlay-header {
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+  font-size: 0.8rem;
+  padding: 6px 10px;
+}
+.rbc-time-header-content { border-color: hsl(var(--border)); }
+.rbc-time-content { border-color: hsl(var(--border)); }
+.rbc-time-gutter .rbc-label { color: hsl(var(--muted-foreground)); font-size: 0.7rem; }
+.rbc-day-slot .rbc-event-label { font-size: 0.65rem; }

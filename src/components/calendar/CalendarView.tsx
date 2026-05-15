@@ -1,9 +1,20 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { format, formatDistanceToNow, isPast } from 'date-fns';
 import {
-  startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
-  format, isSameMonth, isSameDay, isToday, addMonths, subMonths, isPast, formatDistanceToNow,
-} from 'date-fns';
-import { ChevronLeft, ChevronRight, CalendarDays, Check, Trash2, Loader2, Undo2, Eye, Briefcase } from 'lucide-react';
+  Calendar,
+  dateFnsLocalizer,
+  Views,
+  type Event,
+  type NavigateAction,
+  type SlotInfo,
+  type ToolbarProps,
+  type View,
+} from 'react-big-calendar';
+import withDragAndDropDefault from 'react-big-calendar/lib/addons/dragAndDrop';
+import type { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
+import { format as dateFnsFormat, getDay, parse, startOfWeek } from 'date-fns';
+import { enUS } from 'date-fns/locale';
+import { ChevronLeft, ChevronRight, Briefcase, Home, Car, Building2, Check, Undo2, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -17,667 +28,387 @@ import { getProperties, getPreForeclosures } from '@/lib/api';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
 import { FullDetailsModal } from '@/components/preforeclosure/FullDetailsModal';
 import { useCrmStore } from '@/crm/store/useCrmStore';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
-const STAGE_COLORS: Record<string, string> = {
-  negotiating: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  comps: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
-  sent_offer: 'bg-green-500/20 text-green-400 border-green-500/30',
+// ── react-big-calendar setup ───────────────────────────────────────────────
+const withDragAndDrop =
+  (typeof withDragAndDropDefault === 'function'
+    ? withDragAndDropDefault
+    : (withDragAndDropDefault as unknown as { default: typeof withDragAndDropDefault }).default) as typeof withDragAndDropDefault;
+
+const locales = { 'en-US': enUS };
+const localizer = dateFnsLocalizer({
+  format: dateFnsFormat,
+  parse,
+  startOfWeek: (date: Date) => startOfWeek(date, { weekStartsOn: 0 }),
+  getDay,
+  locales,
+});
+
+// ── Event types ────────────────────────────────────────────────────────────
+type EventKind = 'followup' | 'd4d' | 'crm';
+
+type CalEvent = Event & {
+  id: string;
+  kind: EventKind;
+  completed: boolean;
+  payload: FollowUp | DrivingLead | { id: string; leadId: string; type: string; dueAt: string; completed: boolean; notes: string; completedAt: string | null };
 };
 
-function getAddress(followUp: FollowUp): string {
-  if (followUp.drivingLead) {
-    return followUp.drivingLead.rawAddress || followUp.drivingLead.street || 'Unknown';
-  }
-  if (followUp.property) {
-    const name = followUp.property.ownerName || '';
-    if (/^\d/.test(name)) return name;
-    return followUp.property.propertyAddress || name || 'Unknown';
-  }
-  if (followUp.preForeclosure) {
-    return followUp.preForeclosure.address || 'Unknown';
-  }
-  return 'Unknown';
+const KIND_COLORS: Record<EventKind, { bg: string; border: string; text: string; badge: string }> = {
+  followup: { bg: '#1e3a5f',  border: '#3b82f6', text: '#93c5fd', badge: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  d4d:      { bg: '#3b1f6b',  border: '#8b5cf6', text: '#c4b5fd', badge: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+  crm:      { bg: '#78350f',  border: '#f59e0b', text: '#fcd34d', badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+};
+
+const VIEW_LABELS: Record<View, string> = {
+  month: 'Month', week: 'Week', work_week: 'Work Week', day: 'Day', agenda: 'Agenda',
+};
+
+const DragAndDropCalendar = withDragAndDrop<CalEvent, object>(Calendar);
+
+// ── Toolbar ────────────────────────────────────────────────────────────────
+function Toolbar({ label, onNavigate, onView, view, views }: ToolbarProps<CalEvent, object>) {
+  const availableViews = Array.isArray(views)
+    ? views
+    : (Object.keys(views).filter((k) => views[k as View]) as View[]);
+  const nav = (a: NavigateAction) => onNavigate(a);
+  return (
+    <div className="mb-3 flex flex-col gap-3 border-b border-border/70 pb-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => nav('TODAY')}>Today</Button>
+        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => nav('PREV')}><ChevronLeft className="h-4 w-4" /></Button>
+        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => nav('NEXT')}><ChevronRight className="h-4 w-4" /></Button>
+        <h2 className="min-w-[180px] text-base font-semibold lg:text-lg">{label}</h2>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Legend */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1"><Building2 className="h-3 w-3 text-blue-400" /> Follow-ups</span>
+          <span className="flex items-center gap-1"><Car className="h-3 w-3 text-purple-400" /> D4$</span>
+          <span className="flex items-center gap-1"><Briefcase className="h-3 w-3 text-amber-400" /> CRM</span>
+        </div>
+        {/* View switcher */}
+        <div className="flex rounded-md border border-border/70 bg-background p-0.5">
+          {availableViews.map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => onView(v)}
+              className={cn(
+                'rounded px-3 py-1.5 text-xs font-medium transition',
+                v === view ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              {VIEW_LABELS[v] ?? v}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function getStageLabel(followUp: FollowUp): string {
-  if (followUp.drivingLead) return followUp.drivingLead.status || '';
-  const stage = followUp.property?.workflowStage || followUp.preForeclosure?.workflowStage || '';
-  return WORKFLOW_STAGES[stage as WorkflowStage]?.shortLabel || stage || '';
+// ── Helpers ────────────────────────────────────────────────────────────────
+function followUpTitle(fu: FollowUp): string {
+  if (fu.drivingLead) return fu.drivingLead.street || fu.drivingLead.rawAddress || 'D4$ Lead';
+  if (fu.property) return fu.property.propertyAddress || fu.property.ownerName || 'Property';
+  if (fu.preForeclosure) return fu.preForeclosure.address || 'Pre-FC';
+  return 'Follow-up';
 }
 
-function getType(followUp: FollowUp): 'property' | 'preforeclosure' | 'd4$' {
-  if (followUp.drivingLeadId) return 'd4$';
-  return followUp.propertyId ? 'property' : 'preforeclosure';
+function crmTaskDuration(type: string) {
+  return type === 'Meeting' || type === 'Property Tour' ? 60 * 60 * 1000 : 30 * 60 * 1000;
 }
 
+// ── Main component ─────────────────────────────────────────────────────────
 export function CalendarView() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [view, setView] = useState<View>(Views.MONTH);
+  const [date, setDate] = useState(new Date());
+  const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedPreForeclosure, setSelectedPreForeclosure] = useState<PreForeclosureRecord | null>(null);
 
-  const monthKey = format(currentMonth, 'yyyy-MM');
-  const { data: followUps, isLoading } = useFollowUps(monthKey);
+  const monthKey = format(date, 'yyyy-MM');
+  const { data: followUps = [] } = useFollowUps(monthKey);
   const { data: drivingLeads = [] } = useDrivingLeads();
-
-  // CRM tasks
-  const crmHydrate = useCrmStore((s) => s.hydrate);
-  const crmTasks = useCrmStore((s) => s.tasks);
-  const crmLeads = useCrmStore((s) => s.leads);
-  useEffect(() => { crmHydrate(new Date()); }, [crmHydrate]);
-
-  const crmLeadById = useMemo(() => new Map(crmLeads.map(l => [l.id, l])), [crmLeads]);
-
-  const crmTasksByDate = useMemo(() => {
-    const map = new Map<string, typeof crmTasks>();
-    for (const task of crmTasks) {
-      const key = format(new Date(task.dueAt), 'yyyy-MM-dd');
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(task);
-    }
-    return map;
-  }, [crmTasks]);
   const updateMutation = useUpdateFollowUp();
   const deleteMutation = useDeleteFollowUp();
 
-  // D4$ leads with a scheduled follow-up date
-  const d4dScheduled = useMemo(() => {
-    const map = new Map<string, DrivingLead[]>();
+  // CRM
+  const crmHydrate = useCrmStore((s) => s.hydrate);
+  const crmTasks = useCrmStore((s) => s.tasks);
+  const crmLeads = useCrmStore((s) => s.leads);
+  const crmReschedule = useCrmStore((s) => s.rescheduleTask);
+  useEffect(() => { crmHydrate(new Date()); }, [crmHydrate]);
+  const crmLeadById = useMemo(() => new Map(crmLeads.map((l) => [l.id, l])), [crmLeads]);
+
+  // ── Build unified event list ─────────────────────────────────────────────
+  const events = useMemo<CalEvent[]>(() => {
+    const list: CalEvent[] = [];
+
+    // Follow-ups (all-day)
+    for (const fu of followUps) {
+      const day = new Date(fu.date);
+      day.setHours(0, 0, 0, 0);
+      const end = new Date(day);
+      end.setHours(23, 59, 59);
+      list.push({
+        id: fu.id,
+        kind: fu.drivingLeadId ? 'd4d' : 'followup',
+        title: followUpTitle(fu),
+        start: day,
+        end,
+        allDay: true,
+        completed: fu.completed,
+        payload: fu,
+      });
+    }
+
+    // D4$ scheduled (all-day)
     for (const lead of drivingLeads) {
       const wf = (lead.metadata as any) || {};
       if (!wf.scheduledFollowUpAt) continue;
-      const key = format(new Date(wf.scheduledFollowUpAt), 'yyyy-MM-dd');
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(lead);
-    }
-    return map;
-  }, [drivingLeads]);
-
-  // Build calendar grid days
-  const calendarDays = useMemo(() => {
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
-    const calStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-    const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
-    return eachDayOfInterval({ start: calStart, end: calEnd });
-  }, [currentMonth]);
-
-  // Group follow-ups by date
-  const followUpsByDate = useMemo(() => {
-    const map = new Map<string, FollowUp[]>();
-    for (const fu of followUps || []) {
-      const key = format(new Date(fu.date), 'yyyy-MM-dd');
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(fu);
-    }
-    return map;
-  }, [followUps]);
-
-  // Follow-ups for selected day
-  const selectedDayFollowUps = useMemo(() => {
-    if (!selectedDay) return [];
-    const key = format(selectedDay, 'yyyy-MM-dd');
-    return followUpsByDate.get(key) || [];
-  }, [selectedDay, followUpsByDate]);
-
-  const selectedDayD4d = useMemo(() => {
-    if (!selectedDay) return [];
-    const key = format(selectedDay, 'yyyy-MM-dd');
-    return d4dScheduled.get(key) || [];
-  }, [selectedDay, d4dScheduled]);
-
-  const selectedDayCrmTasks = useMemo(() => {
-    if (!selectedDay) return [];
-    const key = format(selectedDay, 'yyyy-MM-dd');
-    return crmTasksByDate.get(key) || [];
-  }, [selectedDay, crmTasksByDate]);
-
-  // Stats
-  const totalPending = useMemo(() => {
-    return (followUps || []).filter(f => !f.completed).length;
-  }, [followUps]);
-
-  const totalCompleted = useMemo(() => {
-    return (followUps || []).filter(f => f.completed).length;
-  }, [followUps]);
-
-  const handleToggleComplete = async (followUp: FollowUp) => {
-    try {
-      await updateMutation.mutateAsync({
-        id: followUp.id,
-        completed: !followUp.completed,
+      const day = new Date(wf.scheduledFollowUpAt);
+      day.setHours(0, 0, 0, 0);
+      const end = new Date(day);
+      end.setHours(23, 59, 59);
+      const done = wf.lastFollowUpAt && new Date(wf.lastFollowUpAt) >= new Date(wf.scheduledFollowUpAt);
+      list.push({
+        id: `d4d-sched-${lead.id}`,
+        kind: 'd4d',
+        title: `D4$ ${lead.street || lead.rawAddress}`,
+        start: day,
+        end,
+        allDay: true,
+        completed: !!done,
+        payload: lead,
       });
-      toast({
-        title: followUp.completed ? 'Marked as pending' : 'Marked as complete',
+    }
+
+    // CRM tasks (timed)
+    for (const task of crmTasks) {
+      const lead = crmLeadById.get(task.leadId);
+      const start = new Date(task.dueAt);
+      const end = new Date(start.getTime() + crmTaskDuration(task.type));
+      list.push({
+        id: `crm-${task.id}`,
+        kind: 'crm',
+        title: `${task.type} · ${lead?.ownerName || lead?.businessName || 'Unknown'}`,
+        start,
+        end,
+        allDay: false,
+        completed: task.completed,
+        payload: task,
       });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to update follow-up', variant: 'destructive' });
     }
-  };
 
-  const handleDelete = async (followUp: FollowUp) => {
-    try {
-      await deleteMutation.mutateAsync(followUp.id);
-      toast({ title: 'Follow-up deleted' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to delete follow-up', variant: 'destructive' });
+    return list;
+  }, [followUps, drivingLeads, crmTasks, crmLeadById]);
+
+  // ── Event styling ────────────────────────────────────────────────────────
+  const eventStyleGetter = useCallback((event: CalEvent) => {
+    const c = KIND_COLORS[event.kind];
+    return {
+      style: {
+        backgroundColor: c.bg,
+        border: `1px solid ${c.border}`,
+        borderLeft: `4px solid ${c.border}`,
+        color: c.text,
+        borderRadius: '4px',
+        opacity: event.completed ? 0.55 : 1,
+        textDecoration: event.completed ? 'line-through' : 'none',
+        fontSize: '12px',
+        padding: '2px 6px',
+      },
+    };
+  }, []);
+
+  // ── Drag & drop ──────────────────────────────────────────────────────────
+  const onEventDrop = useCallback(({ event, start }: EventInteractionArgs<CalEvent>) => {
+    if (event.kind === 'crm') {
+      const task = event.payload as any;
+      crmReschedule(task.id, (start as Date).toISOString());
+      toast({ title: 'CRM task rescheduled' });
+    } else if (event.kind === 'followup') {
+      const fu = event.payload as FollowUp;
+      updateMutation.mutate({ id: fu.id, date: format(start as Date, 'yyyy-MM-dd') });
+      toast({ title: 'Follow-up rescheduled' });
     }
-  };
+  }, [crmReschedule, updateMutation]);
 
-  const handleViewDetails = async (followUp: FollowUp) => {
-    if (followUp.drivingLead) {
-      const dl = followUp.drivingLead;
-      const fullAddress = [dl.street, dl.city, dl.state, dl.zip].filter(Boolean).join(', ');
-      const stub = {
-        id: `d4d-${dl.id}`,
-        accountNumber: '',
-        ownerName: dl.ownerName || '',
-        propertyAddress: fullAddress || dl.rawAddress,
-        mailingAddress: '',
-        status: 'UNKNOWN',
-        phoneNumbers: dl.phoneNumbers || [],
-        ownerPhoneIndex: dl.ownerPhoneIndex,
-        emails: dl.emails || [],
-        contacts: dl.contacts || null,
-        notes: dl.notes || '',
-        latitude: dl.latitude,
-        longitude: dl.longitude,
-        d4dStatus: dl.status,
-        metadata: dl.metadata || null,
-      } as unknown as Property;
-      setSelectedProperty(stub);
-    } else if (followUp.propertyId && followUp.property) {
+  const onEventResize = useCallback(({ event, start }: EventInteractionArgs<CalEvent>) => {
+    if (event.kind === 'crm') {
+      const task = event.payload as any;
+      crmReschedule(task.id, (start as Date).toISOString());
+    }
+  }, [crmReschedule]);
+
+  // ── View details helpers ─────────────────────────────────────────────────
+  const handleViewDetails = async (event: CalEvent) => {
+    if (event.kind === 'crm') return;
+    const fu = event.payload as FollowUp;
+    if (fu.propertyId) {
       try {
         const result = await getProperties(1, 50000);
-        const properties = result.properties || result.data || result;
-        const found = (properties as Property[]).find(p => p.id === followUp.propertyId);
-        if (found) {
-          setSelectedProperty(found);
-        } else {
-          toast({ title: 'Property not found', variant: 'destructive' });
-        }
-      } catch {
-        toast({ title: 'Error', description: 'Failed to load property', variant: 'destructive' });
-      }
-    } else if (followUp.preForeclosure) {
+        const found = (result.properties || result.data || result as Property[]).find((p: Property) => p.id === fu.propertyId);
+        if (found) setSelectedProperty(found);
+      } catch { toast({ title: 'Error loading property', variant: 'destructive' }); }
+    } else if (fu.preForeclosure) {
       try {
         const records = await getPreForeclosures();
-        const found = records.find((r: PreForeclosureRecord) => r.document_number === followUp.preForeclosure?.documentNumber);
-        if (found) {
-          setSelectedPreForeclosure(found);
-        } else {
-          toast({ title: 'Record not found', variant: 'destructive' });
-        }
-      } catch {
-        toast({ title: 'Error', description: 'Failed to load record', variant: 'destructive' });
-      }
+        const found = records.find((r: PreForeclosureRecord) => r.document_number === fu.preForeclosure?.documentNumber);
+        if (found) setSelectedPreForeclosure(found);
+      } catch { toast({ title: 'Error loading record', variant: 'destructive' }); }
     }
+    setSelectedEvent(null);
   };
 
-  return (
-    <div className="p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-            <CalendarDays className="h-6 w-6 text-primary" />
-            Follow-Up Calendar
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {totalPending} pending{totalCompleted > 0 ? ` · ${totalCompleted} completed` : ''} this month
+  const handleToggleComplete = async (event: CalEvent) => {
+    const fu = event.payload as FollowUp;
+    await updateMutation.mutateAsync({ id: fu.id, completed: !fu.completed });
+    toast({ title: fu.completed ? 'Marked as pending' : 'Marked as complete' });
+    setSelectedEvent(null);
+  };
+
+  const handleDelete = async (event: CalEvent) => {
+    const fu = event.payload as FollowUp;
+    await deleteMutation.mutateAsync(fu.id);
+    toast({ title: 'Follow-up deleted' });
+    setSelectedEvent(null);
+  };
+
+  // ── Slot click (future: create event) ───────────────────────────────────
+  const onSelectSlot = useCallback((_slot: SlotInfo) => {
+    // Future: open create dialog
+  }, []);
+
+  // ── Detail dialog content ────────────────────────────────────────────────
+  const renderEventDetail = () => {
+    if (!selectedEvent) return null;
+    const { kind, payload, completed } = selectedEvent;
+    const c = KIND_COLORS[kind];
+
+    if (kind === 'crm') {
+      const task = payload as any;
+      const lead = crmLeadById.get(task.leadId);
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={c.badge}>CRM</Badge>
+            <Badge variant="outline" className="text-xs">{task.type}</Badge>
+          </div>
+          <div>
+            <p className="font-medium">{lead?.ownerName || lead?.businessName || 'Unknown'}</p>
+            {lead?.firm && <p className="text-sm text-muted-foreground">{lead.firm}</p>}
+            {lead?.phone && <p className="text-sm text-muted-foreground">{lead.phone}</p>}
+          </div>
+          {task.notes && <p className="text-sm italic text-muted-foreground">{task.notes}</p>}
+          <p className="text-xs text-muted-foreground">
+            {format(new Date(task.dueAt), 'EEEE, MMMM d · h:mm a')}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9"
-            onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-          >
-            <ChevronLeft className="h-4 w-4" />
+      );
+    }
+
+    if (kind === 'd4d') {
+      const lead = payload as DrivingLead;
+      const wf = (lead.metadata as any) || {};
+      const address = lead.street || lead.rawAddress;
+      return (
+        <div className="space-y-3">
+          <Badge variant="outline" className={c.badge}>Driving 4$</Badge>
+          <p className="font-medium">{address}</p>
+          {lead.ownerName && <p className="text-sm text-muted-foreground">{lead.ownerName}</p>}
+          {wf.lastFollowUpAt && (
+            <p className="text-xs text-muted-foreground">Last follow-up: {formatDistanceToNow(new Date(wf.lastFollowUpAt), { addSuffix: true })}</p>
+          )}
+          <Badge variant="outline" className={isPast(new Date(wf.scheduledFollowUpAt || selectedEvent.start as Date)) && !completed ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs' : 'text-xs'}>
+            {completed ? '✓ Done' : isPast(new Date(wf.scheduledFollowUpAt || selectedEvent.start as Date)) ? '⚠ Overdue' : 'Pending'}
+          </Badge>
+        </div>
+      );
+    }
+
+    // Follow-up
+    const fu = payload as FollowUp;
+    const stage = fu.property?.workflowStage || fu.preForeclosure?.workflowStage || '';
+    const stageLabel = WORKFLOW_STAGES[stage as WorkflowStage]?.shortLabel || '';
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className={c.badge}>
+            {fu.preForeclosure ? 'Pre-Foreclosure' : 'Property'}
+          </Badge>
+          {stageLabel && <Badge variant="outline" className="text-xs">{stageLabel}</Badge>}
+          {fu.preForeclosure?.type && (
+            <Badge variant="outline" className={cn('text-xs', fu.preForeclosure.type === 'Mortgage' ? 'bg-purple-500/20 text-purple-400' : 'bg-orange-500/20 text-orange-400')}>
+              {fu.preForeclosure.type}
+            </Badge>
+          )}
+        </div>
+        <p className="font-medium">{followUpTitle(fu)}</p>
+        {fu.note && <p className="text-sm italic text-muted-foreground">{fu.note}</p>}
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={() => handleViewDetails(selectedEvent)}>
+            <Eye className="h-3 w-3 mr-1" /> Open
           </Button>
           <Button
-            variant="ghost"
-            className="font-semibold text-base min-w-[160px]"
-            onClick={() => setCurrentMonth(new Date())}
+            size="sm"
+            variant={fu.completed ? 'outline' : 'default'}
+            className={cn(!fu.completed && 'bg-green-600 hover:bg-green-700')}
+            disabled={updateMutation.isPending}
+            onClick={() => handleToggleComplete(selectedEvent)}
           >
-            {format(currentMonth, 'MMMM yyyy')}
+            {fu.completed ? <><Undo2 className="h-3 w-3 mr-1" />Undo</> : <><Check className="h-3 w-3 mr-1" />Complete</>}
           </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9"
-            onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-          >
-            <ChevronRight className="h-4 w-4" />
+          <Button size="sm" variant="outline" className="text-destructive border-destructive/50" disabled={deleteMutation.isPending} onClick={() => handleDelete(selectedEvent)}>
+            <Trash2 className="h-3 w-3" />
           </Button>
         </div>
       </div>
+    );
+  };
 
-      {/* Loading */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      )}
+  return (
+    <div className="p-4 lg:p-6 space-y-4">
+      <div className="rounded-md border border-border/70 bg-card p-3 shadow-sm calendar-container">
+        <DragAndDropCalendar
+          localizer={localizer}
+          events={events}
+          startAccessor="start"
+          endAccessor="end"
+          view={view}
+          onView={setView}
+          date={date}
+          onNavigate={setDate}
+          views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
+          onSelectEvent={setSelectedEvent}
+          onSelectSlot={onSelectSlot}
+          onEventDrop={onEventDrop}
+          onEventResize={onEventResize}
+          resizable
+          selectable
+          eventPropGetter={eventStyleGetter}
+          components={{ toolbar: Toolbar }}
+          style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}
+          popup
+        />
+      </div>
 
-      {/* Calendar Grid */}
-      {!isLoading && (
-        <div className="rounded-xl border border-border overflow-hidden">
-          {/* Day headers */}
-          <div className="grid grid-cols-7 bg-secondary/50">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-              <div key={day} className="p-2 sm:p-3 text-center text-xs sm:text-sm font-medium text-muted-foreground border-b border-border">
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Day cells */}
-          <div className="grid grid-cols-7">
-            {calendarDays.map((day, i) => {
-              const dateKey = format(day, 'yyyy-MM-dd');
-              const dayFollowUps = followUpsByDate.get(dateKey) || [];
-              const pendingCount = dayFollowUps.filter(f => !f.completed).length;
-              const completedCount = dayFollowUps.filter(f => f.completed).length;
-              const dayD4dLeads = d4dScheduled.get(dateKey) || [];
-              const dayCrmTasks = crmTasksByDate.get(dateKey) || [];
-              const hasFollowUps = dayFollowUps.length > 0 || dayD4dLeads.length > 0 || dayCrmTasks.length > 0;
-              const isCurrentMonth = isSameMonth(day, currentMonth);
-              const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
-              const dayIsPast = isPast(day) && !isToday(day);
-
-              return (
-                <div
-                  key={dateKey}
-                  onClick={() => hasFollowUps ? setSelectedDay(day) : undefined}
-                  className={cn(
-                    'relative border-b border-r border-border p-1.5 sm:p-2 min-h-[70px] sm:min-h-[90px] transition-colors',
-                    !isCurrentMonth && 'bg-secondary/20 opacity-40',
-                    isCurrentMonth && 'bg-card',
-                    isToday(day) && 'ring-2 ring-primary ring-inset bg-primary/5',
-                    hasFollowUps && 'cursor-pointer hover:bg-secondary/50',
-                    isSelected && 'bg-primary/10',
-                    // Right border removed on last column
-                    (i + 1) % 7 === 0 && 'border-r-0',
-                  )}
-                >
-                  {/* Day number */}
-                  <span className={cn(
-                    'text-xs sm:text-sm font-medium',
-                    isToday(day) && 'text-primary font-bold',
-                    dayIsPast && !hasFollowUps && 'text-muted-foreground',
-                  )}>
-                    {format(day, 'd')}
-                  </span>
-
-                  {/* Follow-up indicators */}
-                  {hasFollowUps && (
-                    <div className="mt-1 space-y-0.5">
-                      {/* Show up to 3 follow-up previews on desktop */}
-                      {dayFollowUps.slice(0, 3).map(fu => (
-                        <div
-                          key={fu.id}
-                          className={cn(
-                            'hidden sm:block text-[10px] leading-tight px-1 py-0.5 rounded truncate',
-                            fu.completed
-                              ? 'bg-green-500/10 text-green-400 line-through'
-                              : 'bg-blue-500/10 text-blue-400',
-                          )}
-                        >
-                          {getAddress(fu)}
-                        </div>
-                      ))}
-                      {dayFollowUps.length > 3 && (
-                        <div className="hidden sm:block text-[10px] text-muted-foreground px-1">
-                          +{dayFollowUps.length - 3} more
-                        </div>
-                      )}
-                      {/* D4$ scheduled follow-ups */}
-                      {dayD4dLeads.slice(0, 2).map(lead => {
-                        const wf = (lead.metadata as any) || {};
-                        const done = wf.lastFollowUpAt && new Date(wf.lastFollowUpAt) >= new Date(wf.scheduledFollowUpAt);
-                        return (
-                          <div
-                            key={lead.id}
-                            className={cn(
-                              'hidden sm:block text-[10px] leading-tight px-1 py-0.5 rounded truncate',
-                              done
-                                ? 'bg-green-500/10 text-green-400 line-through'
-                                : isPast(day) && !isToday(day)
-                                  ? 'bg-yellow-500/10 text-yellow-400'
-                                  : 'bg-purple-500/10 text-purple-400',
-                            )}
-                          >
-                            D4$ {lead.street || lead.rawAddress}
-                          </div>
-                        );
-                      })}
-                      {dayD4dLeads.length > 2 && (
-                        <div className="hidden sm:block text-[10px] text-muted-foreground px-1">
-                          +{dayD4dLeads.length - 2} D4$
-                        </div>
-                      )}
-                      {/* CRM tasks */}
-                      {dayCrmTasks.slice(0, 2).map(task => {
-                        const lead = crmLeadById.get(task.leadId);
-                        return (
-                          <div
-                            key={task.id}
-                            className={cn(
-                              'hidden sm:block text-[10px] leading-tight px-1 py-0.5 rounded truncate',
-                              task.completed
-                                ? 'bg-amber-500/10 text-amber-400 line-through'
-                                : 'bg-amber-500/20 text-amber-300',
-                            )}
-                          >
-                            CRM {task.type} · {lead?.ownerName || lead?.businessName || ''}
-                          </div>
-                        );
-                      })}
-                      {dayCrmTasks.length > 2 && (
-                        <div className="hidden sm:block text-[10px] text-muted-foreground px-1">
-                          +{dayCrmTasks.length - 2} CRM
-                        </div>
-                      )}
-                      {/* Mobile: show dots */}
-                      <div className="sm:hidden flex gap-1 mt-0.5">
-                        {pendingCount > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <span className="w-2 h-2 rounded-full bg-blue-500" />
-                            {pendingCount > 1 && <span className="text-[10px] text-blue-400">{pendingCount}</span>}
-                          </span>
-                        )}
-                        {completedCount > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <span className="w-2 h-2 rounded-full bg-green-500/50" />
-                            {completedCount > 1 && <span className="text-[10px] text-green-400">{completedCount}</span>}
-                          </span>
-                        )}
-                        {dayD4dLeads.length > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <span className="w-2 h-2 rounded-full bg-purple-500" />
-                            {dayD4dLeads.length > 1 && <span className="text-[10px] text-purple-400">{dayD4dLeads.length}</span>}
-                          </span>
-                        )}
-                        {dayCrmTasks.length > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <span className="w-2 h-2 rounded-full bg-amber-500" />
-                            {dayCrmTasks.length > 1 && <span className="text-[10px] text-amber-400">{dayCrmTasks.length}</span>}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Day Detail Dialog */}
-      <Dialog open={!!selectedDay} onOpenChange={(open) => !open && setSelectedDay(null)}>
-        <DialogContent className="max-w-md">
+      {/* Event detail dialog */}
+      <Dialog open={!!selectedEvent} onOpenChange={(o) => !o && setSelectedEvent(null)}>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-primary" />
-              {selectedDay ? format(selectedDay, 'EEEE, MMMM d, yyyy') : ''}
-            </DialogTitle>
+            <DialogTitle className="text-base">{selectedEvent?.title as string}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-            {selectedDayFollowUps.length === 0 && selectedDayD4d.length === 0 && selectedDayCrmTasks.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No follow-ups for this day</p>
-            )}
-            {selectedDayFollowUps.map(fu => {
-              const address = getAddress(fu);
-              const stageLabel = getStageLabel(fu);
-              const stage = fu.property?.workflowStage || fu.preForeclosure?.workflowStage || '';
-              const type = getType(fu);
-              // Enrich D4$ follow-ups with pipeline metadata from the lead
-              const matchingLead = type === 'd4$' ? drivingLeads.find(l => l.id === fu.drivingLeadId) : null;
-              const d4dWf = (matchingLead?.metadata as any) || null;
-              const d4dOutcome = d4dWf?.contactedOutcome;
-              const d4dOutcomeLabel = d4dOutcome === 'wants_to_sell' ? 'Wants to Sell' : d4dOutcome === 'thinking_about_selling' ? 'Thinking About Selling' : d4dOutcome === 'doesnt_want_to_sell' ? "Doesn't Want to Sell" : null;
-
-              return (
-                <div
-                  key={fu.id}
-                  className={cn(
-                    'rounded-lg border p-3 transition-all',
-                    fu.completed
-                      ? 'border-green-500/20 bg-green-500/5 opacity-70'
-                      : 'border-border bg-card',
-                  )}
-                >
-                  {/* Address */}
-                  <p className={cn(
-                    'font-medium text-sm',
-                    fu.completed && 'line-through text-muted-foreground',
-                  )}>
-                    {address}
-                  </p>
-
-                  {/* Stage + Type badges */}
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    {stageLabel && (
-                      <Badge
-                        variant="outline"
-                        className={cn('text-[10px] px-1.5 py-0', STAGE_COLORS[stage] || 'bg-secondary')}
-                      >
-                        {stageLabel}
-                      </Badge>
-                    )}
-                    <Badge variant="outline" className={cn(
-                      'text-[10px] px-1.5 py-0',
-                      type === 'd4$' && 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-                    )}>
-                      {type === 'preforeclosure' ? 'Pre-FC' : type === 'd4$' ? 'D4$' : 'Property'}
-                    </Badge>
-                    {d4dOutcomeLabel && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-secondary">{d4dOutcomeLabel}</Badge>
-                    )}
-                    {fu.preForeclosure?.type && (
-                      <Badge variant="outline" className={cn(
-                        'text-[10px] px-1.5 py-0',
-                        fu.preForeclosure.type === 'Mortgage'
-                          ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-                          : 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-                      )}>
-                        {fu.preForeclosure.type}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Note */}
-                  {fu.note && (
-                    <p className="text-xs text-muted-foreground mt-2 italic">{fu.note}</p>
-                  )}
-
-                  {/* D4$ pipeline metadata */}
-                  {d4dWf && (
-                    <div className="mt-2 space-y-0.5 text-xs text-muted-foreground border-t border-border/50 pt-2">
-                      {d4dWf.lastFollowUpAt && (
-                        <p>Last follow up: <span className="text-foreground">{formatDistanceToNow(new Date(d4dWf.lastFollowUpAt), { addSuffix: true })}</span></p>
-                      )}
-                      {d4dWf.scheduledFollowUpAt && (() => {
-                        const s = new Date(d4dWf.scheduledFollowUpAt);
-                        const overdue = s < new Date();
-                        return (
-                          <p className={overdue ? 'text-yellow-400' : ''}>
-                            {overdue ? '⚠ Follow-up overdue' : `Next follow up: ${format(s, 'MMM d, yyyy')}`}
-                          </p>
-                        );
-                      })()}
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex gap-2 mt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => handleViewDetails(fu)}
-                    >
-                      <Eye className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant={fu.completed ? 'outline' : 'default'}
-                      size="sm"
-                      className={cn(
-                        'flex-1 text-xs',
-                        !fu.completed && 'bg-green-600 hover:bg-green-700',
-                      )}
-                      disabled={updateMutation.isPending}
-                      onClick={() => handleToggleComplete(fu)}
-                    >
-                      {fu.completed ? (
-                        <><Undo2 className="h-3 w-3 mr-1" /> Undo</>
-                      ) : (
-                        <><Check className="h-3 w-3 mr-1" /> Complete</>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs border-destructive/50 hover:border-destructive hover:bg-destructive/10 text-destructive"
-                      disabled={deleteMutation.isPending}
-                      onClick={() => handleDelete(fu)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* D4$ Scheduled Follow-ups */}
-            {selectedDayD4d.length > 0 && (
-              <>
-                {selectedDayFollowUps.length > 0 && <hr className="border-border" />}
-                <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide">D4$ Scheduled Follow-ups</p>
-                {selectedDayD4d.map(lead => {
-                  const wf = (lead.metadata as any) || {};
-                  const scheduled = new Date(wf.scheduledFollowUpAt);
-                  const done = wf.lastFollowUpAt && new Date(wf.lastFollowUpAt) >= scheduled;
-                  const overdue = !done && isPast(scheduled) && !isToday(scheduled);
-                  const address = lead.street || lead.rawAddress;
-                  const outcome = wf.contactedOutcome;
-                  const outcomeLabel = outcome === 'wants_to_sell' ? 'Wants to Sell' : outcome === 'thinking_about_selling' ? 'Thinking About Selling' : outcome === 'doesnt_want_to_sell' ? "Doesn't Want to Sell" : null;
-
-                  const openLead = () => {
-                    const fullAddress = [lead.street, lead.city, lead.state, lead.zip].filter(Boolean).join(', ');
-                    setSelectedProperty({
-                      id: `d4d-${lead.id}`,
-                      accountNumber: '',
-                      ownerName: (lead as any).ownerName || '',
-                      propertyAddress: fullAddress || lead.rawAddress,
-                      mailingAddress: '',
-                      status: 'UNKNOWN',
-                      phoneNumbers: (lead as any).phoneNumbers || [],
-                      ownerPhoneIndex: (lead as any).ownerPhoneIndex,
-                      emails: (lead as any).emails || [],
-                      contacts: (lead as any).contacts || null,
-                      notes: lead.notes || '',
-                      latitude: lead.latitude,
-                      longitude: lead.longitude,
-                      d4dStatus: lead.status,
-                      metadata: lead.metadata || null,
-                    } as unknown as Property);
-                  };
-
-                  return (
-                    <div key={lead.id} className={cn(
-                      'rounded-lg border p-3',
-                      done ? 'border-green-500/20 bg-green-500/5 opacity-70'
-                        : overdue ? 'border-yellow-500/30 bg-yellow-500/5'
-                        : 'border-purple-500/20 bg-purple-500/5',
-                    )}>
-                      <div className="flex items-start justify-between gap-2">
-                        <p className={cn('font-medium text-sm', done && 'line-through text-muted-foreground')}>{address}</p>
-                        <Button variant="outline" size="sm" className="h-6 w-6 p-0 flex-shrink-0" onClick={openLead}>
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-purple-500/20 text-purple-400 border-purple-500/30">
-                          D4$ Follow-up
-                        </Badge>
-                        {done && <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-green-500/20 text-green-400 border-green-500/30">✓ Done</Badge>}
-                        {overdue && !done && <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-yellow-500/20 text-yellow-400 border-yellow-500/30">⚠ Overdue</Badge>}
-                        {outcomeLabel && <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-secondary">{outcomeLabel}</Badge>}
-                      </div>
-                      {wf.lastFollowUpAt && (
-                        <p className="text-xs text-muted-foreground mt-1">Last follow up: {formatDistanceToNow(new Date(wf.lastFollowUpAt), { addSuffix: true })}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </>
-            )}
-            {/* CRM Tasks */}
-            {selectedDayCrmTasks.length > 0 && (
-              <>
-                {(selectedDayFollowUps.length > 0 || selectedDayD4d.length > 0) && <hr className="border-border" />}
-                <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide flex items-center gap-1">
-                  <Briefcase className="h-3 w-3" /> CRM Tasks
-                </p>
-                {selectedDayCrmTasks.map(task => {
-                  const lead = crmLeadById.get(task.leadId);
-                  return (
-                    <div key={task.id} className={cn(
-                      'rounded-lg border p-3',
-                      task.completed
-                        ? 'border-amber-500/20 bg-amber-500/5 opacity-70'
-                        : 'border-amber-500/30 bg-amber-500/5',
-                    )}>
-                      <div className="flex items-start justify-between gap-2">
-                        <p className={cn('font-medium text-sm', task.completed && 'line-through text-muted-foreground')}>
-                          {task.type} · {lead?.ownerName || lead?.businessName || 'Unknown'}
-                        </p>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-500/20 text-amber-400 border-amber-500/30 flex-shrink-0">
-                          CRM
-                        </Badge>
-                      </div>
-                      {lead?.firm && (
-                        <p className="text-xs text-muted-foreground mt-0.5">{lead.firm}</p>
-                      )}
-                      {task.notes && (
-                        <p className="text-xs text-muted-foreground mt-1 italic">{task.notes}</p>
-                      )}
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <Badge variant="outline" className={cn(
-                          'text-[10px] px-1.5 py-0',
-                          task.completed
-                            ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                            : 'bg-amber-500/10 text-amber-300 border-amber-500/20',
-                        )}>
-                          {task.completed ? '✓ Done' : 'Pending'}
-                        </Badge>
-                      </div>
-                    </div>
-                  );
-                })}
-              </>
-            )}
-          </div>
+          {renderEventDetail()}
         </DialogContent>
       </Dialog>
 
-      {/* Property Details Modal */}
-      <PropertyDetailsModal
-        property={selectedProperty}
-        isOpen={!!selectedProperty}
-        onClose={() => setSelectedProperty(null)}
-      />
-
-      {/* Pre-Foreclosure Details Modal */}
-      <FullDetailsModal
-        record={selectedPreForeclosure}
-        isOpen={!!selectedPreForeclosure}
-        onClose={() => setSelectedPreForeclosure(null)}
-      />
+      <PropertyDetailsModal property={selectedProperty} isOpen={!!selectedProperty} onClose={() => setSelectedProperty(null)} />
+      <FullDetailsModal record={selectedPreForeclosure} isOpen={!!selectedPreForeclosure} onClose={() => setSelectedPreForeclosure(null)} />
     </div>
   );
 }
