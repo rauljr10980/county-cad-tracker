@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
   format, isSameMonth, isSameDay, isToday, addMonths, subMonths, isPast, formatDistanceToNow,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, CalendarDays, Check, Trash2, Loader2, Undo2, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, Check, Trash2, Loader2, Undo2, Eye, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -16,6 +16,7 @@ import { toast } from '@/hooks/use-toast';
 import { getProperties, getPreForeclosures } from '@/lib/api';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
 import { FullDetailsModal } from '@/components/preforeclosure/FullDetailsModal';
+import { useCrmStore } from '@/crm/store/useCrmStore';
 
 const STAGE_COLORS: Record<string, string> = {
   negotiating: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
@@ -58,6 +59,24 @@ export function CalendarView() {
   const monthKey = format(currentMonth, 'yyyy-MM');
   const { data: followUps, isLoading } = useFollowUps(monthKey);
   const { data: drivingLeads = [] } = useDrivingLeads();
+
+  // CRM tasks
+  const crmHydrate = useCrmStore((s) => s.hydrate);
+  const crmTasks = useCrmStore((s) => s.tasks);
+  const crmLeads = useCrmStore((s) => s.leads);
+  useEffect(() => { crmHydrate(new Date()); }, [crmHydrate]);
+
+  const crmLeadById = useMemo(() => new Map(crmLeads.map(l => [l.id, l])), [crmLeads]);
+
+  const crmTasksByDate = useMemo(() => {
+    const map = new Map<string, typeof crmTasks>();
+    for (const task of crmTasks) {
+      const key = format(new Date(task.dueAt), 'yyyy-MM-dd');
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(task);
+    }
+    return map;
+  }, [crmTasks]);
   const updateMutation = useUpdateFollowUp();
   const deleteMutation = useDeleteFollowUp();
 
@@ -106,6 +125,12 @@ export function CalendarView() {
     const key = format(selectedDay, 'yyyy-MM-dd');
     return d4dScheduled.get(key) || [];
   }, [selectedDay, d4dScheduled]);
+
+  const selectedDayCrmTasks = useMemo(() => {
+    if (!selectedDay) return [];
+    const key = format(selectedDay, 'yyyy-MM-dd');
+    return crmTasksByDate.get(key) || [];
+  }, [selectedDay, crmTasksByDate]);
 
   // Stats
   const totalPending = useMemo(() => {
@@ -256,7 +281,8 @@ export function CalendarView() {
               const pendingCount = dayFollowUps.filter(f => !f.completed).length;
               const completedCount = dayFollowUps.filter(f => f.completed).length;
               const dayD4dLeads = d4dScheduled.get(dateKey) || [];
-              const hasFollowUps = dayFollowUps.length > 0 || dayD4dLeads.length > 0;
+              const dayCrmTasks = crmTasksByDate.get(dateKey) || [];
+              const hasFollowUps = dayFollowUps.length > 0 || dayD4dLeads.length > 0 || dayCrmTasks.length > 0;
               const isCurrentMonth = isSameMonth(day, currentMonth);
               const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
               const dayIsPast = isPast(day) && !isToday(day);
@@ -332,6 +358,28 @@ export function CalendarView() {
                           +{dayD4dLeads.length - 2} D4$
                         </div>
                       )}
+                      {/* CRM tasks */}
+                      {dayCrmTasks.slice(0, 2).map(task => {
+                        const lead = crmLeadById.get(task.leadId);
+                        return (
+                          <div
+                            key={task.id}
+                            className={cn(
+                              'hidden sm:block text-[10px] leading-tight px-1 py-0.5 rounded truncate',
+                              task.completed
+                                ? 'bg-amber-500/10 text-amber-400 line-through'
+                                : 'bg-amber-500/20 text-amber-300',
+                            )}
+                          >
+                            CRM {task.type} · {lead?.ownerName || lead?.businessName || ''}
+                          </div>
+                        );
+                      })}
+                      {dayCrmTasks.length > 2 && (
+                        <div className="hidden sm:block text-[10px] text-muted-foreground px-1">
+                          +{dayCrmTasks.length - 2} CRM
+                        </div>
+                      )}
                       {/* Mobile: show dots */}
                       <div className="sm:hidden flex gap-1 mt-0.5">
                         {pendingCount > 0 && (
@@ -350,6 +398,12 @@ export function CalendarView() {
                           <span className="flex items-center gap-0.5">
                             <span className="w-2 h-2 rounded-full bg-purple-500" />
                             {dayD4dLeads.length > 1 && <span className="text-[10px] text-purple-400">{dayD4dLeads.length}</span>}
+                          </span>
+                        )}
+                        {dayCrmTasks.length > 0 && (
+                          <span className="flex items-center gap-0.5">
+                            <span className="w-2 h-2 rounded-full bg-amber-500" />
+                            {dayCrmTasks.length > 1 && <span className="text-[10px] text-amber-400">{dayCrmTasks.length}</span>}
                           </span>
                         )}
                       </div>
@@ -372,7 +426,7 @@ export function CalendarView() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-            {selectedDayFollowUps.length === 0 && selectedDayD4d.length === 0 && (
+            {selectedDayFollowUps.length === 0 && selectedDayD4d.length === 0 && selectedDayCrmTasks.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No follow-ups for this day</p>
             )}
             {selectedDayFollowUps.map(fu => {
@@ -557,6 +611,51 @@ export function CalendarView() {
                       {wf.lastFollowUpAt && (
                         <p className="text-xs text-muted-foreground mt-1">Last follow up: {formatDistanceToNow(new Date(wf.lastFollowUpAt), { addSuffix: true })}</p>
                       )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            {/* CRM Tasks */}
+            {selectedDayCrmTasks.length > 0 && (
+              <>
+                {(selectedDayFollowUps.length > 0 || selectedDayD4d.length > 0) && <hr className="border-border" />}
+                <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide flex items-center gap-1">
+                  <Briefcase className="h-3 w-3" /> CRM Tasks
+                </p>
+                {selectedDayCrmTasks.map(task => {
+                  const lead = crmLeadById.get(task.leadId);
+                  return (
+                    <div key={task.id} className={cn(
+                      'rounded-lg border p-3',
+                      task.completed
+                        ? 'border-amber-500/20 bg-amber-500/5 opacity-70'
+                        : 'border-amber-500/30 bg-amber-500/5',
+                    )}>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={cn('font-medium text-sm', task.completed && 'line-through text-muted-foreground')}>
+                          {task.type} · {lead?.ownerName || lead?.businessName || 'Unknown'}
+                        </p>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-500/20 text-amber-400 border-amber-500/30 flex-shrink-0">
+                          CRM
+                        </Badge>
+                      </div>
+                      {lead?.firm && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{lead.firm}</p>
+                      )}
+                      {task.notes && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">{task.notes}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <Badge variant="outline" className={cn(
+                          'text-[10px] px-1.5 py-0',
+                          task.completed
+                            ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                            : 'bg-amber-500/10 text-amber-300 border-amber-500/20',
+                        )}>
+                          {task.completed ? '✓ Done' : 'Pending'}
+                        </Badge>
+                      </div>
                     </div>
                   );
                 })}
