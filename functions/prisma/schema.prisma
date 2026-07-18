@@ -93,8 +93,8 @@ model Property {
   // Contact Information
   phoneNumbers    String[] // Array of phone numbers (flat, for backward compat)
   ownerPhoneIndex Int? // Index of owner's primary phone
-  emails          String[] @default([]) // Array of email addresses (flat, for backward compat)
-  contacts        Json?    // Structured contacts: {phoneRows: [{name, phones}], emailRows: [{name, emails}]}
+  emails          String[]  @default([]) // Array of email addresses (flat, for backward compat)
+  contacts        Json? // Structured contacts: {phoneRows: [{name, phones}], emailRows: [{name, emails}]}
   lastCallTime    DateTime? // Last time a call button was pressed for this property
 
   // Notes (simple string field for quick notes, separate from Note relation for detailed notes)
@@ -116,7 +116,7 @@ model Property {
   // Metadata
   isNew             Boolean @default(false)
   isRemoved         Boolean @default(false)
-  statusChanged      Boolean @default(false)
+  statusChanged     Boolean @default(false)
   percentageChanged Boolean @default(false)
 
   // Visited Status
@@ -131,7 +131,7 @@ model Property {
   noteRecords    Note[]           @relation("PropertyNotes") // Detailed notes with authors
   tasks          Task[]
   paymentHistory PaymentHistory[]
-  routeRecords   RouteRecord[]    // Routes this property is in
+  routeRecords   RouteRecord[] // Routes this property is in
   followUps      FollowUp[]
 
   // Indexes for performance (50k+ properties)
@@ -377,55 +377,55 @@ enum FileStatus {
 // ============================================================================
 
 model PreForeclosure {
-  id               String      @id @default(cuid())
-  documentNumber   String      @unique
-  type             String // "Mortgage" or "Tax"
-  address          String
-  city             String
-  zip              String
-  filingMonth      String
-  county           String      @default("Bexar")
-  latitude         Float?
-  longitude        Float?
-  schoolDistrict   String?
-  recordedDate     DateTime?
-  saleDate         DateTime?
-  internalStatus   String      @default("New") // "New", "Contact Attempted", "Monitoring", "Dead"
-  notes            String?     @db.Text
-  phoneNumbers     String[] // Array of phone numbers (up to 6)
-  ownerPhoneIndex  Int? // Index of which phone number is the owner's (0-5)
-  lastActionDate   DateTime?
-  nextFollowUpDate DateTime?
-  actionType       ActionType?
-  priority         Priority?
-  dueTime          DateTime?
-  assignedTo       String? // "Luciano" or "Raul"
-  inactive         Boolean     @default(false)
-  isReturning      Boolean     @default(false) // Flagged if address matched a prior record
-  previousDocumentNumbers String[] @default([]) // Chain of prior document numbers
-  visited          Boolean     @default(false) // Mark if property has been visited
-  visitedAt        DateTime? // When the property was visited
-  visitedBy        String? // Who visited (driver name)
-  visitCount       Int         @default(0) // Number of times visited
-  firstSeenMonth   String
-  lastSeenMonth    String
-  workflowStage    String      @default("not_started")
-  workflowLog      Json        @default("[]")
+  id                      String      @id @default(cuid())
+  documentNumber          String      @unique
+  type                    String // "Mortgage" or "Tax"
+  address                 String
+  city                    String
+  zip                     String
+  filingMonth             String
+  county                  String      @default("Bexar")
+  latitude                Float?
+  longitude               Float?
+  schoolDistrict          String?
+  recordedDate            DateTime?
+  saleDate                DateTime?
+  internalStatus          String      @default("New") // "New", "Contact Attempted", "Monitoring", "Dead"
+  notes                   String?     @db.Text
+  phoneNumbers            String[] // Array of phone numbers (up to 6)
+  ownerPhoneIndex         Int? // Index of which phone number is the owner's (0-5)
+  lastActionDate          DateTime?
+  nextFollowUpDate        DateTime?
+  actionType              ActionType?
+  priority                Priority?
+  dueTime                 DateTime?
+  assignedTo              String? // "Luciano" or "Raul"
+  inactive                Boolean     @default(false)
+  isReturning             Boolean     @default(false) // Flagged if address matched a prior record
+  previousDocumentNumbers String[]    @default([]) // Chain of prior document numbers
+  visited                 Boolean     @default(false) // Mark if property has been visited
+  visitedAt               DateTime? // When the property was visited
+  visitedBy               String? // Who visited (driver name)
+  visitCount              Int         @default(0) // Number of times visited
+  firstSeenMonth          String
+  lastSeenMonth           String
+  workflowStage           String      @default("not_started")
+  workflowLog             Json        @default("[]")
 
   // Financial
-  loanAmount        Float?      // Original loan / mortgage amount
-  appraisedValue    Float?      // Appraised market value
-  landType          String?     // "Home" or "Vacant Land"
+  loanAmount     Float? // Original loan / mortgage amount
+  appraisedValue Float? // Appraised market value
+  landType       String? // "Home" or "Vacant Land"
 
   // Owner Lookup (auto-populated from tax assessor + people search)
   ownerName         String?
   ownerAddress      String?
-  emails            String[]    @default([])
+  emails            String[]  @default([])
   ownerLookupAt     DateTime?
-  ownerLookupStatus String?     // "success", "partial", "failed", "pending"
+  ownerLookupStatus String? // "success", "partial", "failed", "pending"
 
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   routeRecords RouteRecord[]
@@ -447,34 +447,34 @@ model PreForeclosure {
 // ============================================================================
 
 model Foreclosure {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Document identifiers
-  docNumber       String
-  fileId          String?
+  docNumber String
+  fileId    String?
 
   // Dates
-  recordedDate    DateTime?
-  saleDate        DateTime?
+  recordedDate DateTime?
+  saleDate     DateTime?
 
   // Property information
-  type            String?   // Mortgage or Tax
-  streetAddress   String?
-  city            String?
-  state           String?
-  zipCode         String?
+  type          String? // Mortgage or Tax
+  streetAddress String?
+  city          String?
+  state         String?
+  zipCode       String?
 
   // Additional information
-  remarks         String?   @db.Text
-  filingMonth     String?   // YYYY-MM format
+  remarks     String? @db.Text
+  filingMonth String? // YYYY-MM format
 
   // Upload metadata
-  uploadMode      String?   // standard or address-only
-  active          Boolean   @default(true)
+  uploadMode String? // standard or address-only
+  active     Boolean @default(true)
 
   // Timestamps
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([docNumber])
   @@index([saleDate])
@@ -491,27 +491,27 @@ model PreForeclosureUploadHistory {
   id String @id @default(cuid())
 
   // Upload Metadata
-  filename String
+  filename   String
   uploadedBy String? // Username or "System"
   uploadedAt DateTime @default(now())
 
   // Comparison Stats
   recordsProcessed Int // Total records in the uploaded file
-  newRecords Int // Records created (didn't exist before)
-  updatedRecords Int // Records that already existed and were updated
-  inactiveRecords Int // Records marked as inactive (missing from new upload)
+  newRecords       Int // Records created (didn't exist before)
+  updatedRecords   Int // Records that already existed and were updated
+  inactiveRecords  Int // Records marked as inactive (missing from new upload)
 
   // Summary Counts (after upload)
-  totalRecords Int // Total records in database after upload
+  totalRecords  Int // Total records in database after upload
   activeRecords Int // Active records after upload
 
   // Upload Result
-  success Boolean @default(true)
+  success      Boolean @default(true)
   errorMessage String? @db.Text
 
   // Detailed Changes (JSON array of document numbers)
-  newDocumentNumbers Json? // Array of new document numbers added
-  updatedDocumentNumbers Json? // Array of document numbers updated
+  newDocumentNumbers      Json? // Array of new document numbers added
+  updatedDocumentNumbers  Json? // Array of document numbers updated
   inactiveDocumentNumbers Json? // Array of document numbers marked inactive
 
   @@index([uploadedAt])
@@ -530,7 +530,7 @@ model Route {
   name      String? // Optional route name (e.g., "2nd Visit")
   driver    String // "Luciano" or "Raul"
   status    RouteStatus @default(ACTIVE)
-  routeType RouteType @default(PREFORECLOSURE) // Type of records in this route
+  routeType RouteType   @default(PREFORECLOSURE) // Type of records in this route
 
   // Route Data (stored as JSON)
   routeData Json // Full route optimization result
@@ -583,7 +583,7 @@ model RouteRecord {
   isDepot Boolean @default(false)
 
   // Visited status (for properties - stored separately from pre-foreclosure)
-  visited Boolean @default(false)
+  visited   Boolean   @default(false)
   visitedAt DateTime?
   visitedBy String?
 
@@ -605,7 +605,7 @@ model Zone {
 
   // Zone Details
   name        String
-  description String? @db.Text
+  description String?  @db.Text
   type        ZoneType
   color       String // Hex color code
 
@@ -658,24 +658,24 @@ model DrivingLead {
   longitude Float?
 
   // User notes and status
-  notes  String?            @db.Text
-  status DrivingLeadStatus  @default(NEW)
+  notes  String?           @db.Text
+  status DrivingLeadStatus @default(NEW)
 
   // Contacts (mirrors Property fields)
-  phoneNumbers   String[]  @default([])
+  phoneNumbers    String[]  @default([])
   ownerPhoneIndex Int?
-  emails         String[]  @default([])
-  contacts       Json?
-  ownerName      String?
-  lastCallTime   DateTime?
+  emails          String[]  @default([])
+  contacts        Json?
+  ownerName       String?
+  lastCallTime    DateTime?
 
   // Workflow metadata (research/contact checklists, dead reason, last contacted)
-  metadata   Json?
+  metadata Json?
 
   // Who logged it
-  loggedBy    String?
-  createdById String?
-  createdByUser User? @relation(fields: [createdById], references: [id])
+  loggedBy      String?
+  createdById   String?
+  createdByUser User?   @relation(fields: [createdById], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -732,7 +732,7 @@ model FollowUp {
   drivingLead      DrivingLead?    @relation(fields: [drivingLeadId], references: [id], onDelete: Cascade)
 
   createdById String
-  createdBy   User @relation(fields: [createdById], references: [id])
+  createdBy   User   @relation(fields: [createdById], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -751,7 +751,7 @@ model FollowUp {
 // ============================================================================
 model ActivityLog {
   id            String   @id @default(cuid())
-  type          String   // CONTACT_MADE | APPOINTMENT_SET | CONTRACT_SIGNED
+  type          String // CONTACT_MADE | APPOINTMENT_SET | CONTRACT_SIGNED
   createdAt     DateTime @default(now())
   propertyId    String?
   drivingLeadId String?
@@ -868,4 +868,135 @@ model CrmActivity {
   @@index([leadId])
   @@index([timestamp])
   @@map("crm_activities")
+}
+
+// ============================================================================
+// EVICTION LANDLORD PROSPECTING
+// ============================================================================
+
+model EvictionImport {
+  id            String   @id @default(cuid())
+  filename      String
+  totalRows     Int      @default(0)
+  createdRows   Int      @default(0)
+  updatedRows   Int      @default(0)
+  unchangedRows Int      @default(0)
+  rejectedRows  Int      @default(0)
+  errorDetails  Json     @default("[]")
+  uploadedBy    String?
+  createdAt     DateTime @default(now())
+
+  filings EvictionFiling[]
+
+  @@index([createdAt])
+  @@map("eviction_imports")
+}
+
+model EvictionLandlord {
+  id               String    @id @default(cuid())
+  name             String
+  normalizedName   String    @unique
+  isCorporate      Boolean   @default(false)
+  contactStage     String    @default("New")
+  serviceInterests String[]  @default(["Undecided"])
+  contacts         Json      @default("{\"phoneRows\":[],\"emailRows\":[]}")
+  notes            String    @default("") @db.Text
+  lastContactedAt  DateTime?
+  nextFollowUpAt   DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  addresses  EvictionAddress[]
+  filings    EvictionFiling[]
+  activities EvictionActivity[]
+  tasks      EvictionTask[]
+
+  @@index([name])
+  @@index([isCorporate])
+  @@index([contactStage])
+  @@index([serviceInterests], type: Gin)
+  @@map("eviction_landlords")
+}
+
+model EvictionAddress {
+  id                String   @id @default(cuid())
+  landlordId        String
+  address           String
+  city              String   @default("")
+  state             String   @default("")
+  zip               String   @default("")
+  normalizedAddress String
+  createdAt         DateTime @default(now())
+
+  landlord EvictionLandlord @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+
+  @@unique([landlordId, normalizedAddress])
+  @@index([landlordId])
+  @@map("eviction_addresses")
+}
+
+model EvictionFiling {
+  id               String    @id @default(cuid())
+  landlordId       String
+  importId         String
+  caseNumber       String
+  filedDate        DateTime?
+  caseStatus       String    @default("")
+  precinct         String    @default("")
+  caseType         String    @default("")
+  corporateFlag    Boolean   @default(false)
+  satisfiedFlag    Boolean   @default(false)
+  disposition      String    @default("")
+  dispositionDate  DateTime?
+  plaintiffAddress String    @default("")
+  addressCity      String    @default("")
+  addressState     String    @default("")
+  addressZip       String    @default("")
+  homePhone        String    @default("")
+  cellPhone        String    @default("")
+  workPhone        String    @default("")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  landlord EvictionLandlord @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+  import   EvictionImport   @relation(fields: [importId], references: [id], onDelete: Restrict)
+
+  @@unique([landlordId, caseNumber])
+  @@index([caseNumber])
+  @@index([filedDate])
+  @@index([caseStatus])
+  @@index([precinct])
+  @@index([corporateFlag])
+  @@map("eviction_filings")
+}
+
+model EvictionActivity {
+  id         String   @id @default(cuid())
+  landlordId String
+  kind       String
+  body       String   @db.Text
+  createdAt  DateTime @default(now())
+
+  landlord EvictionLandlord @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+
+  @@index([landlordId, createdAt])
+  @@map("eviction_activities")
+}
+
+model EvictionTask {
+  id          String    @id @default(cuid())
+  landlordId  String
+  type        String    @default("Call")
+  dueAt       DateTime
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  notes       String    @default("")
+  createdAt   DateTime  @default(now())
+
+  landlord EvictionLandlord @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+
+  @@index([landlordId])
+  @@index([dueAt])
+  @@index([completed])
+  @@map("eviction_tasks")
 }

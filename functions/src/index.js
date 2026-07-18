@@ -40,6 +40,7 @@ const callLogsRoutes = require('./routes/callLogs');
 const teamStatsRoutes = require('./routes/teamStats');
 const activityLogsRoutes = require('./routes/activityLogs');
 const crmRoutes = require('./routes/crm');
+const evictionRoutes = require('./routes/evictions');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -186,6 +187,7 @@ app.use('/api/call-logs', callLogsRoutes);
 app.use('/api/team-stats', teamStatsRoutes);
 app.use('/api/activity-logs', activityLogsRoutes);
 app.use('/api/crm', crmRoutes);
+app.use('/api/evictions', evictionRoutes);
 
 // ============================================================================
 // ERROR HANDLING
