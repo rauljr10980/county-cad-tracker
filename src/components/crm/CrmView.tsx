@@ -4,16 +4,18 @@ import ContactsView from '@/crm/views/ContactsView';
 import OpportunitiesView from '@/crm/views/OpportunitiesView';
 import CrmTasksView from '@/crm/views/CrmTasksView';
 import RetailView from '@/crm/views/RetailView';
+import EvictionLeadsView from '@/crm/views/EvictionLeadsView';
 import { cn } from '@/lib/utils';
-import { Users, Kanban, CheckSquare, Store } from 'lucide-react';
+import { Users, Kanban, CheckSquare, Store, Gavel } from 'lucide-react';
 
-type CrmTab = 'contacts' | 'opportunities' | 'tasks' | 'retail';
+type CrmTab = 'contacts' | 'opportunities' | 'tasks' | 'retail' | 'evictions';
 
 const crmTabs: { id: CrmTab; label: string; icon: React.ElementType }[] = [
   { id: 'contacts', label: 'Contacts', icon: Users },
   { id: 'opportunities', label: 'Opportunities', icon: Kanban },
   { id: 'tasks', label: 'Tasks', icon: CheckSquare },
   { id: 'retail', label: 'Retail', icon: Store },
+  { id: 'evictions', label: 'Eviction Leads', icon: Gavel },
 ];
 
 export function CrmView() {
@@ -64,6 +66,7 @@ export function CrmView() {
         {activeTab === 'opportunities' && <OpportunitiesView />}
         {activeTab === 'tasks' && <CrmTasksView />}
         {activeTab === 'retail' && <RetailView />}
+        {activeTab === 'evictions' && <EvictionLeadsView />}
       </div>
     </div>
   );
