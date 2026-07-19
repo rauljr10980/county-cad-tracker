@@ -23,10 +23,12 @@ const date = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 const phoneKey = (value) => clean(value).replace(/\D/g, '').slice(-10);
+const chunkUploads = new Map();
+const importJobs = new Map();
 
 router.use(authenticateToken);
 
-router.post('/upload', upload.single('file'), async (req, res) => {
+const handleWorkbookUpload = async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No workbook uploaded' });
   try {
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
@@ -129,7 +131,81 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     console.error('[EVICTIONS] import error', error);
     res.status(500).json({ error: 'Failed to import eviction workbook', details: error.message });
   }
+};
+
+const startImportJob = (file, user) => {
+  const jobId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  importJobs.set(jobId, { id: jobId, status: 'processing', startedAt: new Date().toISOString() });
+  setImmediate(async () => {
+    let statusCode = 200;
+    const response = {
+      status(code) { statusCode = code; return this; },
+      json(payload) {
+        importJobs.set(jobId, {
+          id: jobId,
+          status: statusCode >= 400 ? 'failed' : 'completed',
+          ...(statusCode >= 400 ? { error: payload.error, details: payload.details } : { result: payload }),
+          finishedAt: new Date().toISOString(),
+        });
+        return payload;
+      },
+    };
+    try { await handleWorkbookUpload({ file, user }, response); }
+    catch (error) {
+      console.error('[EVICTIONS] background import failed', error);
+      importJobs.set(jobId, { id: jobId, status: 'failed', error: error.message, finishedAt: new Date().toISOString() });
+    }
+  });
+  return jobId;
+};
+
+// Legacy single-request upload retained for small workbooks.
+router.post('/upload', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No workbook uploaded' });
+  const jobId = startImportJob(req.file, req.user);
+  res.status(202).json({ jobId, status: 'processing' });
 });
+
+// Reliable upload for larger workbooks: receive small chunks, then process asynchronously.
+router.post('/upload-chunk', upload.single('chunk'), (req, res) => {
+  const uploadId = clean(req.body.uploadId);
+  const index = Number(req.body.index), totalChunks = Number(req.body.totalChunks), totalSize = Number(req.body.totalSize);
+  const filename = clean(req.body.filename);
+  if (!req.file || !/^[a-zA-Z0-9-]+$/.test(uploadId) || !Number.isInteger(index) || !Number.isInteger(totalChunks) || index < 0 || index >= totalChunks || totalChunks > 1000) {
+    return res.status(400).json({ error: 'Invalid upload chunk' });
+  }
+  let entry = chunkUploads.get(uploadId);
+  if (!entry) {
+    entry = { filename, totalChunks, totalSize, chunks: new Map(), createdAt: Date.now() };
+    chunkUploads.set(uploadId, entry);
+  }
+  if (entry.totalChunks !== totalChunks || entry.filename !== filename) return res.status(409).json({ error: 'Upload metadata changed between chunks' });
+  entry.chunks.set(index, req.file.buffer);
+  if (entry.chunks.size < totalChunks) return res.json({ received: entry.chunks.size, totalChunks });
+
+  const ordered = Array.from({ length: totalChunks }, (_, i) => entry.chunks.get(i));
+  if (ordered.some((part) => !part)) return res.status(400).json({ error: 'One or more upload chunks are missing' });
+  const buffer = Buffer.concat(ordered);
+  chunkUploads.delete(uploadId);
+  if (totalSize && buffer.length !== totalSize) return res.status(400).json({ error: `Upload size mismatch: expected ${totalSize}, received ${buffer.length}` });
+  const jobId = startImportJob({ buffer, originalname: filename, size: buffer.length }, req.user);
+  res.status(202).json({ jobId, status: 'processing', uploadedBytes: buffer.length });
+});
+
+router.get('/jobs/:jobId', (req, res) => {
+  const job = importJobs.get(req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'Import job not found or server restarted' });
+  res.json(job);
+});
+
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [id, uploadEntry] of chunkUploads) if (uploadEntry.createdAt < cutoff) chunkUploads.delete(id);
+  for (const [id, job] of importJobs) {
+    const timestamp = new Date(job.finishedAt || job.startedAt).getTime();
+    if (timestamp < cutoff) importJobs.delete(id);
+  }
+}, 10 * 60 * 1000).unref();
 
 router.get('/imports', async (_req, res) => res.json(await prisma.evictionImport.findMany({ orderBy: { createdAt: 'desc' }, take: 20 })));
 
