@@ -11,6 +11,7 @@ import { ForeclosureView } from '@/components/foreclosure/ForeclosureView';
 import { CrmView } from '@/components/crm/CrmView';
 import { DrivingView } from '@/components/driving/DrivingView';
 import { CalendarView } from '@/components/calendar/CalendarView';
+import EvictionLeadsView from '@/crm/views/EvictionLeadsView';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { SignupModal } from '@/components/auth/SignupModal';
@@ -23,7 +24,7 @@ import { Property } from '@/types/property';
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
   const hash = window.location.hash.slice(1); // Remove the #
-  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'foreclosure', 'crm', 'driving'];
+  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'foreclosure', 'crm', 'driving', 'evictions'];
   return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
 };
 
@@ -93,6 +94,8 @@ const Index = () => {
         return <CrmView />;
       case 'driving':
         return <DrivingView />;
+      case 'evictions':
+        return <EvictionLeadsView />;
       default:
         return <Dashboard />;
     }
