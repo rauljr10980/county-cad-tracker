@@ -32,6 +32,7 @@ const fmt = (value?: string) => value ? new Date(value).toLocaleDateString() : '
 export default function EvictionLeadsView() {
   const [items, setItems] = useState<Landlord[]>([]), [total, setTotal] = useState(0), [pages, setPages] = useState(1), [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true), [uploading, setUploading] = useState(false), [error, setError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState('');
   const [search, setSearch] = useState(''), [corporate, setCorporate] = useState(''), [stage, setStage] = useState(''), [service, setService] = useState('');
   const [dateFrom, setDateFrom] = useState(''), [dateTo, setDateTo] = useState(''), [status, setStatus] = useState(''), [disposition, setDisposition] = useState(''), [precinct, setPrecinct] = useState(''), [satisfied, setSatisfied] = useState('');
   const [selected, setSelected] = useState<Detail | null>(null), [rawText, setRawText] = useState(''), [saving, setSaving] = useState(false);
@@ -53,9 +54,40 @@ export default function EvictionLeadsView() {
     finally { setSaving(false); }
   };
   const uploadFile = async (file?: File) => {
-    if (!file) return; setUploading(true); setError(''); const form = new FormData(); form.append('file', file);
-    try { const result = await request('/upload', { method: 'POST', body: form }); alert(`Import complete: ${result.createdRows.toLocaleString()} new cases, ${result.updatedRows.toLocaleString()} updated, ${result.rejectedRows.toLocaleString()} rejected.`); setPage(1); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Import failed'); } finally { setUploading(false); }
+    if (!file) return;
+    setUploading(true); setError(''); setUploadProgress('Preparing upload…');
+    try {
+      const chunkSize = 256 * 1024;
+      const totalChunks = Math.ceil(file.size / chunkSize);
+      const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      let jobId = '';
+      for (let index = 0; index < totalChunks; index++) {
+        const form = new FormData();
+        form.append('chunk', file.slice(index * chunkSize, Math.min(file.size, (index + 1) * chunkSize)), `${file.name}.part${index}`);
+        form.append('uploadId', uploadId); form.append('index', String(index)); form.append('totalChunks', String(totalChunks));
+        form.append('totalSize', String(file.size)); form.append('filename', file.name);
+        let response: { jobId?: string } | undefined;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try { response = await request('/upload-chunk', { method: 'POST', body: form }); break; }
+          catch (chunkError) { if (attempt === 3) throw chunkError; await new Promise((resolve) => setTimeout(resolve, attempt * 750)); }
+        }
+        if (response?.jobId) jobId = response.jobId;
+        setUploadProgress(`Uploading ${Math.round(((index + 1) / totalChunks) * 100)}%`);
+      }
+      if (!jobId) throw new Error('Upload finished but no import job was created');
+      setUploadProgress('Processing workbook in Railway…');
+      let result: { createdRows: number; updatedRows: number; rejectedRows: number } | undefined;
+      for (let poll = 0; poll < 900; poll++) {
+        const job = await request(`/jobs/${jobId}`);
+        if (job.status === 'completed') { result = job.result; break; }
+        if (job.status === 'failed') throw new Error(job.details || job.error || 'Import failed');
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      if (!result) throw new Error('Import is still processing. Refresh the list in a few minutes.');
+      alert(`Import complete: ${result.createdRows.toLocaleString()} new cases, ${result.updatedRows.toLocaleString()} updated, ${result.rejectedRows.toLocaleString()} rejected.`);
+      setPage(1); await load();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Import failed'); }
+    finally { setUploading(false); setUploadProgress(''); }
   };
   const toggleService = (value: string) => {
     if (!selected) return; let next = selected.serviceInterests || ['Undecided'];
@@ -93,7 +125,7 @@ export default function EvictionLeadsView() {
   return <div className="p-4 md:p-6 space-y-4">
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
       <div><h1 className="text-2xl font-semibold">Eviction Leads</h1><p className="text-sm text-muted-foreground">{total.toLocaleString()} landlord prospects grouped from eviction filings</p></div>
-      <label className="inline-flex"><input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => uploadFile(e.target.files?.[0])} disabled={uploading}/><Button asChild disabled={uploading}><span>{uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <Upload className="h-4 w-4 mr-2"/>}Import Eviction Workbook</span></Button></label>
+      <div className="flex flex-col items-end gap-1"><label className="inline-flex"><input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => uploadFile(e.target.files?.[0])} disabled={uploading}/><Button asChild disabled={uploading}><span>{uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <Upload className="h-4 w-4 mr-2"/>}{uploading ? uploadProgress || 'Uploading…' : 'Import Eviction Workbook'}</span></Button></label>{uploading && <span className="text-xs text-muted-foreground">Keep this page open while the import runs.</span>}</div>
     </div>
     <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 rounded-lg border bg-card/30 p-3">
       <div className="relative col-span-2"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"/><Input className="pl-8" placeholder="Landlord or address" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}/></div>
