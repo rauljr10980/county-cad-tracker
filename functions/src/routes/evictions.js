@@ -48,6 +48,10 @@ const handleWorkbookUpload = async (req, res) => {
         errors.push({ row: index + 2, error: !caseNumber ? 'Missing CaseNbr' : 'Missing Plaintiff' });
         return;
       }
+      if (bool(row.CORP)) {
+        errors.push({ row: index + 2, error: 'Corporate plaintiff skipped' });
+        return;
+      }
       valid.push({ row, caseNumber, name, normalizedName: normalizeName(name) });
     });
 
@@ -76,10 +80,16 @@ const handleWorkbookUpload = async (req, res) => {
     }
     if (addressMap.size) await prisma.evictionAddress.createMany({ data: [...addressMap.values()], skipDuplicates: true });
 
-    const existing = await prisma.evictionFiling.findMany({
-      where: { landlordId: { in: landlords.map((l) => l.id) }, caseNumber: { in: [...new Set(valid.map((v) => v.caseNumber))] } },
-      select: { landlordId: true, caseNumber: true },
-    });
+    const existing = [];
+    const caseNumbers = [...new Set(valid.map((v) => v.caseNumber))];
+    const landlordIds = landlords.map((l) => l.id);
+    // Keep each PostgreSQL prepared statement well below its 32,767 bind-variable limit.
+    for (let i = 0; i < caseNumbers.length; i += 5000) {
+      existing.push(...await prisma.evictionFiling.findMany({
+        where: { landlordId: { in: landlordIds }, caseNumber: { in: caseNumbers.slice(i, i + 5000) } },
+        select: { landlordId: true, caseNumber: true },
+      }));
+    }
     const existingKeys = new Set(existing.map((f) => `${f.landlordId}|${f.caseNumber}`));
     let createdRows = 0, updatedRows = 0, unchangedRows = 0;
     const filingMap = new Map();
@@ -211,9 +221,8 @@ router.get('/imports', async (_req, res) => res.json(await prisma.evictionImport
 
 router.get('/landlords', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1), pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize) || 25));
-  const where = {};
+  const where = { isCorporate: false };
   if (req.query.search) where.OR = [{ name: { contains: String(req.query.search), mode: 'insensitive' } }, { addresses: { some: { address: { contains: String(req.query.search), mode: 'insensitive' } } } }];
-  if (req.query.corporate === 'true' || req.query.corporate === 'false') where.isCorporate = req.query.corporate === 'true';
   if (req.query.stage) where.contactStage = String(req.query.stage);
   if (req.query.service) where.serviceInterests = { has: String(req.query.service) };
   const filingSome = {};
