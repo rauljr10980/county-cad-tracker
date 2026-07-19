@@ -24,8 +24,21 @@ type Detail = Landlord & {
 const stages = ['New', 'Researching', 'Contacted', 'Follow Up', 'Qualified', 'Not Interested', 'Do Not Call'];
 const services = ['Undecided', 'Acquisition / Sell to Us', 'Listing', 'Property Management'];
 const request = async (path: string, init?: RequestInit) => {
-  const res = await fetch(`${API_BASE_URL}/api/evictions${path}`, { ...init, headers: { ...getAuthHeaders(), ...(init?.headers || {}) } });
-  const body = await res.json(); if (!res.ok) throw new Error(body.error || 'Request failed'); return body;
+  const headers = { ...getAuthHeaders(), ...(init?.headers || {}) } as Record<string, string>;
+  if (init?.body instanceof FormData) delete headers['Content-Type'];
+
+  const res = await fetch(`${API_BASE_URL}/api/evictions${path}`, { ...init, headers });
+  const text = await res.text();
+  let body = JSON.parse('{}');
+
+  try {
+    if (text) body = JSON.parse(text);
+  } catch {
+    body = { error: text || `Request failed (${res.status})` };
+  }
+
+  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+  return body;
 };
 const fmt = (value?: string) => value ? new Date(value).toLocaleDateString() : '—';
 
