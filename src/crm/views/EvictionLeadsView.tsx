@@ -142,7 +142,7 @@ export default function EvictionLeadsView() {
     </div>
     <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 rounded-lg border bg-card/30 p-3">
       <div className="relative col-span-2"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"/><Input className="pl-8" placeholder="Landlord or address" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}/></div>
-      <select className="h-10 rounded-md border bg-background px-2 text-sm" value={corporate} onChange={(e) => {setCorporate(e.target.value);setPage(1)}}><option value="">All entity types</option><option value="true">Corporate</option><option value="false">Person</option></select>
+      <select className="h-10 rounded-md border bg-background px-2 text-sm" value={corporate} onChange={(e) => {setCorporate(e.target.value);setPage(1)}}><option value="">Individuals only</option></select>
       <select className="h-10 rounded-md border bg-background px-2 text-sm" value={stage} onChange={(e) => {setStage(e.target.value);setPage(1)}}><option value="">All contact stages</option>{stages.map((x)=><option key={x}>{x}</option>)}</select>
       <select className="h-10 rounded-md border bg-background px-2 text-sm" value={service} onChange={(e) => {setService(e.target.value);setPage(1)}}><option value="">All services</option>{services.map((x)=><option key={x}>{x}</option>)}</select>
       <Input type="date" title="Filed from" value={dateFrom} onChange={(e)=>{setDateFrom(e.target.value);setPage(1)}}/><Input type="date" title="Filed through" value={dateTo} onChange={(e)=>{setDateTo(e.target.value);setPage(1)}}/>
