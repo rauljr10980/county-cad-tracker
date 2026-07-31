@@ -225,8 +225,8 @@ const SERVICE_INTEREST_VALUES = ['Undecided', 'Acquisition / Sell to Us', 'Listi
 router.get('/stats', async (_req, res) => {
   try {
     const now = new Date();
-    const endOfToday = new Date(now); endOfToday.setHours(23, 59, 59, 999);
-    const endOfNext7 = new Date(now); endOfNext7.setDate(endOfNext7.getDate() + 7); endOfNext7.setHours(23, 59, 59, 999);
+    const endOfToday = new Date(now); endOfToday.setUTCHours(23, 59, 59, 999);
+    const endOfNext7 = new Date(now); endOfNext7.setUTCDate(endOfNext7.getUTCDate() + 7); endOfNext7.setUTCHours(23, 59, 59, 999);
 
     const [total, stageGroups, assigneeGroups, unassigned, overdue, dueToday, dueNext7, serviceCounts] = await Promise.all([
       prisma.evictionLandlord.count(),
@@ -235,7 +235,8 @@ router.get('/stats', async (_req, res) => {
       prisma.evictionLandlord.count({ where: { assignedToId: null } }),
       prisma.evictionTask.count({ where: { completed: false, dueAt: { lt: now } } }),
       prisma.evictionTask.count({ where: { completed: false, dueAt: { gte: now, lte: endOfToday } } }),
-      prisma.evictionTask.count({ where: { completed: false, dueAt: { gte: now, lte: endOfNext7 } } }),
+      // Follow-up task buckets are disjoint: overdue, today, and next7. To get all tasks due within 7 days, sum today + next7.
+      prisma.evictionTask.count({ where: { completed: false, dueAt: { gt: endOfToday, lte: endOfNext7 } } }),
       Promise.all(SERVICE_INTEREST_VALUES.map(async (value) => [
         value,
         await prisma.evictionLandlord.count({ where: { serviceInterests: { has: value } } })
