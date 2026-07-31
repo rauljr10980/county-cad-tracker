@@ -3,6 +3,7 @@ import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { extractContacts } from '@/lib/contactParser';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Building2, ChevronLeft, ChevronRight, ExternalLink, Loader2, Search, Upload, User } from 'lucide-react';
+import { STAGES, SERVICE_INTERESTS } from '@/crm-evictions/constants';
 import '@/styles/corporate.css';
 
 type Phone = { number: string; status?: string; type?: string; source?: string };
@@ -19,8 +20,6 @@ type Detail = Landlord & {
   tasks: { id: string; type: string; dueAt: string; completed: boolean; notes: string }[];
 };
 
-const stages = ['New', 'Researching', 'Contacted', 'Follow Up', 'Qualified', 'Not Interested', 'Do Not Call'];
-const services = ['Undecided', 'Acquisition / Sell to Us', 'Listing', 'Property Management'];
 const request = async (path: string, init?: RequestInit) => {
   const headers = { ...getAuthHeaders(), ...(init?.headers || {}) } as Record<string, string>;
   if (init?.body instanceof FormData) delete headers['Content-Type'];
@@ -169,11 +168,11 @@ export default function EvictionLeadsView() {
       </label>
       <label className="urg-field">
         <span>CONTACT STAGE</span>
-        <select className="urg-input" value={stage} onChange={(e) => { setStage(e.target.value); setPage(1); }}><option value="">All stages</option>{stages.map((x) => <option key={x}>{x}</option>)}</select>
+        <select className="urg-input" value={stage} onChange={(e) => { setStage(e.target.value); setPage(1); }}><option value="">All stages</option>{STAGES.map((x) => <option key={x}>{x}</option>)}</select>
       </label>
       <label className="urg-field">
         <span>SERVICE INTEREST</span>
-        <select className="urg-input" value={service} onChange={(e) => { setService(e.target.value); setPage(1); }}><option value="">All services</option>{services.map((x) => <option key={x}>{x}</option>)}</select>
+        <select className="urg-input" value={service} onChange={(e) => { setService(e.target.value); setPage(1); }}><option value="">All services</option>{SERVICE_INTERESTS.map((x) => <option key={x}>{x}</option>)}</select>
       </label>
       <label className="urg-field">
         <span>FILED FROM</span>
@@ -248,8 +247,8 @@ export default function EvictionLeadsView() {
       <div className="grid md:grid-cols-2 gap-4">
         <section className="urg-sub space-y-3">
           <h3>Prospecting</h3>
-          <select className="urg-input" value={selected.contactStage} onChange={(e) => patch({ contactStage: e.target.value })}>{stages.map((x) => <option key={x}>{x}</option>)}</select>
-          <div className="flex flex-wrap gap-2">{services.map((x) => <button key={x} className={`urg-chip ${selected.serviceInterests?.includes(x) ? 'on' : ''}`} onClick={() => toggleService(x)}>{x}</button>)}</div>
+          <select className="urg-input" value={selected.contactStage} onChange={(e) => patch({ contactStage: e.target.value })}>{STAGES.map((x) => <option key={x}>{x}</option>)}</select>
+          <div className="flex flex-wrap gap-2">{SERVICE_INTERESTS.map((x) => <button key={x} className={`urg-chip ${selected.serviceInterests?.includes(x) ? 'on' : ''}`} onClick={() => toggleService(x)}>{x}</button>)}</div>
           <textarea className="urg-input" placeholder="Landlord notes" value={selected.notes || ''} onChange={(e) => setSelected({ ...selected, notes: e.target.value })} onBlur={() => patch({ notes: selected.notes })}/>
         </section>
         <section className="urg-sub space-y-3">
