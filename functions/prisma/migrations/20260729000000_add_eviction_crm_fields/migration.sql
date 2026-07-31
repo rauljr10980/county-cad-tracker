@@ -33,6 +33,6 @@ BEGIN
     )
     GROUP BY "contactStage"
   LOOP
-    RAISE WARNING 'Unmapped contactStage % on % row(s) — left untouched', stray."contactStage", stray.n;
+    RAISE WARNING 'Unmapped contactStage % on % row(s) - left untouched', stray."contactStage", stray.n;
   END LOOP;
 END $$;
