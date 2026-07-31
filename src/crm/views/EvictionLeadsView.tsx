@@ -3,7 +3,7 @@ import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { extractContacts } from '@/lib/contactParser';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Building2, ChevronLeft, ChevronRight, ExternalLink, Loader2, Search, Upload, User } from 'lucide-react';
-import { STAGES, SERVICE_INTERESTS } from '@/crm-evictions/constants';
+import { STAGES, SERVICE_INTERESTS, mapLegacyStage, type Stage } from '@/crm-evictions/constants';
 import '@/styles/corporate.css';
 
 type Phone = { number: string; status?: string; type?: string; source?: string };
@@ -38,13 +38,23 @@ const request = async (path: string, init?: RequestInit) => {
   return body;
 };
 const fmt = (value?: string) => value ? new Date(value).toLocaleDateString() : '—';
-const stageTone = (stage: string) => {
-  if (stage === 'Qualified') return '';
-  if (stage === 'Contacted' || stage === 'Follow Up') return 'blue';
-  if (stage === 'Researching') return 'warn';
-  if (stage === 'Not Interested' || stage === 'Do Not Call') return 'danger';
-  return 'grey';
+// Corporate pill modifiers for the .urg-pill class, not the Tailwind classes in
+// STAGE_TONE (that map is for the dark CRM views; this page is light/corporate).
+const STAGE_PILL_TONE: Record<Stage, string> = {
+  'New Lead': 'grey',
+  Researching: 'warn',
+  'Ready to Contact': 'blue',
+  'Attempted Contact': 'blue',
+  Contacted: 'blue',
+  'Follow-Up': 'warn',
+  'Appointment Scheduled': 'blue',
+  Interested: '',
+  'Not Interested': 'danger',
+  'Under Contract': '',
+  Closed: '',
+  'Do Not Contact': 'danger',
 };
+export const stageTone = (stage: string) => STAGE_PILL_TONE[stage as Stage] ?? 'grey';
 
 export default function EvictionLeadsView() {
   const [items, setItems] = useState<Landlord[]>([]), [total, setTotal] = useState(0), [pages, setPages] = useState(1), [page, setPage] = useState(1);
@@ -59,12 +69,12 @@ export default function EvictionLeadsView() {
     setLoading(true); setError('');
     const params = new URLSearchParams({ page: String(page), pageSize: '25' });
     Object.entries({ search, stage, service, dateFrom, dateTo, status, disposition, precinct, satisfied }).forEach(([k, v]) => v && params.set(k, v));
-    try { const data = await request(`/landlords?${params}`); setItems(data.items); setTotal(data.total); setPages(data.pages || 1); }
+    try { const data = await request(`/landlords?${params}`); setItems(data.items.map((item: Landlord) => ({ ...item, contactStage: mapLegacyStage(item.contactStage) }))); setTotal(data.total); setPages(data.pages || 1); }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load eviction leads'); } finally { setLoading(false); }
   }, [page, search, stage, service, dateFrom, dateTo, status, disposition, precinct, satisfied]);
   useEffect(() => { const timer = setTimeout(load, 250); return () => clearTimeout(timer); }, [load]);
 
-  const open = async (id: string) => { setSelected(await request(`/landlords/${id}`)); setRawText(''); };
+  const open = async (id: string) => { const detail = await request(`/landlords/${id}`); setSelected({ ...detail, contactStage: mapLegacyStage(detail.contactStage) }); setRawText(''); };
   const patch = async (data: Partial<Detail>) => {
     if (!selected) return; setSaving(true);
     try { await request(`/landlords/${selected.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); setSelected({ ...selected, ...data }); await load(); }
@@ -130,13 +140,13 @@ export default function EvictionLeadsView() {
   const addActivity = async () => {
     if (!selected || !activityBody.trim()) return;
     await request(`/landlords/${selected.id}/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: activityKind, body: activityBody }) });
-    if (activityKind === 'call') await patch({ lastContactedAt: new Date().toISOString(), contactStage: selected.contactStage === 'New' ? 'Contacted' : selected.contactStage });
+    if (activityKind === 'call') await patch({ lastContactedAt: new Date().toISOString(), contactStage: selected.contactStage === 'New Lead' ? 'Contacted' : selected.contactStage });
     setActivityBody(''); await open(selected.id);
   };
   const addTask = async () => {
     if (!selected || !taskDue) return;
     await request(`/landlords/${selected.id}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'Call', dueAt: new Date(taskDue).toISOString(), notes: 'Eviction lead follow-up' }) });
-    await patch({ nextFollowUpAt: new Date(taskDue).toISOString(), contactStage: 'Follow Up' }); setTaskDue(''); await open(selected.id);
+    await patch({ nextFollowUpAt: new Date(taskDue).toISOString(), contactStage: 'Follow-Up' }); setTaskDue(''); await open(selected.id);
   };
 
   return <div className="urg min-h-full p-6 md:p-8">
