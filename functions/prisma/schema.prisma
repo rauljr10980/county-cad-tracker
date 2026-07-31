@@ -26,14 +26,14 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  assignedTasks  Task[]         @relation("AssignedTasks")
-  createdTasks   Task[]         @relation("CreatedTasks")
-  notes          Note[]
-  taskActivities TaskActivity[]
-  followUps      FollowUp[]
-  callLogs       CallLog[]
-  drivingLeads   DrivingLead[]
-  activityLogs   ActivityLog[]
+  assignedTasks     Task[]             @relation("AssignedTasks")
+  createdTasks      Task[]             @relation("CreatedTasks")
+  notes             Note[]
+  taskActivities    TaskActivity[]
+  followUps         FollowUp[]
+  callLogs          CallLog[]
+  drivingLeads      DrivingLead[]
+  activityLogs      ActivityLog[]
   evictionLandlords EvictionLandlord[] @relation("EvictionAssignee")
 
   @@index([email])
@@ -912,7 +912,7 @@ model EvictionLandlord {
   filings    EvictionFiling[]
   activities EvictionActivity[]
   tasks      EvictionTask[]
-  assignedTo User? @relation("EvictionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo User?              @relation("EvictionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([name])
   @@index([isCorporate])
