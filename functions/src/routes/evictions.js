@@ -219,6 +219,57 @@ setInterval(() => {
 
 router.get('/imports', async (_req, res) => res.json(await prisma.evictionImport.findMany({ orderBy: { createdAt: 'desc' }, take: 20 })));
 
+const ACTIVE_OPPORTUNITY_STAGES = ['Interested', 'Under Contract'];
+const SERVICE_INTEREST_VALUES = ['Undecided', 'Acquisition / Sell to Us', 'Listing', 'Property Management'];
+
+router.get('/stats', async (_req, res) => {
+  try {
+    const now = new Date();
+    const endOfToday = new Date(now); endOfToday.setHours(23, 59, 59, 999);
+    const endOfNext7 = new Date(now); endOfNext7.setDate(endOfNext7.getDate() + 7); endOfNext7.setHours(23, 59, 59, 999);
+
+    const [total, stageGroups, assigneeGroups, unassigned, overdue, dueToday, dueNext7, serviceCounts] = await Promise.all([
+      prisma.evictionLandlord.count(),
+      prisma.evictionLandlord.groupBy({ by: ['contactStage'], _count: { _all: true } }),
+      prisma.evictionLandlord.groupBy({ by: ['assignedToId'], _count: { _all: true }, where: { assignedToId: { not: null } } }),
+      prisma.evictionLandlord.count({ where: { assignedToId: null } }),
+      prisma.evictionTask.count({ where: { completed: false, dueAt: { lt: now } } }),
+      prisma.evictionTask.count({ where: { completed: false, dueAt: { gte: now, lte: endOfToday } } }),
+      prisma.evictionTask.count({ where: { completed: false, dueAt: { gte: now, lte: endOfNext7 } } }),
+      Promise.all(SERVICE_INTEREST_VALUES.map(async (value) => [
+        value,
+        await prisma.evictionLandlord.count({ where: { serviceInterests: { has: value } } })
+      ]))
+    ]);
+
+    const byStage = Object.fromEntries(stageGroups.map((g) => [g.contactStage, g._count._all]));
+
+    const assigneeIds = assigneeGroups.map((g) => g.assignedToId);
+    const users = assigneeIds.length
+      ? await prisma.user.findMany({ where: { id: { in: assigneeIds } }, select: { id: true, username: true } })
+      : [];
+    const usernameById = Object.fromEntries(users.map((u) => [u.id, u.username]));
+
+    res.json({
+      total,
+      byStage,
+      byService: Object.fromEntries(serviceCounts),
+      byAssignee: assigneeGroups.map((g) => ({
+        userId: g.assignedToId,
+        username: usernameById[g.assignedToId] || 'Unknown',
+        count: g._count._all
+      })),
+      unassigned,
+      followUpsDue: { overdue, today: dueToday, next7: dueNext7 },
+      activeOpportunities: ACTIVE_OPPORTUNITY_STAGES.reduce((sum, s) => sum + (byStage[s] || 0), 0),
+      closedDeals: byStage['Closed'] || 0
+    });
+  } catch (error) {
+    console.error('[EVICTIONS] Stats error:', error);
+    res.status(500).json({ error: 'Unable to load stats' });
+  }
+});
+
 router.get('/landlords', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1), pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize) || 25));
   const where = { isCorporate: false };
