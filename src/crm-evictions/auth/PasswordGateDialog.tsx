@@ -14,6 +14,7 @@ export function PasswordGateDialog({ open, onOpenChange, onGranted }: Props) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (checking) return;
     if (!password) return;
     setChecking(true); setError('');
     try {
@@ -45,10 +46,13 @@ export function PasswordGateDialog({ open, onOpenChange, onGranted }: Props) {
             type="password"
             autoFocus
             placeholder="Password"
+            aria-label="Password"
+            autoComplete="current-password"
+            disabled={checking}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={!password || checking}>
             {checking && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Enter workspace

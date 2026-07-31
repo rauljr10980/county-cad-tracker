@@ -32,4 +32,15 @@ describe('CRM grant storage', () => {
     sessionStorage.setItem('evictionsCrmGrant', 'not-a-number');
     expect(readGrant()).toBe(false);
   });
+
+  it('fails closed when sessionStorage throws on read', () => {
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage disabled');
+    });
+    try {
+      expect(readGrant()).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
