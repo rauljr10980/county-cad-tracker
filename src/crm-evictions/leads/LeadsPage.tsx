@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,16 +20,20 @@ export function LeadsPage() {
   const [stage, setStage] = useState('');
   const [service, setService] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+  const requestSeq = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestSeq.current;
     setLoading(true); setError('');
     try {
       const data = await listLeads({ page, pageSize: 25, search, stage, service, corporate: 'all' });
+      if (requestSeq.current !== requestId) return; // superseded by a newer request
       setItems(data.items); setTotal(data.total); setPages(data.pages || 1);
     } catch (e) {
+      if (requestSeq.current !== requestId) return;
       setError(e instanceof Error ? e.message : 'Unable to load leads');
     } finally {
-      setLoading(false);
+      if (requestSeq.current === requestId) setLoading(false);
     }
   }, [page, search, stage, service]);
 
