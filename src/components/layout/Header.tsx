@@ -223,6 +223,19 @@ export function Header({ onRefresh, isRefreshing, onTabChange, onOpenEvictionsCr
                           </Button>
                         </>
                       )}
+                      {onOpenEvictionsCrm && (
+                        <Button
+                          variant="ghost"
+                          className="justify-start mobile-touch-target"
+                          onClick={() => {
+                            setIsMobileMenuOpen(false);
+                            onOpenEvictionsCrm();
+                          }}
+                        >
+                          <Gavel className="h-5 w-5 mr-3" />
+                          Login to Evictions CRM
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         className="justify-start mobile-touch-target"

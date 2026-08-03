@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Header } from '@/components/layout/Header';
 import { TabNavigation, TabType } from '@/components/layout/TabNavigation';
 import { Dashboard } from '@/components/dashboard/Dashboard';
@@ -42,6 +42,17 @@ const Index = () => {
   const [isCrmOpen, setIsCrmOpen] = useState(() => window.location.hash.slice(1) === 'evictions-crm');
   const [isGateOpen, setIsGateOpen] = useState(false);
   const { hasGrant, grant } = useCrmGrant();
+  // Set by onGranted just before it closes the dialog, so the onOpenChange
+  // handler below can tell "closed because granted" apart from "dismissed" —
+  // component state (isCrmOpen/hasGrant) hasn't re-rendered yet at that point,
+  // so it can't be used to distinguish the two.
+  const justGrantedRef = useRef(false);
+
+  // The workspace only ever renders when both are true; gate every hash/UI
+  // decision on that, not on isCrmOpen alone, so a stale isCrmOpen with no
+  // grant (e.g. a bookmark or a refresh inside the workspace) can't freeze
+  // hash syncing or strand the user on a route that renders nothing.
+  const isCrmVisible = isCrmOpen && hasGrant;
 
   const openEvictionsCrm = () => {
     if (hasGrant) { setIsCrmOpen(true); window.location.hash = 'evictions-crm'; }
@@ -50,11 +61,22 @@ const Index = () => {
 
   const exitEvictionsCrm = () => { setIsCrmOpen(false); window.location.hash = 'evictions'; };
 
+  // If the page loads (or is refreshed) with #evictions-crm in the address bar
+  // but no live grant, prompt for the password instead of silently dropping
+  // the user on the dashboard with a dead URL.
+  useEffect(() => {
+    if (isCrmOpen && !hasGrant) {
+      setIsGateOpen(true);
+    }
+    // Intentionally mount-only: this reflects the hash/grant state at load time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Update URL hash when tab changes
   useEffect(() => {
-    if (isCrmOpen) return;
+    if (isCrmVisible) return;
     window.location.hash = activeTab;
-  }, [activeTab, isCrmOpen]);
+  }, [activeTab, isCrmVisible]);
 
   // Listen for hash changes (e.g., browser back/forward)
   useEffect(() => {
@@ -181,7 +203,7 @@ const Index = () => {
     );
   }
 
-  if (isCrmOpen && hasGrant) {
+  if (isCrmVisible) {
     return <EvictionsCrmWorkspace onExit={exitEvictionsCrm} />;
   }
 
@@ -207,8 +229,27 @@ const Index = () => {
       />
       <PasswordGateDialog
         open={isGateOpen}
-        onOpenChange={setIsGateOpen}
-        onGranted={() => { grant(); setIsCrmOpen(true); window.location.hash = 'evictions-crm'; }}
+        onOpenChange={(open) => {
+          setIsGateOpen(open);
+          if (open) return;
+          if (justGrantedRef.current) {
+            justGrantedRef.current = false;
+            return;
+          }
+          // Dismissed without granting. If this dialog was covering a stale
+          // #evictions-crm route (mount/refresh case), don't strand the user
+          // there — send them back to a normal tab.
+          if (isCrmOpen && !hasGrant) {
+            setIsCrmOpen(false);
+            window.location.hash = activeTab;
+          }
+        }}
+        onGranted={() => {
+          justGrantedRef.current = true;
+          grant();
+          setIsCrmOpen(true);
+          window.location.hash = 'evictions-crm';
+        }}
       />
     </div>
   );
