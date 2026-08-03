@@ -4,6 +4,11 @@
  * Both the Evictions CRM and the Eviction List tab import from here. They write
  * the same `contactStage` column on the same row, so the lists cannot be allowed
  * to drift.
+ *
+ * Required co-edit: `functions/src/routes/evictions.js` hand-copies this vocabulary
+ * into `ACTIVE_OPPORTUNITY_STAGES` and `SERVICE_INTEREST_VALUES` because the backend
+ * is CommonJS and cannot import this ESM module. Update both there whenever STAGES
+ * or SERVICE_INTERESTS below change.
  */
 
 export const STAGES = [

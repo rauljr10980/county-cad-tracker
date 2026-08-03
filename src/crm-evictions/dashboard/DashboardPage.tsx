@@ -4,6 +4,7 @@ import { getStats } from '../api/evictionsCrm';
 import type { CrmStats } from '../types/crm';
 import { KpiTiles } from './KpiTiles';
 import { StageDistribution } from './StageDistribution';
+import { ErrorBanner } from '../components/ErrorBanner';
 
 export function DashboardPage({ onOpenPipeline }: { onOpenPipeline: () => void }) {
   const [stats, setStats] = useState<CrmStats | null>(null);
@@ -13,7 +14,7 @@ export function DashboardPage({ onOpenPipeline }: { onOpenPipeline: () => void }
     getStats().then(setStats).catch((e) => setError(e instanceof Error ? e.message : 'Unable to load stats'));
   }, []);
 
-  if (error) return <div className="p-6"><div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div></div>;
+  if (error) return <div className="p-6"><ErrorBanner message={error} /></div>;
   if (!stats) return <div className="p-6 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   return (

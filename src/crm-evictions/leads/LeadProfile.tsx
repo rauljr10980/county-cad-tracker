@@ -6,16 +6,17 @@ import { Loader2 } from 'lucide-react';
 import { getLead, patchLead } from '../api/evictionsCrm';
 import { STAGES, SERVICE_INTERESTS } from '../constants';
 import type { LeadDetail } from '../types/crm';
-
-const fmt = (v?: string) => (v ? new Date(v).toLocaleDateString() : '—');
-
-const ErrorBanner = ({ message }: { message: string }) => (
-  <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{message}</div>
-);
+import { fmt } from '../format';
+import { ErrorBanner } from '../components/ErrorBanner';
 
 export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onClose: () => void; onSaved: () => void }) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [error, setError] = useState('');
+  // In-flight guard: save() reads the render-closure `lead` to compute the next
+  // value (e.g. toggleService), so two edits fired before the first PATCH lands
+  // both read the same stale base and the second overwrites the first. Disabling
+  // the editable controls while a save is in flight closes that window.
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setError('');
@@ -26,6 +27,7 @@ export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onCl
 
   const save = async (data: Record<string, unknown>) => {
     if (!lead) return;
+    setSaving(true);
     try {
       await patchLead(lead.id, data);
       setLead({ ...lead, ...data } as LeadDetail);
@@ -33,6 +35,8 @@ export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onCl
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to save changes.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -64,7 +68,7 @@ export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onCl
           <DialogHeader>
             <DialogTitle>{lead.name}</DialogTitle>
             <DialogDescription>
-              {lead.isCorporate ? 'Business entity' : 'Individual'} · {lead.filings.length} filings · {lead.addresses.length} properties
+              {lead.isCorporate ? 'Business entity' : 'Individual'} · {lead.filingCount} filings · {lead.addressCount} properties
             </DialogDescription>
           </DialogHeader>
 
@@ -76,13 +80,14 @@ export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onCl
               <select
                 className="h-10 w-full rounded-md border bg-background px-2 text-sm"
                 value={lead.contactStage}
+                disabled={saving}
                 onChange={(e) => save({ contactStage: e.target.value })}
               >
                 {STAGES.map((s) => <option key={s}>{s}</option>)}
               </select>
               <div className="flex flex-wrap gap-2">
                 {SERVICE_INTERESTS.map((s) => (
-                  <Button key={s} size="sm" variant={lead.serviceInterests?.includes(s) ? 'default' : 'outline'} onClick={() => toggleService(s)}>
+                  <Button key={s} size="sm" disabled={saving} variant={lead.serviceInterests?.includes(s) ? 'default' : 'outline'} onClick={() => toggleService(s)}>
                     {s}
                   </Button>
                 ))}
@@ -93,6 +98,7 @@ export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onCl
               <Textarea
                 placeholder="Notes"
                 value={lead.notes || ''}
+                disabled={saving}
                 onChange={(e) => setLead({ ...lead, notes: e.target.value })}
                 onBlur={() => save({ notes: lead.notes })}
               />

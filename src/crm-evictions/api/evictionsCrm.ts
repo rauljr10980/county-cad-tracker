@@ -1,5 +1,5 @@
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
-import type { CrmStats, LeadDetail, LeadListResponse, ListLeadsParams } from '../types/crm';
+import type { CrmStats, LeadDetail, LeadListResponse, LeadRow, ListLeadsParams } from '../types/crm';
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const headers = { ...getAuthHeaders(), ...(init?.headers || {}) } as Record<string, string>;
@@ -36,8 +36,9 @@ export const listLeads = (params: ListLeadsParams = {}) => {
 
 export const getLead = (id: string) => request<LeadDetail>(`/api/evictions/landlords/${id}`);
 
+// PATCH /landlords/:id returns a bare `update(...)` with no `include` — see LeadRow.
 export const patchLead = (id: string, data: Record<string, unknown>) =>
-  request<LeadDetail>(`/api/evictions/landlords/${id}`, {
+  request<LeadRow>(`/api/evictions/landlords/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),

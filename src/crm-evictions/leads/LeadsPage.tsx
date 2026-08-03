@@ -6,8 +6,8 @@ import { listLeads } from '../api/evictionsCrm';
 import { STAGES, STAGE_TONE, SERVICE_INTERESTS, type Stage } from '../constants';
 import type { Lead } from '../types/crm';
 import { LeadProfile } from './LeadProfile';
-
-const fmt = (v?: string) => (v ? new Date(v).toLocaleDateString() : '—');
+import { fmt } from '../format';
+import { ErrorBanner } from '../components/ErrorBanner';
 
 export function LeadsPage() {
   const [items, setItems] = useState<Lead[]>([]);
@@ -61,7 +61,7 @@ export function LeadsPage() {
         </select>
       </div>
 
-      {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {error && <ErrorBanner message={error} />}
 
       <div className="rounded-lg border overflow-hidden">
         <table className="w-full text-sm">

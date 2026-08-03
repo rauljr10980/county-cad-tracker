@@ -3,6 +3,7 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } f
 import { STAGES } from '../constants';
 import { patchLead } from '../api/evictionsCrm';
 import { StageColumn } from './StageColumn';
+import { ErrorBanner } from '../components/ErrorBanner';
 
 const initialReloadKeys = (): Record<string, number> =>
   Object.fromEntries(STAGES.map((stage) => [stage, 0]));
@@ -40,7 +41,7 @@ export function PipelinePage() {
         <h1 className="text-2xl font-semibold">Pipeline</h1>
         <p className="text-sm text-muted-foreground">Drag a lead to change its stage</p>
       </div>
-      {error && <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">{error}</div>}
+      {error && <ErrorBanner message={error} className="mb-3" />}
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="flex gap-3 overflow-x-auto flex-1 pb-2">
           {STAGES.map((stage) => (

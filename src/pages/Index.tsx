@@ -263,6 +263,13 @@ const Index = () => {
           // there. Just flip isCrmOpen off — isCrmVisible drops to false and
           // the tab-to-hash effect (the single hash writer) takes it from
           // there, syncing the hash back to the already-valid activeTab.
+          // This only works because isCrmVisible was already false (and the
+          // tab-to-hash effect had already overwritten '#evictions-crm' with
+          // activeTab's hash) back at mount, before the gate ever opened —
+          // setIsCrmOpen(false) here is a no-op for that effect's dependency
+          // and doesn't itself trigger a hash rewrite. A future fix for the
+          // address-bar flicker that defers that initial rewrite until the
+          // gate resolves must make dismissal correct the hash itself.
           if (isCrmOpen && !hasGrant) {
             setIsCrmOpen(false);
           }

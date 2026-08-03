@@ -26,6 +26,14 @@ export type Lead = {
   nextTask?: { dueAt: string } | null;
 };
 
+/**
+ * What `PATCH /landlords/:id` actually returns: a bare `prisma.evictionLandlord.update(...)`
+ * with no `include`, so none of the joined/derived fields are present. `patchLead` is typed
+ * to this — not `Lead` or `LeadDetail` — so reading `.filings`, `.filingCount`, etc. off its
+ * result is a type error instead of a runtime crash.
+ */
+export type LeadRow = Omit<Lead, 'filingCount' | 'addressCount' | 'latestFilingDate' | 'nextTask'>;
+
 export type LeadDetail = Lead & {
   addresses: { id: string; address: string; city: string; state: string; zip: string }[];
   filings: {
