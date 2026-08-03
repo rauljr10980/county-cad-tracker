@@ -103,6 +103,10 @@ export function Header({ onRefresh, isRefreshing, onTabChange, onOpenEvictionsCr
                           Files
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
+                      </>
+                    )}
+                    {onOpenEvictionsCrm && (
+                      <>
                         <DropdownMenuItem onClick={onOpenEvictionsCrm}>
                           <Gavel className="h-4 w-4 mr-2" />
                           Login to Evictions CRM

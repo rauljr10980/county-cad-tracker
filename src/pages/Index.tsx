@@ -59,39 +59,61 @@ const Index = () => {
     else setIsGateOpen(true);
   };
 
-  const exitEvictionsCrm = () => { setIsCrmOpen(false); window.location.hash = 'evictions'; };
+  // Route back to the (already-valid) 'evictions' tab through activeTab rather
+  // than writing the hash directly — the tab-to-hash effect below is the only
+  // hash writer for real tabs, so this avoids a two-writer race against it.
+  const exitEvictionsCrm = () => { setIsCrmOpen(false); setActiveTab('evictions'); };
 
   // If the page loads (or is refreshed) with #evictions-crm in the address bar
   // but no live grant, prompt for the password instead of silently dropping
-  // the user on the dashboard with a dead URL.
+  // the user on the dashboard with a dead URL. Gated on isAuthenticated so this
+  // can't arm the dialog while logged out — it would otherwise sit primed and
+  // pop open, unexplained, the instant login completes (the dialog only
+  // renders in the authenticated branch below). Re-runs when isAuthenticated
+  // flips to true so a hash present before auth resolves still gets picked up.
   useEffect(() => {
-    if (isCrmOpen && !hasGrant) {
+    if (isAuthenticated && isCrmOpen && !hasGrant) {
       setIsGateOpen(true);
     }
-    // Intentionally mount-only: this reflects the hash/grant state at load time.
+    // isCrmOpen/hasGrant intentionally excluded: this should reflect state at
+    // load/auth-resolution time, not become a live subscription that reopens
+    // the dialog after the user closes it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthenticated]);
 
-  // Update URL hash when tab changes
+  // Update URL hash when tab changes. This is the single writer for
+  // activeTab-driven hash values; the CRM routes ('evictions-crm') are
+  // written directly at their call sites and never flow through activeTab.
   useEffect(() => {
     if (isCrmVisible) return;
     window.location.hash = activeTab;
   }, [activeTab, isCrmVisible]);
 
-  // Listen for hash changes (e.g., browser back/forward)
+  // Listen for hash changes (e.g., browser back/forward). Ignore the CRM hash
+  // here: entering the workspace (openEvictionsCrm / onGranted) writes
+  // '#evictions-crm' directly, which fires this same listener. getInitialTab()
+  // doesn't recognize that hash and would fall back to 'dashboard', clobbering
+  // whatever tab the user was actually on. Reading window.location.hash
+  // directly (rather than closing over isCrmVisible) matters because this
+  // effect has an empty dependency array and would otherwise capture a stale
+  // value.
   useEffect(() => {
     const handleHashChange = () => {
-      const newTab = getInitialTab();
-      setActiveTab(newTab);
+      if (window.location.hash.slice(1) === 'evictions-crm') return;
+      setActiveTab(getInitialTab());
     };
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Global Shift+P → phone search
+  // Global Shift+P → phone search. Skipped while the CRM workspace is visible:
+  // PhoneSearchModal only renders in the main return below, so arming it here
+  // would leave isPhoneSearchOpen true and spring the modal open later, the
+  // moment the user exits back to the platform.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isCrmVisible) return;
       if (e.shiftKey && e.key === 'P' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault();
         setIsPhoneSearchOpen(true);
@@ -99,7 +121,7 @@ const Index = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isCrmVisible]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -238,10 +260,11 @@ const Index = () => {
           }
           // Dismissed without granting. If this dialog was covering a stale
           // #evictions-crm route (mount/refresh case), don't strand the user
-          // there — send them back to a normal tab.
+          // there. Just flip isCrmOpen off — isCrmVisible drops to false and
+          // the tab-to-hash effect (the single hash writer) takes it from
+          // there, syncing the hash back to the already-valid activeTab.
           if (isCrmOpen && !hasGrant) {
             setIsCrmOpen(false);
-            window.location.hash = activeTab;
           }
         }}
         onGranted={() => {
