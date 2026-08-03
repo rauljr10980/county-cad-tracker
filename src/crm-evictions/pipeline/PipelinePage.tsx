@@ -14,9 +14,13 @@ export function PipelinePage() {
 
   const onDragEnd = async (event: DragEndEvent) => {
     const leadId = String(event.active.id);
-    const sourceStage = (event.active.data.current as { stage?: string } | undefined)?.stage ?? '';
+    const sourceStage = (event.active.data.current as { stage?: string } | undefined)?.stage;
     const targetStage = event.over ? String(event.over.id) : '';
-    if (!targetStage || targetStage === sourceStage) return;
+    if (!targetStage) return;
+    // Guard against a missing/unrecognized source stage rather than silently bumping a
+    // reload key no column watches, which would leave the source column stuck stale.
+    if (!sourceStage || !(STAGES as readonly string[]).includes(sourceStage)) return;
+    if (targetStage === sourceStage) return;
 
     try {
       await patchLead(leadId, { contactStage: targetStage });
