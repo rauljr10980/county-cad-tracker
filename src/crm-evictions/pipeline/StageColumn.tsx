@@ -37,7 +37,7 @@ export function StageColumn({ stage, reloadKey }: { stage: string; reloadKey: nu
         <span className="text-[11px] text-muted-foreground">{total.toLocaleString()}</span>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
-        {leads.map((lead) => <LeadCard key={lead.id} lead={lead} />)}
+        {leads.map((lead) => <LeadCard key={lead.id} lead={lead} stage={stage} />)}
         {loading && <Loader2 className="h-4 w-4 animate-spin mx-auto text-muted-foreground" />}
         {!loading && leads.length < total && (
           <button

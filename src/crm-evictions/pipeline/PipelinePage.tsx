@@ -4,19 +4,27 @@ import { STAGES } from '../constants';
 import { patchLead } from '../api/evictionsCrm';
 import { StageColumn } from './StageColumn';
 
+const initialReloadKeys = (): Record<string, number> =>
+  Object.fromEntries(STAGES.map((stage) => [stage, 0]));
+
 export function PipelinePage() {
-  const [reloadKey, setReloadKey] = useState(0);
+  const [reloadKeys, setReloadKeys] = useState<Record<string, number>>(initialReloadKeys);
   const [error, setError] = useState('');
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const onDragEnd = async (event: DragEndEvent) => {
     const leadId = String(event.active.id);
+    const sourceStage = (event.active.data.current as { stage?: string } | undefined)?.stage ?? '';
     const targetStage = event.over ? String(event.over.id) : '';
-    if (!targetStage) return;
+    if (!targetStage || targetStage === sourceStage) return;
 
     try {
       await patchLead(leadId, { contactStage: targetStage });
-      setReloadKey((k) => k + 1);
+      setReloadKeys((prev) => ({
+        ...prev,
+        [sourceStage]: (prev[sourceStage] ?? 0) + 1,
+        [targetStage]: (prev[targetStage] ?? 0) + 1,
+      }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not move lead');
     }
@@ -31,7 +39,9 @@ export function PipelinePage() {
       {error && <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">{error}</div>}
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="flex gap-3 overflow-x-auto flex-1 pb-2">
-          {STAGES.map((stage) => <StageColumn key={stage} stage={stage} reloadKey={reloadKey} />)}
+          {STAGES.map((stage) => (
+            <StageColumn key={stage} stage={stage} reloadKey={reloadKeys[stage] ?? 0} />
+          ))}
         </div>
       </DndContext>
     </div>

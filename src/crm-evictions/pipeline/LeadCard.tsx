@@ -2,8 +2,11 @@ import { useDraggable } from '@dnd-kit/core';
 import { Building2, User } from 'lucide-react';
 import type { Lead } from '../types/crm';
 
-export function LeadCard({ lead }: { lead: Lead }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id });
+export function LeadCard({ lead, stage }: { lead: Lead; stage: string }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: lead.id,
+    data: { stage },
+  });
 
   return (
     <div
