@@ -38,6 +38,7 @@ export function PipelinePage() {
   return (
     <div className="p-6 flex flex-col h-full">
       <div className="mb-4">
+        <p className="crm-kicker text-[10px] uppercase text-muted-foreground mb-1">Pipeline board</p>
         <h1 className="text-2xl font-semibold">Pipeline</h1>
         <p className="text-sm text-muted-foreground">Drag a lead to change its stage</p>
       </div>

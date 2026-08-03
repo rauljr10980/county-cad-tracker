@@ -17,10 +17,10 @@ export function KpiTiles({ stats }: { stats: CrmStats }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {tiles.map((t) => (
-        <div key={t.label} className="rounded-lg border bg-card p-4">
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{t.label}</p>
-          <p className={`text-2xl font-semibold mt-1 ${t.tone}`}>{t.value.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t.hint}</p>
+        <div key={t.label} className="rounded-lg border bg-card p-5">
+          <p className="crm-kpi-label text-[10px] uppercase tracking-widest text-muted-foreground">{t.label}</p>
+          <p className={`crm-kpi-value text-2xl font-semibold mt-2 ${t.tone}`}>{t.value.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t.hint}</p>
         </div>
       ))}
     </div>

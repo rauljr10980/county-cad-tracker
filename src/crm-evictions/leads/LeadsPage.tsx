@@ -42,6 +42,7 @@ export function LeadsPage() {
   return (
     <div className="p-6 space-y-4">
       <div>
+        <p className="crm-kicker text-[10px] uppercase text-muted-foreground mb-1">Landlord directory</p>
         <h1 className="text-2xl font-semibold">Leads</h1>
         <p className="text-sm text-muted-foreground">{total.toLocaleString()} eviction landlords</p>
       </div>

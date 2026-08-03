@@ -20,6 +20,7 @@ export function DashboardPage({ onOpenPipeline }: { onOpenPipeline: () => void }
   return (
     <div className="p-6 space-y-4">
       <div>
+        <p className="crm-kicker text-[10px] uppercase text-muted-foreground mb-1">Command center</p>
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Eviction landlord prospecting at a glance</p>
       </div>
