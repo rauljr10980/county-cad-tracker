@@ -1,0 +1,135 @@
+import { useEffect, useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2 } from 'lucide-react';
+import { getLead, patchLead } from '../api/evictionsCrm';
+import { STAGES, SERVICE_INTERESTS } from '../constants';
+import type { LeadDetail } from '../types/crm';
+
+const fmt = (v?: string) => (v ? new Date(v).toLocaleDateString() : '—');
+
+export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onClose: () => void; onSaved: () => void }) {
+  const [lead, setLead] = useState<LeadDetail | null>(null);
+
+  useEffect(() => { getLead(leadId).then(setLead); }, [leadId]);
+
+  const save = async (data: Record<string, unknown>) => {
+    if (!lead) return;
+    await patchLead(lead.id, data);
+    setLead({ ...lead, ...data } as LeadDetail);
+    onSaved();
+  };
+
+  const toggleService = (value: string) => {
+    if (!lead) return;
+    let next = lead.serviceInterests || ['Undecided'];
+    if (value === 'Undecided') next = ['Undecided'];
+    else {
+      next = next.filter((x) => x !== 'Undecided');
+      next = next.includes(value) ? next.filter((x) => x !== value) : [...next, value];
+      if (!next.length) next = ['Undecided'];
+    }
+    save({ serviceInterests: next });
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        {!lead ? <Loader2 className="h-6 w-6 animate-spin mx-auto my-12" /> : <>
+          <DialogHeader>
+            <DialogTitle>{lead.name}</DialogTitle>
+            <DialogDescription>
+              {lead.isCorporate ? 'Business entity' : 'Individual'} · {lead.filings.length} filings · {lead.addresses.length} properties
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <section className="rounded-lg border p-3 space-y-3">
+              <h3 className="text-sm font-semibold">Pipeline</h3>
+              <select
+                className="h-10 w-full rounded-md border bg-background px-2 text-sm"
+                value={lead.contactStage}
+                onChange={(e) => save({ contactStage: e.target.value })}
+              >
+                {STAGES.map((s) => <option key={s}>{s}</option>)}
+              </select>
+              <div className="flex flex-wrap gap-2">
+                {SERVICE_INTERESTS.map((s) => (
+                  <Button key={s} size="sm" variant={lead.serviceInterests?.includes(s) ? 'default' : 'outline'} onClick={() => toggleService(s)}>
+                    {s}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Owner: {lead.assignedTo?.username || 'Unassigned'} · Next follow-up: {fmt(lead.nextFollowUpAt)}
+              </p>
+              <Textarea
+                placeholder="Notes"
+                value={lead.notes || ''}
+                onChange={(e) => setLead({ ...lead, notes: e.target.value })}
+                onBlur={() => save({ notes: lead.notes })}
+              />
+            </section>
+
+            <section className="rounded-lg border p-3 space-y-2">
+              <h3 className="text-sm font-semibold">Contacts</h3>
+              {(lead.contacts?.phoneRows || []).flatMap((r) => r.phones.map((p, i) => (
+                <div key={`${r.name}-${i}`} className="text-sm flex gap-2">
+                  <span className="font-medium">{r.name || lead.name}</span>
+                  <a className="text-primary" href={`tel:${p.number}`}>{p.number}</a>
+                </div>
+              )))}
+              {(lead.contacts?.emailRows || []).flatMap((r) => r.emails.map((e) => (
+                <div key={e} className="text-sm"><a className="text-primary" href={`mailto:${e}`}>{e}</a></div>
+              )))}
+              {!lead.contacts?.phoneRows?.length && !lead.contacts?.emailRows?.length && (
+                <p className="text-sm text-muted-foreground">No contacts captured yet.</p>
+              )}
+            </section>
+          </div>
+
+          <section className="rounded-lg border p-3">
+            <h3 className="text-sm font-semibold mb-2">Properties</h3>
+            <div className="grid md:grid-cols-2 gap-2">
+              {lead.addresses.map((a) => (
+                <div key={a.id} className="rounded bg-muted/40 p-2 text-sm">{a.address}, {a.city}, {a.state} {a.zip}</div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-lg border p-3">
+            <h3 className="text-sm font-semibold mb-2">Eviction filings</h3>
+            <div className="max-h-64 overflow-auto">
+              <table className="w-full text-xs">
+                <thead><tr>{['Case', 'Filed', 'Status', 'Precinct', 'Disposition'].map((h) => <th key={h} className="text-left p-2 text-muted-foreground">{h}</th>)}</tr></thead>
+                <tbody>
+                  {lead.filings.map((f) => (
+                    <tr key={f.id} className="border-t">
+                      <td className="p-2">{f.caseNumber}</td>
+                      <td className="p-2 whitespace-nowrap">{fmt(f.filedDate)}</td>
+                      <td className="p-2">{f.caseStatus}</td>
+                      <td className="p-2">{f.precinct}</td>
+                      <td className="p-2">{f.disposition}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="rounded-lg border p-3">
+            <h3 className="text-sm font-semibold mb-2">Activity</h3>
+            {lead.activities.length === 0 && <p className="text-sm text-muted-foreground">No activity logged.</p>}
+            {lead.activities.slice(0, 15).map((a) => (
+              <div key={a.id} className="text-sm border-l-2 pl-2 mb-2">
+                <span className="font-medium capitalize">{a.kind}</span> · {fmt(a.createdAt)}
+                <div className="text-muted-foreground">{a.body}</div>
+              </div>
+            ))}
+          </section>
+        </>}
+      </DialogContent>
+    </Dialog>
+  );
+}
