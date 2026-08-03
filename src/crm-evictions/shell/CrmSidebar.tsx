@@ -10,16 +10,21 @@ const ITEMS: { id: CrmSection; label: string; icon: typeof LayoutDashboard }[] =
 
 type Props = { section: CrmSection; onSectionChange: (s: CrmSection) => void; onExit: () => void };
 
+/**
+ * Nav item colors live in theme.css rather than here. The sidebar sits on navy
+ * while the rest of the workspace is on paper, so its states cannot be
+ * expressed with the same semantic tokens the content area uses.
+ */
 export function CrmSidebar({ section, onSectionChange, onExit }: Props) {
   return (
     <aside className="w-56 shrink-0 border-r bg-card/40 flex flex-col p-3 gap-1">
-      <div className="flex items-center gap-2 px-2 py-3 mb-2">
-        <div className="h-8 w-8 rounded-lg bg-primary/15 grid place-items-center">
+      <div className="flex items-center gap-2 px-2 py-3 mb-3">
+        <div className="crm-brand-mark h-9 w-9 rounded-lg bg-primary/15 grid place-items-center">
           <Gavel className="h-4 w-4 text-primary" />
         </div>
         <div className="leading-tight">
           <p className="text-sm font-semibold">Evictions CRM</p>
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Workspace</p>
+          <p className="crm-kicker text-[9px] uppercase text-muted-foreground">Workspace</p>
         </div>
       </div>
 
@@ -27,7 +32,8 @@ export function CrmSidebar({ section, onSectionChange, onExit }: Props) {
         <button
           key={id}
           onClick={() => onSectionChange(id)}
-          className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left transition-colors ${
+          data-active={section === id}
+          className={`crm-nav-item flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left transition-colors ${
             section === id ? 'bg-primary/15 text-primary font-medium' : 'text-muted-foreground hover:bg-muted/50'
           }`}
         >
@@ -38,7 +44,7 @@ export function CrmSidebar({ section, onSectionChange, onExit }: Props) {
 
       <button
         onClick={onExit}
-        className="mt-auto flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50"
+        className="crm-nav-exit mt-auto flex items-center gap-2 rounded-md px-3 py-2 pt-4 text-sm text-muted-foreground hover:bg-muted/50"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to platform
