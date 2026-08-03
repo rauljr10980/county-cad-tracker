@@ -28,6 +28,23 @@ echo "🔄 Running data migrations..."
 echo "UPDATE \"PreForeclosure\" SET type = 'Mortgage' WHERE type = 'NOTICE_OF_FORECLOSURE';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Type migration complete" || echo "⚠️ Type migration skipped"
 echo "UPDATE \"PreForeclosure\" SET \"ownerLookupStatus\" = NULL WHERE \"ownerLookupStatus\" = 'failed' AND \"ownerName\" IS NULL;" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Reset failed owner lookups" || echo "⚠️ Owner lookup reset skipped"
 
+# Eviction stage vocabulary: 7 legacy values -> 12.
+#
+# This lives here rather than in the migration that declares it
+# (prisma/migrations/20260729000000_add_eviction_crm_fields) because this
+# script runs `prisma db push`, which syncs the schema and never executes
+# anything in migrations/. The column changes in that migration land via
+# db push; these row updates would not run at all without these lines.
+#
+# Idempotent: after the first run each statement matches zero rows. Values
+# outside the mapping are left untouched by design, so unexpected data stays
+# visible instead of being folded into a real stage.
+echo "🔄 Remapping eviction contactStage vocabulary..."
+echo "UPDATE \"eviction_landlords\" SET \"contactStage\" = 'New Lead' WHERE \"contactStage\" = 'New';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ New -> New Lead" || echo "⚠️ New -> New Lead skipped"
+echo "UPDATE \"eviction_landlords\" SET \"contactStage\" = 'Follow-Up' WHERE \"contactStage\" = 'Follow Up';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Follow Up -> Follow-Up" || echo "⚠️ Follow Up -> Follow-Up skipped"
+echo "UPDATE \"eviction_landlords\" SET \"contactStage\" = 'Interested' WHERE \"contactStage\" = 'Qualified';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Qualified -> Interested" || echo "⚠️ Qualified -> Interested skipped"
+echo "UPDATE \"eviction_landlords\" SET \"contactStage\" = 'Do Not Contact' WHERE \"contactStage\" = 'Do Not Call';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Do Not Call -> Do Not Contact" || echo "⚠️ Do Not Call -> Do Not Contact skipped"
+
 # Start the application
 echo "✅ Starting application..."
 exec node src/index.js
