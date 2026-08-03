@@ -9,16 +9,31 @@ import type { LeadDetail } from '../types/crm';
 
 const fmt = (v?: string) => (v ? new Date(v).toLocaleDateString() : '—');
 
+const ErrorBanner = ({ message }: { message: string }) => (
+  <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{message}</div>
+);
+
 export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onClose: () => void; onSaved: () => void }) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
+  const [error, setError] = useState('');
 
-  useEffect(() => { getLead(leadId).then(setLead); }, [leadId]);
+  useEffect(() => {
+    setError('');
+    getLead(leadId)
+      .then(setLead)
+      .catch((e) => setError(e instanceof Error ? e.message : 'Unable to load this lead.'));
+  }, [leadId]);
 
   const save = async (data: Record<string, unknown>) => {
     if (!lead) return;
-    await patchLead(lead.id, data);
-    setLead({ ...lead, ...data } as LeadDetail);
-    onSaved();
+    try {
+      await patchLead(lead.id, data);
+      setLead({ ...lead, ...data } as LeadDetail);
+      setError('');
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to save changes.');
+    }
   };
 
   const toggleService = (value: string) => {
@@ -36,13 +51,24 @@ export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onCl
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        {!lead ? <Loader2 className="h-6 w-6 animate-spin mx-auto my-12" /> : <>
+        {!lead ? (
+          error ? (
+            <div className="my-12 flex flex-col items-center gap-4">
+              <ErrorBanner message={error} />
+              <Button variant="outline" onClick={onClose}>Close</Button>
+            </div>
+          ) : (
+            <Loader2 className="h-6 w-6 animate-spin mx-auto my-12" />
+          )
+        ) : <>
           <DialogHeader>
             <DialogTitle>{lead.name}</DialogTitle>
             <DialogDescription>
               {lead.isCorporate ? 'Business entity' : 'Individual'} · {lead.filings.length} filings · {lead.addresses.length} properties
             </DialogDescription>
           </DialogHeader>
+
+          {error && <ErrorBanner message={error} />}
 
           <div className="grid md:grid-cols-2 gap-4">
             <section className="rounded-lg border p-3 space-y-3">
