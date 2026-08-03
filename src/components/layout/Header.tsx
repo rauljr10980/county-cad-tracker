@@ -1,4 +1,4 @@
-import { Building2, RefreshCw, Settings, LogIn, LogOut, User, Menu, X, Upload, FileText } from 'lucide-react';
+import { Building2, RefreshCw, Settings, LogIn, LogOut, User, Menu, X, Upload, FileText, Gavel } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
@@ -24,9 +24,10 @@ interface HeaderProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
   onTabChange?: (tab: 'upload' | 'files') => void;
+  onOpenEvictionsCrm?: () => void;
 }
 
-export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
+export function Header({ onRefresh, isRefreshing, onTabChange, onOpenEvictionsCrm }: HeaderProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isSignupOpen, setIsSignupOpen] = useState(false);
@@ -100,6 +101,11 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
                         <DropdownMenuItem onClick={() => onTabChange('files')}>
                           <FileText className="h-4 w-4 mr-2" />
                           Files
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={onOpenEvictionsCrm}>
+                          <Gavel className="h-4 w-4 mr-2" />
+                          Login to Evictions CRM
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                       </>

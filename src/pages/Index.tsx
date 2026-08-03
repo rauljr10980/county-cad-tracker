@@ -20,6 +20,9 @@ import { Button } from '@/components/ui/button';
 import { PhoneSearchModal } from '@/components/phone/PhoneSearchModal';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
 import { Property } from '@/types/property';
+import { EvictionsCrmWorkspace } from '@/crm-evictions/shell/EvictionsCrmWorkspace';
+import { PasswordGateDialog } from '@/crm-evictions/auth/PasswordGateDialog';
+import { useCrmGrant } from '@/crm-evictions/auth/useCrmGrant';
 
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
@@ -36,11 +39,22 @@ const Index = () => {
   const [isSignupOpen, setIsSignupOpen] = useState(false);
   const [isPhoneSearchOpen, setIsPhoneSearchOpen] = useState(false);
   const [phoneSearchResult, setPhoneSearchResult] = useState<Property | null>(null);
+  const [isCrmOpen, setIsCrmOpen] = useState(() => window.location.hash.slice(1) === 'evictions-crm');
+  const [isGateOpen, setIsGateOpen] = useState(false);
+  const { hasGrant, grant } = useCrmGrant();
+
+  const openEvictionsCrm = () => {
+    if (hasGrant) { setIsCrmOpen(true); window.location.hash = 'evictions-crm'; }
+    else setIsGateOpen(true);
+  };
+
+  const exitEvictionsCrm = () => { setIsCrmOpen(false); window.location.hash = 'evictions'; };
 
   // Update URL hash when tab changes
   useEffect(() => {
+    if (isCrmOpen) return;
     window.location.hash = activeTab;
-  }, [activeTab]);
+  }, [activeTab, isCrmOpen]);
 
   // Listen for hash changes (e.g., browser back/forward)
   useEffect(() => {
@@ -167,9 +181,13 @@ const Index = () => {
     );
   }
 
+  if (isCrmOpen && hasGrant) {
+    return <EvictionsCrmWorkspace onExit={exitEvictionsCrm} />;
+  }
+
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
-      <Header onRefresh={handleRefresh} isRefreshing={isRefreshing} onTabChange={setActiveTab} />
+      <Header onRefresh={handleRefresh} isRefreshing={isRefreshing} onTabChange={setActiveTab} onOpenEvictionsCrm={openEvictionsCrm} />
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
       <main className="container mx-auto animate-fade-in overflow-x-hidden">
         {renderContent()}
@@ -186,6 +204,11 @@ const Index = () => {
         property={phoneSearchResult}
         isOpen={!!phoneSearchResult}
         onClose={() => setPhoneSearchResult(null)}
+      />
+      <PasswordGateDialog
+        open={isGateOpen}
+        onOpenChange={setIsGateOpen}
+        onGranted={() => { grant(); setIsCrmOpen(true); window.location.hash = 'evictions-crm'; }}
       />
     </div>
   );
