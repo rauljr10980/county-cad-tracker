@@ -20,12 +20,23 @@ const tabs = [
   { id: 'evictions' as TabType, label: 'Eviction List', icon: Gavel, shortLabel: 'Evict' },
 ];
 
+/**
+ * Tabs hidden from the nav while the eviction work is the focus.
+ *
+ * This only removes the visual entry point — the tabs themselves are untouched.
+ * Each still renders normally when reached by hash (e.g. #properties), so
+ * bookmarks and links keep working. Empty this set to bring them all back.
+ */
+const HIDDEN_TABS = new Set<TabType>(['properties', 'preforeclosure', 'foreclosure', 'crm', 'driving']);
+
+const visibleTabs = tabs.filter((tab) => !HIDDEN_TABS.has(tab.id));
+
 export function TabNavigation({ activeTab, onTabChange }: TabNavigationProps) {
   return (
     <nav className="border-b border-border bg-card/30 sticky top-[57px] md:top-[61px] z-40">
       <div className="container mx-auto px-2 md:px-4">
         <div className="flex gap-1 overflow-x-auto hide-scrollbar mobile-scroll-container">
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
 
