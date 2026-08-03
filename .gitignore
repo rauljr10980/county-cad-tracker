@@ -48,3 +48,5 @@ ui-debug.log
 *.njsproj
 *.sln
 *.sw?
+# Superpowers brainstorming scratch
+.superpowers/

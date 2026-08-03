@@ -26,14 +26,15 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  assignedTasks  Task[]         @relation("AssignedTasks")
-  createdTasks   Task[]         @relation("CreatedTasks")
-  notes          Note[]
-  taskActivities TaskActivity[]
-  followUps      FollowUp[]
-  callLogs       CallLog[]
-  drivingLeads   DrivingLead[]
-  activityLogs   ActivityLog[]
+  assignedTasks     Task[]             @relation("AssignedTasks")
+  createdTasks      Task[]             @relation("CreatedTasks")
+  notes             Note[]
+  taskActivities    TaskActivity[]
+  followUps         FollowUp[]
+  callLogs          CallLog[]
+  drivingLeads      DrivingLead[]
+  activityLogs      ActivityLog[]
+  evictionLandlords EvictionLandlord[] @relation("EvictionAssignee")
 
   @@index([email])
   @@index([username])
@@ -897,12 +898,13 @@ model EvictionLandlord {
   name             String
   normalizedName   String    @unique
   isCorporate      Boolean   @default(false)
-  contactStage     String    @default("New")
+  contactStage     String    @default("New Lead")
   serviceInterests String[]  @default(["Undecided"])
   contacts         Json      @default("{\"phoneRows\":[],\"emailRows\":[]}")
   notes            String    @default("") @db.Text
   lastContactedAt  DateTime?
   nextFollowUpAt   DateTime?
+  assignedToId     String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -910,11 +912,13 @@ model EvictionLandlord {
   filings    EvictionFiling[]
   activities EvictionActivity[]
   tasks      EvictionTask[]
+  assignedTo User?              @relation("EvictionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([name])
   @@index([isCorporate])
   @@index([contactStage])
   @@index([serviceInterests], type: Gin)
+  @@index([assignedToId])
   @@map("eviction_landlords")
 }
 

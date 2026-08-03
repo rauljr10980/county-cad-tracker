@@ -219,9 +219,68 @@ setInterval(() => {
 
 router.get('/imports', async (_req, res) => res.json(await prisma.evictionImport.findMany({ orderBy: { createdAt: 'desc' }, take: 20 })));
 
+const ACTIVE_OPPORTUNITY_STAGES = ['Interested', 'Under Contract'];
+const SERVICE_INTEREST_VALUES = ['Undecided', 'Acquisition / Sell to Us', 'Listing', 'Property Management'];
+
+router.get('/stats', async (_req, res) => {
+  try {
+    const now = new Date();
+    const endOfToday = new Date(now); endOfToday.setUTCHours(23, 59, 59, 999);
+    const endOfNext7 = new Date(now); endOfNext7.setUTCDate(endOfNext7.getUTCDate() + 7); endOfNext7.setUTCHours(23, 59, 59, 999);
+
+    const [total, stageGroups, assigneeGroups, unassigned, overdue, dueToday, dueNext7, serviceCounts] = await Promise.all([
+      prisma.evictionLandlord.count(),
+      prisma.evictionLandlord.groupBy({ by: ['contactStage'], _count: { _all: true } }),
+      prisma.evictionLandlord.groupBy({ by: ['assignedToId'], _count: { _all: true }, where: { assignedToId: { not: null } } }),
+      prisma.evictionLandlord.count({ where: { assignedToId: null } }),
+      prisma.evictionTask.count({ where: { completed: false, dueAt: { lt: now } } }),
+      prisma.evictionTask.count({ where: { completed: false, dueAt: { gte: now, lte: endOfToday } } }),
+      // Follow-up task buckets are disjoint: overdue, today, and next7. To get all tasks due within 7 days, sum today + next7.
+      prisma.evictionTask.count({ where: { completed: false, dueAt: { gt: endOfToday, lte: endOfNext7 } } }),
+      Promise.all(SERVICE_INTEREST_VALUES.map(async (value) => [
+        value,
+        await prisma.evictionLandlord.count({ where: { serviceInterests: { has: value } } })
+      ]))
+    ]);
+
+    const byStage = Object.fromEntries(stageGroups.map((g) => [g.contactStage, g._count._all]));
+
+    const assigneeIds = assigneeGroups.map((g) => g.assignedToId);
+    const users = assigneeIds.length
+      ? await prisma.user.findMany({ where: { id: { in: assigneeIds } }, select: { id: true, username: true } })
+      : [];
+    const usernameById = Object.fromEntries(users.map((u) => [u.id, u.username]));
+
+    res.json({
+      total,
+      byStage,
+      byService: Object.fromEntries(serviceCounts),
+      byAssignee: assigneeGroups.map((g) => ({
+        userId: g.assignedToId,
+        username: usernameById[g.assignedToId] || 'Unknown',
+        count: g._count._all
+      })),
+      unassigned,
+      followUpsDue: { overdue, today: dueToday, next7: dueNext7 },
+      activeOpportunities: ACTIVE_OPPORTUNITY_STAGES.reduce((sum, s) => sum + (byStage[s] || 0), 0),
+      closedDeals: byStage['Closed'] || 0
+    });
+  } catch (error) {
+    console.error('[EVICTIONS] Stats error:', error);
+    res.status(500).json({ error: 'Unable to load stats' });
+  }
+});
+
 router.get('/landlords', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1), pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize) || 25));
-  const where = { isCorporate: false };
+  // Default preserves the Eviction List tab's behavior; the CRM opts in with `all`.
+  const where = {};
+  if (req.query.corporate === 'all') { /* no filter */ }
+  else if (req.query.corporate === 'true') where.isCorporate = true;
+  else where.isCorporate = false;
+
+  if (req.query.assignedTo === 'unassigned') where.assignedToId = null;
+  else if (req.query.assignedTo) where.assignedToId = String(req.query.assignedTo);
   if (req.query.search) where.OR = [{ name: { contains: String(req.query.search), mode: 'insensitive' } }, { addresses: { some: { address: { contains: String(req.query.search), mode: 'insensitive' } } } }];
   if (req.query.stage) where.contactStage = String(req.query.stage);
   if (req.query.service) where.serviceInterests = { has: String(req.query.service) };
@@ -235,18 +294,18 @@ router.get('/landlords', async (req, res) => {
   const [total, items] = await Promise.all([
     prisma.evictionLandlord.count({ where }),
     prisma.evictionLandlord.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { updatedAt: 'desc' },
-      include: { _count: { select: { filings: true, addresses: true } }, filings: { orderBy: { filedDate: 'desc' }, take: 1, select: { filedDate: true } }, tasks: { where: { completed: false }, orderBy: { dueAt: 'asc' }, take: 1 } } }),
+      include: { _count: { select: { filings: true, addresses: true } }, filings: { orderBy: { filedDate: 'desc' }, take: 1, select: { filedDate: true } }, tasks: { where: { completed: false }, orderBy: { dueAt: 'asc' }, take: 1 }, assignedTo: { select: { id: true, username: true } } } }),
   ]);
   res.json({ items: items.map((x) => ({ ...x, filingCount: x._count.filings, addressCount: x._count.addresses, latestFilingDate: x.filings[0]?.filedDate || null, nextTask: x.tasks[0] || null, _count: undefined, filings: undefined, tasks: undefined })), total, page, pageSize, pages: Math.ceil(total / pageSize) });
 });
 
 router.get('/landlords/:id', async (req, res) => {
-  const item = await prisma.evictionLandlord.findUnique({ where: { id: req.params.id }, include: { addresses: { orderBy: { address: 'asc' } }, filings: { orderBy: { filedDate: 'desc' }, take: 500 }, activities: { orderBy: { createdAt: 'desc' }, take: 100 }, tasks: { orderBy: { dueAt: 'asc' }, take: 100 } } });
-  if (!item) return res.status(404).json({ error: 'Landlord not found' }); res.json(item);
+  const item = await prisma.evictionLandlord.findUnique({ where: { id: req.params.id }, include: { _count: { select: { filings: true, addresses: true } }, addresses: { orderBy: { address: 'asc' } }, filings: { orderBy: { filedDate: 'desc' }, take: 500 }, activities: { orderBy: { createdAt: 'desc' }, take: 100 }, tasks: { orderBy: { dueAt: 'asc' }, take: 100 }, assignedTo: { select: { id: true, username: true } } } });
+  if (!item) return res.status(404).json({ error: 'Landlord not found' }); res.json({ ...item, filingCount: item._count.filings, addressCount: item._count.addresses, _count: undefined });
 });
 
 router.patch('/landlords/:id', async (req, res) => {
-  const allowed = ['contactStage', 'serviceInterests', 'contacts', 'notes', 'lastContactedAt', 'nextFollowUpAt'];
+  const allowed = ['contactStage', 'serviceInterests', 'contacts', 'notes', 'lastContactedAt', 'nextFollowUpAt', 'assignedToId'];
   const data = {}; for (const key of allowed) if (Object.prototype.hasOwnProperty.call(req.body, key)) data[key] = key.endsWith('At') && req.body[key] ? new Date(req.body[key]) : req.body[key];
   res.json(await prisma.evictionLandlord.update({ where: { id: req.params.id }, data }));
 });

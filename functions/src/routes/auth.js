@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
+const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
 
@@ -148,6 +149,57 @@ router.post('/login',
     } catch (error) {
       console.error('[AUTH] Login error:', error);
       res.status(500).json({ error: 'Login failed' });
+    }
+  }
+);
+
+// ============================================================================
+// VERIFY PASSWORD (soft gate for the Evictions CRM workspace)
+// ============================================================================
+
+// This is a UI affordance, not access control — the caller's JWT already
+// authorizes the underlying endpoints. Rate limited so it cannot be used as a
+// password oracle.
+const verifyPasswordLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.user ? req.user.id : req.ip),
+  message: { error: 'Too many attempts. Wait a minute and try again.' }
+});
+
+router.post('/verify-password',
+  authenticateToken,
+  verifyPasswordLimiter,
+  [body('password').notEmpty().withMessage('Password required')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: errors.array()[0].msg });
+      }
+
+      // authenticateToken selects only id/username/email/role, so the hash has
+      // to be fetched here.
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { password: true }
+      });
+
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+
+      const valid = await bcrypt.compare(req.body.password, user.password);
+      if (!valid) {
+        return res.status(401).json({ error: 'Incorrect password' });
+      }
+
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('[AUTH] Verify password error:', error);
+      res.status(500).json({ error: 'Verification failed' });
     }
   }
 );
