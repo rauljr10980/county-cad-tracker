@@ -1,11 +1,12 @@
-import { ArrowLeft, Gavel, KanbanSquare, LayoutDashboard, Users } from 'lucide-react';
+import { ArrowLeft, Gavel, KanbanSquare, LayoutDashboard, MapPin, Users } from 'lucide-react';
 
-export type CrmSection = 'dashboard' | 'pipeline' | 'leads';
+export type CrmSection = 'dashboard' | 'pipeline' | 'leads' | 'map';
 
 const ITEMS: { id: CrmSection; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'pipeline', label: 'Pipeline', icon: KanbanSquare },
   { id: 'leads', label: 'Leads', icon: Users },
+  { id: 'map', label: 'Map', icon: MapPin },
 ];
 
 type Props = { section: CrmSection; onSectionChange: (s: CrmSection) => void; onExit: () => void };

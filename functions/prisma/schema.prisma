@@ -930,12 +930,17 @@ model EvictionAddress {
   state             String   @default("")
   zip               String   @default("")
   normalizedAddress String
+  latitude          Float?
+  longitude         Float?
+  geocodedAt        DateTime?
+  geocodeStatus     String    @default("pending")
   createdAt         DateTime @default(now())
 
   landlord EvictionLandlord @relation(fields: [landlordId], references: [id], onDelete: Cascade)
 
   @@unique([landlordId, normalizedAddress])
   @@index([landlordId])
+  @@index([geocodeStatus])
   @@map("eviction_addresses")
 }
 

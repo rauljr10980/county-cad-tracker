@@ -44,6 +44,25 @@ export type LeadDetail = Lead & {
   tasks: { id: string; type: string; dueAt: string; completed: boolean; notes: string }[];
 };
 
+export type MapPoint = {
+  id: string;
+  lat: number;
+  lng: number;
+  address: string;
+  landlordId: string;
+  landlordName: string;
+  contactStage: Stage | string;
+  isCorporate: boolean;
+};
+
+export type GeocodeStatus = {
+  total: number;
+  pending: number;
+  ok: number;
+  failed: number;
+  complete: boolean;
+};
+
 export type CrmStats = {
   total: number;
   byStage: Record<string, number>;
