@@ -4,6 +4,7 @@ import { CrmSidebar, type CrmSection } from './CrmSidebar';
 import { DashboardPage } from '../dashboard/DashboardPage';
 import { PipelinePage } from '../pipeline/PipelinePage';
 import { LeadsPage } from '../leads/LeadsPage';
+import { MapPage } from '../map/MapPage';
 
 export function EvictionsCrmWorkspace({ onExit }: { onExit: () => void }) {
   const [section, setSection] = useState<CrmSection>('dashboard');
@@ -15,6 +16,7 @@ export function EvictionsCrmWorkspace({ onExit }: { onExit: () => void }) {
         {section === 'dashboard' && <DashboardPage onOpenPipeline={() => setSection('pipeline')} />}
         {section === 'pipeline' && <PipelinePage />}
         {section === 'leads' && <LeadsPage />}
+        {section === 'map' && <MapPage />}
       </main>
     </div>
   );

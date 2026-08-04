@@ -219,6 +219,110 @@ setInterval(() => {
 
 router.get('/imports', async (_req, res) => res.json(await prisma.evictionImport.findMany({ orderBy: { createdAt: 'desc' }, take: 20 })));
 
+// ============================================================================
+// GEOCODING + MAP
+// ============================================================================
+
+const { geocodeAddress, MIN_REQUEST_INTERVAL_MS } = require('../lib/geocode');
+
+router.get('/geocode/status', async (_req, res) => {
+  try {
+    const groups = await prisma.evictionAddress.groupBy({ by: ['geocodeStatus'], _count: { _all: true } });
+    const byStatus = Object.fromEntries(groups.map((g) => [g.geocodeStatus, g._count._all]));
+    const total = groups.reduce((sum, g) => sum + g._count._all, 0);
+    res.json({
+      total,
+      pending: byStatus.pending || 0,
+      ok: byStatus.ok || 0,
+      failed: byStatus.failed || 0,
+      complete: (byStatus.pending || 0) === 0,
+    });
+  } catch (error) {
+    console.error('[EVICTIONS] geocode status error:', error);
+    res.status(500).json({ error: 'Unable to read geocode status' });
+  }
+});
+
+// Geocodes the next slice of pending addresses. Deliberately small and
+// resumable: the driver script calls this repeatedly, so a restart mid-run
+// costs at most one batch rather than the whole hour.
+router.post('/geocode/batch', async (req, res) => {
+  const size = Math.min(50, Math.max(1, Number(req.body?.size) || 25));
+  try {
+    const pending = await prisma.evictionAddress.findMany({
+      where: { geocodeStatus: 'pending' },
+      take: size,
+      select: { id: true, address: true, city: true, state: true, zip: true },
+    });
+    if (!pending.length) return res.json({ processed: 0, ok: 0, failed: 0, remaining: 0 });
+
+    let ok = 0, failed = 0;
+    for (const row of pending) {
+      let coords = null;
+      try {
+        coords = await geocodeAddress(row);
+      } catch (error) {
+        // A transport failure is not the address's fault. Leave it pending so
+        // the next run retries it instead of burning it as permanently failed.
+        console.error(`[EVICTIONS] geocode request failed for ${row.id}:`, error.message);
+        break;
+      }
+
+      await prisma.evictionAddress.update({
+        where: { id: row.id },
+        data: coords
+          ? { ...coords, geocodeStatus: 'ok', geocodedAt: new Date() }
+          : { geocodeStatus: 'failed', geocodedAt: new Date() },
+      });
+      coords ? ok++ : failed++;
+
+      await new Promise((resolve) => setTimeout(resolve, MIN_REQUEST_INTERVAL_MS));
+    }
+
+    const remaining = await prisma.evictionAddress.count({ where: { geocodeStatus: 'pending' } });
+    res.json({ processed: ok + failed, ok, failed, remaining });
+  } catch (error) {
+    console.error('[EVICTIONS] geocode batch error:', error);
+    res.status(500).json({ error: 'Geocode batch failed', details: error.message });
+  }
+});
+
+router.get('/map', async (req, res) => {
+  try {
+    const landlordWhere = {};
+    if (req.query.stage) landlordWhere.contactStage = String(req.query.stage);
+    if (req.query.service) landlordWhere.serviceInterests = { has: String(req.query.service) };
+    if (req.query.assignedTo === 'unassigned') landlordWhere.assignedToId = null;
+    else if (req.query.assignedTo) landlordWhere.assignedToId = String(req.query.assignedTo);
+
+    const points = await prisma.evictionAddress.findMany({
+      where: { geocodeStatus: 'ok', ...(Object.keys(landlordWhere).length ? { landlord: landlordWhere } : {}) },
+      select: {
+        id: true, latitude: true, longitude: true, address: true, city: true, zip: true,
+        landlord: { select: { id: true, name: true, contactStage: true, isCorporate: true } },
+      },
+      take: 10000,
+    });
+
+    res.json({
+      points: points.map((p) => ({
+        id: p.id,
+        lat: p.latitude,
+        lng: p.longitude,
+        address: [p.address, p.city, p.zip].filter(Boolean).join(', '),
+        landlordId: p.landlord.id,
+        landlordName: p.landlord.name,
+        contactStage: p.landlord.contactStage,
+        isCorporate: p.landlord.isCorporate,
+      })),
+      total: points.length,
+    });
+  } catch (error) {
+    console.error('[EVICTIONS] map error:', error);
+    res.status(500).json({ error: 'Unable to load map points' });
+  }
+});
+
 const ACTIVE_OPPORTUNITY_STAGES = ['Interested', 'Under Contract'];
 const SERVICE_INTEREST_VALUES = ['Undecided', 'Acquisition / Sell to Us', 'Listing', 'Property Management'];
 
