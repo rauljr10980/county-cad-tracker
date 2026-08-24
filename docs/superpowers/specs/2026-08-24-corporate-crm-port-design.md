@@ -201,3 +201,64 @@ The design port is verified by screenshot against the other CRM, not by test.
 The public marketing site, Better Auth, Drizzle, and anything from the Next.js
 side as code. The other project's Merge/duplicates and Imports screens. Any
 change to the Railway deployment topology.
+
+---
+
+## Addendum — the public-facing site
+
+Added after the initial approval.
+
+### What it is
+
+`rauljr10980/estate-essentials-co` — the Lovable-built marketing site deployed as
+the `public-site` service in the same Railway project. TanStack Start,
+TypeScript, Tailwind. Fifteen routes:
+
+`index`, `about`, `contact`, `schedule`, `find-a-solution`, `sell-property`,
+`distressed-property`, `inherited-property`, `landlord-help`, `tenant-problem`,
+`rental-strategy`, `financing`, `invest`, `realtor-partners`, `legal.$doc`,
+`thank-you.$type`
+
+Its content is the funnel: a visitor with a problem — a difficult tenant, an
+inherited property, a financing question — lands on the matching page and books
+a call.
+
+### One repo, two deployables
+
+The site is **not** added as routes inside the CRM bundle. It gets its own Vite
+entry and its own build output, so the two deploy independently to different
+domains — the same shape as the Railway project's `crm` and `public-site`
+services sharing one Postgres.
+
+Three reasons this is not merely tidiness:
+
+1. **URLs.** The CRM is served from a project subpath. A marketing page at
+   `/county-cad-tracker/sell-property` is not a public URL anyone would use.
+   A separate build can take a bare domain.
+2. **The login gate stays simple.** The CRM's shell assumes authentication.
+   Mixing public routes into it means every guard grows an exception list, and
+   exception lists are where auth bugs live.
+3. **Bundle weight.** Marketing visitors would otherwise download Leaflet,
+   dnd-kit, Recharts and the whole CRM.
+
+### What is shared
+
+The design token layer, and nothing else. Both sides use the same navy, gold and
+greyscale so the marketing site and the internal tool read as one company. The
+site keeps its own layout, hero treatment and copy — it is a different job.
+
+Contact-form submissions post to the existing Express API. The other project
+guards this path with an `INTAKE_SHARED_SECRET`; the same idea applies here, so
+the public form cannot be used to write arbitrary records.
+
+### Phase
+
+Phase 5, after the CRM work. It depends on the token layer from phase 1 and on
+nothing else, so it could move earlier if the marketing site becomes more urgent
+than the eviction screens.
+
+### Out of scope
+
+Better Auth, the MCP server, and TanStack Start itself. The routes are
+reimplemented against this repo's React Router setup, and the copy is carried
+over as content.
