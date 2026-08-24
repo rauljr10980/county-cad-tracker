@@ -262,3 +262,78 @@ than the eviction screens.
 Better Auth, the MCP server, and TanStack Start itself. The routes are
 reimplemented against this repo's React Router setup, and the copy is carried
 over as content.
+
+---
+
+## Revision — scope narrowed
+
+Supersedes the phasing above. Three things come across from the Private CRM,
+and nothing else:
+
+1. The **design language** (unchanged, phase 1)
+2. The **Pipeline tab** and how it works
+3. The **public-facing website**
+
+**Dropped:** the owners-screen rebuild, the property-detail rebuild, and the
+contact-points table as separate work. Contact state is carried only as far as
+the Pipeline needs it — last contact, next follow-up, stage.
+
+### The Pipeline is a work queue, not a board
+
+This is the substantive difference, and it was nearly missed.
+
+This repo's Evictions CRM has a twelve-column drag-and-drop kanban. It answers
+*where is everything*. The Private CRM's Pipeline is a **table fronted by
+work-queue tabs** — `All`, `Needs contact`, `Overdue`, `Due today`, `Upcoming`,
+`Parked`, `Closed` — each showing a count. It answers *who do I call now*.
+
+For a caller working several thousand owners, the second question is the one
+that matters. A board with 8,000 cards in its first column is not a tool.
+
+### Structure
+
+**Header.** Eyebrow `BEXAR COUNTY · EVICTION FILINGS`, title, and a live corpus
+line on the right: `8,150 owners · 42,932 filings · 0 properties`. It states the
+shape of the data before any filter is applied.
+
+**Queue tabs.** Each carries its own count, computed server-side:
+
+| Tab | Means |
+| --- | --- |
+| All | Everything matching the filters |
+| Needs contact | Never contacted |
+| Overdue | Follow-up date in the past |
+| Due today | Follow-up date is today |
+| Upcoming | Follow-up date in the future |
+| Parked | Deliberately set aside |
+| Closed | Finished, won or lost |
+
+**Filters.** A search box over owner name and mailing address, an entity filter
+(`Individuals` / entities), and a sort by filing volume. A result count sits on
+the right: `350 of 3,388`.
+
+**Columns.** `OWNER`, `FILINGS`, `DOORS`, `STAGE`, `LAST CONTACT`,
+`NEXT FOLLOW-UP`, `ASSIGNED`, and a row action.
+
+Two columns are doing real work. `LAST CONTACT` reads `Never` rather than a
+dash — an absence stated, not a blank. `NEXT FOLLOW-UP` reads `14d overdue`
+rather than a date, so urgency is legible without the reader doing arithmetic.
+Both are worth copying exactly.
+
+### What the screenshot also shows
+
+`ROMO, LOWAH` appears twice, `JACQUES, CHRISTINE` twice, `MCCOY, SANDY` three
+times — the same owner split across rows by name variations the importer did not
+collapse. The Private CRM has a Merge screen for exactly this, which is **out of
+scope here**. The consequence is that duplicate owners inflate the queue and the
+same person can be called twice. Worth knowing before the counts are trusted.
+
+`0 properties` and every `DOORS` reading `0` mirror this repo's own empty
+`eviction_filings` table — neither system has property counts populated.
+
+### Revised phasing
+
+1. **Design tokens and shell** — unchanged; plan already written.
+2. **Pipeline tab** — queue tabs with server-side counts, the filter bar, and the
+   table with its relative-time columns. Replaces the kanban board.
+3. **Public-facing site** — separate Vite entry, own domain, shared tokens.
