@@ -21,13 +21,13 @@ const tabs = [
 ];
 
 /**
- * Tabs hidden from the nav while the eviction work is the focus.
+ * Tabs hidden from the nav. Empty means every tab shows.
  *
- * This only removes the visual entry point — the tabs themselves are untouched.
- * Each still renders normally when reached by hash (e.g. #properties), so
- * bookmarks and links keep working. Empty this set to bring them all back.
+ * Hiding only removes the visual entry point — a hidden tab still renders when
+ * reached by hash (e.g. #properties), so bookmarks and links keep working. Add
+ * a TabType here to hide it again.
  */
-const HIDDEN_TABS = new Set<TabType>(['properties', 'preforeclosure', 'foreclosure', 'crm', 'driving']);
+const HIDDEN_TABS = new Set<TabType>([]);
 
 const visibleTabs = tabs.filter((tab) => !HIDDEN_TABS.has(tab.id));
 
