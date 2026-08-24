@@ -2,62 +2,92 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 @layer base {
   :root {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 96%;
+    /* ------------------------------------------------------------------ *
+     * Corporate real-estate operations.
+     *
+     * Light, institutional, hairline-ruled. Navy carries authority, a single
+     * muted gold marks what needs attention today, and everything else is
+     * greyscale so colour never competes with the data. Monospace stays
+     * reserved for record values — addresses, dates, counts.
+     * ------------------------------------------------------------------ */
 
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 96%;
+    /* Raw palette, for the few places semantic tokens cannot express. */
+    --ground:       210 22% 95%;
+    --surface-alt:  210 33% 98%;
+    --line-strong:  213 19% 82%;
+    --navy:         210 54% 16%;
+    --navy-mid:     210 51% 24%;
+    --navy-soft:    209 35% 32%;
+    --ink-faint:    211 11% 59%;
+    --gold:          40 69% 36%;
+    --gold-soft:     41 54% 87%;
+    --brick:          5 59% 41%;
+    --brick-soft:     6 55% 92%;
 
-    --popover: 222 47% 10%;
-    --popover-foreground: 210 40% 96%;
+    /* Service interest, one hue each. */
+    --mgmt:    160 55% 27%;
+    --lending: 211 63% 38%;
+    --listing:  15 48% 44%;
+    --acq:     253 29% 41%;
 
-    --primary: 174 72% 46%;
-    --primary-foreground: 222 47% 6%;
+    /* Semantic tokens — every existing Tailwind class reads through these. */
+    --background:            210 22% 95%;
+    --foreground:            210 49% 12%;
 
-    --secondary: 222 47% 14%;
-    --secondary-foreground: 210 40% 96%;
+    --card:                    0 0% 100%;
+    --card-foreground:       210 49% 12%;
 
-    --muted: 222 30% 18%;
-    --muted-foreground: 215 20% 55%;
+    --popover:                 0 0% 100%;
+    --popover-foreground:    210 49% 12%;
 
-    --accent: 174 72% 46%;
-    --accent-foreground: 222 47% 6%;
+    --primary:               210 54% 16%;
+    --primary-foreground:      0 0% 100%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --secondary:             210 33% 98%;
+    --secondary-foreground:  210 49% 12%;
 
-    --success: 142 72% 46%;
-    --success-foreground: 222 47% 6%;
+    --muted:                 210 33% 98%;
+    --muted-foreground:      208 13% 38%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 6%;
+    --accent:                 40 69% 36%;
+    --accent-foreground:       0 0% 100%;
 
-    --judgment: 0 72% 51%;
-    --judgment-foreground: 210 40% 98%;
+    --destructive:             5 59% 41%;
+    --destructive-foreground:  0 0% 100%;
 
-    --active: 142 72% 46%;
-    --active-foreground: 222 47% 6%;
+    --success:               160 55% 27%;
+    --success-foreground:      0 0% 100%;
 
-    --pending: 38 92% 50%;
-    --pending-foreground: 222 47% 6%;
+    --warning:                40 69% 36%;
+    --warning-foreground:      0 0% 100%;
 
-    --border: 222 30% 18%;
-    --input: 222 30% 14%;
-    --ring: 174 72% 46%;
+    --judgment:                5 59% 41%;
+    --judgment-foreground:     0 0% 100%;
 
-    --radius: 0.5rem;
+    --active:                160 55% 27%;
+    --active-foreground:       0 0% 100%;
 
-    --chart-1: 174 72% 46%;
-    --chart-2: 142 72% 46%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 0 72% 51%;
-    --chart-5: 262 80% 60%;
+    --pending:                40 69% 36%;
+    --pending-foreground:      0 0% 100%;
 
-    --sidebar-background: 222 47% 5%;
+    --border:                212 21% 90%;
+    --input:                 213 19% 82%;
+    --ring:                  210 54% 16%;
+
+    /* Institutional, not rounded. Hairlines carry the structure. */
+    --radius: 0.25rem;
+
+    --chart-1: 210 54% 16%;
+    --chart-2: 160 55% 27%;
+    --chart-3:  40 69% 36%;
+    --chart-4:   5 59% 41%;
+    --chart-5: 253 29% 41%;
+
+    --sidebar-background: 210 54% 16%;
     --sidebar-foreground: 210 40% 96%;
     --sidebar-primary: 174 72% 46%;
     --sidebar-primary-foreground: 222 47% 6%;
@@ -70,23 +100,11 @@
     --font-mono: 'JetBrains Mono', monospace;
   }
 
-  .light {
-    --background: 0 0% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 174 72% 40%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 20% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 20% 94%;
-    --muted-foreground: 215 20% 45%;
-    --accent: 174 72% 40%;
-    --accent-foreground: 0 0% 100%;
-    --border: 214 20% 88%;
-    --input: 214 20% 88%;
+  html { color-scheme: light; }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 }
 
@@ -282,3 +300,20 @@
 .rbc-time-content { border-color: hsl(var(--border)); }
 .rbc-time-gutter .rbc-label { color: hsl(var(--muted-foreground)); font-size: 0.7rem; }
 .rbc-day-slot .rbc-event-label { font-size: 0.65rem; }
+
+@layer components {
+  /* Micro-labels carry the institutional voice. Used for every field label. */
+  .label {
+    font-size: 0.625rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: hsl(var(--ink-faint));
+  }
+
+  /* Record values — addresses, dates, counts, case numbers. Never prose. */
+  .record {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
