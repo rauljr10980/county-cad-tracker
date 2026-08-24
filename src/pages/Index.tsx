@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Header } from '@/components/layout/Header';
-import { TabNavigation, TabType } from '@/components/layout/TabNavigation';
+import { TabType } from '@/components/layout/TabNavigation';
+import { NavRail } from '@/components/layout/NavRail';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { PropertiesView } from '@/components/properties/PropertiesView';
 import { TasksView } from '@/components/tasks/TasksView';
@@ -230,12 +231,16 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
-      <Header onRefresh={handleRefresh} isRefreshing={isRefreshing} onTabChange={setActiveTab} onOpenEvictionsCrm={openEvictionsCrm} />
-      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-      <main className="container mx-auto animate-fade-in overflow-x-hidden">
-        {renderContent()}
-      </main>
+    <div className="flex h-dvh overflow-hidden bg-background">
+      <NavRail activeTab={activeTab} onTabChange={setActiveTab} />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <Header onRefresh={handleRefresh} isRefreshing={isRefreshing} onTabChange={setActiveTab} onOpenEvictionsCrm={openEvictionsCrm} />
+        <div className="flex-1 overflow-y-auto">
+          <main className="container mx-auto animate-fade-in overflow-x-hidden">
+            {renderContent()}
+          </main>
+        </div>
+      </div>
       <PhoneSearchModal
         isOpen={isPhoneSearchOpen}
         onClose={() => setIsPhoneSearchOpen(false)}
