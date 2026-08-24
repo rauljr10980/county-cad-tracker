@@ -46,7 +46,7 @@ export function NavRail({
                 style={isActive ? { backgroundColor: 'hsl(var(--navy-mid))' } : undefined}
               >
                 <Icon className="h-[18px] w-[18px]" />
-                <span className="label text-[9px] leading-tight text-current">{tab.shortLabel}</span>
+                <span aria-hidden="true" className="label text-[9px] leading-tight text-current">{tab.shortLabel}</span>
                 <span className="sr-only">{tab.label}</span>
               </button>
             </li>

@@ -5,7 +5,7 @@ import { NavRail } from './NavRail';
 describe('NavRail', () => {
   it('renders every visible tab', () => {
     render(<NavRail activeTab="dashboard" onTabChange={() => {}} />);
-    expect(screen.getByRole('button', { name: /Dashboard/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Dashboard' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Eviction List/ })).toBeTruthy();
     expect(screen.getAllByRole('button').length).toBeGreaterThanOrEqual(8);
   });
@@ -22,7 +22,7 @@ describe('NavRail', () => {
   it('calls onTabChange with the clicked tab id', () => {
     const onTabChange = vi.fn();
     render(<NavRail activeTab="dashboard" onTabChange={onTabChange} />);
-    screen.getByRole('button', { name: /Calendar/ }).click();
+    screen.getByRole('button', { name: 'Calendar' }).click();
     expect(onTabChange).toHaveBeenCalledWith('calendar');
   });
 });
