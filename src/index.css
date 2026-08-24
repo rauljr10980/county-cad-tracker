@@ -96,8 +96,8 @@
     --sidebar-border: 222 30% 15%;
     --sidebar-ring: 174 72% 46%;
 
-    --font-sans: 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-sans: 'Libre Franklin', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   }
 
   html { color-scheme: light; }
