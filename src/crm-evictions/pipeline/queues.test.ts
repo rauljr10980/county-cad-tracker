@@ -51,4 +51,14 @@ describe('followUpLabel', () => {
   it('compares whole UTC days, so a late-evening follow-up today is not overdue', () => {
     expect(followUpLabel('2026-08-25T00:30:00Z', now)).toBe('Today');
   });
+
+  it('treats a 60-minute gap across midnight UTC as a full day', () => {
+    const minuteBeforeMidnight = new Date('2026-08-24T23:30:00Z');
+    const minuteAfterMidnight = new Date('2026-08-25T00:30:00Z');
+    expect(followUpLabel(minuteBeforeMidnight.toISOString(), minuteAfterMidnight)).toBe('1d overdue');
+  });
+
+  it('renders undefined scheduled as an em dash', () => {
+    expect(followUpLabel(undefined, now)).toBe('—');
+  });
 });
