@@ -107,13 +107,40 @@ const handleWorkbookUpload = async (req, res) => {
       filingMap.set(key, { landlordId: landlord.id, caseNumber: item.caseNumber, data });
     }
     const filings = [...filingMap.values()];
-    for (let i = 0; i < filings.length; i += 150) {
-      const batch = filings.slice(i, i + 150);
-      await prisma.$transaction(batch.map((f) => prisma.evictionFiling.upsert({
+
+    // Split on what already exists so new rows can go in one statement at a time
+    // instead of one round trip each. This is the difference between a 44,000-row
+    // workbook finishing and it never getting past this phase: the previous
+    // version ran 150 upserts inside a $transaction, and Prisma's default
+    // transaction timeout is 5 seconds, which that cannot meet against a remote
+    // database. Landlords and addresses had already committed by then, which is
+    // why imports left owners with no filings behind them.
+    const toCreate = [], toUpdate = [];
+    for (const f of filings) {
+      (existingKeys.has(`${f.landlordId}|${f.caseNumber}`) ? toUpdate : toCreate).push(f);
+    }
+
+    // 17 columns per row against PostgreSQL's 32,767 bind-variable ceiling caps a
+    // batch near 1,900; 1,000 leaves headroom for the driver's own parameters.
+    for (let i = 0; i < toCreate.length; i += 1000) {
+      const batch = toCreate.slice(i, i + 1000);
+      const inserted = await prisma.evictionFiling.createMany({
+        data: batch.map((f) => ({ landlordId: f.landlordId, caseNumber: f.caseNumber, ...f.data })),
+        skipDuplicates: true,
+      });
+      createdRows += inserted.count;
+    }
+
+    // Existing filings carry per-row values, so they cannot collapse into one
+    // statement. They run individually and deliberately outside a transaction:
+    // each write is independent, so a failure part-way leaves earlier rows
+    // correctly written and re-running the import finishes the rest.
+    for (const f of toUpdate) {
+      await prisma.evictionFiling.update({
         where: { landlordId_caseNumber: { landlordId: f.landlordId, caseNumber: f.caseNumber } },
-        create: { landlordId: f.landlordId, caseNumber: f.caseNumber, ...f.data }, update: f.data,
-      })));
-      for (const f of batch) existingKeys.has(`${f.landlordId}|${f.caseNumber}`) ? updatedRows++ : createdRows++;
+        data: f.data,
+      });
+      updatedRows++;
     }
 
     // Merge court-file phones into structured contacts without overwriting researched contacts.
