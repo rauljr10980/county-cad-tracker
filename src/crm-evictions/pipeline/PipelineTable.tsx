@@ -43,7 +43,17 @@ export function PipelineTable({
                 </td>
                 <td className="text-muted-foreground">{lead.assignedTo?.username || '—'}</td>
                 <td>
-                  <span className="label rounded border px-2 py-1">Open</span>
+                  <button
+                    type="button"
+                    aria-label={`Open ${lead.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpen(lead.id);
+                    }}
+                    className="label rounded border px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  >
+                    <span aria-hidden="true">Open</span>
+                  </button>
                 </td>
               </tr>
             );
