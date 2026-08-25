@@ -4,7 +4,6 @@ import { extractContacts } from '@/lib/contactParser';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Building2, ChevronLeft, ChevronRight, ExternalLink, Loader2, Search, Upload, User } from 'lucide-react';
 import { STAGES, SERVICE_INTERESTS, mapLegacyStage, type Stage } from '@/crm-evictions/constants';
-import '@/styles/corporate.css';
 
 type Phone = { number: string; status?: string; type?: string; source?: string };
 type Contacts = { phoneRows?: { name: string; phones: Phone[] }[]; emailRows?: { name: string; emails: string[] }[] };
@@ -38,8 +37,10 @@ const request = async (path: string, init?: RequestInit) => {
   return body;
 };
 const fmt = (value?: string) => value ? new Date(value).toLocaleDateString() : '—';
-// Corporate pill modifiers for the .urg-pill class, not the Tailwind classes in
-// STAGE_TONE (that map is for the dark CRM views; this page is light/corporate).
+// Pill tone keyword per stage, translated to Tailwind classes via
+// PILL_TONE_CLASSES below. Kept as its own keyword vocabulary (rather than
+// reusing the Tailwind classes in STAGE_TONE from crm-evictions/constants.ts)
+// because stageTone()'s test coverage asserts these exact keyword strings.
 const STAGE_PILL_TONE: Record<Stage, string> = {
   'New Lead': 'grey',
   Researching: 'warn',
@@ -55,6 +56,17 @@ const STAGE_PILL_TONE: Record<Stage, string> = {
   'Do Not Contact': 'danger',
 };
 export const stageTone = (stage: string) => STAGE_PILL_TONE[stage as Stage] ?? 'grey';
+
+// Shared pill styling: layout stays fixed, tone controls background/text.
+const PILL_BASE = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold';
+const PILL_TONE_CLASSES: Record<string, string> = {
+  '': 'bg-muted text-muted-foreground',
+  grey: 'bg-muted text-muted-foreground',
+  blue: 'bg-primary/15 text-primary',
+  warn: 'bg-warning/15 text-warning',
+  danger: 'bg-destructive/15 text-destructive',
+};
+const pillClass = (tone: string) => `${PILL_BASE} ${PILL_TONE_CLASSES[tone] ?? PILL_TONE_CLASSES.grey}`;
 
 export default function EvictionLeadsView() {
   const [items, setItems] = useState<Landlord[]>([]), [total, setTotal] = useState(0), [pages, setPages] = useState(1), [page, setPage] = useState(1);
@@ -149,160 +161,160 @@ export default function EvictionLeadsView() {
     await patch({ nextFollowUpAt: new Date(taskDue).toISOString(), contactStage: 'Follow-Up' }); setTaskDue(''); await open(selected.id);
   };
 
-  return <div className="urg min-h-full p-6 md:p-8">
-    <div className="urg-toolbar">
+  return <div className="min-h-full p-6 md:p-8">
+    <div className="flex flex-wrap items-end justify-between gap-4 mb-5">
       <div>
-        <p className="urg-eyebrow">CLIENT PIPELINE</p>
-        <h1>Eviction Leads</h1>
-        <p>{total.toLocaleString()} landlord prospects grouped from eviction filings</p>
+        <p className="label">CLIENT PIPELINE</p>
+        <h1 className="text-2xl font-semibold">Eviction Leads</h1>
+        <p className="mt-1 text-muted-foreground"><span className="record">{total.toLocaleString()}</span> landlord prospects grouped from eviction filings</p>
       </div>
       <div className="flex flex-col items-end gap-1">
         <label>
           <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => uploadFile(e.target.files?.[0])} disabled={uploading}/>
-          <span className="urg-btn" role="button" aria-disabled={uploading}>
+          <span className="inline-flex items-center gap-2 rounded bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 cursor-pointer aria-disabled:opacity-50 aria-disabled:pointer-events-none" role="button" aria-disabled={uploading}>
             {uploading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Upload className="h-4 w-4"/>}
             {uploading ? uploadProgress || 'Uploading…' : 'Import Eviction Workbook'}
           </span>
         </label>
-        {uploading && <span className="text-xs urg-muted">Keep this page open while the import runs.</span>}
+        {uploading && <span className="text-xs text-muted-foreground">Keep this page open while the import runs.</span>}
       </div>
     </div>
 
-    <div className="urg-panel urg-filters">
-      <label className="urg-field">
-        <span>SEARCH</span>
-        <span className="urg-search">
-          <Search className="h-4 w-4"/>
-          <input className="urg-input" placeholder="Landlord or address" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}/>
+    <div className="rounded border bg-card grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.7fr_repeat(4,1fr)] gap-[11px] p-4 mb-[18px]">
+      <label className="grid gap-1.5">
+        <span className="label">SEARCH</span>
+        <span className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/>
+          <input className="h-10 w-full rounded border bg-card pl-8 pr-3 text-sm" placeholder="Landlord or address" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}/>
         </span>
       </label>
-      <label className="urg-field">
-        <span>CONTACT STAGE</span>
-        <select className="urg-input" value={stage} onChange={(e) => { setStage(e.target.value); setPage(1); }}><option value="">All stages</option>{STAGES.map((x) => <option key={x}>{x}</option>)}</select>
+      <label className="grid gap-1.5">
+        <span className="label">CONTACT STAGE</span>
+        <select className="h-10 w-full rounded border bg-card px-3 text-sm" value={stage} onChange={(e) => { setStage(e.target.value); setPage(1); }}><option value="">All stages</option>{STAGES.map((x) => <option key={x}>{x}</option>)}</select>
       </label>
-      <label className="urg-field">
-        <span>SERVICE INTEREST</span>
-        <select className="urg-input" value={service} onChange={(e) => { setService(e.target.value); setPage(1); }}><option value="">All services</option>{SERVICE_INTERESTS.map((x) => <option key={x}>{x}</option>)}</select>
+      <label className="grid gap-1.5">
+        <span className="label">SERVICE INTEREST</span>
+        <select className="h-10 w-full rounded border bg-card px-3 text-sm" value={service} onChange={(e) => { setService(e.target.value); setPage(1); }}><option value="">All services</option>{SERVICE_INTERESTS.map((x) => <option key={x}>{x}</option>)}</select>
       </label>
-      <label className="urg-field">
-        <span>FILED FROM</span>
-        <input className="urg-input" type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}/>
+      <label className="grid gap-1.5">
+        <span className="label">FILED FROM</span>
+        <input className="h-10 w-full rounded border bg-card px-3 text-sm" type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}/>
       </label>
-      <label className="urg-field">
-        <span>FILED THROUGH</span>
-        <input className="urg-input" type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }}/>
+      <label className="grid gap-1.5">
+        <span className="label">FILED THROUGH</span>
+        <input className="h-10 w-full rounded border bg-card px-3 text-sm" type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }}/>
       </label>
-      <div className="urg-filters-row2">
-        <label className="urg-field">
-          <span>CASE STATUS</span>
-          <input className="urg-input" placeholder="Exact status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}/>
+      <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[11px]">
+        <label className="grid gap-1.5">
+          <span className="label">CASE STATUS</span>
+          <input className="h-10 w-full rounded border bg-card px-3 text-sm" placeholder="Exact status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}/>
         </label>
-        <label className="urg-field">
-          <span>DISPOSITION</span>
-          <input className="urg-input" placeholder="Contains…" value={disposition} onChange={(e) => { setDisposition(e.target.value); setPage(1); }}/>
+        <label className="grid gap-1.5">
+          <span className="label">DISPOSITION</span>
+          <input className="h-10 w-full rounded border bg-card px-3 text-sm" placeholder="Contains…" value={disposition} onChange={(e) => { setDisposition(e.target.value); setPage(1); }}/>
         </label>
-        <label className="urg-field">
-          <span>PRECINCT</span>
-          <input className="urg-input" placeholder="Exact precinct" value={precinct} onChange={(e) => { setPrecinct(e.target.value); setPage(1); }}/>
+        <label className="grid gap-1.5">
+          <span className="label">PRECINCT</span>
+          <input className="h-10 w-full rounded border bg-card px-3 text-sm" placeholder="Exact precinct" value={precinct} onChange={(e) => { setPrecinct(e.target.value); setPage(1); }}/>
         </label>
-        <label className="urg-field">
-          <span>SATISFIED FLAG</span>
-          <select className="urg-input" value={satisfied} onChange={(e) => { setSatisfied(e.target.value); setPage(1); }}><option value="">Any</option><option value="true">Satisfied</option><option value="false">Not satisfied</option></select>
+        <label className="grid gap-1.5">
+          <span className="label">SATISFIED FLAG</span>
+          <select className="h-10 w-full rounded border bg-card px-3 text-sm" value={satisfied} onChange={(e) => { setSatisfied(e.target.value); setPage(1); }}><option value="">Any</option><option value="true">Satisfied</option><option value="false">Not satisfied</option></select>
         </label>
       </div>
     </div>
 
-    {error && <div className="urg-notice">{error}</div>}
+    {error && <div className="mb-[18px] rounded-r-md border-l-[3px] border-destructive bg-destructive/10 px-3.5 py-3 text-destructive">{error}</div>}
 
-    <div className="urg-panel overflow-hidden">
+    <div className="rounded border bg-card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="urg-table">
+        <table className="data-table">
           <thead><tr>{['Landlord', 'Entity', 'Filings', 'Addresses Represented', 'Latest Filing', 'Contact Stage', 'Service Interest', 'Next Follow-up'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={8} className="urg-empty"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></td></tr> : items.map((item) => <tr key={item.id} onClick={() => open(item.id)}>
-              <td className="urg-who min-w-[240px]">{item.name}</td>
-              <td><span className="urg-pill grey">{item.isCorporate ? <Building2 className="h-3 w-3"/> : <User className="h-3 w-3"/>}{item.isCorporate ? 'Corporate' : 'Person'}</span></td>
-              <td>{item.filingCount}</td>
-              <td>{item.addressCount}</td>
-              <td className="whitespace-nowrap">{fmt(item.latestFilingDate)}</td>
-              <td><span className={`urg-pill ${stageTone(item.contactStage)}`}>{item.contactStage}</span></td>
-              <td className="min-w-[170px] urg-muted">{item.serviceInterests?.join(', ')}</td>
-              <td className="whitespace-nowrap">{fmt(item.nextTask?.dueAt)}</td>
+            {loading ? <tr><td colSpan={8} className="py-[45px] px-2.5 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></td></tr> : items.map((item) => <tr key={item.id} className="cursor-pointer" onClick={() => open(item.id)}>
+              <td className="font-semibold min-w-[240px]">{item.name}</td>
+              <td><span className={pillClass('grey')}>{item.isCorporate ? <Building2 className="h-3 w-3"/> : <User className="h-3 w-3"/>}{item.isCorporate ? 'Corporate' : 'Person'}</span></td>
+              <td className="record">{item.filingCount}</td>
+              <td className="record">{item.addressCount}</td>
+              <td className="whitespace-nowrap record">{fmt(item.latestFilingDate)}</td>
+              <td><span className={pillClass(stageTone(item.contactStage))}>{item.contactStage}</span></td>
+              <td className="min-w-[170px] text-muted-foreground">{item.serviceInterests?.join(', ')}</td>
+              <td className="whitespace-nowrap record">{fmt(item.nextTask?.dueAt)}</td>
             </tr>)}
-            {!loading && !items.length && <tr><td colSpan={8} className="urg-empty">No eviction leads match these filters.</td></tr>}
+            {!loading && !items.length && <tr><td colSpan={8} className="py-[45px] px-2.5 text-center text-muted-foreground">No eviction leads match these filters.</td></tr>}
           </tbody>
         </table>
       </div>
     </div>
 
-    <div className="urg-pager">
+    <div className="flex items-center justify-between pt-3.5 text-xs text-muted-foreground">
       <span>Page {page} of {pages}</span>
       <span className="flex gap-2">
-        <button className="urg-btn secondary small" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft className="h-4 w-4"/></button>
-        <button className="urg-btn secondary small" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}><ChevronRight className="h-4 w-4"/></button>
+        <button className="inline-flex items-center gap-1.5 rounded border bg-card px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50 disabled:pointer-events-none" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft className="h-4 w-4"/></button>
+        <button className="inline-flex items-center gap-1.5 rounded border bg-card px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50 disabled:pointer-events-none" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}><ChevronRight className="h-4 w-4"/></button>
       </span>
     </div>
 
-    <Dialog open={!!selected} onOpenChange={(v) => !v && setSelected(null)}><DialogContent className="urg urg-dialog max-w-5xl max-h-[90vh] overflow-y-auto">{selected && <>
+    <Dialog open={!!selected} onOpenChange={(v) => !v && setSelected(null)}><DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">{selected && <>
       <DialogHeader>
-        <p className="urg-eyebrow">LANDLORD</p>
+        <p className="label">LANDLORD</p>
         <DialogTitle className="pr-8">{selected.name}</DialogTitle>
       </DialogHeader>
       <div className="flex flex-wrap gap-2">
-        <span className="urg-pill blue">{selected.filings.length} filings loaded</span>
-        <span className="urg-pill grey">{selected.addresses.length} Addresses Represented</span>
-        {selected.isCorporate && <span className="urg-pill warn">Business plaintiff — identify an owner or manager for people search</span>}
+        <span className={pillClass('blue')}>{selected.filings.length} filings loaded</span>
+        <span className={pillClass('grey')}>{selected.addresses.length} Addresses Represented</span>
+        {selected.isCorporate && <span className={pillClass('warn')}>Business plaintiff — identify an owner or manager for people search</span>}
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <section className="urg-sub space-y-3">
+        <section className="rounded border bg-card p-3.5 space-y-3">
           <h3>Prospecting</h3>
-          <select className="urg-input" value={selected.contactStage} onChange={(e) => patch({ contactStage: e.target.value })}>{STAGES.map((x) => <option key={x}>{x}</option>)}</select>
-          <div className="flex flex-wrap gap-2">{SERVICE_INTERESTS.map((x) => <button key={x} className={`urg-chip ${selected.serviceInterests?.includes(x) ? 'on' : ''}`} onClick={() => toggleService(x)}>{x}</button>)}</div>
-          <textarea className="urg-input" placeholder="Landlord notes" value={selected.notes || ''} onChange={(e) => setSelected({ ...selected, notes: e.target.value })} onBlur={() => patch({ notes: selected.notes })}/>
+          <select className="h-10 w-full rounded border bg-card px-3 text-sm" value={selected.contactStage} onChange={(e) => patch({ contactStage: e.target.value })}>{STAGES.map((x) => <option key={x}>{x}</option>)}</select>
+          <div className="flex flex-wrap gap-2">{SERVICE_INTERESTS.map((x) => <button key={x} className={`inline-block rounded-md border px-2.5 py-1.5 text-xs transition-colors ${selected.serviceInterests?.includes(x) ? 'border-primary bg-primary text-primary-foreground font-semibold' : 'bg-card text-muted-foreground hover:border-primary/40'}`} onClick={() => toggleService(x)}>{x}</button>)}</div>
+          <textarea className="min-h-[72px] w-full resize-y rounded border bg-card px-3 py-2 text-sm" placeholder="Landlord notes" value={selected.notes || ''} onChange={(e) => setSelected({ ...selected, notes: e.target.value })} onBlur={() => patch({ notes: selected.notes })}/>
         </section>
-        <section className="urg-sub space-y-3">
+        <section className="rounded border bg-card p-3.5 space-y-3">
           <div className="flex justify-between items-center gap-2">
             <h3>TruePeopleSearch Contact Extractor</h3>
-            <button className="urg-btn secondary small" onClick={truePeopleSearch}><ExternalLink className="h-4 w-4"/>Open search</button>
+            <button className="inline-flex items-center gap-1.5 rounded border bg-card px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50 disabled:pointer-events-none" onClick={truePeopleSearch}><ExternalLink className="h-4 w-4"/>Open search</button>
           </div>
-          <textarea className="urg-input min-h-[120px] font-mono text-xs" placeholder="Paste all text from TruePeopleSearch; name, phones, and emails will be extracted." value={rawText} onChange={(e) => setRawText(e.target.value)}/>
-          <button className="urg-btn small" onClick={extract} disabled={!rawText.trim() || saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : null}Extract and save</button>
+          <textarea className="min-h-[120px] w-full resize-y rounded border bg-card px-3 py-2 font-mono text-xs" placeholder="Paste all text from TruePeopleSearch; name, phones, and emails will be extracted." value={rawText} onChange={(e) => setRawText(e.target.value)}/>
+          <button className="inline-flex items-center gap-1.5 rounded bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none" onClick={extract} disabled={!rawText.trim() || saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : null}Extract and save</button>
         </section>
       </div>
 
-      <section className="urg-sub space-y-2">
+      <section className="rounded border bg-card p-3.5 space-y-2">
         <h3>Contacts</h3>
-        {(selected.contacts?.phoneRows || []).flatMap((r) => r.phones.map((p, i) => <div key={`${r.name}-${i}`} className="flex gap-2 text-sm"><span className="font-semibold">{r.name || selected.name}</span><a style={{ color: 'var(--urg-blue)' }} href={`tel:${p.number}`}>{p.number}</a><span className="urg-muted">{p.type || ''} {p.source ? `· ${p.source}` : ''}</span></div>))}
-        {(selected.contacts?.emailRows || []).flatMap((r) => r.emails.map((e) => <div key={e} className="text-sm"><span className="font-semibold mr-2">{r.name}</span><a style={{ color: 'var(--urg-blue)' }} href={`mailto:${e}`}>{e}</a></div>))}
+        {(selected.contacts?.phoneRows || []).flatMap((r) => r.phones.map((p, i) => <div key={`${r.name}-${i}`} className="flex gap-2 text-sm"><span className="font-semibold">{r.name || selected.name}</span><a className="text-primary record" href={`tel:${p.number}`}>{p.number}</a><span className="text-muted-foreground">{p.type || ''} {p.source ? `· ${p.source}` : ''}</span></div>))}
+        {(selected.contacts?.emailRows || []).flatMap((r) => r.emails.map((e) => <div key={e} className="text-sm"><span className="font-semibold mr-2">{r.name}</span><a className="text-primary" href={`mailto:${e}`}>{e}</a></div>))}
       </section>
 
-      <section className="urg-sub space-y-3">
+      <section className="rounded border bg-card p-3.5 space-y-3">
         <h3>Outreach &amp; Follow-up</h3>
-        <div className="urg-row-outreach">
-          <select className="urg-input" value={activityKind} onChange={(e) => setActivityKind(e.target.value)}><option value="call">Call outcome</option><option value="text">Text</option><option value="email">Email</option><option value="note">Note</option></select>
-          <input className="urg-input" placeholder="Outcome or activity notes" value={activityBody} onChange={(e) => setActivityBody(e.target.value)}/>
-          <button className="urg-btn" onClick={addActivity} disabled={!activityBody.trim()}>Log activity</button>
+        <div className="grid grid-cols-1 md:grid-cols-[160px_minmax(0,1fr)_auto] items-center gap-[9px]">
+          <select className="h-10 w-full rounded border bg-card px-3 text-sm" value={activityKind} onChange={(e) => setActivityKind(e.target.value)}><option value="call">Call outcome</option><option value="text">Text</option><option value="email">Email</option><option value="note">Note</option></select>
+          <input className="h-10 w-full rounded border bg-card px-3 text-sm" placeholder="Outcome or activity notes" value={activityBody} onChange={(e) => setActivityBody(e.target.value)}/>
+          <button className="inline-flex items-center gap-2 rounded bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none" onClick={addActivity} disabled={!activityBody.trim()}>Log activity</button>
         </div>
-        <div className="urg-row-task">
-          <input className="urg-input" type="datetime-local" value={taskDue} onChange={(e) => setTaskDue(e.target.value)}/>
-          <button className="urg-btn secondary" onClick={addTask} disabled={!taskDue}>Schedule call</button>
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,260px)_auto] justify-start items-center gap-[9px]">
+          <input className="h-10 w-full rounded border bg-card px-3 text-sm" type="datetime-local" value={taskDue} onChange={(e) => setTaskDue(e.target.value)}/>
+          <button className="inline-flex items-center gap-2 rounded border bg-card px-3 py-2 text-sm hover:bg-muted disabled:opacity-50 disabled:pointer-events-none" onClick={addTask} disabled={!taskDue}>Schedule call</button>
         </div>
-        {selected.tasks.filter((t) => !t.completed).map((t) => <div key={t.id} className="text-sm urg-muted">Upcoming {t.type}: {new Date(t.dueAt).toLocaleString()} — {t.notes}</div>)}
-        {selected.activities.slice(0, 8).map((a) => <div key={a.id} className="urg-activity text-sm"><span className="urg-dot"/><span><span className="font-semibold capitalize">{a.kind}</span> · {fmt(a.createdAt)}<div className="urg-muted">{a.body}</div></span></div>)}
+        {selected.tasks.filter((t) => !t.completed).map((t) => <div key={t.id} className="text-sm text-muted-foreground">Upcoming {t.type}: <span className="record">{new Date(t.dueAt).toLocaleString()}</span> — {t.notes}</div>)}
+        {selected.activities.slice(0, 8).map((a) => <div key={a.id} className="grid grid-cols-[8px_1fr] gap-2.5 text-sm"><span className="mt-1.5 h-[7px] w-[7px] rounded-full bg-accent"/><span><span className="font-semibold capitalize">{a.kind}</span> · <span className="record">{fmt(a.createdAt)}</span><div className="text-muted-foreground">{a.body}</div></span></div>)}
       </section>
 
-      <section className="urg-sub">
+      <section className="rounded border bg-card p-3.5">
         <h3 className="mb-2">Addresses Represented</h3>
-        <div className="grid md:grid-cols-2 gap-2">{selected.addresses.map((a) => <div key={a.id} className="rounded p-2 text-sm" style={{ background: '#f4f7fb' }}>{a.address}, {a.city}, {a.state} {a.zip}</div>)}</div>
+        <div className="grid md:grid-cols-2 gap-2">{selected.addresses.map((a) => <div key={a.id} className="rounded bg-muted p-2 text-sm">{a.address}, {a.city}, {a.state} {a.zip}</div>)}</div>
       </section>
 
-      <section className="urg-sub">
+      <section className="rounded border bg-card p-3.5">
         <h3 className="mb-2">Eviction Filings</h3>
         <div className="max-h-72 overflow-auto">
-          <table className="urg-table text-xs">
+          <table className="data-table text-xs">
             <thead><tr>{['Case', 'Filed', 'Status', 'Precinct', 'Disposition', 'Plaintiff Address'].map((x) => <th key={x}>{x}</th>)}</tr></thead>
-            <tbody>{selected.filings.map((f) => <tr key={f.id} style={{ cursor: 'default' }}><td>{f.caseNumber}</td><td className="whitespace-nowrap">{fmt(f.filedDate)}</td><td>{f.caseStatus}</td><td>{f.precinct}</td><td>{f.disposition}</td><td>{f.plaintiffAddress}</td></tr>)}</tbody>
+            <tbody>{selected.filings.map((f) => <tr key={f.id} style={{ cursor: 'default' }}><td className="record">{f.caseNumber}</td><td className="whitespace-nowrap record">{fmt(f.filedDate)}</td><td>{f.caseStatus}</td><td>{f.precinct}</td><td>{f.disposition}</td><td>{f.plaintiffAddress}</td></tr>)}</tbody>
           </table>
         </div>
       </section>

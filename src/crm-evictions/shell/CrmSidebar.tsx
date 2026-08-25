@@ -12,9 +12,9 @@ const ITEMS: { id: CrmSection; label: string; icon: typeof LayoutDashboard }[] =
 type Props = { section: CrmSection; onSectionChange: (s: CrmSection) => void; onExit: () => void };
 
 /**
- * Nav item colors live in theme.css rather than here. The sidebar sits on navy
- * while the rest of the workspace is on paper, so its states cannot be
- * expressed with the same semantic tokens the content area uses.
+ * Nav item colors are plain semantic Tailwind classes below — the sidebar now
+ * shares the same light corporate token layer as the rest of the workspace,
+ * so no separate scoped stylesheet is needed for its states.
  */
 export function CrmSidebar({ section, onSectionChange, onExit }: Props) {
   return (
