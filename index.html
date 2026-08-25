@@ -31,6 +31,12 @@
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
     
     <!-- Using Leaflet + OpenStreetMap (FREE, no API key required) -->
+    <!-- Loaded here rather than via @import in index.css: an @import placed after
+         the @tailwind directives is dropped by the bundler, so the faces were
+         declared but never fetched and silently fell back to system fonts. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
   </head>
 
   <body>
