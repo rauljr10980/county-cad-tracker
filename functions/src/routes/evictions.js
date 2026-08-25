@@ -353,6 +353,78 @@ router.get('/map', async (req, res) => {
 const ACTIVE_OPPORTUNITY_STAGES = ['Interested', 'Under Contract'];
 const SERVICE_INTEREST_VALUES = ['Undecided', 'Acquisition / Sell to Us', 'Listing', 'Property Management'];
 
+/**
+ * Prisma `where` fragments shared by the corporate / assignedTo / service /
+ * search filters. `/landlords` and the pipeline counts route both build off
+ * this so their filtering can never drift apart.
+ *
+ * Default preserves the Eviction List tab's behavior (absent `corporate`
+ * means `isCorporate: false`); the CRM opts in with `all`.
+ */
+const baseLandlordFilter = (query) => {
+  const where = {};
+  if (query.corporate === 'all') { /* no filter */ }
+  else if (query.corporate === 'true') where.isCorporate = true;
+  else where.isCorporate = false;
+
+  if (query.assignedTo === 'unassigned') where.assignedToId = null;
+  else if (query.assignedTo) where.assignedToId = String(query.assignedTo);
+  if (query.service) where.serviceInterests = { has: String(query.service) };
+  if (query.search) {
+    where.OR = [
+      { name: { contains: String(query.search), mode: 'insensitive' } },
+      { addresses: { some: { address: { contains: String(query.search), mode: 'insensitive' } } } },
+    ];
+  }
+  return where;
+};
+
+/**
+ * Prisma `where` fragments for the pipeline's work queues.
+ *
+ * One builder serves both the row query and the counts query, so a tab's number
+ * can never disagree with what opening that tab shows.
+ *
+ * Boundaries are UTC to match /stats. The four active queues exclude parked and
+ * closed leads: something deliberately set aside, or finished, is not work to
+ * do now. `all` excludes nothing.
+ */
+const queueFilter = (queue) => {
+  const now = new Date();
+  const startOfToday = new Date(now); startOfToday.setUTCHours(0, 0, 0, 0);
+  const endOfToday = new Date(now); endOfToday.setUTCHours(23, 59, 59, 999);
+  const active = { parkedAt: null, contactStage: { not: 'Closed' } };
+
+  switch (queue) {
+    case 'needsContact': return { ...active, lastContactedAt: null };
+    case 'overdue':      return { ...active, nextFollowUpAt: { lt: startOfToday } };
+    case 'dueToday':     return { ...active, nextFollowUpAt: { gte: startOfToday, lte: endOfToday } };
+    case 'upcoming':     return { ...active, nextFollowUpAt: { gt: endOfToday } };
+    case 'parked':       return { parkedAt: { not: null } };
+    case 'closed':       return { contactStage: 'Closed' };
+    default:             return {};
+  }
+};
+
+const QUEUES = ['all', 'needsContact', 'overdue', 'dueToday', 'upcoming', 'parked', 'closed'];
+
+router.get('/pipeline/counts', async (req, res) => {
+  try {
+    // The same filters the table uses, minus the queue itself — each tab counts
+    // its own slice of the current filter set.
+    const base = baseLandlordFilter(req.query);
+
+    const counts = await Promise.all(
+      QUEUES.map((q) => prisma.evictionLandlord.count({ where: { ...base, ...queueFilter(q) } }))
+    );
+
+    res.json(Object.fromEntries(QUEUES.map((q, i) => [q, counts[i]])));
+  } catch (error) {
+    console.error('[EVICTIONS] pipeline counts error:', error);
+    res.status(500).json({ error: 'Unable to load pipeline counts' });
+  }
+});
+
 router.get('/stats', async (_req, res) => {
   try {
     const now = new Date();
@@ -405,16 +477,9 @@ router.get('/stats', async (_req, res) => {
 router.get('/landlords', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1), pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize) || 25));
   // Default preserves the Eviction List tab's behavior; the CRM opts in with `all`.
-  const where = {};
-  if (req.query.corporate === 'all') { /* no filter */ }
-  else if (req.query.corporate === 'true') where.isCorporate = true;
-  else where.isCorporate = false;
-
-  if (req.query.assignedTo === 'unassigned') where.assignedToId = null;
-  else if (req.query.assignedTo) where.assignedToId = String(req.query.assignedTo);
-  if (req.query.search) where.OR = [{ name: { contains: String(req.query.search), mode: 'insensitive' } }, { addresses: { some: { address: { contains: String(req.query.search), mode: 'insensitive' } } } }];
+  const where = baseLandlordFilter(req.query);
   if (req.query.stage) where.contactStage = String(req.query.stage);
-  if (req.query.service) where.serviceInterests = { has: String(req.query.service) };
+  if (req.query.queue && req.query.queue !== 'all') Object.assign(where, queueFilter(String(req.query.queue)));
   const filingSome = {};
   if (req.query.dateFrom || req.query.dateTo) filingSome.filedDate = { ...(req.query.dateFrom && { gte: new Date(String(req.query.dateFrom)) }), ...(req.query.dateTo && { lte: new Date(`${req.query.dateTo}T23:59:59.999Z`) }) };
   if (req.query.status) filingSome.caseStatus = String(req.query.status);
@@ -436,7 +501,7 @@ router.get('/landlords/:id', async (req, res) => {
 });
 
 router.patch('/landlords/:id', async (req, res) => {
-  const allowed = ['contactStage', 'serviceInterests', 'contacts', 'notes', 'lastContactedAt', 'nextFollowUpAt', 'assignedToId'];
+  const allowed = ['contactStage', 'serviceInterests', 'contacts', 'notes', 'lastContactedAt', 'nextFollowUpAt', 'assignedToId', 'parkedAt'];
   const data = {}; for (const key of allowed) if (Object.prototype.hasOwnProperty.call(req.body, key)) data[key] = key.endsWith('At') && req.body[key] ? new Date(req.body[key]) : req.body[key];
   res.json(await prisma.evictionLandlord.update({ where: { id: req.params.id }, data }));
 });

@@ -904,6 +904,7 @@ model EvictionLandlord {
   notes            String    @default("") @db.Text
   lastContactedAt  DateTime?
   nextFollowUpAt   DateTime?
+  parkedAt         DateTime?
   assignedToId     String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -919,6 +920,8 @@ model EvictionLandlord {
   @@index([contactStage])
   @@index([serviceInterests], type: Gin)
   @@index([assignedToId])
+  @@index([parkedAt])
+  @@index([nextFollowUpAt])
   @@map("eviction_landlords")
 }
 
