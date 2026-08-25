@@ -18,6 +18,7 @@ export type Lead = {
   notes: string;
   lastContactedAt?: string;
   nextFollowUpAt?: string;
+  parkedAt?: string | null;
   assignedToId?: string | null;
   assignedTo?: Assignee | null;
   filingCount: number;
@@ -90,4 +91,15 @@ export type ListLeadsParams = {
   service?: string;
   corporate?: 'true' | 'false' | 'all';
   assignedTo?: string;
+  queue?: string;
+};
+
+export type PipelineCounts = {
+  all: number;
+  needsContact: number;
+  overdue: number;
+  dueToday: number;
+  upcoming: number;
+  parked: number;
+  closed: number;
 };
