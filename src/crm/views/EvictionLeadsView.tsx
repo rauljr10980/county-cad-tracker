@@ -161,7 +161,7 @@ export default function EvictionLeadsView() {
     await patch({ nextFollowUpAt: new Date(taskDue).toISOString(), contactStage: 'Follow-Up' }); setTaskDue(''); await open(selected.id);
   };
 
-  return <div className="min-h-full p-6 md:p-8">
+  return <div className="min-h-full p-6 md:p-8 text-sm">
     <div className="flex flex-wrap items-end justify-between gap-4 mb-5">
       <div>
         <p className="label">CLIENT PIPELINE</p>
@@ -268,14 +268,14 @@ export default function EvictionLeadsView() {
 
       <div className="grid md:grid-cols-2 gap-4">
         <section className="rounded border bg-card p-3.5 space-y-3">
-          <h3>Prospecting</h3>
+          <h3 className="text-base font-semibold">Prospecting</h3>
           <select className="h-10 w-full rounded border bg-card px-3 text-sm" value={selected.contactStage} onChange={(e) => patch({ contactStage: e.target.value })}>{STAGES.map((x) => <option key={x}>{x}</option>)}</select>
           <div className="flex flex-wrap gap-2">{SERVICE_INTERESTS.map((x) => <button key={x} className={`inline-block rounded-md border px-2.5 py-1.5 text-xs transition-colors ${selected.serviceInterests?.includes(x) ? 'border-primary bg-primary text-primary-foreground font-semibold' : 'bg-card text-muted-foreground hover:border-primary/40'}`} onClick={() => toggleService(x)}>{x}</button>)}</div>
           <textarea className="min-h-[72px] w-full resize-y rounded border bg-card px-3 py-2 text-sm" placeholder="Landlord notes" value={selected.notes || ''} onChange={(e) => setSelected({ ...selected, notes: e.target.value })} onBlur={() => patch({ notes: selected.notes })}/>
         </section>
         <section className="rounded border bg-card p-3.5 space-y-3">
           <div className="flex justify-between items-center gap-2">
-            <h3>TruePeopleSearch Contact Extractor</h3>
+            <h3 className="text-base font-semibold">TruePeopleSearch Contact Extractor</h3>
             <button className="inline-flex items-center gap-1.5 rounded border bg-card px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50 disabled:pointer-events-none" onClick={truePeopleSearch}><ExternalLink className="h-4 w-4"/>Open search</button>
           </div>
           <textarea className="min-h-[120px] w-full resize-y rounded border bg-card px-3 py-2 font-mono text-xs" placeholder="Paste all text from TruePeopleSearch; name, phones, and emails will be extracted." value={rawText} onChange={(e) => setRawText(e.target.value)}/>
@@ -284,13 +284,13 @@ export default function EvictionLeadsView() {
       </div>
 
       <section className="rounded border bg-card p-3.5 space-y-2">
-        <h3>Contacts</h3>
+        <h3 className="text-base font-semibold">Contacts</h3>
         {(selected.contacts?.phoneRows || []).flatMap((r) => r.phones.map((p, i) => <div key={`${r.name}-${i}`} className="flex gap-2 text-sm"><span className="font-semibold">{r.name || selected.name}</span><a className="text-primary record" href={`tel:${p.number}`}>{p.number}</a><span className="text-muted-foreground">{p.type || ''} {p.source ? `· ${p.source}` : ''}</span></div>))}
         {(selected.contacts?.emailRows || []).flatMap((r) => r.emails.map((e) => <div key={e} className="text-sm"><span className="font-semibold mr-2">{r.name}</span><a className="text-primary" href={`mailto:${e}`}>{e}</a></div>))}
       </section>
 
       <section className="rounded border bg-card p-3.5 space-y-3">
-        <h3>Outreach &amp; Follow-up</h3>
+        <h3 className="text-base font-semibold">Outreach &amp; Follow-up</h3>
         <div className="grid grid-cols-1 md:grid-cols-[160px_minmax(0,1fr)_auto] items-center gap-[9px]">
           <select className="h-10 w-full rounded border bg-card px-3 text-sm" value={activityKind} onChange={(e) => setActivityKind(e.target.value)}><option value="call">Call outcome</option><option value="text">Text</option><option value="email">Email</option><option value="note">Note</option></select>
           <input className="h-10 w-full rounded border bg-card px-3 text-sm" placeholder="Outcome or activity notes" value={activityBody} onChange={(e) => setActivityBody(e.target.value)}/>
@@ -305,16 +305,16 @@ export default function EvictionLeadsView() {
       </section>
 
       <section className="rounded border bg-card p-3.5">
-        <h3 className="mb-2">Addresses Represented</h3>
-        <div className="grid md:grid-cols-2 gap-2">{selected.addresses.map((a) => <div key={a.id} className="rounded bg-muted p-2 text-sm">{a.address}, {a.city}, {a.state} {a.zip}</div>)}</div>
+        <h3 className="mb-2 text-base font-semibold">Addresses Represented</h3>
+        <div className="grid md:grid-cols-2 gap-2">{selected.addresses.map((a) => <div key={a.id} className="rounded bg-muted p-2 text-sm record">{a.address}, {a.city}, {a.state} {a.zip}</div>)}</div>
       </section>
 
       <section className="rounded border bg-card p-3.5">
-        <h3 className="mb-2">Eviction Filings</h3>
+        <h3 className="mb-2 text-base font-semibold">Eviction Filings</h3>
         <div className="max-h-72 overflow-auto">
           <table className="data-table text-xs">
             <thead><tr>{['Case', 'Filed', 'Status', 'Precinct', 'Disposition', 'Plaintiff Address'].map((x) => <th key={x}>{x}</th>)}</tr></thead>
-            <tbody>{selected.filings.map((f) => <tr key={f.id} style={{ cursor: 'default' }}><td className="record">{f.caseNumber}</td><td className="whitespace-nowrap record">{fmt(f.filedDate)}</td><td>{f.caseStatus}</td><td>{f.precinct}</td><td>{f.disposition}</td><td>{f.plaintiffAddress}</td></tr>)}</tbody>
+            <tbody>{selected.filings.map((f) => <tr key={f.id} style={{ cursor: 'default' }}><td className="record">{f.caseNumber}</td><td className="whitespace-nowrap record">{fmt(f.filedDate)}</td><td>{f.caseStatus}</td><td>{f.precinct}</td><td>{f.disposition}</td><td className="record">{f.plaintiffAddress}</td></tr>)}</tbody>
           </table>
         </div>
       </section>

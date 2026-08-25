@@ -66,7 +66,7 @@ export function MapPage() {
   return (
     <div className="p-6 flex flex-col h-full">
       <div className="mb-4">
-        <p className="crm-kicker text-[10px] uppercase text-muted-foreground mb-1">Geography</p>
+        <p className="label mb-1">Geography</p>
         <h1 className="text-2xl font-semibold">Map</h1>
         <p className="text-sm text-muted-foreground">
           Landlord mailing addresses from eviction filings &mdash; not verified rental locations

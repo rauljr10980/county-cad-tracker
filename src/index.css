@@ -23,6 +23,7 @@
     --navy-mid:     210 51% 24%;
     --navy-soft:    209 35% 32%;
     --ink-faint:    211 11% 59%;
+    --ink-dim:      208 13% 38%;
     --gold:          40 69% 36%;
     --gold-soft:     41 54% 87%;
     --brick:          5 59% 41%;
@@ -47,10 +48,10 @@
     --primary:               210 54% 16%;
     --primary-foreground:      0 0% 100%;
 
-    --secondary:             210 33% 98%;
+    --secondary:             210 22% 95%;
     --secondary-foreground:  210 49% 12%;
 
-    --muted:                 210 33% 98%;
+    --muted:                 210 22% 95%;
     --muted-foreground:      208 13% 38%;
 
     --accent:                 40 69% 36%;
@@ -140,7 +141,8 @@
   }
 
   .data-table th {
-    @apply text-left text-muted-foreground font-medium px-3 py-2 border-b border-border bg-secondary/50;
+    @apply text-left uppercase tracking-[0.13em] text-[10px] font-semibold px-3 py-2 border-b border-border bg-secondary/50;
+    color: hsl(var(--ink-dim));
   }
 
   .data-table td {
@@ -179,10 +181,7 @@
 @layer utilities {
   .font-mono {
     font-family: var(--font-mono);
-  }
-
-  .text-gradient {
-    @apply bg-gradient-to-r from-primary to-[hsl(142,72%,46%)] bg-clip-text text-transparent;
+    font-variant-numeric: tabular-nums;
   }
 
   .animate-pulse-slow {
@@ -308,12 +307,12 @@
     letter-spacing: 0.13em;
     text-transform: uppercase;
     font-weight: 600;
-    color: hsl(var(--ink-faint));
+    color: hsl(var(--ink-dim));
   }
 
   /* Record values — addresses, dates, counts, case numbers. Never prose. */
   .record {
-    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
 }

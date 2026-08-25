@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Header } from '@/components/layout/Header';
-import { TabType } from '@/components/layout/TabNavigation';
+import { TabType } from '@/components/layout/navItems';
 import { NavRail } from '@/components/layout/NavRail';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { PropertiesView } from '@/components/properties/PropertiesView';

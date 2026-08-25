@@ -1,4 +1,5 @@
 import { ArrowLeft, Gavel, KanbanSquare, LayoutDashboard, MapPin, Users } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export type CrmSection = 'dashboard' | 'pipeline' | 'leads' | 'map';
 
@@ -28,24 +29,31 @@ export function CrmSidebar({ section, onSectionChange, onExit }: Props) {
         </div>
         <div className="leading-tight">
           <p className="text-sm font-semibold text-white">Evictions CRM</p>
-          <p className="crm-kicker label text-white/70">Workspace</p>
+          <p className="label text-white/70">Workspace</p>
         </div>
       </div>
 
-      {ITEMS.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          onClick={() => onSectionChange(id)}
-          data-active={section === id}
-          className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left transition-colors ${
-            section === id ? 'text-white font-medium' : 'text-white/60 hover:text-white'
-          }`}
-          style={section === id ? { backgroundColor: 'hsl(var(--navy-mid))' } : undefined}
-        >
-          <Icon className="h-4 w-4" />
-          {label}
-        </button>
-      ))}
+      <nav aria-label="Sections" className="flex flex-col gap-1">
+        {ITEMS.map(({ id, label, icon: Icon }) => {
+          const isActive = section === id;
+          return (
+            <button
+              key={id}
+              onClick={() => onSectionChange(id)}
+              aria-current={isActive ? 'page' : undefined}
+              className={cn(
+                'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left transition-colors',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+                isActive ? 'text-white font-medium' : 'text-white/60 hover:text-white'
+              )}
+              style={isActive ? { backgroundColor: 'hsl(var(--navy-mid))' } : undefined}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
 
       <button
         onClick={onExit}
