@@ -72,13 +72,18 @@ and mapping or geocoding these properties.
 
 ## Decisions
 
-**`mlsOwnerName` and `cadOwnerName`, not `seller` and `buyer`.** The `Owner`
-column is the owner at listing time. On a sold row that is the seller; on the
-1,571 rows that did not sell it is simply the current owner. Naming the field
-`sellerName` would be wrong on two-thirds of the data. On a sold row the two
-fields are seller and buyer; on a live or expired row they should agree, and a
-disagreement is a title change the MLS did not report — a signal worth seeing
-rather than a bug.
+**Contacts carry a `role` — `mls_owner` or `cad_owner` — not `seller` and
+`buyer`.** The `Owner` column is the owner at listing time. On a sold row that
+is the seller; on the 1,571 rows that did not sell it is simply the current
+owner. A field named `sellerName` would be wrong on two-thirds of the data. The
+role says where the name came from, which is always true; whether that makes the
+person a seller is a question of the property's status. On a live or expired row
+the two roles should name the same person, and a disagreement is a title change
+the MLS did not report — a signal worth seeing rather than a bug.
+
+Names live only on `MlsContact`. The lead keeps lookup metadata
+(`cadLookupAt`, `cadLookupStatus`) because whether a lookup ran is a fact about
+the property, not about a person.
 
 **Per-user from day one, keyed `@@unique([userId, mlsNumber])`.**
 `PreForeclosure` makes `documentNumber` globally unique; that is wrong here.
@@ -110,12 +115,14 @@ New model `MlsLead`:
   `yearBuilt`, `propertyType`, `construction`, `builderName`
 - **County records:** `legalDescription`, `countyAccountNumber`, `taxPropId`
 - **Agents:** `listAgent`, `listAgentPhone`, `sellingAgent`, `sellingAgentPhone`
-- **Owner from the file:** `mlsOwnerName`, `mlsOwnerKind`
-- **Owner from CAD:** `cadOwnerName`, `cadOwnerAddress`, `cadLookupAt`,
-  `cadLookupStatus`
-- **Contact:** `phoneNumbers[]`, `emails[]`
-- **Working fields:** `workflowStage`, `notes`, `nextFollowUpDate`
+- **Raw owner:** `mlsOwnerRaw` — the `Owner` cell exactly as imported, kept
+  even when it classifies as junk, so a corrected classifier can be re-run
+  without re-importing
+- **Lookup metadata:** `cadLookupAt`, `cadLookupStatus`
+- **Working fields:** `notes`
 - `createdAt`, `updatedAt`
+
+Contact details and workflow state do not live here — see Contacts below.
 
 `userId` is nullable in the schema for the same reason as the CRM design:
 Railway runs `prisma db push --accept-data-loss`, and a required column with no
@@ -124,6 +131,108 @@ default fails against a populated table. It is always set in application code.
 `price` is `LP/SP` — list price on active rows, sale price on sold ones. Stored
 once and interpreted by status; the UI labels it accordingly rather than
 pretending it means one thing.
+
+## Contacts
+
+A sold property has two people worth calling: the seller the file names and the
+buyer the lookup returns. A single `workflowStage` on the property cannot record
+"called the seller, have not called the buyer" — and that distinction is the
+whole point of the feature. Skip tracing, calling, and following up all happen
+against a person, not a parcel.
+
+So contact state lives in a child model, `MlsContact`:
+
+- `mlsLeadId`, `role` — `mls_owner` or `cad_owner`
+- `name`, `nameKind` (the classification), `searchName` (normalised)
+- `mailingAddress`, `phoneNumbers[]`, `emails[]`
+- `workflowStage`, `workflowLog`, `notes`
+- `@@unique([mlsLeadId, role])`, `onDelete: Cascade`
+
+A property has one contact on import (`mls_owner`) and gains a second when a
+lookup returns a different current owner. On a sold row those are seller and
+buyer. Where the two names agree, no second contact is created — there is one
+person to call, not two records of them.
+
+Only `person` and `entity` contacts are created. A `junk`, `addressLike`, or
+`blank` owner produces no contact, which is what keeps the 173 `"see agent"`
+rows out of the call list without discarding the listing itself.
+
+## Workflow
+
+The existing `WORKFLOW_STAGES` machine in `src/types/property.ts` is reused as a
+*mechanism* — a stage with a question, outcomes that name the next stage, an
+appended `WorkflowLogEntry` per transition, and a task auto-created on entering
+certain stages — but not as a *vocabulary*. Its twelve stages describe distressed
+door-knocking: `initial_visit`, `visit_heirs`, `call_heirs`, `land_records`.
+None of that happens here. Reusing those labels would leave every MLS lead
+sitting in stages that describe work nobody is doing.
+
+MLS contacts get their own stage set, on the same engine:
+
+| stage | question | outcomes |
+| --- | --- | --- |
+| `not_started` | — | Begin → `needs_skip_trace` |
+| `needs_skip_trace` | Did you find a number? | Found → `ready_to_call`; Nothing → `dead` |
+| `ready_to_call` | — | Call made → `attempted` |
+| `attempted` | Did they pick up? | Spoke → `spoke`; No answer → `attempted`; Give up → `dead` |
+| `spoke` | What do they want? | Sell → `negotiating`; Buy more → `buyer_interest`; Not now → `nurture`; No → `dead` |
+| `nurture` | — | Ready now → `spoke`; Done → `dead` |
+| `buyer_interest` | — | Has inventory → `negotiating`; Done → `dead` |
+| `negotiating` | — | Offer sent → `sent_offer`; Fell through → `dead` |
+| `sent_offer` | Accepted? | Yes → `closed` (terminal, success); No → `dead` |
+| `closed` | — | terminal, success |
+| `dead` | — | terminal, failure |
+
+A contact whose `nameKind` is `entity` starts at `needs_skip_trace` like any
+other, but is flagged in the UI as not directly traceable — reaching it needs the
+CAD mailing address or a registered-agent search, which is out of scope.
+
+Entering `ready_to_call` or `attempted` auto-creates a call task, mirroring
+`STAGE_TASK_MAP`. Entering `nurture` schedules a follow-up rather than a task.
+
+## Follow-ups
+
+`FollowUp` is already polymorphic across `propertyId`, `preforeclosureId`, and
+`drivingLeadId`. Add `mlsLeadId` with the same nullable-FK-plus-cascade shape and
+an index. Follow-ups attach at the property level, matching the existing three;
+the note names which contact it concerns.
+
+Three call sites must be extended or MLS follow-ups will be created and then
+silently fail to appear:
+
+- `functions/src/routes/followups.js` — `GET /` must include the MLS relation the
+  way it includes the other three, or the records come back without the data the
+  calendar needs to label them
+- `src/components/calendar/CalendarView.tsx:115-117` — label resolution checks
+  `fu.drivingLead`, `fu.property`, `fu.preForeclosure` in turn and falls through
+  to a generic string; without an MLS branch these render unlabelled
+- `src/components/calendar/CalendarView.tsx:159` — `kind` is derived from
+  `fu.drivingLeadId`, so MLS follow-ups need to resolve to a sensible kind rather
+  than defaulting
+
+This is the part most likely to be declared done while broken: creating the
+follow-up works, and the failure only shows up on the calendar screen.
+
+## Property details
+
+Each property opens a details view covering, in tabbed sections:
+
+- **Property** — address, county, status with its transition history, units,
+  square feet, year built, type, construction, price interpreted by status, days
+  on market, legal description, and the county account and tax IDs
+- **Contacts** — one panel per `MlsContact` with name and kind, phones, emails,
+  mailing address, current stage, and the stage control that drives the workflow
+- **Activity** — the merged `workflowLog` across contacts and the follow-up
+  history, newest first
+- **Research** — the prefilled `bexar.tx.publicsearch.us` deed link, a
+  people-search link built from `searchName`, and the lookup status with its
+  timestamp
+
+`src/components/preforeclosure/FullDetailsModal.tsx` is the closest existing
+analogue and should be read for its patterns — particularly the deed link at
+line 359 — but not copied. It is 1,486 lines in a single file. Build this as
+one component per tab so each stays reviewable, and so a change to the contacts
+panel cannot break the property panel.
 
 ## Owner classification
 
@@ -194,13 +303,13 @@ An explicit `unsupported_county` state matters: without it 384 rows sit at
 A `Custom MLS Leads` entry in the nav rail, scoped to the signed-in user.
 
 The working list is a table filterable by status group (sold / failed / active),
-county, unit count, and price. Columns cover address, status, units, price,
-`mlsOwnerName` with its kind, `cadOwnerName`, and lookup status.
+county, unit count, price, and contact stage. Columns cover address, status,
+units, price, the contact names with their kinds, lookup status, and next
+follow-up date. Opening a row opens the property details view above.
 
-Each property carries a deed-search link opening
-`bexar.tx.publicsearch.us` prefilled with the address — the pattern already used
-at `src/components/preforeclosure/FullDetailsModal.tsx:359` — so the chain of
-title can be checked by hand where the automated lookup does not reach.
+A lead's row shows the furthest-along stage across its contacts, so a property
+where the seller is dead but the buyer is negotiating reads as negotiating
+rather than dead.
 
 ## Testing
 
@@ -218,13 +327,32 @@ config already collects:
   status leaves both alone
 - lookup ordering puts sold-in-Bexar first, and non-Bexar rows get
   `unsupported_county` rather than being attempted
+- contacts are created for `person` and `entity` owners and not for `junk`,
+  `addressLike`, or `blank`
+- a lookup returning the same name as the file creates no second contact; a
+  different name creates the `cad_owner` contact
+- every workflow stage's outcomes name a stage that exists, every non-terminal
+  stage has at least one outcome, and both terminal stages have none — a
+  transition table is worth nothing if an outcome can point at a typo
+- a stage transition appends a `WorkflowLogEntry` recording both the old and new
+  stage, and does not overwrite earlier entries
+- the list's row stage is the furthest-along across a property's contacts
+
+Frontend tests with Vitest and React Testing Library, matching the existing
+convention that `@testing-library/jest-dom` is not installed:
+
+- a follow-up created against an MLS lead renders on the calendar with the
+  property's address as its label, not a generic fallback — the specific failure
+  the follow-up call sites invite
 
 ## Risks
 
 **The `Owner` heuristic will misclassify.** A person named "Trust" or a company
-without a suffix lands in the wrong bucket. Misclassification only affects
-whether a row is offered for calling, and `mlsOwnerKind` is stored so a bad
-rule can be re-run over existing rows rather than needing a re-import.
+without a suffix lands in the wrong bucket. Misclassification decides whether a
+contact is created at all, so a row wrongly called junk disappears from the call
+list entirely — the failure is silent. `mlsOwnerRaw` is retained on the lead for
+exactly this case: a corrected classifier can be re-run across stored rows and
+create the contacts it should have created, without re-importing the files.
 
 **Scraper fragility.** `ownerLookup.js` drives a headless browser against a
 county site that can change without notice. It already has this exposure through
