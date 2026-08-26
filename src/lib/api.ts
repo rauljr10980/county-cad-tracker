@@ -16,8 +16,8 @@ const getApiBaseUrl = () => {
     return 'https://county-cad-tracker-production.up.railway.app';
   }
   
-  // In development, use localhost
-  return 'http://localhost:8080';
+  // The API is hosted on Railway in both production and local frontend development.
+  return 'https://county-cad-tracker-production.up.railway.app';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
@@ -706,7 +706,7 @@ export async function login(username: string, password: string) {
   });
   
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json().catch(() => ({}));
     throw new Error(error.error || 'Login failed');
   }
   
