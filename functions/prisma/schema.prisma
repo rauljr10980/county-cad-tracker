@@ -35,6 +35,7 @@ model User {
   drivingLeads      DrivingLead[]
   activityLogs      ActivityLog[]
   evictionLandlords EvictionLandlord[] @relation("EvictionAssignee")
+  crmLeads          CrmLead[]
 
   @@index([email])
   @@index([username])
@@ -812,7 +813,9 @@ model CrmLead {
   letterCadenceDays     Int?
   lastContactedAt       DateTime?
   createdAt             DateTime  @default(now())
+  userId                String?
 
+  user       User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   deals      CrmDeal[]
   tasks      CrmTask[]
   activities CrmActivity[]
@@ -820,6 +823,7 @@ model CrmLead {
   @@index([kind])
   @@index([industry])
   @@index([createdAt])
+  @@index([userId])
   @@map("crm_leads")
 }
 
