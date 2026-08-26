@@ -1,13 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NavRail } from './NavRail';
+import { visibleTabs } from './navItems';
 
 describe('NavRail', () => {
   it('renders every visible tab', () => {
     render(<NavRail activeTab="dashboard" onTabChange={() => {}} />);
     expect(screen.getByRole('button', { name: 'Dashboard' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Eviction List/ })).toBeTruthy();
-    expect(screen.getAllByRole('button').length).toBeGreaterThanOrEqual(8);
+    expect(screen.getAllByRole('button')).toHaveLength(visibleTabs.length);
   });
 
   it('marks only the active tab with aria-current', () => {
