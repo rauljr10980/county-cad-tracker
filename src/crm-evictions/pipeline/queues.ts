@@ -5,6 +5,11 @@
  * a follow-up set for 00:30 today is due today, not eighteen hours overdue.
  * UTC matches the backend's queue boundaries, so a row's label and the tab it
  * appears under always agree.
+ *
+ * Required co-edit: `functions/src/lib/pipelineQueues.js` hand-copies these
+ * seven queue ids into its own `QUEUES` array because the backend is
+ * CommonJS and cannot import this ESM module. Update both whenever a queue
+ * id is added, renamed, or removed here.
  */
 
 export const QUEUES = [

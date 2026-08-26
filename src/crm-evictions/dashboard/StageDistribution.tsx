@@ -1,7 +1,11 @@
 import { STAGES } from '../constants';
 import type { CrmStats } from '../types/crm';
 
-export function StageDistribution({ stats, onSelectStage }: { stats: CrmStats; onSelectStage?: (stage: string) => void }) {
+// The Pipeline screen has no stage control (the work queue replaced it), so a
+// bar click cannot land on "this stage" there — only `onOpenPipeline` (no
+// argument) is honored. Keep the bars clickable regardless: opening the
+// Pipeline at all is still useful, just not stage-filtered.
+export function StageDistribution({ stats, onOpenPipeline }: { stats: CrmStats; onOpenPipeline?: () => void }) {
   const max = Math.max(1, ...STAGES.map((s) => stats.byStage[s] || 0));
 
   return (
@@ -13,7 +17,7 @@ export function StageDistribution({ stats, onSelectStage }: { stats: CrmStats; o
           return (
             <button
               key={stage}
-              onClick={() => onSelectStage?.(stage)}
+              onClick={() => onOpenPipeline?.()}
               className="w-full flex items-center gap-3 text-sm hover:bg-muted/40 rounded px-1 py-0.5"
             >
               <span className="w-40 shrink-0 text-left text-muted-foreground">{stage}</span>

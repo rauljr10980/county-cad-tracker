@@ -8,8 +8,8 @@ import { QueueTabs } from './QueueTabs';
 import { PipelineTable } from './PipelineTable';
 import type { QueueId } from './queues';
 
-export function PipelinePage() {
-  const [queue, setQueue] = useState<QueueId>('needsContact');
+export function PipelinePage({ initialQueue = 'needsContact' }: { initialQueue?: QueueId }) {
+  const [queue, setQueue] = useState<QueueId>(initialQueue);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [counts, setCounts] = useState<PipelineCounts | null>(null);
   const [total, setTotal] = useState(0);
@@ -47,8 +47,8 @@ export function PipelinePage() {
           <p className="label mb-1">Bexar County · Eviction filings</p>
           <h1 className="text-2xl font-semibold">Pipeline</h1>
         </div>
-        <p className="record text-sm text-muted-foreground">
-          {counts ? `${counts.all.toLocaleString()} owners` : ' '}
+        <p className="text-sm text-muted-foreground">
+          {counts ? <><span className="record">{counts.all.toLocaleString()}</span> owners</> : ' '}
         </p>
       </div>
 
@@ -60,8 +60,12 @@ export function PipelinePage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <p className="record text-sm text-muted-foreground md:justify-self-end">
-          {loading ? ' ' : `${leads.length.toLocaleString()} of ${total.toLocaleString()}`}
+        <p className="text-sm text-muted-foreground md:justify-self-end">
+          {loading ? ' ' : (
+            <>
+              <span className="record">{leads.length.toLocaleString()}</span> of <span className="record">{total.toLocaleString()}</span>
+            </>
+          )}
         </p>
       </div>
 

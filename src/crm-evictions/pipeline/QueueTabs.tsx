@@ -17,7 +17,7 @@ export function QueueTabs({
   onChange: (queue: QueueId) => void;
 }) {
   return (
-    <div className="flex gap-1 overflow-x-auto border-b" role="tablist" aria-label="Work queues">
+    <nav className="flex gap-1 overflow-x-auto border-b" aria-label="Work queues">
       {QUEUES.map((q) => {
         const isActive = active === q.id;
         const count = counts ? counts[q.id] : null;
@@ -26,8 +26,7 @@ export function QueueTabs({
           <button
             key={q.id}
             type="button"
-            role="tab"
-            aria-selected={isActive}
+            aria-current={isActive ? 'page' : undefined}
             onClick={() => onChange(q.id)}
             className={cn(
               'flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors',
@@ -43,6 +42,6 @@ export function QueueTabs({
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }

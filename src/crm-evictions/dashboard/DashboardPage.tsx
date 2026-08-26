@@ -26,7 +26,7 @@ export function DashboardPage({ onOpenPipeline }: { onOpenPipeline: () => void }
       </div>
       <KpiTiles stats={stats} />
       <div className="grid lg:grid-cols-2 gap-4">
-        <StageDistribution stats={stats} onSelectStage={onOpenPipeline} />
+        <StageDistribution stats={stats} onOpenPipeline={onOpenPipeline} />
         <div className="rounded-lg border bg-card p-4">
           <h3 className="text-sm font-semibold mb-3">Assigned</h3>
           {stats.byAssignee.length === 0 && <p className="text-sm text-muted-foreground">No leads assigned yet.</p>}
