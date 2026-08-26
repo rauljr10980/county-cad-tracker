@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useCrmStore } from '@/crm/store/useCrmStore';
+import { useAuth } from '@/contexts/AuthContext';
 import ContactsView from '@/crm/views/ContactsView';
 import OpportunitiesView from '@/crm/views/OpportunitiesView';
 import CrmTasksView from '@/crm/views/CrmTasksView';
@@ -20,12 +21,13 @@ const crmTabs: { id: CrmTab; label: string; icon: React.ElementType }[] = [
 export function CrmView() {
   const hydrate = useCrmStore((s) => s.hydrate);
   const hydrateError = useCrmStore((s) => s.hydrateError);
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<CrmTab>('contacts');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    hydrate(new Date()).then(() => setLoaded(true));
-  }, [hydrate]);
+    hydrate(new Date(), user?.id).then(() => setLoaded(true));
+  }, [hydrate, user?.id]);
 
   if (!loaded) {
     return (
@@ -45,7 +47,7 @@ export function CrmView() {
         <AlertTriangle className="h-8 w-8 text-destructive" />
         <p className="text-sm font-medium text-foreground">Couldn't load your CRM data</p>
         <p className="max-w-sm text-xs text-muted-foreground">{hydrateError}</p>
-        <Button size="sm" onClick={() => hydrate(new Date())}>
+        <Button size="sm" onClick={() => hydrate(new Date(), user?.id)}>
           Try again
         </Button>
       </div>

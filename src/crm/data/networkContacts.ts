@@ -107,8 +107,14 @@ const slug = (value: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
 
-export const networkLeadId = (record: NetworkContactRecord): string =>
-  `network-${slug(`${record.category}-${record.name}-${record.company || record.city || 'contact'}`)}`
+// Ids are namespaced per owner (`network-<ownerKey>-...`) because the backend
+// enforces that a lead/deal/task/activity id belongs to exactly one account.
+// Minting the same id for every user (as this used to do, keyed only on
+// static contact content) meant every account but the one that saved first
+// got a 409 on every future save. See networkLeadIdPattern below for how
+// namespaced ids are still recognized as "network seed data" on re-hydrate.
+export const networkLeadId = (record: NetworkContactRecord, ownerKey: string): string =>
+  `network-${slug(ownerKey)}-${slug(`${record.category}-${record.name}-${record.company || record.city || 'contact'}`)}`
 
 const textFor = (record: NetworkContactRecord): string =>
   `${record.category} ${record.company} ${record.asset} ${record.specialization} ${record.notes}`.toLowerCase()
@@ -184,8 +190,8 @@ const metaNotesFor = (record: NetworkContactRecord): string =>
     .filter(Boolean)
     .join('\n')
 
-const contactToLead = (record: NetworkContactRecord, now: Date, index: number): Lead => ({
-  id: networkLeadId(record),
+const contactToLead = (record: NetworkContactRecord, now: Date, index: number, ownerKey: string): Lead => ({
+  id: networkLeadId(record, ownerKey),
   businessName: record.company || record.name,
   ownerName: record.name,
   jobTitleIndustry: record.category,
@@ -211,7 +217,8 @@ const contactToLead = (record: NetworkContactRecord, now: Date, index: number): 
 
 type OpportunityDemo = { lead: Lead; deal: Deal }
 
-const buildOpportunityDemos = (now: Date): OpportunityDemo[] => {
+const buildOpportunityDemos = (now: Date, ownerKey: string): OpportunityDemo[] => {
+  const ownerSlug = slug(ownerKey)
   const make = (
     suffix: string,
     name: string,
@@ -225,7 +232,7 @@ const buildOpportunityDemos = (now: Date): OpportunityDemo[] => {
   ): OpportunityDemo => {
     const createdAt = dayOffset(now, -ageDays)
     const lead: Lead = {
-      id: `network-opp-${suffix}`,
+      id: `network-${ownerSlug}-opp-${suffix}`,
       businessName: firm,
       ownerName: name,
       jobTitleIndustry: 'Brokers',
@@ -247,7 +254,7 @@ const buildOpportunityDemos = (now: Date): OpportunityDemo[] => {
       createdAt,
     }
     const deal: Deal = {
-      id: `network-opp-deal-${suffix}`,
+      id: `network-${ownerSlug}-opp-deal-${suffix}`,
       leadId: lead.id,
       stage,
       value,
@@ -274,21 +281,23 @@ const needsFollowUpTask = (record: NetworkContactRecord): boolean => {
 export const buildNetworkStateFromRecords = (
   records: NetworkContactRecord[],
   now: Date,
+  ownerKey: string,
 ): CrmState => {
-  const industryLeads = records.map((record, index) => contactToLead(record, now, index))
-  const opportunityDemos = buildOpportunityDemos(now)
+  const ownerSlug = slug(ownerKey)
+  const industryLeads = records.map((record, index) => contactToLead(record, now, index, ownerKey))
+  const opportunityDemos = buildOpportunityDemos(now, ownerKey)
   const leads = [...industryLeads, ...opportunityDemos.map((entry) => entry.lead)]
   const deals: Deal[] = opportunityDemos.map((entry) => entry.deal)
   const activities: Activity[] = [
     ...industryLeads.map((lead, index) => ({
-      id: `network-activity-${String(index + 1).padStart(4, '0')}`,
+      id: `network-${ownerSlug}-activity-${String(index + 1).padStart(4, '0')}`,
       leadId: lead.id,
       kind: 'created' as const,
       body: `Imported from RE network.xlsx`,
       timestamp: lead.createdAt,
     })),
     ...opportunityDemos.map((entry, index) => ({
-      id: `network-opp-activity-${String(index + 1).padStart(4, '0')}`,
+      id: `network-${ownerSlug}-opp-activity-${String(index + 1).padStart(4, '0')}`,
       leadId: entry.lead.id,
       kind: 'stage-change' as const,
       body: 'Moved contact into Opportunities',
@@ -296,11 +305,15 @@ export const buildNetworkStateFromRecords = (
     })),
   ]
 
+  // Task ids have the identical defect (globally constant, so a second
+  // account's client 409s the moment it saves one of these) even though it
+  // wasn't in the original enumerated list — namespacing it for the same
+  // reason as its four siblings above.
   const tasks: Task[] = records.flatMap((record, index) => {
     if (!needsFollowUpTask(record)) return []
     const lead = industryLeads[index]
     return [{
-      id: `network-task-${String(index + 1).padStart(4, '0')}`,
+      id: `network-${ownerSlug}-task-${String(index + 1).padStart(4, '0')}`,
       leadId: lead.id,
       type: taskTypeFor(record),
       dueAt: dayOffset(now, (index % 5) + 1),
@@ -324,10 +337,15 @@ export const buildNetworkStateFromRecords = (
   }
 }
 
-export const buildNetworkState = (now: Date): CrmState =>
-  buildNetworkStateFromRecords(NETWORK_CONTACTS, now)
+export const buildNetworkState = (now: Date, ownerKey: string): CrmState =>
+  buildNetworkStateFromRecords(NETWORK_CONTACTS, now, ownerKey)
 
 const demoLeadIdPattern = /^lead-\d{4}$/
+// Namespaced ids are still `network-<ownerKey>-...`, so this keeps matching
+// every network-seeded lead regardless of which owner's namespace minted it —
+// including legacy un-namespaced rows from before this fix. That is what
+// lets a hydrate cleanly replace an account's old network-* rows (whatever
+// shape their ids are in) with the current namespaced set.
 const networkLeadIdPattern = /^network-/
 
 type ReplaceNetworkContactsOptions = {
@@ -339,13 +357,14 @@ export const replaceNetworkContacts = (
   state: CrmState,
   records: NetworkContactRecord[],
   now: Date,
+  ownerKey: string,
   options: ReplaceNetworkContactsOptions = {},
 ): CrmState => {
   const {
     preserveLocalRelationshipState = true,
     preserveLocalNotes = false,
   } = options
-  const networkState = buildNetworkStateFromRecords(records, now)
+  const networkState = buildNetworkStateFromRecords(records, now, ownerKey)
   const existingById = new Map(state.leads.map((lead) => [lead.id, lead]))
   const demoIds = new Set(
     state.leads
@@ -404,8 +423,15 @@ export const replaceNetworkContacts = (
   }
 }
 
-export const mergeNetworkState = (state: CrmState, now: Date): CrmState =>
-  replaceNetworkContacts(state, NETWORK_CONTACTS, now, {
+// ownerKey is the signed-in user's id. Without one there is no namespace to
+// mint ids under, and injecting un-namespaced (globally constant) ids is
+// exactly the bug this is here to prevent — so this is a deliberate no-op
+// rather than falling back to some default namespace. It is safe to skip:
+// the next hydrate that does have an ownerKey will inject normally.
+export const mergeNetworkState = (state: CrmState, now: Date, ownerKey?: string): CrmState => {
+  if (!ownerKey) return state
+  return replaceNetworkContacts(state, NETWORK_CONTACTS, now, ownerKey, {
     preserveLocalRelationshipState: true,
     preserveLocalNotes: true,
   })
+}

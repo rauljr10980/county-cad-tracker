@@ -38,7 +38,7 @@ type HydrationState = {
 }
 
 type Actions = {
-  hydrate: (now: Date) => Promise<void>
+  hydrate: (now: Date, ownerKey?: string) => Promise<void>
   addLead: (input: NewLeadInput) => Lead
   updateLead: (id: string, patch: Partial<Lead>) => void
   setLeadKind: (leadId: string, kind: LeadKind) => void
@@ -56,8 +56,8 @@ type Actions = {
   setTheme: (theme: 'light' | 'dark') => void
   setDefaultRetailLetterCadence: (days: number) => void
   setDefaultOpportunityOutreachMessage: (message: string) => void
-  resetToSeed: (now: Date) => void
-  importNetworkContacts: (records: NetworkContactRecord[], now: Date) => void
+  resetToSeed: (now: Date, ownerKey: string) => void
+  importNetworkContacts: (records: NetworkContactRecord[], now: Date, ownerKey: string) => void
   runStaleLeadAutomation: (now: Date) => void
 }
 
@@ -96,7 +96,7 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
     hydrated: false,
     hydrateError: null,
 
-    hydrate: async (now) => {
+    hydrate: async (now, ownerKey) => {
       const result = await dataService.load()
       if (!result.ok) {
         // Do not touch leads/deals/tasks/activities: on a first-ever hydrate
@@ -115,7 +115,15 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
         stored.activities.length === 0
 
       if (isGenuinelyEmpty) {
-        const seed = generateSeed(now)
+        // Seed ids are namespaced per owner (see networkContacts.ts), so
+        // without an ownerKey there is nothing safe to seed with — leave the
+        // account empty rather than mint globally-constant ids. The next
+        // hydrate that does have an ownerKey will seed normally.
+        if (!ownerKey) {
+          set({ ...EMPTY_STATE, hydrated: true, hydrateError: null })
+          return
+        }
+        const seed = generateSeed(now, ownerKey)
         set({ ...seed, hydrated: true, hydrateError: null })
         return
       }
@@ -135,7 +143,7 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
             "Hi, it was great meeting you. You mentioned you were thinking about buying — I'd love to sit down and chat to see how I can help. When would be a good time to connect?",
         },
       }
-      const next = mergeNetworkState(normalized, now)
+      const next = mergeNetworkState(normalized, now, ownerKey)
       set({ ...next, hydrated: true, hydrateError: null })
     },
 
@@ -511,14 +519,14 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
       persist(snapshot(next))
     },
 
-    resetToSeed: (now) => {
-      const seed = generateSeed(now)
+    resetToSeed: (now, ownerKey) => {
+      const seed = generateSeed(now, ownerKey)
       set({ ...seed, hydrated: true, hydrateError: null })
       persist(seed)
     },
 
-    importNetworkContacts: (records, now) => {
-      const next = replaceNetworkContacts(get(), records, now)
+    importNetworkContacts: (records, now, ownerKey) => {
+      const next = replaceNetworkContacts(get(), records, now, ownerKey)
       set(next)
       persist(snapshot(next))
     },
