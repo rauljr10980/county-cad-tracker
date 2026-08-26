@@ -63,6 +63,24 @@ router.get('/state', authenticateToken, async (req, res) => {
   }
 });
 
+// Rejects a child payload (deals/tasks/activities) that references, by primary
+// key, a row already owned by a different account. upsert() addresses rows by
+// id alone, so without this check a client could send another account's
+// child id and repoint its leadId onto its own lead.
+async function assertChildrenOwned(tx, model, ids, userId) {
+  if (!ids.length) return;
+  const existing = await tx[model].findMany({
+    where: { id: { in: ids } },
+    select: { id: true, lead: { select: { userId: true } } },
+  });
+  const foreign = existing.some((row) => row.lead.userId !== userId);
+  if (foreign) {
+    const err = new Error('Payload references records owned by another account');
+    err.code = FOREIGN_ID_CODE;
+    throw err;
+  }
+}
+
 // PUT /api/crm/state - bulk sync full CRM state
 router.put('/state', authenticateToken, async (req, res) => {
   const { leads = [], deals = [], tasks = [], activities = [] } = req.body;
@@ -102,6 +120,29 @@ router.put('/state', authenticateToken, async (req, res) => {
           throw err;
         }
       }
+
+      // Every child must hang off a lead this caller will own. At this point
+      // the lead foreign-id check above has proven every incoming lead id is
+      // either the caller's own or new (about to be created, owned, by the
+      // lead upsert loop below), so membership in incomingLeadIds is exactly
+      // "a lead this caller will own." Without this, a payload could create
+      // a child under another account's lead by leadId alone.
+      const knownLeadIds = new Set(incomingLeadIds);
+      const hasForeignLeadId = [...deals, ...tasks, ...activities].some(
+        (child) => !knownLeadIds.has(child.leadId)
+      );
+      if (hasForeignLeadId) {
+        const err = new Error('Payload references a lead not present in this save');
+        err.code = FOREIGN_ID_CODE;
+        throw err;
+      }
+
+      // A child id could still name a row another account already owns —
+      // upsert() addresses rows by id alone, so that would update the
+      // victim's row and repoint its leadId onto the caller's lead.
+      await assertChildrenOwned(tx, 'crmDeal', incomingDealIds, userId);
+      await assertChildrenOwned(tx, 'crmTask', incomingTaskIds, userId);
+      await assertChildrenOwned(tx, 'crmActivity', incomingActivityIds, userId);
 
       // Delete records removed on the client, within this account only
       await tx.crmActivity.deleteMany({ where: childDeleteWhere(userId, incomingActivityIds) });
