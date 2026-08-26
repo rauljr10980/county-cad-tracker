@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/layout/Header';
 import { TabType } from '@/components/layout/navItems';
 import { NavRail } from '@/components/layout/NavRail';
@@ -8,7 +8,6 @@ import { TasksView } from '@/components/tasks/TasksView';
 import { UploadView } from '@/components/upload/UploadView';
 import { FileHistory } from '@/components/files/FileHistory';
 import { PreForeclosureView } from '@/components/preforeclosure/PreForeclosureView';
-import { ForeclosureView } from '@/components/foreclosure/ForeclosureView';
 import { CrmView } from '@/components/crm/CrmView';
 import { DrivingView } from '@/components/driving/DrivingView';
 import { CalendarView } from '@/components/calendar/CalendarView';
@@ -22,13 +21,11 @@ import { PhoneSearchModal } from '@/components/phone/PhoneSearchModal';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
 import { Property } from '@/types/property';
 import { EvictionsCrmWorkspace } from '@/crm-evictions/shell/EvictionsCrmWorkspace';
-import { PasswordGateDialog } from '@/crm-evictions/auth/PasswordGateDialog';
-import { useCrmGrant } from '@/crm-evictions/auth/useCrmGrant';
 
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
   const hash = window.location.hash.slice(1); // Remove the #
-  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'foreclosure', 'crm', 'driving', 'evictions'];
+  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'crm', 'driving', 'evictions'];
   return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
 };
 
@@ -40,47 +37,15 @@ const Index = () => {
   const [isSignupOpen, setIsSignupOpen] = useState(false);
   const [isPhoneSearchOpen, setIsPhoneSearchOpen] = useState(false);
   const [phoneSearchResult, setPhoneSearchResult] = useState<Property | null>(null);
-  const [isCrmOpen, setIsCrmOpen] = useState(() => window.location.hash.slice(1) === 'evictions-crm');
-  const [isGateOpen, setIsGateOpen] = useState(false);
-  const { hasGrant, grant } = useCrmGrant();
-  // Set by onGranted just before it closes the dialog, so the onOpenChange
-  // handler below can tell "closed because granted" apart from "dismissed" —
-  // component state (isCrmOpen/hasGrant) hasn't re-rendered yet at that point,
-  // so it can't be used to distinguish the two.
-  const justGrantedRef = useRef(false);
-
-  // The workspace only ever renders when both are true; gate every hash/UI
-  // decision on that, not on isCrmOpen alone, so a stale isCrmOpen with no
-  // grant (e.g. a bookmark or a refresh inside the workspace) can't freeze
-  // hash syncing or strand the user on a route that renders nothing.
-  const isCrmVisible = isCrmOpen && hasGrant;
-
-  const openEvictionsCrm = () => {
-    if (hasGrant) { setIsCrmOpen(true); window.location.hash = 'evictions-crm'; }
-    else setIsGateOpen(true);
-  };
+  // The Evictions CRM workspace is reached only by the '#evictions-crm' hash —
+  // there is no menu entry and no password gate. It renders whenever that hash
+  // is present and the user is authenticated like any other route.
+  const [isCrmVisible, setIsCrmVisible] = useState(() => window.location.hash.slice(1) === 'evictions-crm');
 
   // Route back to the (already-valid) 'evictions' tab through activeTab rather
   // than writing the hash directly — the tab-to-hash effect below is the only
   // hash writer for real tabs, so this avoids a two-writer race against it.
-  const exitEvictionsCrm = () => { setIsCrmOpen(false); setActiveTab('evictions'); };
-
-  // If the page loads (or is refreshed) with #evictions-crm in the address bar
-  // but no live grant, prompt for the password instead of silently dropping
-  // the user on the dashboard with a dead URL. Gated on isAuthenticated so this
-  // can't arm the dialog while logged out — it would otherwise sit primed and
-  // pop open, unexplained, the instant login completes (the dialog only
-  // renders in the authenticated branch below). Re-runs when isAuthenticated
-  // flips to true so a hash present before auth resolves still gets picked up.
-  useEffect(() => {
-    if (isAuthenticated && isCrmOpen && !hasGrant) {
-      setIsGateOpen(true);
-    }
-    // isCrmOpen/hasGrant intentionally excluded: this should reflect state at
-    // load/auth-resolution time, not become a live subscription that reopens
-    // the dialog after the user closes it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
+  const exitEvictionsCrm = () => { setIsCrmVisible(false); setActiveTab('evictions'); };
 
   // Update URL hash when tab changes. This is the single writer for
   // activeTab-driven hash values; the CRM routes ('evictions-crm') are
@@ -90,17 +55,19 @@ const Index = () => {
     window.location.hash = activeTab;
   }, [activeTab, isCrmVisible]);
 
-  // Listen for hash changes (e.g., browser back/forward). Ignore the CRM hash
-  // here: entering the workspace (openEvictionsCrm / onGranted) writes
-  // '#evictions-crm' directly, which fires this same listener. getInitialTab()
-  // doesn't recognize that hash and would fall back to 'dashboard', clobbering
-  // whatever tab the user was actually on. Reading window.location.hash
-  // directly (rather than closing over isCrmVisible) matters because this
-  // effect has an empty dependency array and would otherwise capture a stale
-  // value.
+  // Listen for hash changes (e.g., browser back/forward). '#evictions-crm' is
+  // the only entry point to the workspace, so it is handled here rather than
+  // routed through activeTab — getInitialTab() doesn't recognize that hash and
+  // would fall back to 'dashboard'. Reading window.location.hash directly
+  // (rather than closing over isCrmVisible) matters because this effect has an
+  // empty dependency array and would otherwise capture a stale value.
   useEffect(() => {
     const handleHashChange = () => {
-      if (window.location.hash.slice(1) === 'evictions-crm') return;
+      if (window.location.hash.slice(1) === 'evictions-crm') {
+        setIsCrmVisible(true);
+        return;
+      }
+      setIsCrmVisible(false);
       setActiveTab(getInitialTab());
     };
 
@@ -147,8 +114,6 @@ const Index = () => {
         return <FileHistory />;
       case 'preforeclosure':
         return <PreForeclosureView />;
-      case 'foreclosure':
-        return <ForeclosureView />;
       case 'crm':
         return <CrmView />;
       case 'driving':
@@ -234,7 +199,7 @@ const Index = () => {
     <div className="flex h-dvh overflow-hidden bg-background">
       <NavRail activeTab={activeTab} onTabChange={setActiveTab} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header onRefresh={handleRefresh} isRefreshing={isRefreshing} onTabChange={setActiveTab} onOpenEvictionsCrm={openEvictionsCrm} />
+        <Header onRefresh={handleRefresh} isRefreshing={isRefreshing} onTabChange={setActiveTab} />
         <div className="flex-1 overflow-y-auto">
           <main className="container mx-auto animate-fade-in overflow-x-hidden">
             {renderContent()}
@@ -253,38 +218,6 @@ const Index = () => {
         property={phoneSearchResult}
         isOpen={!!phoneSearchResult}
         onClose={() => setPhoneSearchResult(null)}
-      />
-      <PasswordGateDialog
-        open={isGateOpen}
-        onOpenChange={(open) => {
-          setIsGateOpen(open);
-          if (open) return;
-          if (justGrantedRef.current) {
-            justGrantedRef.current = false;
-            return;
-          }
-          // Dismissed without granting. If this dialog was covering a stale
-          // #evictions-crm route (mount/refresh case), don't strand the user
-          // there. Just flip isCrmOpen off — isCrmVisible drops to false and
-          // the tab-to-hash effect (the single hash writer) takes it from
-          // there, syncing the hash back to the already-valid activeTab.
-          // This only works because isCrmVisible was already false (and the
-          // tab-to-hash effect had already overwritten '#evictions-crm' with
-          // activeTab's hash) back at mount, before the gate ever opened —
-          // setIsCrmOpen(false) here is a no-op for that effect's dependency
-          // and doesn't itself trigger a hash rewrite. A future fix for the
-          // address-bar flicker that defers that initial rewrite until the
-          // gate resolves must make dismissal correct the hash itself.
-          if (isCrmOpen && !hasGrant) {
-            setIsCrmOpen(false);
-          }
-        }}
-        onGranted={() => {
-          justGrantedRef.current = true;
-          grant();
-          setIsCrmOpen(true);
-          window.location.hash = 'evictions-crm';
-        }}
       />
     </div>
   );
