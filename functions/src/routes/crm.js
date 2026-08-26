@@ -229,7 +229,7 @@ router.put('/state', authenticateToken, async (req, res) => {
       });
     }
     if (err.code === FOREIGN_ID_CODE) {
-      return res.status(409).json({ error: 'Payload references records owned by another account' });
+      return res.status(409).json({ error: err.message });
     }
     console.error('[CRM] PUT /state error:', err);
     res.status(500).json({ error: 'Failed to sync CRM state' });
