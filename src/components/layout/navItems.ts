@@ -21,6 +21,6 @@ export const tabs = [
  * Hiding only removes the visual entry point — a hidden tab still renders when
  * reached by hash (e.g. #properties), so bookmarks and links keep working.
  */
-export const HIDDEN_TABS = new Set<TabType>([]);
+export const HIDDEN_TABS = new Set<TabType>(['foreclosure']);
 
 export const visibleTabs = tabs.filter((tab) => !HIDDEN_TABS.has(tab.id));
