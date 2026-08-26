@@ -110,11 +110,14 @@ New model `MlsLead`:
   `@@index([userId])`
 - **Status:** `status`, `previousStatus`, `statusChangedAt`
 - **Location:** `address`, `streetNumber`, `streetDir`, `streetName`, `zip`,
-  `county`, `state`, `areaCode`
+  `zipPlus`, `county`, `state`, `areaCode`
 - **Property:** `price`, `daysOnMarket`, `totalUnits`, `squareFeet`,
   `yearBuilt`, `propertyType`, `construction`, `builderName`
-- **County records:** `legalDescription`, `countyAccountNumber`, `taxPropId`
-- **Agents:** `listAgent`, `listAgentPhone`, `sellingAgent`, `sellingAgentPhone`
+- **County records:** `legalDescription`, `legalLot`, `countyAccountNumber`,
+  `taxPropId`, `countyTax`
+- **Agents:** `listAgent`, `listAgentPhone`, `sellingAgent`,
+  `sellingAgentPhone`, `lreaLreb`
+- **Triage:** `hidden`, `hiddenAt`
 - **Raw owner:** `mlsOwnerRaw` — the `Owner` cell exactly as imported, kept
   even when it classifies as junk, so a corrected classifier can be re-run
   without re-importing
@@ -215,18 +218,36 @@ follow-up works, and the failure only shows up on the calendar screen.
 
 ## Property details
 
-Each property opens a details view covering, in tabbed sections:
+Each property opens a details view. **Every one of the 30 source columns is
+stored and shown** — nothing the export carries is dropped on the way in, and
+nothing stored is hidden from this view. A column that looked useless while
+designing the importer is exactly the one wanted while working a lead, and
+recovering it later means a re-import.
 
-- **Property** — address, county, status with its transition history, units,
-  square feet, year built, type, construction, price interpreted by status, days
-  on market, legal description, and the county account and tax IDs
+Tabbed sections:
+
+- **Property** — `Address` with its `Str #` / `Dir` / `Street Name` parts,
+  `Zip`, `ZipPlus`, `County`, `State`, `Area`, `Status` with its transition
+  history, `Ttl Units`, `SqFt`, `Yr Blt`, `Type`, `Constrctn`, `Bldr Name`,
+  `LP/SP` labelled by status, and `DOM`
+- **County** — `Legal Desc`, `LglDsc-Lot`, `CountAct#`, `TaxPropID`,
+  `County Tax`
+- **Agents** — `List Agent` and `List Agent Ph.`, `Selling Agent` and
+  `Selling Agent Ph.`, `LREA/LREB`. The selling agent is only present on 30% of
+  rows and is blank rather than absent on the rest
 - **Contacts** — one panel per `MlsContact` with name and kind, phones, emails,
-  mailing address, current stage, and the stage control that drives the workflow
+  mailing address, current stage, and the stage control that drives the
+  workflow. Also shows `mlsOwnerRaw` verbatim, so a misclassified owner is
+  visible and correctable from the screen rather than only from the database
 - **Activity** — the merged `workflowLog` across contacts and the follow-up
   history, newest first
 - **Research** — the prefilled `bexar.tx.publicsearch.us` deed link, a
   people-search link built from `searchName`, and the lookup status with its
   timestamp
+
+Fields with no value render as an explicit empty marker rather than being
+omitted. A field that vanishes when blank makes the reader wonder whether the
+data is missing or the app forgot it.
 
 `src/components/preforeclosure/FullDetailsModal.tsx` is the closest existing
 analogue and should be read for its patterns — particularly the deed link at
@@ -311,6 +332,22 @@ A lead's row shows the furthest-along stage across its contacts, so a property
 where the seller is dead but the buyer is negotiating reads as negotiating
 rather than dead.
 
+**Hide.** Each row carries a hide button, so a property can be cleared from view
+once it has been worked without deleting anything. Hiding sets `hidden` and
+`hiddenAt`; the list excludes hidden rows by default and a `Show hidden` toggle
+brings them back, where the same button un-hides. `PreForeclosure.inactive` is
+the existing precedent for this.
+
+Hidden is deliberately not a workflow stage. It answers "am I still looking at
+this", which is a question about the screen, not about the deal — a lead can be
+mid-negotiation and hidden because it is someone else's turn to act. Folding it
+into the stage set would force a lie into the pipeline.
+
+Re-importing does not un-hide a row. But a status transition does — a hidden
+property that moves from `ACT` to `SLD` has just changed hands, which is the
+event the feature exists to catch, so it returns to the list with its new
+status.
+
 ## Testing
 
 Backend tests under `functions/src/**/*.test.js`, which the existing Vitest
@@ -320,8 +357,14 @@ config already collects:
   including that `junk` beats `addressLike`
 - name normalisation converts surname-first to search order, and leaves
   already-normal names and entity names untouched
-- the parser maps all 30 columns, and tolerates the nulls seen in real data
-  (`CountAct#`, `TaxPropID`, `ZipPlus`)
+- the parser maps **all 30 columns** — asserted against the full column list, so
+  adding a field to the model without mapping it fails rather than silently
+  importing nulls — and tolerates the nulls seen in real data (`CountAct#`,
+  `TaxPropID`, `ZipPlus`, `Selling Agent`)
+- hiding sets `hidden` and `hiddenAt`, un-hiding clears both, and the default
+  list query excludes hidden rows
+- a re-import leaves `hidden` alone when the status is unchanged, and clears it
+  when the status changes
 - dedupe keeps the first occurrence of a repeated `MLS#`
 - a status change sets `previousStatus` and `statusChangedAt`; an unchanged
   status leaves both alone
