@@ -1,55 +1,79 @@
-import { useState } from 'react';
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { STAGES } from '../constants';
-import { patchLead } from '../api/evictionsCrm';
-import { StageColumn } from './StageColumn';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { listLeads, getPipelineCounts } from '../api/evictionsCrm';
+import type { Lead, PipelineCounts } from '../types/crm';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { LeadProfile } from '../leads/LeadProfile';
+import { QueueTabs } from './QueueTabs';
+import { PipelineTable } from './PipelineTable';
+import type { QueueId } from './queues';
 
-const initialReloadKeys = (): Record<string, number> =>
-  Object.fromEntries(STAGES.map((stage) => [stage, 0]));
-
-export function PipelinePage() {
-  const [reloadKeys, setReloadKeys] = useState<Record<string, number>>(initialReloadKeys);
+export function PipelinePage({ initialQueue = 'needsContact' }: { initialQueue?: QueueId }) {
+  const [queue, setQueue] = useState<QueueId>(initialQueue);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [counts, setCounts] = useState<PipelineCounts | null>(null);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const [search, setSearch] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
+  const requestSeq = useRef(0);
 
-  const onDragEnd = async (event: DragEndEvent) => {
-    const leadId = String(event.active.id);
-    const sourceStage = (event.active.data.current as { stage?: string } | undefined)?.stage;
-    const targetStage = event.over ? String(event.over.id) : '';
-    if (!targetStage) return;
-    // Guard against a missing/unrecognized source stage rather than silently bumping a
-    // reload key no column watches, which would leave the source column stuck stale.
-    if (!sourceStage || !(STAGES as readonly string[]).includes(sourceStage)) return;
-    if (targetStage === sourceStage) return;
-
+  const load = useCallback(async () => {
+    const requestId = ++requestSeq.current;
+    setLoading(true);
+    setError('');
     try {
-      await patchLead(leadId, { contactStage: targetStage });
-      setReloadKeys((prev) => ({
-        ...prev,
-        [sourceStage]: (prev[sourceStage] ?? 0) + 1,
-        [targetStage]: (prev[targetStage] ?? 0) + 1,
-      }));
+      const params = { queue, search, corporate: 'all' as const, page: 1, pageSize: 100 };
+      const [rows, tallies] = await Promise.all([listLeads(params), getPipelineCounts(params)]);
+      if (requestSeq.current !== requestId) return; // superseded by a newer request
+      setLeads(rows.items);
+      setTotal(rows.total);
+      setCounts(tallies);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not move lead');
+      if (requestSeq.current !== requestId) return;
+      setError(e instanceof Error ? e.message : 'Unable to load the pipeline');
+    } finally {
+      if (requestSeq.current === requestId) setLoading(false);
     }
-  };
+  }, [queue, search]);
+
+  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [load]);
 
   return (
-    <div className="p-6 flex flex-col h-full">
-      <div className="mb-4">
-        <p className="label mb-1">Pipeline board</p>
-        <h1 className="text-2xl font-semibold">Pipeline</h1>
-        <p className="text-sm text-muted-foreground">Drag a lead to change its stage</p>
-      </div>
-      {error && <ErrorBanner message={error} className="mb-3" />}
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-        <div className="flex gap-3 overflow-x-auto flex-1 pb-2">
-          {STAGES.map((stage) => (
-            <StageColumn key={stage} stage={stage} reloadKey={reloadKeys[stage] ?? 0} />
-          ))}
+    <div className="p-6 space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="label mb-1">Bexar County · Eviction filings</p>
+          <h1 className="text-2xl font-semibold">Pipeline</h1>
         </div>
-      </DndContext>
+        <p className="text-sm text-muted-foreground">
+          {counts ? <><span className="record">{counts.all.toLocaleString()}</span> owners</> : ' '}
+        </p>
+      </div>
+
+      <QueueTabs active={queue} counts={counts} onChange={setQueue} />
+
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto] md:items-center">
+        <Input
+          placeholder="Search owner or mailing address"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <p className="text-sm text-muted-foreground md:justify-self-end">
+          {loading ? ' ' : (
+            <>
+              <span className="record">{leads.length.toLocaleString()}</span> of <span className="record">{total.toLocaleString()}</span>
+            </>
+          )}
+        </p>
+      </div>
+
+      {error && <ErrorBanner message={error} />}
+
+      <PipelineTable leads={leads} loading={loading} onOpen={setOpenId} />
+
+      {openId && <LeadProfile leadId={openId} onClose={() => setOpenId(null)} onSaved={load} />}
     </div>
   );
 }

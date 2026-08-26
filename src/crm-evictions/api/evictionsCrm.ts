@@ -1,6 +1,6 @@
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import type {
-  CrmStats, GeocodeStatus, LeadDetail, LeadListResponse, LeadRow, ListLeadsParams, MapPoint,
+  CrmStats, GeocodeStatus, LeadDetail, LeadListResponse, LeadRow, ListLeadsParams, MapPoint, PipelineCounts,
 } from '../types/crm';
 
 type MapParams = { stage?: string; service?: string; assignedTo?: string };
@@ -36,6 +36,19 @@ export const listLeads = (params: ListLeadsParams = {}) => {
     if (value !== undefined && value !== '') query.set(key, String(value));
   });
   return request<LeadListResponse>(`/api/evictions/landlords?${query}`);
+};
+
+export const getPipelineCounts = (params: ListLeadsParams = {}) => {
+  const query = new URLSearchParams();
+  // The counts endpoint applies every filter except the queue, since each tab
+  // counts its own slice of the same filter set.
+  Object.entries(params).forEach(([key, value]) => {
+    if (key !== 'queue' && key !== 'page' && key !== 'pageSize' && value !== undefined && value !== '') {
+      query.set(key, String(value));
+    }
+  });
+  const suffix = query.toString();
+  return request<PipelineCounts>(`/api/evictions/pipeline/counts${suffix ? `?${suffix}` : ''}`);
 };
 
 export const getLead = (id: string) => request<LeadDetail>(`/api/evictions/landlords/${id}`);

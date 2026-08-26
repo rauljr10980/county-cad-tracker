@@ -353,6 +353,27 @@ router.get('/map', async (req, res) => {
 const ACTIVE_OPPORTUNITY_STAGES = ['Interested', 'Under Contract'];
 const SERVICE_INTEREST_VALUES = ['Undecided', 'Acquisition / Sell to Us', 'Listing', 'Property Management'];
 
+// queueFilter/baseLandlordFilter/QUEUES live in ../lib/pipelineQueues so they
+// can be unit tested without pulling in Prisma — see pipelineQueues.test.js.
+const { QUEUES, baseLandlordFilter, queueFilter } = require('../lib/pipelineQueues');
+
+router.get('/pipeline/counts', async (req, res) => {
+  try {
+    // The same filters the table uses, minus the queue itself — each tab counts
+    // its own slice of the current filter set.
+    const base = baseLandlordFilter(req.query);
+
+    const counts = await Promise.all(
+      QUEUES.map((q) => prisma.evictionLandlord.count({ where: { ...base, ...queueFilter(q) } }))
+    );
+
+    res.json(Object.fromEntries(QUEUES.map((q, i) => [q, counts[i]])));
+  } catch (error) {
+    console.error('[EVICTIONS] pipeline counts error:', error);
+    res.status(500).json({ error: 'Unable to load pipeline counts' });
+  }
+});
+
 router.get('/stats', async (_req, res) => {
   try {
     const now = new Date();
@@ -402,19 +423,18 @@ router.get('/stats', async (_req, res) => {
   }
 });
 
+// Queues ordered by urgency show the most overdue lead first rather than the
+// most recently edited one — see the `orderBy` below.
+const URGENCY_ORDERED_QUEUES = ['overdue', 'dueToday', 'upcoming'];
+
 router.get('/landlords', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1), pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize) || 25));
+  const queue = req.query.queue ? String(req.query.queue) : null;
+  if (queue && !QUEUES.includes(queue)) return res.status(400).json({ error: `Unknown queue: ${queue}` });
   // Default preserves the Eviction List tab's behavior; the CRM opts in with `all`.
-  const where = {};
-  if (req.query.corporate === 'all') { /* no filter */ }
-  else if (req.query.corporate === 'true') where.isCorporate = true;
-  else where.isCorporate = false;
-
-  if (req.query.assignedTo === 'unassigned') where.assignedToId = null;
-  else if (req.query.assignedTo) where.assignedToId = String(req.query.assignedTo);
-  if (req.query.search) where.OR = [{ name: { contains: String(req.query.search), mode: 'insensitive' } }, { addresses: { some: { address: { contains: String(req.query.search), mode: 'insensitive' } } } }];
+  const where = baseLandlordFilter(req.query);
   if (req.query.stage) where.contactStage = String(req.query.stage);
-  if (req.query.service) where.serviceInterests = { has: String(req.query.service) };
+  if (queue && queue !== 'all') Object.assign(where, queueFilter(queue));
   const filingSome = {};
   if (req.query.dateFrom || req.query.dateTo) filingSome.filedDate = { ...(req.query.dateFrom && { gte: new Date(String(req.query.dateFrom)) }), ...(req.query.dateTo && { lte: new Date(`${req.query.dateTo}T23:59:59.999Z`) }) };
   if (req.query.status) filingSome.caseStatus = String(req.query.status);
@@ -422,9 +442,14 @@ router.get('/landlords', async (req, res) => {
   if (req.query.precinct) filingSome.precinct = String(req.query.precinct);
   if (req.query.satisfied === 'true' || req.query.satisfied === 'false') filingSome.satisfiedFlag = req.query.satisfied === 'true';
   if (Object.keys(filingSome).length) where.filings = { some: filingSome };
+  // Overdue/dueToday/upcoming are date-driven queues: the top of the list should
+  // be the most overdue (or soonest-due) lead, not the most recently edited one.
+  // Every other queue, and every caller that passes no `queue`, keeps the
+  // existing "most recently touched" ordering.
+  const orderBy = URGENCY_ORDERED_QUEUES.includes(queue) ? { nextFollowUpAt: 'asc' } : { updatedAt: 'desc' };
   const [total, items] = await Promise.all([
     prisma.evictionLandlord.count({ where }),
-    prisma.evictionLandlord.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { updatedAt: 'desc' },
+    prisma.evictionLandlord.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy,
       include: { _count: { select: { filings: true, addresses: true } }, filings: { orderBy: { filedDate: 'desc' }, take: 1, select: { filedDate: true } }, tasks: { where: { completed: false }, orderBy: { dueAt: 'asc' }, take: 1 }, assignedTo: { select: { id: true, username: true } } } }),
   ]);
   res.json({ items: items.map((x) => ({ ...x, filingCount: x._count.filings, addressCount: x._count.addresses, latestFilingDate: x.filings[0]?.filedDate || null, nextTask: x.tasks[0] || null, _count: undefined, filings: undefined, tasks: undefined })), total, page, pageSize, pages: Math.ceil(total / pageSize) });
@@ -436,14 +461,33 @@ router.get('/landlords/:id', async (req, res) => {
 });
 
 router.patch('/landlords/:id', async (req, res) => {
-  const allowed = ['contactStage', 'serviceInterests', 'contacts', 'notes', 'lastContactedAt', 'nextFollowUpAt', 'assignedToId'];
+  const allowed = ['contactStage', 'serviceInterests', 'contacts', 'notes', 'lastContactedAt', 'nextFollowUpAt', 'assignedToId', 'parkedAt'];
   const data = {}; for (const key of allowed) if (Object.prototype.hasOwnProperty.call(req.body, key)) data[key] = key.endsWith('At') && req.body[key] ? new Date(req.body[key]) : req.body[key];
   res.json(await prisma.evictionLandlord.update({ where: { id: req.params.id }, data }));
 });
 
 router.post('/landlords/:id/activities', async (req, res) => res.json(await prisma.evictionActivity.create({ data: { landlordId: req.params.id, kind: req.body.kind || 'note', body: clean(req.body.body) } })));
 router.post('/landlords/:id/tasks', async (req, res) => res.json(await prisma.evictionTask.create({ data: { landlordId: req.params.id, type: req.body.type || 'Call', dueAt: new Date(req.body.dueAt), notes: clean(req.body.notes) } })));
-router.patch('/tasks/:id', async (req, res) => res.json(await prisma.evictionTask.update({ where: { id: req.params.id }, data: { completed: !!req.body.completed, completedAt: req.body.completed ? new Date() : null } })));
+// Completing (or un-completing) a task changes which task is now the
+// landlord's earliest open one, so nextFollowUpAt is recomputed from what
+// remains incomplete after the update — in both directions — rather than
+// left pointing at a task that either just closed or reopened.
+router.patch('/tasks/:id', async (req, res) => {
+  const task = await prisma.evictionTask.update({
+    where: { id: req.params.id },
+    data: { completed: !!req.body.completed, completedAt: req.body.completed ? new Date() : null },
+  });
+  const earliestOpen = await prisma.evictionTask.findFirst({
+    where: { landlordId: task.landlordId, completed: false },
+    orderBy: { dueAt: 'asc' },
+    select: { dueAt: true },
+  });
+  await prisma.evictionLandlord.update({
+    where: { id: task.landlordId },
+    data: { nextFollowUpAt: earliestOpen?.dueAt ?? null },
+  });
+  res.json(task);
+});
 
 router.post('/landlords/:id/merge', async (req, res) => {
   const sourceId = req.body.sourceId, targetId = req.params.id;

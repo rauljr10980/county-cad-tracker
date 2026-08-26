@@ -66,7 +66,14 @@ export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onCl
           )
         ) : <>
           <DialogHeader>
-            <DialogTitle>{lead.name}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {lead.name}
+              {lead.parkedAt && (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                  Parked
+                </span>
+              )}
+            </DialogTitle>
             <DialogDescription>
               {lead.isCorporate ? 'Business entity' : 'Individual'} · {lead.filingCount} filings · {lead.addressCount} properties
             </DialogDescription>
@@ -77,14 +84,26 @@ export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onCl
           <div className="grid md:grid-cols-2 gap-4">
             <section className="rounded-lg border p-3 space-y-3">
               <h3 className="text-sm font-semibold">Pipeline</h3>
-              <select
-                className="h-10 w-full rounded-md border bg-background px-2 text-sm"
-                value={lead.contactStage}
-                disabled={saving}
-                onChange={(e) => save({ contactStage: e.target.value })}
-              >
-                {STAGES.map((s) => <option key={s}>{s}</option>)}
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  className="h-10 flex-1 rounded-md border bg-background px-2 text-sm"
+                  value={lead.contactStage}
+                  disabled={saving}
+                  onChange={(e) => save({ contactStage: e.target.value })}
+                >
+                  {STAGES.map((s) => <option key={s}>{s}</option>)}
+                </select>
+                {/* parkedAt is independent of contactStage — parking never touches the stage. */}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={lead.parkedAt ? 'default' : 'outline'}
+                  disabled={saving}
+                  onClick={() => save({ parkedAt: lead.parkedAt ? null : new Date().toISOString() })}
+                >
+                  {lead.parkedAt ? 'Unpark' : 'Park'}
+                </Button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {SERVICE_INTERESTS.map((s) => (
                   <Button key={s} size="sm" disabled={saving} variant={lead.serviceInterests?.includes(s) ? 'default' : 'outline'} onClick={() => toggleService(s)}>
