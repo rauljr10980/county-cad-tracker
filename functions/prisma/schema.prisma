@@ -909,11 +909,12 @@ model EvictionLandlord {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  addresses  EvictionAddress[]
-  filings    EvictionFiling[]
-  activities EvictionActivity[]
-  tasks      EvictionTask[]
-  assignedTo User?              @relation("EvictionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  addresses        EvictionAddress[]
+  ownedProperties  EvictionOwnedProperty[]
+  filings          EvictionFiling[]
+  activities       EvictionActivity[]
+  tasks            EvictionTask[]
+  assignedTo       User?                    @relation("EvictionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([name])
   @@index([isCorporate])
@@ -945,6 +946,22 @@ model EvictionAddress {
   @@index([landlordId])
   @@index([geocodeStatus])
   @@map("eviction_addresses")
+}
+
+model EvictionOwnedProperty {
+  id         String   @id @default(cuid())
+  landlordId String
+  address    String
+  city       String   @default("")
+  state      String   @default("")
+  zip        String   @default("")
+  notes      String   @default("") @db.Text
+  createdAt  DateTime @default(now())
+
+  landlord EvictionLandlord @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+
+  @@index([landlordId])
+  @@map("eviction_owned_properties")
 }
 
 model EvictionFiling {
