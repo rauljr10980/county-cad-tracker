@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useCrmStore } from '@/crm/store/useCrmStore';
+import { useAuth } from '@/contexts/AuthContext';
 import ContactsView from '@/crm/views/ContactsView';
 import OpportunitiesView from '@/crm/views/OpportunitiesView';
 import CrmTasksView from '@/crm/views/CrmTasksView';
 import RetailView from '@/crm/views/RetailView';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Users, Kanban, CheckSquare, Store } from 'lucide-react';
+import { Users, Kanban, CheckSquare, Store, AlertTriangle } from 'lucide-react';
 
 type CrmTab = 'contacts' | 'opportunities' | 'tasks' | 'retail';
 
@@ -18,17 +20,36 @@ const crmTabs: { id: CrmTab; label: string; icon: React.ElementType }[] = [
 
 export function CrmView() {
   const hydrate = useCrmStore((s) => s.hydrate);
+  const hydrateError = useCrmStore((s) => s.hydrateError);
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<CrmTab>('contacts');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    hydrate(new Date()).then(() => setLoaded(true));
-  }, [hydrate]);
+    hydrate(new Date(), user?.id).then(() => setLoaded(true));
+  }, [hydrate, user?.id]);
 
   if (!loaded) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">
         Loading CRM…
+      </div>
+    );
+  }
+
+  // A failed load must never render as an empty-but-real CRM: the store was
+  // deliberately left un-hydrated (see useCrmStore.hydrate) so nothing here
+  // can be mistaken for the account's actual data, and so it can't be saved
+  // over. Show the failure and let the user retry instead.
+  if (hydrateError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+        <AlertTriangle className="h-8 w-8 text-destructive" />
+        <p className="text-sm font-medium text-foreground">Couldn't load your CRM data</p>
+        <p className="max-w-sm text-xs text-muted-foreground">{hydrateError}</p>
+        <Button size="sm" onClick={() => hydrate(new Date(), user?.id)}>
+          Try again
+        </Button>
       </div>
     );
   }

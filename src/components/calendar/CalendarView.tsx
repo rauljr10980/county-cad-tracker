@@ -28,6 +28,7 @@ import { getProperties, getPreForeclosures } from '@/lib/api';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
 import { FullDetailsModal } from '@/components/preforeclosure/FullDetailsModal';
 import { useCrmStore } from '@/crm/store/useCrmStore';
+import { useAuth } from '@/contexts/AuthContext';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
@@ -137,11 +138,12 @@ export function CalendarView() {
   const deleteMutation = useDeleteFollowUp();
 
   // CRM
+  const { user } = useAuth();
   const crmHydrate = useCrmStore((s) => s.hydrate);
   const crmTasks = useCrmStore((s) => s.tasks);
   const crmLeads = useCrmStore((s) => s.leads);
   const crmReschedule = useCrmStore((s) => s.rescheduleTask);
-  useEffect(() => { crmHydrate(new Date()); }, [crmHydrate]);
+  useEffect(() => { crmHydrate(new Date(), user?.id); }, [crmHydrate, user?.id]);
   const crmLeadById = useMemo(() => new Map(crmLeads.map((l) => [l.id, l])), [crmLeads]);
 
   // ── Build unified event list ─────────────────────────────────────────────

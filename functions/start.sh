@@ -45,6 +45,18 @@ echo "UPDATE \"eviction_landlords\" SET \"contactStage\" = 'Follow-Up' WHERE \"c
 echo "UPDATE \"eviction_landlords\" SET \"contactStage\" = 'Interested' WHERE \"contactStage\" = 'Qualified';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Qualified -> Interested" || echo "⚠️ Qualified -> Interested skipped"
 echo "UPDATE \"eviction_landlords\" SET \"contactStage\" = 'Do Not Contact' WHERE \"contactStage\" = 'Do Not Call';" | npx prisma db execute --stdin 2>/dev/null && echo "✅ Do Not Call -> Do Not Contact" || echo "⚠️ Do Not Call -> Do Not Contact skipped"
 
+# Assign pre-isolation CRM leads to the oldest account.
+#
+# This lives here rather than in prisma/migrations/ because this script runs
+# `prisma db push`, which syncs the schema and never executes anything in
+# migrations/. The userId column lands via db push; this row update would not
+# run at all without these lines.
+#
+# Idempotent: after the first run no rows have a null userId. The EXISTS guard
+# makes it a no-op on an empty users table rather than writing NULL over NULL.
+echo "🔄 Assigning unowned CRM leads to the oldest account..."
+echo "UPDATE \"crm_leads\" SET \"userId\" = (SELECT id FROM users ORDER BY \"createdAt\" ASC LIMIT 1) WHERE \"userId\" IS NULL AND EXISTS (SELECT 1 FROM users);" | npx prisma db execute --stdin 2>/dev/null && echo "✅ CRM backfill complete" || echo "⚠️ CRM backfill skipped"
+
 # Start the application
 echo "✅ Starting application..."
 exec node src/index.js

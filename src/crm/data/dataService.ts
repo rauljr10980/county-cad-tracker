@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import {
   INDUSTRIES,
@@ -108,17 +109,48 @@ const normalizeState = (state: CrmState): CrmState => ({
   },
 });
 
+// The server always responds with `{ error: "..." }` on a handled failure
+// (both 409 guards, and the generic 500). Fall back to a generic message when
+// the body isn't JSON (e.g. a network proxy error page) so callers never show
+// a bare status code.
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json();
+    if (body && typeof body.error === 'string' && body.error.trim()) {
+      return body.error;
+    }
+  } catch {
+    // response wasn't JSON — use the fallback below
+  }
+  return fallback;
+}
+
+// A load can fail for two very different reasons: the request itself failed
+// (network error, non-2xx), or it succeeded and the account genuinely has no
+// data yet. Callers must not conflate the two — a failed load must never be
+// treated as "empty" (see dataService.load doc below).
+export type LoadResult = { ok: true; state: CrmState } | { ok: false; error: string };
+
 export const dataService = {
-  async load(): Promise<CrmState | null> {
+  async load(): Promise<LoadResult> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/crm/state`, {
         headers: getAuthHeaders(),
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        const error = await readErrorMessage(
+          res,
+          'Could not load your CRM data from the server. Please try again.',
+        );
+        return { ok: false, error };
+      }
       const data = await res.json();
-      return normalizeState(data as CrmState);
+      return { ok: true, state: normalizeState(data as CrmState) };
     } catch {
-      return null;
+      return {
+        ok: false,
+        error: 'Could not reach the server to load your CRM data. Check your connection and try again.',
+      };
     }
   },
 
@@ -127,7 +159,21 @@ export const dataService = {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(state),
-    }).catch((err) => console.error('[CRM] sync error:', err));
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const message = await readErrorMessage(
+            res,
+            'Your CRM changes were not saved. Please try again.',
+          );
+          console.error('[CRM] save rejected:', message);
+          toast.error(message);
+        }
+      })
+      .catch((err) => {
+        console.error('[CRM] sync error:', err);
+        toast.error('Could not reach the server to save your CRM changes. Check your connection and try again.');
+      });
   },
 
   clear(): void {

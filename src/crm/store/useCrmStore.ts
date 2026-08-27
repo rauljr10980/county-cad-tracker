@@ -25,8 +25,20 @@ type NewLeadInput = Omit<Lead, 'id' | 'createdAt' | 'lastContactedAt' | 'kind'> 
 type NewOpportunityInput = Partial<Pick<Deal, 'stage' | 'value' | 'expectedCloseDate' | 'probability'>>
 type NewTaskInput = Omit<Task, 'id' | 'completed' | 'completedAt'>
 
+type HydrationState = {
+  // True once a load has completed successfully (with real data or a genuine
+  // empty account) and the store's contents reflect the server. Saves are
+  // gated on this so a failed load — which leaves stale/empty local state —
+  // can never be persisted over the user's real data.
+  hydrated: boolean
+  // Set when the most recent load failed, so the UI can show the failure
+  // instead of a CRM that looks real but is only empty because loading it
+  // didn't work. Cleared on the next successful hydrate.
+  hydrateError: string | null
+}
+
 type Actions = {
-  hydrate: (now: Date) => Promise<void>
+  hydrate: (now: Date, ownerKey?: string) => Promise<void>
   addLead: (input: NewLeadInput) => Lead
   updateLead: (id: string, patch: Partial<Lead>) => void
   setLeadKind: (leadId: string, kind: LeadKind) => void
@@ -44,8 +56,8 @@ type Actions = {
   setTheme: (theme: 'light' | 'dark') => void
   setDefaultRetailLetterCadence: (days: number) => void
   setDefaultOpportunityOutreachMessage: (message: string) => void
-  resetToSeed: (now: Date) => void
-  importNetworkContacts: (records: NetworkContactRecord[], now: Date) => void
+  resetToSeed: (now: Date, ownerKey: string) => void
+  importNetworkContacts: (records: NetworkContactRecord[], now: Date, ownerKey: string) => void
   runStaleLeadAutomation: (now: Date) => void
 }
 
@@ -57,10 +69,6 @@ const uid = (): string =>
 const nowIso = () => new Date().toISOString()
 const OFFER_FOLLOW_UP_NOTE = 'Automation: follow up after Offer / LOI sent'
 
-const persist = (state: CrmState) => {
-  dataService.save(state)
-}
-
 const snapshot = (state: CrmState): CrmState => ({
   leads: state.leads,
   deals: state.deals,
@@ -69,12 +77,57 @@ const snapshot = (state: CrmState): CrmState => ({
   settings: state.settings,
 })
 
-export const useCrmStore = create<CrmState & Actions>((set, get) => ({
-  ...EMPTY_STATE,
+export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get) => {
+  // Gated on `hydrated` so a save can never fire against a store that has not
+  // completed a successful load. Without this, a failed load leaves the store
+  // at EMPTY_STATE (or stale data), and the very next user action would
+  // persist that over the account's real records — the server's deletes are
+  // scoped correctly, so an autosave like that deletes real data with a 200.
+  const persist = (state: CrmState) => {
+    if (!get().hydrated) {
+      console.error('[CRM] Skipping save: CRM has not finished loading, so nothing was persisted.')
+      return
+    }
+    dataService.save(state)
+  }
 
-  hydrate: async (now) => {
-    const stored = await dataService.load()
-    if (stored) {
+  return {
+    ...EMPTY_STATE,
+    hydrated: false,
+    hydrateError: null,
+
+    hydrate: async (now, ownerKey) => {
+      const result = await dataService.load()
+      if (!result.ok) {
+        // Do not touch leads/deals/tasks/activities: on a first-ever hydrate
+        // the store is still EMPTY_STATE, and on a later hydrate it still
+        // holds whatever was last loaded successfully. Either way, leaving
+        // `hydrated: false` blocks persist() above from saving over it.
+        set({ hydrateError: result.error, hydrated: false })
+        return
+      }
+
+      const stored = result.state
+      const isGenuinelyEmpty =
+        stored.leads.length === 0 &&
+        stored.deals.length === 0 &&
+        stored.tasks.length === 0 &&
+        stored.activities.length === 0
+
+      if (isGenuinelyEmpty) {
+        // Seed ids are namespaced per owner (see networkContacts.ts), so
+        // without an ownerKey there is nothing safe to seed with — leave the
+        // account empty rather than mint globally-constant ids. The next
+        // hydrate that does have an ownerKey will seed normally.
+        if (!ownerKey) {
+          set({ ...EMPTY_STATE, hydrated: true, hydrateError: null })
+          return
+        }
+        const seed = generateSeed(now, ownerKey)
+        set({ ...seed, hydrated: true, hydrateError: null })
+        return
+      }
+
       const normalized: CrmState = {
         ...stored,
         leads: stored.leads.map((lead) => ({
@@ -90,439 +143,435 @@ export const useCrmStore = create<CrmState & Actions>((set, get) => ({
             "Hi, it was great meeting you. You mentioned you were thinking about buying — I'd love to sit down and chat to see how I can help. When would be a good time to connect?",
         },
       }
-      const next = mergeNetworkState(normalized, now)
-      set({ ...next })
-      return
-    }
+      const next = mergeNetworkState(normalized, now, ownerKey)
+      set({ ...next, hydrated: true, hydrateError: null })
+    },
 
-    const seed = generateSeed(now)
-    set({ ...seed })
-  },
+    addLead: (input) => {
+      const createdAt = nowIso()
+      const lead: Lead = {
+        ...input,
+        kind: input.kind ?? 'industry',
+        id: uid(),
+        lastContactedAt: null,
+        createdAt,
+      }
 
-  addLead: (input) => {
-    const createdAt = nowIso()
-    const lead: Lead = {
-      ...input,
-      kind: input.kind ?? 'industry',
-      id: uid(),
-      lastContactedAt: null,
-      createdAt,
-    }
+      const activity: Activity = {
+        id: uid(),
+        leadId: lead.id,
+        kind: 'created',
+        body: `Relationship created from ${lead.source}`,
+        timestamp: createdAt,
+      }
 
-    const activity: Activity = {
-      id: uid(),
-      leadId: lead.id,
-      kind: 'created',
-      body: `Relationship created from ${lead.source}`,
-      timestamp: createdAt,
-    }
+      const next: CrmState = {
+        ...get(),
+        leads: [...get().leads, lead],
+        activities: [...get().activities, activity],
+      }
 
-    const next: CrmState = {
-      ...get(),
-      leads: [...get().leads, lead],
-      activities: [...get().activities, activity],
-    }
+      set(next)
+      persist(snapshot(next))
+      return lead
+    },
 
-    set(next)
-    persist(snapshot(next))
-    return lead
-  },
+    updateLead: (id, patch) => {
+      const next: CrmState = {
+        ...get(),
+        leads: get().leads.map((lead) => (lead.id === id ? { ...lead, ...patch } : lead)),
+      }
 
-  updateLead: (id, patch) => {
-    const next: CrmState = {
-      ...get(),
-      leads: get().leads.map((lead) => (lead.id === id ? { ...lead, ...patch } : lead)),
-    }
+      set(next)
+      persist(snapshot(next))
+    },
 
-    set(next)
-    persist(snapshot(next))
-  },
+    setLeadKind: (leadId, kind) => {
+      const currentState = get()
+      const lead = currentState.leads.find((entry) => entry.id === leadId)
+      if (!lead || lead.kind === kind) return
 
-  setLeadKind: (leadId, kind) => {
-    const currentState = get()
-    const lead = currentState.leads.find((entry) => entry.id === leadId)
-    if (!lead || lead.kind === kind) return
-
-    const timestamp = nowIso()
-    const next: CrmState = {
-      ...currentState,
-      leads: currentState.leads.map((entry) =>
-        entry.id === leadId ? { ...entry, kind } : entry,
-      ),
-      activities: [
-        ...currentState.activities,
-        {
-          id: uid(),
-          leadId,
-          kind: 'stage-change',
-          body: kind === 'retail' ? 'Moved to Retail' : 'Moved to Contacts',
-          timestamp,
-        },
-      ],
-    }
-
-    set(next)
-    persist(snapshot(next))
-  },
-
-  createOpportunity: (leadId, input = {}) => {
-    const currentState = get()
-    const lead = currentState.leads.find((entry) => entry.id === leadId)
-    if (!lead) return null
-
-    const existingDeal = currentState.deals.find((entry) => entry.leadId === leadId)
-    if (existingDeal) return existingDeal
-
-    const createdAt = nowIso()
-    const deal: Deal = {
-      id: uid(),
-      leadId,
-      stage: input.stage ?? 'New Prospect',
-      value: input.value ?? 0,
-      expectedCloseDate:
-        input.expectedCloseDate ??
-        new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-      probability: input.probability ?? 20,
-      createdAt,
-      updatedAt: createdAt,
-    }
-
-    const activity: Activity = {
-      id: uid(),
-      leadId,
-      kind: 'stage-change',
-      body: 'Moved contact into Opportunities',
-      timestamp: createdAt,
-    }
-
-    const next: CrmState = {
-      ...currentState,
-      deals: [...currentState.deals, deal],
-      activities: [...currentState.activities, activity],
-    }
-
-    set(next)
-    persist(snapshot(next))
-    return deal
-  },
-
-  removeOpportunity: (leadId) => {
-    const currentState = get()
-    const deal = currentState.deals.find((entry) => entry.leadId === leadId)
-    if (!deal) return
-
-    const timestamp = nowIso()
-    const next: CrmState = {
-      ...currentState,
-      deals: currentState.deals.filter((entry) => entry.leadId !== leadId),
-      activities: [
-        ...currentState.activities,
-        {
-          id: uid(),
-          leadId,
-          kind: 'stage-change',
-          body: 'Moved opportunity back to Contacts',
-          timestamp,
-        },
-      ],
-    }
-
-    set(next)
-    persist(snapshot(next))
-  },
-
-  moveOpportunityToRetail: (leadId) => {
-    const currentState = get()
-    const deal = currentState.deals.find((entry) => entry.leadId === leadId)
-    const lead = currentState.leads.find((entry) => entry.id === leadId)
-    if (!lead) return
-
-    const timestamp = nowIso()
-    const next: CrmState = {
-      ...currentState,
-      deals: deal
-        ? currentState.deals.filter((entry) => entry.leadId !== leadId)
-        : currentState.deals,
-      leads: currentState.leads.map((entry) =>
-        entry.id === leadId ? { ...entry, kind: 'retail' } : entry,
-      ),
-      activities: [
-        ...currentState.activities,
-        {
-          id: uid(),
-          leadId,
-          kind: 'stage-change',
-          body: 'Moved opportunity to Retail',
-          timestamp,
-        },
-      ],
-    }
-
-    set(next)
-    persist(snapshot(next))
-  },
-
-  deleteLead: (id) => {
-    const next: CrmState = {
-      ...get(),
-      leads: get().leads.filter((lead) => lead.id !== id),
-      deals: get().deals.filter((deal) => deal.leadId !== id),
-      tasks: get().tasks.filter((task) => task.leadId !== id),
-      activities: get().activities.filter((activity) => activity.leadId !== id),
-    }
-
-    set(next)
-    persist(snapshot(next))
-  },
-
-  moveDealStage: (dealId, newStage) => {
-    const currentState = get()
-    const deal = currentState.deals.find((entry) => entry.id === dealId)
-    if (!deal || deal.stage === newStage) return
-
-    const updatedAt = nowIso()
-    const updatedDeal: Deal = {
-      ...deal,
-      stage: newStage,
-      updatedAt,
-      probability:
-        newStage === 'Closed Won'
-          ? 100
-          : newStage === 'Archived'
-            ? 0
-            : deal.probability,
-    }
-
-    const stageChangeActivity: Activity = {
-      id: uid(),
-      leadId: deal.leadId,
-      kind: 'stage-change',
-      body: `Stage changed: ${deal.stage} -> ${newStage}`,
-      timestamp: updatedAt,
-    }
-
-    const offerFollowUp =
-      newStage === 'Offer / LOI' &&
-      !currentState.tasks.some(
-        (task) =>
-          task.leadId === deal.leadId &&
-          !task.completed &&
-          task.notes === OFFER_FOLLOW_UP_NOTE,
-      )
-        ? {
+      const timestamp = nowIso()
+      const next: CrmState = {
+        ...currentState,
+        leads: currentState.leads.map((entry) =>
+          entry.id === leadId ? { ...entry, kind } : entry,
+        ),
+        activities: [
+          ...currentState.activities,
+          {
             id: uid(),
-            leadId: deal.leadId,
-            type: 'Call' as const,
-            dueAt: new Date(Date.now() + 2 * 86400000).toISOString(),
+            leadId,
+            kind: 'stage-change',
+            body: kind === 'retail' ? 'Moved to Retail' : 'Moved to Contacts',
+            timestamp,
+          },
+        ],
+      }
+
+      set(next)
+      persist(snapshot(next))
+    },
+
+    createOpportunity: (leadId, input = {}) => {
+      const currentState = get()
+      const lead = currentState.leads.find((entry) => entry.id === leadId)
+      if (!lead) return null
+
+      const existingDeal = currentState.deals.find((entry) => entry.leadId === leadId)
+      if (existingDeal) return existingDeal
+
+      const createdAt = nowIso()
+      const deal: Deal = {
+        id: uid(),
+        leadId,
+        stage: input.stage ?? 'New Prospect',
+        value: input.value ?? 0,
+        expectedCloseDate:
+          input.expectedCloseDate ??
+          new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+        probability: input.probability ?? 20,
+        createdAt,
+        updatedAt: createdAt,
+      }
+
+      const activity: Activity = {
+        id: uid(),
+        leadId,
+        kind: 'stage-change',
+        body: 'Moved contact into Opportunities',
+        timestamp: createdAt,
+      }
+
+      const next: CrmState = {
+        ...currentState,
+        deals: [...currentState.deals, deal],
+        activities: [...currentState.activities, activity],
+      }
+
+      set(next)
+      persist(snapshot(next))
+      return deal
+    },
+
+    removeOpportunity: (leadId) => {
+      const currentState = get()
+      const deal = currentState.deals.find((entry) => entry.leadId === leadId)
+      if (!deal) return
+
+      const timestamp = nowIso()
+      const next: CrmState = {
+        ...currentState,
+        deals: currentState.deals.filter((entry) => entry.leadId !== leadId),
+        activities: [
+          ...currentState.activities,
+          {
+            id: uid(),
+            leadId,
+            kind: 'stage-change',
+            body: 'Moved opportunity back to Contacts',
+            timestamp,
+          },
+        ],
+      }
+
+      set(next)
+      persist(snapshot(next))
+    },
+
+    moveOpportunityToRetail: (leadId) => {
+      const currentState = get()
+      const deal = currentState.deals.find((entry) => entry.leadId === leadId)
+      const lead = currentState.leads.find((entry) => entry.id === leadId)
+      if (!lead) return
+
+      const timestamp = nowIso()
+      const next: CrmState = {
+        ...currentState,
+        deals: deal
+          ? currentState.deals.filter((entry) => entry.leadId !== leadId)
+          : currentState.deals,
+        leads: currentState.leads.map((entry) =>
+          entry.id === leadId ? { ...entry, kind: 'retail' } : entry,
+        ),
+        activities: [
+          ...currentState.activities,
+          {
+            id: uid(),
+            leadId,
+            kind: 'stage-change',
+            body: 'Moved opportunity to Retail',
+            timestamp,
+          },
+        ],
+      }
+
+      set(next)
+      persist(snapshot(next))
+    },
+
+    deleteLead: (id) => {
+      const next: CrmState = {
+        ...get(),
+        leads: get().leads.filter((lead) => lead.id !== id),
+        deals: get().deals.filter((deal) => deal.leadId !== id),
+        tasks: get().tasks.filter((task) => task.leadId !== id),
+        activities: get().activities.filter((activity) => activity.leadId !== id),
+      }
+
+      set(next)
+      persist(snapshot(next))
+    },
+
+    moveDealStage: (dealId, newStage) => {
+      const currentState = get()
+      const deal = currentState.deals.find((entry) => entry.id === dealId)
+      if (!deal || deal.stage === newStage) return
+
+      const updatedAt = nowIso()
+      const updatedDeal: Deal = {
+        ...deal,
+        stage: newStage,
+        updatedAt,
+        probability:
+          newStage === 'Closed Won'
+            ? 100
+            : newStage === 'Archived'
+              ? 0
+              : deal.probability,
+      }
+
+      const stageChangeActivity: Activity = {
+        id: uid(),
+        leadId: deal.leadId,
+        kind: 'stage-change',
+        body: `Stage changed: ${deal.stage} -> ${newStage}`,
+        timestamp: updatedAt,
+      }
+
+      const offerFollowUp =
+        newStage === 'Offer / LOI' &&
+        !currentState.tasks.some(
+          (task) =>
+            task.leadId === deal.leadId &&
+            !task.completed &&
+            task.notes === OFFER_FOLLOW_UP_NOTE,
+        )
+          ? {
+              id: uid(),
+              leadId: deal.leadId,
+              type: 'Call' as const,
+              dueAt: new Date(Date.now() + 2 * 86400000).toISOString(),
+              completed: false,
+              completedAt: null,
+              notes: OFFER_FOLLOW_UP_NOTE,
+            }
+          : null
+
+      const next: CrmState = {
+        ...currentState,
+        deals: currentState.deals.map((entry) =>
+          entry.id === dealId ? updatedDeal : entry,
+        ),
+        tasks: offerFollowUp
+          ? [...currentState.tasks, offerFollowUp]
+          : currentState.tasks,
+        activities: [...currentState.activities, stageChangeActivity],
+      }
+
+      set(next)
+      persist(snapshot(next))
+    },
+
+    updateDeal: (id, patch) => {
+      const next: CrmState = {
+        ...get(),
+        deals: get().deals.map((deal) =>
+          deal.id === id ? { ...deal, ...patch, updatedAt: nowIso() } : deal,
+        ),
+      }
+
+      set(next)
+      persist(snapshot(next))
+    },
+
+    addTask: (input) => {
+      const task: Task = {
+        ...input,
+        id: uid(),
+        completed: false,
+        completedAt: null,
+      }
+
+      const next: CrmState = { ...get(), tasks: [...get().tasks, task] }
+      set(next)
+      persist(snapshot(next))
+      return task
+    },
+
+    rescheduleTask: (id, dueAt) => {
+      const currentState = get()
+      const task = currentState.tasks.find((entry) => entry.id === id)
+      if (!task) return
+      const next: CrmState = {
+        ...currentState,
+        tasks: currentState.tasks.map((entry) => (entry.id === id ? { ...entry, dueAt } : entry)),
+      }
+      set(next)
+      persist(snapshot(next))
+    },
+
+    deleteTask: (id) => {
+      const currentState = get()
+      if (!currentState.tasks.some((entry) => entry.id === id)) return
+      const next: CrmState = {
+        ...currentState,
+        tasks: currentState.tasks.filter((entry) => entry.id !== id),
+      }
+      set(next)
+      persist(snapshot(next))
+    },
+
+    completeTask: (id) => {
+      const currentState = get()
+      const task = currentState.tasks.find((entry) => entry.id === id)
+      if (!task || task.completed) return
+
+      const completedAt = nowIso()
+      const updatedTask: Task = { ...task, completed: true, completedAt }
+
+      const next: CrmState = {
+        ...currentState,
+        leads: currentState.leads.map((lead) =>
+          lead.id === task.leadId ? { ...lead, lastContactedAt: completedAt } : lead,
+        ),
+        tasks: currentState.tasks.map((entry) => (entry.id === id ? updatedTask : entry)),
+        activities: [
+          ...currentState.activities,
+          {
+            id: uid(),
+            leadId: task.leadId,
+            kind: 'task-completed',
+            body: `Completed task: ${task.type}`,
+            timestamp: completedAt,
+          },
+        ],
+      }
+
+      set(next)
+      persist(snapshot(next))
+    },
+
+    addActivity: (leadId, kind, body) => {
+      const timestamp = nowIso()
+      const isTouchpoint =
+        kind === 'call' || kind === 'text' || kind === 'visit' || kind === 'meeting'
+
+      const next: CrmState = {
+        ...get(),
+        leads: isTouchpoint
+          ? get().leads.map((lead) =>
+              lead.id === leadId ? { ...lead, lastContactedAt: timestamp } : lead,
+            )
+          : get().leads,
+        activities: [
+          ...get().activities,
+          {
+            id: uid(),
+            leadId,
+            kind,
+            body,
+            timestamp,
+          },
+        ],
+      }
+
+      set(next)
+      persist(snapshot(next))
+    },
+
+    setTheme: (theme) => {
+      const next: CrmState = {
+        ...get(),
+        settings: { ...get().settings, theme },
+      }
+
+      set(next)
+      persist(snapshot(next))
+    },
+
+    setDefaultRetailLetterCadence: (days) => {
+      const safe = Math.max(1, Math.floor(days))
+      const next: CrmState = {
+        ...get(),
+        settings: { ...get().settings, defaultRetailLetterCadenceDays: safe },
+      }
+      set(next)
+      persist(snapshot(next))
+    },
+
+    setDefaultOpportunityOutreachMessage: (message) => {
+      const next: CrmState = {
+        ...get(),
+        settings: { ...get().settings, defaultOpportunityOutreachMessage: message },
+      }
+      set(next)
+      persist(snapshot(next))
+    },
+
+    resetToSeed: (now, ownerKey) => {
+      const seed = generateSeed(now, ownerKey)
+      set({ ...seed, hydrated: true, hydrateError: null })
+      persist(seed)
+    },
+
+    importNetworkContacts: (records, now, ownerKey) => {
+      const next = replaceNetworkContacts(get(), records, now, ownerKey)
+      set(next)
+      persist(snapshot(next))
+    },
+
+    runStaleLeadAutomation: (now) => {
+      const currentState = get()
+      const currentTasks = removeLegacyFakeFollowUps(currentState.tasks)
+      const newTasks: Task[] = []
+
+      for (const lead of currentState.leads) {
+        const hasOpenTask = currentTasks.some(
+          (task) => task.leadId === lead.id && !task.completed,
+        )
+        if (hasOpenTask) continue
+
+        if (lead.kind === 'retail') {
+          const cadenceDays =
+            lead.letterCadenceDays ??
+            currentState.settings.defaultRetailLetterCadenceDays
+          const lastTouch = lead.lastContactedAt
+            ? new Date(lead.lastContactedAt).getTime()
+            : new Date(lead.createdAt).getTime()
+          if (now.getTime() - lastTouch < cadenceDays * 86400000) continue
+
+          newTasks.push({
+            id: uid(),
+            leadId: lead.id,
+            type: 'Send Letter',
+            dueAt: new Date(now.getTime() + 86400000).toISOString(),
             completed: false,
             completedAt: null,
-            notes: OFFER_FOLLOW_UP_NOTE,
-          }
-        : null
-
-    const next: CrmState = {
-      ...currentState,
-      deals: currentState.deals.map((entry) =>
-        entry.id === dealId ? updatedDeal : entry,
-      ),
-      tasks: offerFollowUp
-        ? [...currentState.tasks, offerFollowUp]
-        : currentState.tasks,
-      activities: [...currentState.activities, stageChangeActivity],
-    }
-
-    set(next)
-    persist(snapshot(next))
-  },
-
-  updateDeal: (id, patch) => {
-    const next: CrmState = {
-      ...get(),
-      deals: get().deals.map((deal) =>
-        deal.id === id ? { ...deal, ...patch, updatedAt: nowIso() } : deal,
-      ),
-    }
-
-    set(next)
-    persist(snapshot(next))
-  },
-
-  addTask: (input) => {
-    const task: Task = {
-      ...input,
-      id: uid(),
-      completed: false,
-      completedAt: null,
-    }
-
-    const next: CrmState = { ...get(), tasks: [...get().tasks, task] }
-    set(next)
-    persist(snapshot(next))
-    return task
-  },
-
-  rescheduleTask: (id, dueAt) => {
-    const currentState = get()
-    const task = currentState.tasks.find((entry) => entry.id === id)
-    if (!task) return
-    const next: CrmState = {
-      ...currentState,
-      tasks: currentState.tasks.map((entry) => (entry.id === id ? { ...entry, dueAt } : entry)),
-    }
-    set(next)
-    persist(snapshot(next))
-  },
-
-  deleteTask: (id) => {
-    const currentState = get()
-    if (!currentState.tasks.some((entry) => entry.id === id)) return
-    const next: CrmState = {
-      ...currentState,
-      tasks: currentState.tasks.filter((entry) => entry.id !== id),
-    }
-    set(next)
-    persist(snapshot(next))
-  },
-
-  completeTask: (id) => {
-    const currentState = get()
-    const task = currentState.tasks.find((entry) => entry.id === id)
-    if (!task || task.completed) return
-
-    const completedAt = nowIso()
-    const updatedTask: Task = { ...task, completed: true, completedAt }
-
-    const next: CrmState = {
-      ...currentState,
-      leads: currentState.leads.map((lead) =>
-        lead.id === task.leadId ? { ...lead, lastContactedAt: completedAt } : lead,
-      ),
-      tasks: currentState.tasks.map((entry) => (entry.id === id ? updatedTask : entry)),
-      activities: [
-        ...currentState.activities,
-        {
-          id: uid(),
-          leadId: task.leadId,
-          kind: 'task-completed',
-          body: `Completed task: ${task.type}`,
-          timestamp: completedAt,
-        },
-      ],
-    }
-
-    set(next)
-    persist(snapshot(next))
-  },
-
-  addActivity: (leadId, kind, body) => {
-    const timestamp = nowIso()
-    const isTouchpoint =
-      kind === 'call' || kind === 'text' || kind === 'visit' || kind === 'meeting'
-
-    const next: CrmState = {
-      ...get(),
-      leads: isTouchpoint
-        ? get().leads.map((lead) =>
-            lead.id === leadId ? { ...lead, lastContactedAt: timestamp } : lead,
-          )
-        : get().leads,
-      activities: [
-        ...get().activities,
-        {
-          id: uid(),
-          leadId,
-          kind,
-          body,
-          timestamp,
-        },
-      ],
-    }
-
-    set(next)
-    persist(snapshot(next))
-  },
-
-  setTheme: (theme) => {
-    const next: CrmState = {
-      ...get(),
-      settings: { ...get().settings, theme },
-    }
-
-    set(next)
-    persist(snapshot(next))
-  },
-
-  setDefaultRetailLetterCadence: (days) => {
-    const safe = Math.max(1, Math.floor(days))
-    const next: CrmState = {
-      ...get(),
-      settings: { ...get().settings, defaultRetailLetterCadenceDays: safe },
-    }
-    set(next)
-    persist(snapshot(next))
-  },
-
-  setDefaultOpportunityOutreachMessage: (message) => {
-    const next: CrmState = {
-      ...get(),
-      settings: { ...get().settings, defaultOpportunityOutreachMessage: message },
-    }
-    set(next)
-    persist(snapshot(next))
-  },
-
-  resetToSeed: (now) => {
-    const seed = generateSeed(now)
-    set({ ...seed })
-    persist(seed)
-  },
-
-  importNetworkContacts: (records, now) => {
-    const next = replaceNetworkContacts(get(), records, now)
-    set(next)
-    persist(snapshot(next))
-  },
-
-  runStaleLeadAutomation: (now) => {
-    const currentState = get()
-    const currentTasks = removeLegacyFakeFollowUps(currentState.tasks)
-    const newTasks: Task[] = []
-
-    for (const lead of currentState.leads) {
-      const hasOpenTask = currentTasks.some(
-        (task) => task.leadId === lead.id && !task.completed,
-      )
-      if (hasOpenTask) continue
-
-      if (lead.kind === 'retail') {
-        const cadenceDays =
-          lead.letterCadenceDays ??
-          currentState.settings.defaultRetailLetterCadenceDays
-        const lastTouch = lead.lastContactedAt
-          ? new Date(lead.lastContactedAt).getTime()
-          : new Date(lead.createdAt).getTime()
-        if (now.getTime() - lastTouch < cadenceDays * 86400000) continue
-
-        newTasks.push({
-          id: uid(),
-          leadId: lead.id,
-          type: 'Send Letter',
-          dueAt: new Date(now.getTime() + 86400000).toISOString(),
-          completed: false,
-          completedAt: null,
-          notes: 'Automation: send periodic real estate letter',
-        })
+            notes: 'Automation: send periodic real estate letter',
+          })
+        }
       }
-    }
 
-    if (newTasks.length === 0 && currentTasks.length === currentState.tasks.length) return
+      if (newTasks.length === 0 && currentTasks.length === currentState.tasks.length) return
 
-    const next: CrmState = {
-      ...currentState,
-      tasks: [...currentTasks, ...newTasks],
-    }
+      const next: CrmState = {
+        ...currentState,
+        tasks: [...currentTasks, ...newTasks],
+      }
 
-    set(next)
-    persist(snapshot(next))
-  },
-}))
+      set(next)
+      persist(snapshot(next))
+    },
+  }
+})
