@@ -456,8 +456,8 @@ router.get('/landlords', async (req, res) => {
 });
 
 router.get('/landlords/:id', async (req, res) => {
-  const item = await prisma.evictionLandlord.findUnique({ where: { id: req.params.id }, include: { _count: { select: { filings: true, addresses: true } }, addresses: { orderBy: { address: 'asc' } }, ownedProperties: { orderBy: { createdAt: 'asc' } }, filings: { orderBy: { filedDate: 'desc' }, take: 500 }, activities: { orderBy: { createdAt: 'desc' }, take: 100 }, tasks: { orderBy: { dueAt: 'asc' }, take: 100 }, assignedTo: { select: { id: true, username: true } } } });
-  if (!item) return res.status(404).json({ error: 'Landlord not found' }); res.json({ ...item, filingCount: item._count.filings, addressCount: item._count.addresses, _count: undefined });
+  const item = await prisma.evictionLandlord.findUnique({ where: { id: req.params.id }, include: { _count: { select: { filings: true, addresses: true, ownedProperties: true } }, addresses: { orderBy: { address: 'asc' } }, ownedProperties: { orderBy: { createdAt: 'asc' } }, filings: { orderBy: { filedDate: 'desc' }, take: 500 }, activities: { orderBy: { createdAt: 'desc' }, take: 100 }, tasks: { orderBy: { dueAt: 'asc' }, take: 100 }, assignedTo: { select: { id: true, username: true } } } });
+  if (!item) return res.status(404).json({ error: 'Landlord not found' }); res.json({ ...item, filingCount: item._count.filings, addressCount: item._count.addresses, ownedPropertyCount: item._count.ownedProperties, _count: undefined });
 });
 
 router.patch('/landlords/:id', async (req, res) => {

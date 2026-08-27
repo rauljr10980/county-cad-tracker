@@ -1,8 +1,10 @@
 /**
  * The `contacts` column on an eviction landlord is an unvalidated JSON blob
- * written by several versions of this app. Emails were stored as bare strings
- * before per-line notes existed, so every read goes through normalizeContacts
- * — a reader that assumes the current shape throws on real rows.
+ * written by several versions of this app. Emails and phones were both stored
+ * as bare strings before per-line notes/attempts existed, so every read goes
+ * through normalizeContacts — a reader that assumes the current shape throws
+ * on real rows, and a normalise-then-rewrite that silently erases a shape it
+ * doesn't recognise.
  */
 
 export type PhoneEntry = {
@@ -25,6 +27,10 @@ export type NormalizedContacts = {
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 const normalizePhone = (raw: unknown): PhoneEntry | null => {
+  if (typeof raw === 'string') {
+    const number = raw.trim();
+    return number ? { number, status: '', attempts: 0, lastAttemptAt: null } : null;
+  }
   if (!raw || typeof raw !== 'object') return null;
   const p = raw as Record<string, unknown>;
   const number = typeof p.number === 'string' ? p.number.trim() : '';

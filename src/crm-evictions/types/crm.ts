@@ -1,12 +1,14 @@
 import type { Stage } from '../constants';
+import type { NormalizedContacts } from '@/lib/contactsModel';
 
 export type Assignee = { id: string; username: string };
 
-export type Phone = { number: string; status?: string; type?: string; source?: string };
-export type Contacts = {
-  phoneRows?: { name: string; phones: Phone[] }[];
-  emailRows?: { name: string; emails: string[] }[];
-};
+// The persisted shape is the same unvalidated JSON blob `contactsModel.ts`
+// normalises for the other landlord profile (`EvictionLeadsView`) — see that
+// module's header comment. Sharing the type here keeps both readers honest
+// about what a raw `contacts` column can actually contain.
+export type Phone = NormalizedContacts['phoneRows'][number]['phones'][number];
+export type Contacts = Partial<NormalizedContacts>;
 
 export type Lead = {
   id: string;

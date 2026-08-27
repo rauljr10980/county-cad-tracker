@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { extractContacts } from '@/lib/contactParser';
 import {
@@ -26,6 +26,11 @@ type Detail = Landlord & {
   activities: { id: string; kind: string; body: string; createdAt: string }[];
   tasks: { id: string; type: string; dueAt: string; completed: boolean; notes: string }[];
 };
+// What `GET /landlords` actually returns per row: `contacts` is the raw,
+// unvalidated JSON column — never pre-normalised — so typing it as anything
+// other than `unknown` here would be the same lie that let a raw payload into
+// `NormalizedContacts`-typed state undetected (see the `setItems` call below).
+type RawLandlord = Omit<Landlord, 'contacts'> & { contacts: unknown };
 
 const request = async (path: string, init?: RequestInit) => {
   const headers = { ...getAuthHeaders(), ...(init?.headers || {}) } as Record<string, string>;
@@ -90,12 +95,20 @@ export default function EvictionLeadsView() {
     setLoading(true); setError('');
     const params = new URLSearchParams({ page: String(page), pageSize: '25' });
     Object.entries({ search, stage, service, dateFrom, dateTo, status, disposition, precinct, satisfied }).forEach(([k, v]) => v && params.set(k, v));
-    try { const data = await request(`/landlords?${params}`); setItems(data.items.map((item: Landlord) => ({ ...item, contactStage: mapLegacyStage(item.contactStage) }))); setTotal(data.total); setPages(data.pages || 1); }
+    try { const data = await request(`/landlords?${params}`); setItems(data.items.map((item: RawLandlord) => ({ ...item, contactStage: mapLegacyStage(item.contactStage), contacts: normalizeContacts(item.contacts) }))); setTotal(data.total); setPages(data.pages || 1); }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load eviction leads'); } finally { setLoading(false); }
   }, [page, search, stage, service, dateFrom, dateTo, status, disposition, precinct, satisfied]);
   useEffect(() => { const timer = setTimeout(load, 250); return () => clearTimeout(timer); }, [load]);
 
-  const open = async (id: string) => { const detail = await request(`/landlords/${id}`); setSelected({ ...detail, contactStage: mapLegacyStage(detail.contactStage), contacts: normalizeContacts(detail.contacts) }); setRawText(''); };
+  const open = async (id: string) => {
+    const detail = await request(`/landlords/${id}`);
+    const contacts = normalizeContacts(detail.contacts);
+    // Reset the freshness ref to what the server just returned, so edits on a
+    // newly opened landlord never build on the previous one's blob.
+    contactsRef.current = contacts;
+    setSelected({ ...detail, contactStage: mapLegacyStage(detail.contactStage), contacts });
+    setRawText('');
+  };
   const patch = async (data: Partial<Detail>) => {
     if (!selected) return; setSaving(true);
     try { await request(`/landlords/${selected.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); setSelected({ ...selected, ...data }); await load(); }
@@ -155,32 +168,50 @@ export default function EvictionLeadsView() {
     await patch({ contacts: { phoneRows, emailRows } }); setRawText('');
   };
 
-  const saveContacts = async (contacts: NormalizedContacts) => { await patch({ contacts }); };
+  // Each control derives its next contacts blob from the one in state and
+  // PATCHes the whole thing. Two edits inside one round trip would both start
+  // from the same stale blob, so the second silently reverts the first —
+  // marking a number wrong and then typing a note loses the disposition.
+  // The ref holds the freshest blob, updated synchronously before the request,
+  // so a later edit builds on the earlier one instead of racing it.
+  const contactsRef = useRef<NormalizedContacts | null>(null);
+  const currentContacts = () => contactsRef.current ?? selected?.contacts ?? { phoneRows: [], emailRows: [] };
+  const saveContacts = async (contacts: NormalizedContacts) => {
+    contactsRef.current = contacts;
+    await patch({ contacts });
+  };
 
   const callNumber = async (ri: number, pi: number, number: string) => {
     if (!selected) return;
     window.open(`tel:${number}`, '_self');
-    await saveContacts(recordAttempt(selected.contacts, ri, pi, new Date()));
-    await request(`/landlords/${selected.id}/activities`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'call', body: `Called ${number}` }),
-    });
-    await patch({
-      lastContactedAt: new Date().toISOString(),
-      contactStage: selected.contactStage === 'New Lead' ? 'Contacted' : selected.contactStage,
-    });
-    await open(selected.id);
+    try {
+      await saveContacts(recordAttempt(currentContacts(), ri, pi, new Date()));
+      await request(`/landlords/${selected.id}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'call', body: `Called ${number}` }),
+      });
+      await patch({
+        lastContactedAt: new Date().toISOString(),
+        contactStage: selected.contactStage === 'New Lead' ? 'Contacted' : selected.contactStage,
+      });
+      await open(selected.id);
+    } catch (e) {
+      // Partial failure here (attempt saved but the activity log or stage
+      // bump fails) must not fail silently — callNumber is the primary call
+      // action, so an unhandled rejection here is easy to miss entirely.
+      setError(e instanceof Error ? e.message : 'Unable to record this call. Refresh and try again.');
+    }
   };
 
   const setPhoneDisposition = (ri: number, pi: number, status: string) =>
-    selected && saveContacts(setContactDisposition(selected.contacts, ri, pi, status));
+    selected && saveContacts(setContactDisposition(currentContacts(), ri, pi, status));
 
   const phoneNote = (ri: number, pi: number, note: string) =>
-    selected && saveContacts(setPhoneNote(selected.contacts, ri, pi, note));
+    selected && saveContacts(setPhoneNote(currentContacts(), ri, pi, note));
 
   const emailNote = (ri: number, ei: number, note: string) =>
-    selected && saveContacts(setEmailNote(selected.contacts, ri, ei, note));
+    selected && saveContacts(setEmailNote(currentContacts(), ri, ei, note));
 
   const addOwnedProperty = async () => {
     if (!selected || !opAddress.trim()) return;
@@ -191,12 +222,14 @@ export default function EvictionLeadsView() {
     });
     setOpAddress(''); setOpCity(''); setOpState(''); setOpZip(''); setOpNotes('');
     await open(selected.id);
+    await load();
   };
 
   const removeOwnedProperty = async (id: string) => {
     if (!selected) return;
     await request(`/owned-properties/${id}`, { method: 'DELETE' });
     await open(selected.id);
+    await load();
   };
 
   const addActivity = async () => {
@@ -339,8 +372,9 @@ export default function EvictionLeadsView() {
         {selected.contacts.phoneRows.map((row, ri) => row.phones.map((phone, pi) => (
           <div key={`${ri}-${pi}`} className={`grid gap-2 md:grid-cols-[minmax(0,180px)_auto_auto_minmax(0,1fr)] items-center ${phone.status === 'wrong' ? 'opacity-50' : ''}`}>
             <button
-              className="text-left text-primary record hover:underline"
+              className="text-left text-primary record hover:underline disabled:opacity-50 disabled:pointer-events-none"
               onClick={() => callNumber(ri, pi, phone.number)}
+              disabled={saving}
             >
               {phone.number}
             </button>
@@ -349,21 +383,24 @@ export default function EvictionLeadsView() {
             </span>
             <span className="flex gap-1">
               <button
-                className={`rounded border px-2 py-1 text-xs ${phone.status === 'right' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted'}`}
+                className={`rounded border px-2 py-1 text-xs disabled:opacity-50 disabled:pointer-events-none ${phone.status === 'right' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted'}`}
                 aria-pressed={phone.status === 'right'}
                 onClick={() => setPhoneDisposition(ri, pi, phone.status === 'right' ? '' : 'right')}
+                disabled={saving}
               >Right number</button>
               <button
-                className={`rounded border px-2 py-1 text-xs ${phone.status === 'wrong' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted'}`}
+                className={`rounded border px-2 py-1 text-xs disabled:opacity-50 disabled:pointer-events-none ${phone.status === 'wrong' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted'}`}
                 aria-pressed={phone.status === 'wrong'}
                 onClick={() => setPhoneDisposition(ri, pi, phone.status === 'wrong' ? '' : 'wrong')}
+                disabled={saving}
               >Wrong number</button>
             </span>
             <input
-              className="h-9 w-full rounded border bg-card px-2 text-sm"
+              className="h-9 w-full rounded border bg-card px-2 text-sm disabled:opacity-50"
               placeholder="Note for this number"
               defaultValue={phone.note || ''}
               onBlur={(e) => phoneNote(ri, pi, e.target.value)}
+              disabled={saving}
             />
           </div>
         )))}
@@ -378,10 +415,11 @@ export default function EvictionLeadsView() {
           <div key={`${ri}-${ei}`} className="grid gap-2 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)] items-center">
             <a className="text-primary" href={`mailto:${email.address}`}>{email.address}</a>
             <input
-              className="h-9 w-full rounded border bg-card px-2 text-sm"
+              className="h-9 w-full rounded border bg-card px-2 text-sm disabled:opacity-50"
               placeholder="Note for this email"
               defaultValue={email.note || ''}
               onBlur={(e) => emailNote(ri, ei, e.target.value)}
+              disabled={saving}
             />
           </div>
         )))}

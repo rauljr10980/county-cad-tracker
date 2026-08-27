@@ -43,6 +43,21 @@ describe('normalizeContacts', () => {
     const result = normalizeContacts({ phoneRows: [{ name: 'X', phones: [{ number: '' }, { number: '555' }] }], emailRows: [] });
     expect(result.phoneRows[0].phones).toHaveLength(1);
   });
+
+  it('turns a legacy bare-string phone into an entry instead of dropping it', () => {
+    const result = normalizeContacts({
+      phoneRows: [{ name: 'X', phones: ['(903) 714-4811'] }],
+      emailRows: [],
+    });
+    expect(result.phoneRows[0].phones).toEqual([
+      { number: '(903) 714-4811', status: '', attempts: 0, lastAttemptAt: null },
+    ]);
+  });
+
+  it('drops a blank bare-string phone', () => {
+    const result = normalizeContacts({ phoneRows: [{ name: 'X', phones: ['   '] }], emailRows: [] });
+    expect(result.phoneRows[0].phones).toHaveLength(0);
+  });
 });
 
 describe('recordAttempt', () => {
