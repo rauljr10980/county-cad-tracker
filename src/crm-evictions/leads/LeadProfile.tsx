@@ -8,6 +8,7 @@ import { STAGES, SERVICE_INTERESTS } from '../constants';
 import type { LeadDetail } from '../types/crm';
 import { fmt } from '../format';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { normalizeContacts } from '@/lib/contactsModel';
 
 export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onClose: () => void; onSaved: () => void }) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
@@ -21,7 +22,7 @@ export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onCl
   useEffect(() => {
     setError('');
     getLead(leadId)
-      .then(setLead)
+      .then((detail) => setLead({ ...detail, contacts: normalizeContacts(detail.contacts) }))
       .catch((e) => setError(e instanceof Error ? e.message : 'Unable to load this lead.'));
   }, [leadId]);
 
@@ -131,8 +132,8 @@ export function LeadProfile({ leadId, onClose, onSaved }: { leadId: string; onCl
                   <a className="text-primary" href={`tel:${p.number}`}>{p.number}</a>
                 </div>
               )))}
-              {(lead.contacts?.emailRows || []).flatMap((r) => r.emails.map((e) => (
-                <div key={e} className="text-sm"><a className="text-primary" href={`mailto:${e}`}>{e}</a></div>
+              {(lead.contacts?.emailRows || []).flatMap((r) => r.emails.map((e, i) => (
+                <div key={`${r.name}-${i}`} className="text-sm"><a className="text-primary" href={`mailto:${e.address}`}>{e.address}</a></div>
               )))}
               {!lead.contacts?.phoneRows?.length && !lead.contacts?.emailRows?.length && (
                 <p className="text-sm text-muted-foreground">No contacts captured yet.</p>

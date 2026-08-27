@@ -450,14 +450,14 @@ router.get('/landlords', async (req, res) => {
   const [total, items] = await Promise.all([
     prisma.evictionLandlord.count({ where }),
     prisma.evictionLandlord.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy,
-      include: { _count: { select: { filings: true, addresses: true } }, filings: { orderBy: { filedDate: 'desc' }, take: 1, select: { filedDate: true } }, tasks: { where: { completed: false }, orderBy: { dueAt: 'asc' }, take: 1 }, assignedTo: { select: { id: true, username: true } } } }),
+      include: { _count: { select: { filings: true, addresses: true, ownedProperties: true } }, filings: { orderBy: { filedDate: 'desc' }, take: 1, select: { filedDate: true } }, tasks: { where: { completed: false }, orderBy: { dueAt: 'asc' }, take: 1 }, assignedTo: { select: { id: true, username: true } } } }),
   ]);
-  res.json({ items: items.map((x) => ({ ...x, filingCount: x._count.filings, addressCount: x._count.addresses, latestFilingDate: x.filings[0]?.filedDate || null, nextTask: x.tasks[0] || null, _count: undefined, filings: undefined, tasks: undefined })), total, page, pageSize, pages: Math.ceil(total / pageSize) });
+  res.json({ items: items.map((x) => ({ ...x, filingCount: x._count.filings, addressCount: x._count.addresses, ownedPropertyCount: x._count.ownedProperties, latestFilingDate: x.filings[0]?.filedDate || null, nextTask: x.tasks[0] || null, _count: undefined, filings: undefined, tasks: undefined })), total, page, pageSize, pages: Math.ceil(total / pageSize) });
 });
 
 router.get('/landlords/:id', async (req, res) => {
-  const item = await prisma.evictionLandlord.findUnique({ where: { id: req.params.id }, include: { _count: { select: { filings: true, addresses: true } }, addresses: { orderBy: { address: 'asc' } }, filings: { orderBy: { filedDate: 'desc' }, take: 500 }, activities: { orderBy: { createdAt: 'desc' }, take: 100 }, tasks: { orderBy: { dueAt: 'asc' }, take: 100 }, assignedTo: { select: { id: true, username: true } } } });
-  if (!item) return res.status(404).json({ error: 'Landlord not found' }); res.json({ ...item, filingCount: item._count.filings, addressCount: item._count.addresses, _count: undefined });
+  const item = await prisma.evictionLandlord.findUnique({ where: { id: req.params.id }, include: { _count: { select: { filings: true, addresses: true, ownedProperties: true } }, addresses: { orderBy: { address: 'asc' } }, ownedProperties: { orderBy: { createdAt: 'asc' } }, filings: { orderBy: { filedDate: 'desc' }, take: 500 }, activities: { orderBy: { createdAt: 'desc' }, take: 100 }, tasks: { orderBy: { dueAt: 'asc' }, take: 100 }, assignedTo: { select: { id: true, username: true } } } });
+  if (!item) return res.status(404).json({ error: 'Landlord not found' }); res.json({ ...item, filingCount: item._count.filings, addressCount: item._count.addresses, ownedPropertyCount: item._count.ownedProperties, _count: undefined });
 });
 
 router.patch('/landlords/:id', async (req, res) => {
@@ -468,6 +468,25 @@ router.patch('/landlords/:id', async (req, res) => {
 
 router.post('/landlords/:id/activities', async (req, res) => res.json(await prisma.evictionActivity.create({ data: { landlordId: req.params.id, kind: req.body.kind || 'note', body: clean(req.body.body) } })));
 router.post('/landlords/:id/tasks', async (req, res) => res.json(await prisma.evictionTask.create({ data: { landlordId: req.params.id, type: req.body.type || 'Call', dueAt: new Date(req.body.dueAt), notes: clean(req.body.notes) } })));
+router.post('/landlords/:id/owned-properties', async (req, res) => {
+  const address = clean(req.body.address);
+  if (!address) return res.status(400).json({ error: 'An address is required' });
+  res.json(await prisma.evictionOwnedProperty.create({
+    data: {
+      landlordId: req.params.id,
+      address,
+      city: clean(req.body.city) || '',
+      state: clean(req.body.state) || '',
+      zip: clean(req.body.zip) || '',
+      notes: clean(req.body.notes) || '',
+    },
+  }));
+});
+
+router.delete('/owned-properties/:id', async (req, res) => {
+  await prisma.evictionOwnedProperty.delete({ where: { id: req.params.id } });
+  res.json({ ok: true });
+});
 // Completing (or un-completing) a task changes which task is now the
 // landlord's earliest open one, so nextFollowUpAt is recomputed from what
 // remains incomplete after the update — in both directions — rather than
