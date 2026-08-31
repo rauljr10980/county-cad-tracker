@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ExternalLink, MapPin, DollarSign, Calendar, CalendarDays, FileText, TrendingUp, StickyNote, Edit2, Phone, Star, CheckCircle, MapPin as MapPinIcon, Send, Eye, Building, User, ChevronDown, Loader2, Mail, ClipboardPaste, Clock, GitBranch, Copy } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, formatDistanceToNow, addYears } from 'date-fns';
-import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, sendEmail, updateDrivingLeadPhones, updateDrivingLeadEmails, updateDrivingLead, logCall, logActivity } from '@/lib/api';
+import { updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyEmails, updatePropertyAction, updatePropertyVisited, updatePropertyPrimaryOverride, getPreForeclosures, createFollowUp, updateDrivingLeadPhones, updateDrivingLeadEmails, updateDrivingLead, logCall, logActivity } from '@/lib/api';
 import { extractContacts } from '@/lib/contactParser';
 import { toast } from '@/hooks/use-toast';
 import { usePropertyFollowUps } from '@/hooks/useFollowUps';
@@ -22,6 +22,13 @@ import { PreForeclosureRecord } from '@/types/property';
 import { PropertyWorkflowTracker } from './PropertyWorkflowTracker';
 import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
 import { updatePropertyWorkflowStage } from '@/lib/api';
+import { SendEmailPanel, type EmailRecipient } from '@/components/email/SendEmailPanel';
+
+// Default body for the property Send Email panel. Static across properties —
+// the per-property values ({{PropertyAddress}}, {{Owner}}, etc.) are resolved
+// at send time — so it's fine as a plain constant rather than something set
+// per property.
+const PROPERTY_EMAIL_DEFAULT_BODY = `Hi Ms./Mr. {{LastName}},\n\nMy name is Raul. I'm reaching out regarding the property at {{PropertyAddress}}, which is listed under {{Owner}}.\n\nIf you're connected to the property, could you please let me know the best person to speak with? If the home is vacant, I would be interested in discussing a possible purchase.\n\nWe also work with real estate attorneys to help streamline the process, and you wouldn't have to pay out of pocket for those legal services.\n\nIf I've reached you by mistake, please disregard this message and accept my apologies.\n\nThank you,\nRaul\n210-425-7584`;
 
 interface PhoneEntry {
   number: string;
@@ -77,13 +84,20 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [rawContactText, setRawContactText] = useState('');
   const [emails, setEmails] = useState<string[]>([]);
   const [emailExpanded, setEmailExpanded] = useState(false);
-  const [emailRecipients, setEmailRecipients] = useState<{ name: string; emails: string[]; sent?: boolean }[]>(
+  const [emailRecipients, setEmailRecipients] = useState<EmailRecipient[]>(
     Array.from({ length: 6 }, () => ({ name: '', emails: [''] }))
   );
-  const [emailSubject, setEmailSubject] = useState('Quick question regarding {{PropertyAddress}}');
-  const [emailBody, setEmailBody] = useState('');
-  const [sendingEmailIndex, setSendingEmailIndex] = useState<number | null>(null);
-  const [sendingAllEmails, setSendingAllEmails] = useState(false);
+  // SendEmailPanel's onPersist runs right after it hands back the recipients
+  // with updated "sent" flags via onRecipientsChange below. Because setState
+  // is async, buildContactsJson() reading the `emailRecipients` state
+  // variable at that point would still see the pre-send flags — so the
+  // persist path reads this ref instead, which onRecipientsChange keeps in
+  // sync synchronously. Everything else keeps reading the state as before.
+  const emailRecipientsRef = useRef<EmailRecipient[]>(emailRecipients);
+  const updateEmailRecipients = (next: EmailRecipient[]) => {
+    emailRecipientsRef.current = next;
+    setEmailRecipients(next);
+  };
   const [ownerOverride, setOwnerOverride] = useState('');
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
   const [followUpTime, setFollowUpTime] = useState('09:00');
@@ -173,11 +187,12 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
           sent: r.sent || false,
         }));
         while (restored.length < 6) restored.push({ name: '', emails: [''] });
-        setEmailRecipients(restored);
+        updateEmailRecipients(restored);
       } else {
-        setEmailRecipients(emptyEmailRows);
+        updateEmailRecipients(emptyEmailRows);
       }
-      setEmailBody(`Hi Ms./Mr. {{LastName}},\n\nMy name is Raul. I'm reaching out regarding the property at {{PropertyAddress}}, which is listed under {{Owner}}.\n\nIf you're connected to the property, could you please let me know the best person to speak with? If the home is vacant, I would be interested in discussing a possible purchase.\n\nWe also work with real estate attorneys to help streamline the process, and you wouldn't have to pay out of pocket for those legal services.\n\nIf I've reached you by mistake, please disregard this message and accept my apologies.\n\nThank you,\nRaul\n210-425-7584`);
+      // Subject/body reset to their defaults for the newly opened property —
+      // see SendEmailPanel's `resetKey` prop, passed below.
 
       setOwnerOverride(savedContacts?.ownerOverride || '');
       // Prefer dedicated column, fall back to contacts JSON for old data
@@ -325,6 +340,9 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const toTitleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   const emailAddress = toTitleCase(displayPropertyAddress);
   const emailOwner = ownerOverride.trim() || toTitleCase(displayOwnerName) || 'Property Owner';
+  const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
+    ? property.phoneNumbers[property.ownerPhoneIndex]
+    : (property.phoneNumbers?.find(p => p) || '');
 
   const handleSaveNotes = async () => {
     setSavingNotes(true);
@@ -362,10 +380,32 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
         name: r.name,
         phones: r.phones.filter(p => p.number.trim()).map(p => ({ number: p.number, status: p.status || '', callCount: p.callCount || 0, ...(p.lastCallTime ? { lastCallTime: p.lastCallTime } : {}) })),
       })),
-    emailRows: emailRecipients
+    // Reads the ref (always kept in sync by updateEmailRecipients) rather
+    // than the `emailRecipients` state variable directly, so a call made
+    // synchronously right after an onRecipientsChange from SendEmailPanel
+    // (see persistEmailContacts below) never reads a stale pre-update value.
+    emailRows: emailRecipientsRef.current
       .filter(r => r.name.trim() || r.emails.some(e => e.trim()))
       .map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: r.sent || false })),
   });
+
+  // Persists the Send Email panel's recipient/contacts data for this
+  // property. Passed to SendEmailPanel as onPersist — it's called once
+  // before "Send to All" starts sending (so row data that hasn't
+  // auto-saved yet survives a failure partway through), and once after
+  // (so "sent" flags are recorded), matching the original inline handler.
+  const persistEmailContacts = async (phase: 'pre-send' | 'post-send') => {
+    const contacts = buildContactsJson();
+    const allEmails = emailRecipientsRef.current.flatMap(r => r.emails.filter(e => e.includes('@')));
+    if (!isD4d) {
+      await updatePropertyEmails(property.id, allEmails, contacts);
+    } else {
+      await updateDrivingLeadEmails(d4dLeadId, allEmails, contacts, ownerOverride);
+      if (phase === 'post-send') queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
+    }
+    property.emails = allEmails;
+    property.contacts = contacts;
+  };
 
   const handleSavePhoneNumbers = async () => {
     setSavingPhones(true);
@@ -2022,7 +2062,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                         emails: newEmails.length > 0 ? newEmails : [''],
                       };
                       finalEmails = updated;
-                      setEmailRecipients(updated);
+                      updateEmailRecipients(updated);
                     }
                     // Auto-save immediately using the locally computed values
                     try {
@@ -2084,212 +2124,18 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                 !emailExpanded && "-rotate-90"
               )} />
             </div>
-            {emailExpanded && (
-              <div className="space-y-2 mt-3">
-                {emailRecipients.map((recipient, index) => {
-                  const validEmails = recipient.emails.filter(e => e.includes('@'));
-                  return (
-                    <div key={index} className="flex items-center gap-2">
-                      <span className="text-xs w-6 shrink-0 flex items-center justify-center">
-                        {recipient.sent
-                          ? <CheckCircle className="h-3.5 w-3.5 text-green-400" />
-                          : <span className="text-muted-foreground">{index + 1}.</span>
-                        }
-                      </span>
-                      <Input
-                        value={recipient.name}
-                        onChange={(e) => {
-                          const updated = [...emailRecipients];
-                          updated[index] = { ...updated[index], name: e.target.value };
-                          setEmailRecipients(updated);
-                        }}
-                        placeholder="Name"
-                        className="w-28 shrink-0"
-                      />
-                      <div className="flex-1 overflow-x-auto">
-                        <div className="flex items-center gap-1.5">
-                          {recipient.emails.map((email, emailIdx) => (
-                            <Input
-                              key={emailIdx}
-                              type="email"
-                              value={email}
-                              onChange={(e) => {
-                                const updated = [...emailRecipients];
-                                const newEmails = [...updated[index].emails];
-                                newEmails[emailIdx] = e.target.value;
-                                updated[index] = { ...updated[index], emails: newEmails };
-                                setEmailRecipients(updated);
-                              }}
-                              placeholder={`Email ${emailIdx + 1}`}
-                              className="w-[180px] shrink-0 text-xs"
-                            />
-                          ))}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-                            onClick={() => {
-                              const updated = [...emailRecipients];
-                              updated[index] = { ...updated[index], emails: [...updated[index].emails, ''] };
-                              setEmailRecipients(updated);
-                            }}
-                            title="Add email field"
-                          >
-                            <span className="text-lg leading-none">+</span>
-                          </Button>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-                        onClick={async () => {
-                          if (validEmails.length === 0) return;
-                          setSendingEmailIndex(index);
-                          try {
-                            const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
-                              ? property.phoneNumbers[property.ownerPhoneIndex]
-                              : (property.phoneNumbers?.find(p => p) || '');
-                            const fullName = recipient.name.trim();
-                            const lastName = fullName.split(/\s+/).pop() || fullName || 'there';
-                            const personalBody = emailBody
-                              .replace(/\{\{LastName\}\}/g, lastName)
-                              .replace(/\{\{Name\}\}/g, fullName || 'there')
-                              .replace(/\{\{PropertyAddress\}\}/g, emailAddress)
-                              .replace(/\{\{Owner\}\}/g, emailOwner)
-                              .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
-                            const resolvedSubject = emailSubject
-                              .replace(/\{\{PropertyAddress\}\}/g, emailAddress)
-                              .replace(/\{\{Owner\}\}/g, emailOwner);
-                            await sendEmail({ to: validEmails, subject: resolvedSubject, body: personalBody });
-                            toast({ title: `Email sent to ${validEmails.length} address${validEmails.length > 1 ? 'es' : ''}` });
-                          } catch (err) {
-                            toast({ title: 'Failed to send', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
-                          } finally {
-                            setSendingEmailIndex(null);
-                          }
-                        }}
-                        disabled={validEmails.length === 0 || sendingEmailIndex === index}
-                        title="Send to all emails in this row"
-                      >
-                        {sendingEmailIndex === index ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  );
-                })}
-
-                <div className="border-t border-border pt-3 mt-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">Subject:</span>
-                    <Input
-                      value={emailSubject}
-                      onChange={(e) => setEmailSubject(e.target.value)}
-                      placeholder="Email subject"
-                      className="flex-1"
-                    />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">Variables: <code className="bg-muted px-1 rounded">{'{{LastName}}'}</code> <code className="bg-muted px-1 rounded">{'{{Name}}'}</code> <code className="bg-muted px-1 rounded">{'{{PropertyAddress}}'}</code> <code className="bg-muted px-1 rounded">{'{{Owner}}'}</code></p>
-                  <Textarea
-                    value={emailBody}
-                    onChange={(e) => setEmailBody(e.target.value)}
-                    rows={8}
-                    className="text-sm"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
-                        ? property.phoneNumbers[property.ownerPhoneIndex]
-                        : (property.phoneNumbers?.find(p => p) || '');
-                      const resolved = emailBody
-                        .replace(/\{\{LastName\}\}/g, '___')
-                        .replace(/\{\{Name\}\}/g, '___')
-                        .replace(/\{\{PropertyAddress\}\}/g, emailAddress)
-                        .replace(/\{\{Owner\}\}/g, emailOwner)
-                        .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
-                      navigator.clipboard.writeText(resolved);
-                      toast({ title: 'Email copied to clipboard' });
-                    }}
-                  >
-                    Copy Text
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={async () => {
-                      const allEmails = emailRecipients
-                        .flatMap(r => r.emails.filter(e => e.includes('@')));
-                      if (allEmails.length === 0) return;
-                      setSendingAllEmails(true);
-                      try {
-                        // Save contacts structure + flat emails to persist row data
-                        const contacts = buildContactsJson();
-                        if (!isD4d) await updatePropertyEmails(property.id, allEmails, contacts);
-                        else await updateDrivingLeadEmails(d4dLeadId, allEmails, contacts, ownerOverride);
-                        property.emails = allEmails;
-                        property.contacts = contacts;
-
-                        const ownerPhone = property.ownerPhoneIndex != null && property.phoneNumbers?.[property.ownerPhoneIndex]
-                          ? property.phoneNumbers[property.ownerPhoneIndex]
-                          : (property.phoneNumbers?.find(p => p) || '');
-                        const resolvedSubject = emailSubject
-                          .replace(/\{\{PropertyAddress\}\}/g, emailAddress)
-                          .replace(/\{\{Owner\}\}/g, emailOwner);
-                        // Send personalized email per row so each person gets their own name
-                        let sentCount = 0;
-                        const updatedRecipients = [...emailRecipients];
-                        for (let ri = 0; ri < emailRecipients.length; ri++) {
-                          const recipient = emailRecipients[ri];
-                          const rowEmails = recipient.emails.filter(e => e.includes('@'));
-                          if (rowEmails.length === 0 || recipient.sent) continue;
-                          const fullName = recipient.name.trim();
-                          const lastName = fullName.split(/\s+/).pop() || fullName || 'there';
-                          const resolved = emailBody
-                            .replace(/\{\{LastName\}\}/g, lastName)
-                            .replace(/\{\{Name\}\}/g, fullName || 'there')
-                            .replace(/\{\{PropertyAddress\}\}/g, emailAddress)
-                            .replace(/\{\{Owner\}\}/g, emailOwner)
-                            .replace(/\{\{PhoneNumber\}\}/g, ownerPhone);
-                          await sendEmail({ to: rowEmails, subject: resolvedSubject, body: resolved });
-                          sentCount += rowEmails.length;
-                          updatedRecipients[ri] = { ...updatedRecipients[ri], sent: true };
-                        }
-                        setEmailRecipients(updatedRecipients);
-                        // Persist sent flags
-                        const updatedContacts = { ...buildContactsJson(), emailRows: updatedRecipients.filter(r => r.name.trim() || r.emails.some(e => e.trim())).map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: r.sent || false })) };
-                        if (!isD4d) {
-                          await updatePropertyEmails(property.id, allEmails, updatedContacts);
-                        } else {
-                          await updateDrivingLeadEmails(d4dLeadId, allEmails, updatedContacts, ownerOverride);
-                          queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
-                        }
-                        property.contacts = updatedContacts;
-                        toast({ title: `Email sent to ${sentCount} address${sentCount > 1 ? 'es' : ''}` });
-                      } catch (err) {
-                        toast({ title: 'Failed to send', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
-                      } finally {
-                        setSendingAllEmails(false);
-                      }
-                    }}
-                    disabled={!emailRecipients.some(r => r.emails.some(e => e.includes('@'))) || sendingAllEmails}
-                  >
-                    {sendingAllEmails ? (
-                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <Mail className="h-3.5 w-3.5 mr-1.5" />
-                    )}
-                    {sendingAllEmails ? 'Sending...' : 'Send to All'}
-                  </Button>
-                </div>
-              </div>
-            )}
+            <SendEmailPanel
+              hidden={!emailExpanded}
+              recipients={emailRecipients}
+              onRecipientsChange={updateEmailRecipients}
+              propertyAddress={emailAddress}
+              owner={emailOwner}
+              phoneNumber={ownerPhone}
+              onPersist={persistEmailContacts}
+              defaultSubject="Quick question regarding {{PropertyAddress}}"
+              defaultBody={PROPERTY_EMAIL_DEFAULT_BODY}
+              resetKey={`${property.id}:${isOpen}`}
+            />
           </div>
 
           {/* Actions */}

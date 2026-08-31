@@ -13,6 +13,8 @@ import { truePeopleSearchUrl, taxAssessorUrl, landRecordsUrl } from '@/lib/resea
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Building2, ChevronLeft, ChevronRight, ExternalLink, Loader2, Search, Upload, User } from 'lucide-react';
 import { STAGES, SERVICE_INTERESTS, mapLegacyStage, type Stage } from '@/crm-evictions/constants';
+import { SendEmailPanel } from '@/components/email/SendEmailPanel';
+import { recipientsFromEmailRows, type EmailRecipient } from '@/components/email/emailTemplate';
 
 type Landlord = {
   id: string; name: string; isCorporate: boolean; contactStage: string; serviceInterests: string[]; contacts: NormalizedContacts; notes: string;
@@ -90,6 +92,11 @@ export default function EvictionLeadsView() {
   const [selected, setSelected] = useState<Detail | null>(null), [rawText, setRawText] = useState(''), [saving, setSaving] = useState(false);
   const [activityBody, setActivityBody] = useState(''), [activityKind, setActivityKind] = useState('call'), [taskDue, setTaskDue] = useState('');
   const [opAddress, setOpAddress] = useState(''), [opCity, setOpCity] = useState(''), [opState, setOpState] = useState(''), [opZip, setOpZip] = useState(''), [opNotes, setOpNotes] = useState('');
+  // Seeded from the landlord's contacts.emailRows on open (below) and edited
+  // freely in the Send Email panel. Name/address edits here are session-only
+  // scratch state for this task — only per-email notes persist, via
+  // onNoteChange -> emailNote -> saveContacts, same as phone notes.
+  const [emailRecipients, setEmailRecipients] = useState<EmailRecipient[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -108,6 +115,11 @@ export default function EvictionLeadsView() {
     contactsRef.current = contacts;
     setSelected({ ...detail, contactStage: mapLegacyStage(detail.contactStage), contacts });
     setRawText('');
+    // Seed one Send Email recipient per existing emailRow — not padded with
+    // blank rows. A landlord with none yet gets a single blank row so the
+    // panel is still usable to add a first address.
+    const seeded = recipientsFromEmailRows(contacts.emailRows);
+    setEmailRecipients(seeded.length > 0 ? seeded : [{ name: '', emails: [''] }]);
   };
   const patch = async (data: Partial<Detail>) => {
     if (!selected) return; setSaving(true);
@@ -411,18 +423,18 @@ export default function EvictionLeadsView() {
         {!selected.contacts.emailRows.some((r) => r.emails.length) && (
           <p className="text-sm text-muted-foreground">No emails yet.</p>
         )}
-        {selected.contacts.emailRows.map((row, ri) => row.emails.map((email, ei) => (
-          <div key={`${ri}-${ei}`} className="grid gap-2 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)] items-center">
-            <a className="text-primary" href={`mailto:${email.address}`}>{email.address}</a>
-            <input
-              className="h-9 w-full rounded border bg-card px-2 text-sm disabled:opacity-50"
-              placeholder="Note for this email"
-              defaultValue={email.note || ''}
-              onBlur={(e) => emailNote(ri, ei, e.target.value)}
-              disabled={saving}
-            />
-          </div>
-        )))}
+        {/* Name/address edits made in this panel are session-only for now —
+            only the per-email notes persist, through onNoteChange below. */}
+        <SendEmailPanel
+          recipients={emailRecipients}
+          onRecipientsChange={setEmailRecipients}
+          propertyAddress={selected.addresses[0]
+            ? `${selected.addresses[0].address}, ${selected.addresses[0].city}, ${selected.addresses[0].state} ${selected.addresses[0].zip}`
+            : ''}
+          owner={selected.name}
+          showNotes
+          onNoteChange={(ri, ei, note) => emailNote(ri, ei, note)}
+        />
       </section>
 
       <section className="rounded border bg-card p-3.5 space-y-3">
