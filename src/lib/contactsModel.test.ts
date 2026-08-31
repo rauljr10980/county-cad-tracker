@@ -129,3 +129,41 @@ describe('notes', () => {
     expect(result.emailRows[0].emails[0].note).toBeUndefined();
   });
 });
+
+// The profile PATCHes the whole contacts blob on every edit, so two edits made
+// inside one round trip must not both start from the same snapshot. These two
+// tests pin the invariant EvictionLeadsView's contactsRef exists to hold: the
+// second edit builds on the first. The first test documents the bug that made
+// the ref necessary, so a regression to render-closure reads is recognisable.
+describe('composing edits', () => {
+  it('loses the first edit when both are built from the same stale blob', () => {
+    const base = normalizeContacts(legacy);
+    setDisposition(base, 0, 0, 'wrong');
+    const fromStale = setPhoneNote(base, 0, 0, 'called, no answer');
+
+    expect(fromStale.phoneRows[0].phones[0].note).toBe('called, no answer');
+    expect(fromStale.phoneRows[0].phones[0].status).toBe('');
+  });
+
+  it('keeps both when the second builds on the result of the first', () => {
+    let c = normalizeContacts(legacy);
+    c = setDisposition(c, 0, 0, 'wrong');
+    c = setPhoneNote(c, 0, 0, 'called, no answer');
+
+    expect(c.phoneRows[0].phones[0].status).toBe('wrong');
+    expect(c.phoneRows[0].phones[0].note).toBe('called, no answer');
+  });
+
+  it('compounds an attempt, a disposition, and a note in any order', () => {
+    let c = normalizeContacts(legacy);
+    c = setPhoneNote(c, 0, 0, 'wife answered');
+    c = recordAttempt(c, 0, 0, new Date('2026-08-27T12:00:00Z'));
+    c = setDisposition(c, 0, 0, 'right');
+
+    const phone = c.phoneRows[0].phones[0];
+    expect(phone.note).toBe('wife answered');
+    expect(phone.attempts).toBe(1);
+    expect(phone.status).toBe('right');
+    expect(phone.number).toBe('(903) 714-4811');
+  });
+});
