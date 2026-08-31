@@ -67,7 +67,26 @@ A new `Custom MLS Leads` tab: import, a filterable working list, owner
 classification, and Bexar owner lookup prioritised to sold rows.
 
 **Out of scope**, each its own feature: appraisal-district scrapers for the
-other nine counties, TX Secretary of State lookup for the 753 entity owners,
+other nine counties, and mapping or geocoding these properties.
+
+**Entity lookup is now in scope** (decided 2026-08-31), replacing the Secretary
+of State idea. The Texas Comptroller's
+[Active Franchise Taxpayers](https://data.texas.gov/dataset/Active-Franchise-Taxpayers/9cir-efmm)
+dataset is queryable by entity name over Socrata with **no API key**, returning
+`taxpayer_number`, `taxpayer_name`, `taxpayer_address`, `taxpayer_city`,
+`taxpayer_state`, `taxpayer_zip`, and `secretary_of_state_sos_or_coa_file_number`.
+
+It does **not** name a person. There is no officers or registered-agent dataset
+on the open portal, and the authenticated endpoint at
+`api.comptroller.texas.gov/public-data/v1/public/franchise-tax/{taxpayerId}`
+requires a key that has not been obtained. So an entity lookup resolves
+`Baabco Properties II LLC` to a mailing address, not to a human — which is
+still worth having, because for a small landlord LLC that address is usually
+the owner's home, their CPA, or their attorney, and it feeds the existing
+address-based people search. Anyone reading this expecting a name lookup should
+stop here: it is a two-hop path by nature, not by omission.
+
+Superseded scope note, retained for history:
 and mapping or geocoding these properties.
 
 ## Decisions
