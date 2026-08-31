@@ -1,8 +1,8 @@
-import { LayoutDashboard, CalendarDays, List, Home, Car, Gavel, Briefcase } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, List, Home, Car, Gavel, Briefcase, Building2 } from 'lucide-react';
 
 export type TabType =
   | 'dashboard' | 'calendar' | 'properties' | 'tasks' | 'upload'
-  | 'files' | 'preforeclosure' | 'driving' | 'crm' | 'evictions';
+  | 'files' | 'preforeclosure' | 'driving' | 'crm' | 'evictions' | 'mls';
 
 export const tabs = [
   { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard, shortLabel: 'Dash' },
@@ -12,6 +12,7 @@ export const tabs = [
   { id: 'crm' as TabType, label: 'CRM', icon: Briefcase, shortLabel: 'CRM' },
   { id: 'driving' as TabType, label: 'Driving 4$', icon: Car, shortLabel: 'D4$' },
   { id: 'evictions' as TabType, label: 'Eviction List', icon: Gavel, shortLabel: 'Evict' },
+  { id: 'mls' as TabType, label: 'Custom MLS Leads', icon: Building2, shortLabel: 'MLS' },
 ];
 
 /**

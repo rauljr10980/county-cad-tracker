@@ -36,6 +36,7 @@ model User {
   activityLogs      ActivityLog[]
   evictionLandlords EvictionLandlord[] @relation("EvictionAssignee")
   crmLeads          CrmLead[]
+  mlsLeads          MlsLead[]
 
   @@index([email])
   @@index([username])
@@ -1032,4 +1033,96 @@ model EvictionTask {
   @@index([dueAt])
   @@index([completed])
   @@map("eviction_tasks")
+}
+
+// ============================================================================
+// CUSTOM MLS LEADS (connectMLS multifamily exports)
+// ============================================================================
+
+model MlsLead {
+  id         String  @id @default(cuid())
+  userId     String?
+  mlsNumber  String
+  status     String
+  previousStatus  String?
+  statusChangedAt DateTime?
+
+  address      String
+  streetNumber String @default("")
+  streetDir    String @default("")
+  streetName   String @default("")
+  zip          String @default("")
+  zipPlus      String @default("")
+  county       String @default("")
+  state        String @default("")
+  areaCode     String @default("")
+
+  price        Float?
+  daysOnMarket Int?
+  totalUnits   Int?
+  squareFeet   Int?
+  yearBuilt    Int?
+  propertyType String @default("")
+  construction String @default("")
+  builderName  String @default("")
+
+  legalDescription    String @default("") @db.Text
+  legalLot            String @default("")
+  countyAccountNumber String @default("")
+  taxPropId           String @default("")
+  countyTax           String @default("")
+
+  listAgent         String @default("")
+  listAgentPhone    String @default("")
+  sellingAgent      String @default("")
+  sellingAgentPhone String @default("")
+  lreaLreb          String @default("")
+
+  mlsOwnerRaw String @default("")
+
+  cadLookupAt     DateTime?
+  cadLookupStatus String?
+
+  notes    String    @default("") @db.Text
+  hidden   Boolean   @default(false)
+  hiddenAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts MlsContact[]
+  user     User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mlsNumber])
+  @@index([userId])
+  @@index([status])
+  @@index([county])
+  @@index([hidden])
+  @@map("mls_leads")
+}
+
+model MlsContact {
+  id        String @id @default(cuid())
+  mlsLeadId String
+  role      String
+  name      String
+  nameKind  String
+  searchName String @default("")
+
+  mailingAddress String   @default("")
+  phoneNumbers   String[] @default([])
+  emails         String[] @default([])
+
+  workflowStage String @default("not_started")
+  workflowLog   Json   @default("[]")
+  notes         String @default("") @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lead MlsLead @relation(fields: [mlsLeadId], references: [id], onDelete: Cascade)
+
+  @@unique([mlsLeadId, role])
+  @@index([mlsLeadId])
+  @@map("mls_contacts")
 }

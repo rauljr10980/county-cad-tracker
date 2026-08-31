@@ -12,6 +12,7 @@ import { CrmView } from '@/components/crm/CrmView';
 import { DrivingView } from '@/components/driving/DrivingView';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import EvictionLeadsView from '@/crm/views/EvictionLeadsView';
+import MlsLeadsView from '@/components/mls/MlsLeadsView';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { SignupModal } from '@/components/auth/SignupModal';
@@ -25,7 +26,7 @@ import { EvictionsCrmWorkspace } from '@/crm-evictions/shell/EvictionsCrmWorkspa
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
   const hash = window.location.hash.slice(1); // Remove the #
-  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'crm', 'driving', 'evictions'];
+  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'crm', 'driving', 'evictions', 'mls'];
   return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
 };
 
@@ -120,6 +121,8 @@ const Index = () => {
         return <DrivingView />;
       case 'evictions':
         return <EvictionLeadsView />;
+      case 'mls':
+        return <MlsLeadsView />;
       default:
         return <Dashboard />;
     }
