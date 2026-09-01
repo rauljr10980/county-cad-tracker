@@ -145,49 +145,39 @@ const namesMatch = (a, b) => {
   return Boolean(left) && left === right;
 };
 
-const formatMailingAddress = (entity) =>
-  [entity.address, [entity.city, [entity.state, entity.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')]
-    .filter(Boolean)
-    .join(', ');
-
 const firstTruthy = (...values) => values.find((v) => v) || '';
 
 // Given a taxpayer chosen from a `searchEntity` candidate list (either the
 // sole result, or one the caller picked off an `ambiguous` list), fetches
 // the Franchise Tax Account Status detail record and persists the full
-// thing on the contact — most importantly the registered agent, which
-// `searchEntity`'s candidate rows never carry. If the detail call fails,
-// this still persists what the search candidate already had (address,
-// taxpayer number, file number, status) rather than losing it, and simply
-// leaves the agent fields blank; `detailError` on the return value tells the
+// thing on the contact — most importantly the registered agent and officer
+// roster, which `searchEntity`'s candidate rows never carry (a candidate is
+// just { name, taxpayerId, zip }). If the detail call fails, this still
+// persists what the search candidate already had (taxpayer id, zip as a
+// mailing-address fallback) rather than losing it, and simply leaves the
+// agent/officer fields blank; `detailError` on the return value tells the
 // route whether that happened.
 async function persistEntityDetail(contact, candidate) {
-  const detail = await getEntity(candidate.taxpayerNumber);
+  const detail = await getEntity(candidate.taxpayerId);
   const entity = detail.ok ? detail.entity : null;
 
-  const merged = {
-    taxpayerNumber: firstTruthy(entity?.taxpayerNumber, candidate.taxpayerNumber),
-    address: firstTruthy(entity?.address, candidate.address),
-    city: firstTruthy(entity?.city, candidate.city),
-    state: firstTruthy(entity?.state, candidate.state),
-    zip: firstTruthy(entity?.zip, candidate.zip),
-    fileNumber: firstTruthy(entity?.fileNumber, candidate.fileNumber),
-    status: firstTruthy(entity?.status, candidate.status),
-  };
+  const taxpayerId = firstTruthy(entity?.taxpayerId, candidate.taxpayerId);
+  const mailingAddress = firstTruthy(entity?.mailingAddress, candidate.zip);
 
   const updated = await prisma.mlsContact.update({
     where: { id: contact.id },
     data: {
-      mailingAddress: formatMailingAddress(merged),
-      entityTaxpayerNumber: merged.taxpayerNumber,
-      entityFileNumber: merged.fileNumber,
-      entityStatus: merged.status,
+      mailingAddress,
+      entityTaxpayerNumber: taxpayerId,
+      entityFileNumber: entity?.sosFileNumber || '',
+      entityStatus: entity?.rightToTransact || '',
       registeredAgentName: entity?.registeredAgentName || '',
       registeredOfficeAddress: entity?.registeredOfficeAddress || '',
       stateOfFormation: entity?.stateOfFormation || '',
       sosRegistrationStatus: entity?.sosRegistrationStatus || '',
       sosRegistrationDate: entity?.sosRegistrationDate || '',
       rightToTransact: entity?.rightToTransact || '',
+      officers: entity?.officers || [],
       entityLookupAt: new Date(),
       entityLookupStatus: 'success',
     },
@@ -197,11 +187,11 @@ async function persistEntityDetail(contact, candidate) {
 }
 
 // A candidate as returned by `searchEntity` (see EntityCandidate in
-// MlsLeadDetails.tsx) — only a non-empty taxpayer number is required to
-// look up its detail record; the rest are used as a mailing-address fallback
-// if the detail call itself fails.
+// MlsLeadDetails.tsx) — only a non-empty taxpayer id is required to look up
+// its detail record; the zip is used as a mailing-address fallback if the
+// detail call itself fails.
 const isValidCandidate = (body) =>
-  body && typeof body === 'object' && typeof body.taxpayerNumber === 'string' && body.taxpayerNumber.trim();
+  body && typeof body === 'object' && typeof body.taxpayerId === 'string' && body.taxpayerId.trim();
 
 router.get('/', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);

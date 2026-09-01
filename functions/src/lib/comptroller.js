@@ -1,88 +1,108 @@
 /**
  * Texas Comptroller franchise-tax lookup, used to resolve an entity owner
  * ("Baabco Properties II LLC") to its Registered Agent — a real person, at a
- * real street address — plus the entity's own mailing address as a fallback.
+ * real street address — plus its officers, and the entity's own mailing
+ * address as a fallback.
+ *
+ * This targets the public, keyless data-search API confirmed live at
+ * comptroller.texas.gov (not the authenticated api.comptroller.texas.gov
+ * endpoint the previous version used, which needed a key nobody had — that
+ * left the feature dead in production). No API key, no header: this is a
+ * plain unauthenticated GET.
  *
  * The flow is two calls. `searchEntity` hits the search endpoint with a name
- * and returns a table of candidates (name, taxpayer number, mailing address).
- * Once a single taxpayer number is chosen, `getEntity` hits the detail
- * endpoint and returns the full Franchise Tax Account Status record,
- * including the Registered Agent Name and Registered Office Street Address
- * — confirmed present on the live site for real entities (e.g. Mihaila
- * Holdings Corp: Alex J Mihaila, 797 Crown Jewel, Boerne, TX 78006).
+ * and returns a table of candidates (name, taxpayer id, mailing zip). Once a
+ * single taxpayer id is chosen, `getEntity` hits the detail endpoint and
+ * returns the full Franchise Tax Account Status record, including the
+ * Registered Agent Name, Registered Office Street Address, and the officer
+ * roster — confirmed live for Mihaila Holdings Corp (Alex J Mihaila, 797
+ * Crown Jewel, Boerne, TX 78006).
  *
- * The two routes below were confirmed to exist by probing without a key: AWS
- * API Gateway answers "Forbidden" for a real route and "Missing Authentication
- * Token" for one that does not exist. The search query parameter name and both
- * response shapes could NOT be confirmed that way, so all are handled
- * defensively and the raw body is logged when it does not match.
+ * The response envelope is `{ success, data, ... }` on both endpoints, and
+ * `success: false` (observed on a malformed query, HTTP 400) carries an
+ * `error` string that gets surfaced as-is. Everything else still gets the
+ * defensive treatment: an unrecognised shape logs a truncated body and
+ * returns an empty/failed result rather than throwing on a live lookup.
  */
 
-const COMPTROLLER_BASE = 'https://api.comptroller.texas.gov/public-data/v1/public/franchise-tax';
-const DEFAULT_PARAM = 'name';
-const DEFAULT_HEADER = 'x-api-key';
+const COMPTROLLER_BASE = 'https://comptroller.texas.gov/data-search/franchise-tax';
 
 const str = (value) => (value == null ? '' : String(value).trim());
 
+const joinParts = (...parts) => parts.map(str).filter(Boolean).join(', ');
+
+// "TX" + "78006" -> "TX 78006" (space-joined, not comma-joined, since it's
+// meant to be the last comma-separated segment of a street/city/state-zip
+// address string).
+const stateZip = (state, zip) => [str(state), str(zip)].filter(Boolean).join(' ');
+
+// Officer/agent rows from officerInfo[] — the sample carries the same person
+// twice under different titles (DIRECTOR, PRESIDENT), which is meaningful
+// and kept; exact duplicate name+title rows are not.
+const normalizeOfficers = (rows) => {
+  if (!Array.isArray(rows)) return [];
+  const seen = new Set();
+  const officers = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const name = str(row.AGNT_NM);
+    const title = str(row.AGNT_TITL_TX);
+    const address = joinParts(row.AD_STR_POB_TX, row.CITY_NM, stateZip(row.ST_CD, row.AD_ZP));
+    const key = `${name}|${title}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    officers.push({ name, title, address });
+  }
+  return officers;
+};
+
 const normalizeEntity = (raw) => {
   const row = raw && typeof raw === 'object' ? raw : {};
-  const pick = (...keys) => {
-    for (const key of keys) if (row[key] != null) return str(row[key]);
-    return '';
-  };
   return {
-    taxpayerNumber: pick('taxpayerNumber', 'taxpayer_number', 'texasTaxpayerNumber', 'texas_taxpayer_number'),
-    name: pick('taxpayerName', 'taxpayer_name'),
-    address: pick('taxpayerAddress', 'taxpayer_address'),
-    city: pick('taxpayerCity', 'taxpayer_city'),
-    state: pick('taxpayerState', 'taxpayer_state'),
-    zip: pick('taxpayerZip', 'taxpayer_zip'),
-    fileNumber: pick(
-      'fileNumber', 'secretary_of_state_sos_or_coa_file_number',
-      'sosFileNumber', 'sos_file_number', 'texasSosFileNumber', 'texas_sos_file_number',
+    taxpayerId: str(row.taxpayerId),
+    name: str(row.name),
+    mailingAddress: joinParts(
+      row.mailingAddressStreet,
+      row.mailingAddressCity,
+      stateZip(row.mailingAddressState, row.mailingAddressZip),
     ),
-    status: pick('status', 'right_to_transact_business_code'),
-    // Franchise Tax Account Status detail fields — the registered agent is
-    // the single most valuable field this module returns: a named person at
-    // a real address, not just an entity's mailing address.
-    registeredAgentName: pick(
-      'registeredAgentName', 'registered_agent_name',
-      'agentName', 'agent_name',
-      'raName', 'ra_name',
+    rightToTransact: str(row.rightToTransactTX),
+    stateOfFormation: str(row.stateOfFormation),
+    sosRegistrationStatus: str(row.sosRegistrationStatus),
+    sosRegistrationDate: str(row.effectiveSosRegistrationDate),
+    sosFileNumber: str(row.sosFileNumber),
+    registeredAgentName: str(row.registeredAgentName),
+    registeredOfficeAddress: joinParts(
+      row.registeredOfficeAddressStreet,
+      row.registeredOfficeAddressCity,
+      stateZip(row.registeredOfficeAddressState, row.registeredOfficeAddressZip),
     ),
-    registeredOfficeAddress: pick(
-      'registeredOfficeAddress', 'registered_office_address',
-      'registeredOfficeStreetAddress', 'registered_office_street_address',
-      'agentAddress', 'agent_address',
-      'raAddress', 'ra_address',
-    ),
-    stateOfFormation: pick('stateOfFormation', 'state_of_formation'),
-    sosRegistrationStatus: pick('sosRegistrationStatus', 'sos_registration_status'),
-    sosRegistrationDate: pick(
-      'sosRegistrationDate', 'sos_registration_date',
-      'effectiveSosRegistrationDate', 'effective_sos_registration_date',
-    ),
-    rightToTransact: pick(
-      'rightToTransact', 'right_to_transact',
-      'rightToTransactBusiness', 'right_to_transact_business',
-      'rightToTransactBusinessInTexas', 'right_to_transact_business_in_texas',
-    ),
+    officers: normalizeOfficers(row.officerInfo),
   };
 };
 
-// The API's envelope is unverified, so accept the three plausible shapes and
-// treat anything else as empty rather than throwing on a live lookup.
-const extractRows = (body) => {
+const normalizeSearchRow = (raw) => {
+  const row = raw && typeof raw === 'object' ? raw : {};
+  return {
+    name: str(row.name),
+    taxpayerId: str(row.taxpayerId),
+    zip: str(row.mailingAddressZip),
+  };
+};
+
+// The search endpoint's confirmed shape is `{ success, data: [...], count }`.
+// A bare array is also accepted defensively; anything else is treated as an
+// unrecognised shape rather than guessed at.
+const extractSearchRows = (body) => {
   if (Array.isArray(body)) return body;
   if (body && Array.isArray(body.data)) return body.data;
-  if (body && Array.isArray(body.results)) return body.results;
   return null;
 };
 
-// The detail endpoint returns a single record rather than a collection. Its
-// envelope is equally unverified, so this accepts a bare object, or one
-// nested under a plausible wrapper key, and otherwise returns null so the
-// caller can log the raw shape instead of guessing at it.
+// The detail endpoint's confirmed shape is `{ success, data: {...} }`. A bare
+// record (no wrapper) or a `data` array's first element are accepted
+// defensively; anything else returns null so the caller can log the raw
+// shape instead of guessing at it.
 const extractRecord = (body) => {
   if (Array.isArray(body)) {
     return body[0] && typeof body[0] === 'object' && !Array.isArray(body[0]) ? body[0] : null;
@@ -92,64 +112,70 @@ const extractRecord = (body) => {
     return body.data[0] && typeof body.data[0] === 'object' && !Array.isArray(body.data[0]) ? body.data[0] : null;
   }
   if (body.data && typeof body.data === 'object') return body.data;
-  if (body.result && typeof body.result === 'object') return body.result;
-  if (body.entity && typeof body.entity === 'object') return body.entity;
-  return body;
+  if (typeof body.taxpayerId === 'string') return body;
+  return null;
 };
 
-const resolveOptions = (options) => ({
-  apiKey: options.apiKey ?? process.env.COMPTROLLER_API_KEY ?? '',
-  fetchImpl: options.fetchImpl ?? fetch,
-  header: options.header ?? process.env.COMPTROLLER_API_KEY_HEADER ?? DEFAULT_HEADER,
-});
+// Reads the JSON body if there is one, without throwing on a non-JSON error
+// page. `success: false` is respected regardless of HTTP status — the
+// malformed-query case observed live is a 400 that still carries a JSON
+// `{ success: false, error }` body worth surfacing verbatim.
+const readBody = async (res) => {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+};
+
+const failureFrom = (body, res) => {
+  if (body && body.success === false) return str(body.error) || `Comptroller lookup failed (${res.status})`;
+  return `Comptroller lookup failed (${res.status})`;
+};
 
 const searchEntity = async (name, options = {}) => {
-  const { apiKey, fetchImpl, header } = resolveOptions(options);
-  const param = options.param ?? process.env.COMPTROLLER_SEARCH_PARAM ?? DEFAULT_PARAM;
-
+  const fetchImpl = options.fetchImpl ?? fetch;
   const term = str(name);
-  if (!apiKey) return { ok: false, results: [], error: 'COMPTROLLER_API_KEY is not set' };
   if (!term) return { ok: false, results: [], error: 'An entity name is required' };
 
-  const url = `${COMPTROLLER_BASE}/search?${new URLSearchParams({ [param]: term })}`;
+  const url = `${COMPTROLLER_BASE}?${new URLSearchParams({ name: term })}`;
 
   try {
-    const res = await fetchImpl(url, { headers: { [header]: apiKey, Accept: 'application/json' } });
-    if (!res.ok) {
-      // Deliberately does not include the key or the header value.
-      return { ok: false, results: [], error: `Comptroller lookup failed (${res.status})` };
-    }
-    const body = await res.json();
-    const rows = extractRows(body);
+    const res = await fetchImpl(url, { headers: { Accept: 'application/json' } });
+    const body = await readBody(res);
+
+    if (body && body.success === false) return { ok: false, results: [], error: failureFrom(body, res) };
+    if (!res.ok) return { ok: false, results: [], error: failureFrom(body, res) };
+
+    const rows = extractSearchRows(body);
     if (!rows) {
       console.warn('[COMPTROLLER] unrecognised search response shape:', JSON.stringify(body).slice(0, 400));
       return { ok: true, results: [] };
     }
-    return { ok: true, results: rows.map(normalizeEntity) };
+    return { ok: true, results: rows.map(normalizeSearchRow) };
   } catch (err) {
     return { ok: false, results: [], error: err instanceof Error ? err.message : 'Comptroller lookup failed' };
   }
 };
 
-// Detail lookup for a single taxpayer number — the Franchise Tax Account
-// Status record, including the Registered Agent Name and Registered Office
-// Street Address that `searchEntity`'s candidate rows do not carry.
-const getEntity = async (taxpayerNumber, options = {}) => {
-  const { apiKey, fetchImpl, header } = resolveOptions(options);
-
-  const id = str(taxpayerNumber);
-  if (!apiKey) return { ok: false, entity: null, error: 'COMPTROLLER_API_KEY is not set' };
-  if (!id) return { ok: false, entity: null, error: 'A taxpayer number is required' };
+// Detail lookup for a single taxpayer id — the Franchise Tax Account Status
+// record, including the Registered Agent Name, Registered Office Street
+// Address, and officer roster that `searchEntity`'s candidate rows don't
+// carry.
+const getEntity = async (taxpayerId, options = {}) => {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const id = str(taxpayerId);
+  if (!id) return { ok: false, entity: null, error: 'A taxpayer id is required' };
 
   const url = `${COMPTROLLER_BASE}/${encodeURIComponent(id)}`;
 
   try {
-    const res = await fetchImpl(url, { headers: { [header]: apiKey, Accept: 'application/json' } });
-    if (!res.ok) {
-      // Deliberately does not include the key or the header value.
-      return { ok: false, entity: null, error: `Comptroller lookup failed (${res.status})` };
-    }
-    const body = await res.json();
+    const res = await fetchImpl(url, { headers: { Accept: 'application/json' } });
+    const body = await readBody(res);
+
+    if (body && body.success === false) return { ok: false, entity: null, error: failureFrom(body, res) };
+    if (!res.ok) return { ok: false, entity: null, error: failureFrom(body, res) };
+
     const record = extractRecord(body);
     if (!record) {
       console.warn('[COMPTROLLER] unrecognised entity response shape:', JSON.stringify(body).slice(0, 400));
