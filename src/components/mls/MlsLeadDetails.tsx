@@ -141,6 +141,10 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
   // Which contact's ContactWorkspace is mid-save, so only that contact's
   // controls disable — a note on one owner shouldn't freeze another's.
   const [savingContactId, setSavingContactId] = useState<string | null>(null);
+  // Surfaces a ContactWorkspace call-recording failure per contact — MLS has
+  // no activity log to fall back on, so this is the only feedback the user
+  // gets if the attempt itself failed to save.
+  const [callErrorMessage, setCallErrorMessage] = useState<Record<string, string>>({});
 
   const [propertyExpanded, setPropertyExpanded] = useState(true);
   const [countyExpanded, setCountyExpanded] = useState(false);
@@ -152,6 +156,7 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
     setCadMessage('');
     setEntityMessage({});
     setEntityCandidates({});
+    setCallErrorMessage({});
   }, [lead?.id]);
 
   const saveNotes = async () => {
@@ -427,8 +432,10 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
             ownerName={c.name}
             propertyAddress={details.address}
             owner={c.name}
+            onCallError={(message) => setCallErrorMessage((prev) => ({ ...prev, [c.id]: message }))}
             saving={savingContactId === c.id}
           />
+          {callErrorMessage[c.id] && <p className="text-xs text-destructive">{callErrorMessage[c.id]}</p>}
         </div>
       ))}
     </section>
