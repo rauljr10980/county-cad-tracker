@@ -17,6 +17,12 @@ export type MlsContact = {
   entityStatus: string;
   entityLookupAt: string | null;
   entityLookupStatus: string | null;
+  registeredAgentName: string;
+  registeredOfficeAddress: string;
+  stateOfFormation: string;
+  sosRegistrationStatus: string;
+  sosRegistrationDate: string;
+  rightToTransact: string;
   workflowStage: string;
   notes: string;
 };

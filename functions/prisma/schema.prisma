@@ -914,12 +914,12 @@ model EvictionLandlord {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  addresses        EvictionAddress[]
-  ownedProperties  EvictionOwnedProperty[]
-  filings          EvictionFiling[]
-  activities       EvictionActivity[]
-  tasks            EvictionTask[]
-  assignedTo       User?                    @relation("EvictionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  addresses       EvictionAddress[]
+  ownedProperties EvictionOwnedProperty[]
+  filings         EvictionFiling[]
+  activities      EvictionActivity[]
+  tasks           EvictionTask[]
+  assignedTo      User?                   @relation("EvictionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([name])
   @@index([isCorporate])
@@ -932,18 +932,18 @@ model EvictionLandlord {
 }
 
 model EvictionAddress {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   landlordId        String
   address           String
-  city              String   @default("")
-  state             String   @default("")
-  zip               String   @default("")
+  city              String    @default("")
+  state             String    @default("")
+  zip               String    @default("")
   normalizedAddress String
   latitude          Float?
   longitude         Float?
   geocodedAt        DateTime?
   geocodeStatus     String    @default("pending")
-  createdAt         DateTime @default(now())
+  createdAt         DateTime  @default(now())
 
   landlord EvictionLandlord @relation(fields: [landlordId], references: [id], onDelete: Cascade)
 
@@ -1040,10 +1040,10 @@ model EvictionTask {
 // ============================================================================
 
 model MlsLead {
-  id         String  @id @default(cuid())
-  userId     String?
-  mlsNumber  String
-  status     String
+  id              String    @id @default(cuid())
+  userId          String?
+  mlsNumber       String
+  status          String
   previousStatus  String?
   statusChangedAt DateTime?
 
@@ -1102,11 +1102,11 @@ model MlsLead {
 }
 
 model MlsContact {
-  id        String @id @default(cuid())
-  mlsLeadId String
-  role      String
-  name      String
-  nameKind  String
+  id         String @id @default(cuid())
+  mlsLeadId  String
+  role       String
+  name       String
+  nameKind   String
   searchName String @default("")
 
   mailingAddress String   @default("")
@@ -1118,6 +1118,16 @@ model MlsContact {
   entityStatus         String    @default("")
   entityLookupAt       DateTime?
   entityLookupStatus   String?
+
+  // Registered Agent Name and Registered Office Street Address, from the
+  // Comptroller's Franchise Tax Account Status detail record — a real
+  // person, at a real address, and the headline result of the lookup.
+  registeredAgentName     String @default("")
+  registeredOfficeAddress String @default("")
+  stateOfFormation        String @default("")
+  sosRegistrationStatus   String @default("")
+  sosRegistrationDate     String @default("")
+  rightToTransact         String @default("")
 
   workflowStage String @default("not_started")
   workflowLog   Json   @default("[]")

@@ -2,8 +2,20 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Building, Building2, ChevronDown, Landmark, Loader2, MapPin, Search, User } from 'lucide-react';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
-import { truePeopleSearchUrl, taxAssessorUrl, landRecordsUrl } from '@/lib/researchLinks';
+import { truePeopleSearchUrl, taxAssessorUrl, landRecordsUrl, type ResearchAddress } from '@/lib/researchLinks';
 import { fmtDate, fmtMoney, pillClass, statusTone, type MlsContact, type MlsLead } from './MlsLeadsView';
+
+// The Comptroller's Registered Office Street Address comes back as one
+// formatted string ("797 CROWN JEWEL, BOERNE, TX 78006"), but the people
+// search needs the street separate from city/state/zip. Splits on commas,
+// then the trailing "STATE ZIP" pair on whitespace; falls back to putting
+// the whole thing in `address` if it doesn't look like that shape.
+function splitRegisteredOfficeAddress(combined: string): ResearchAddress {
+  const parts = combined.split(',').map((p) => p.trim()).filter(Boolean);
+  const [address, city, stateZip] = parts;
+  const [state, zip] = (stateZip || '').split(/\s+/);
+  return { address: address || combined, city, state, zip };
+}
 
 type Props = {
   lead: MlsLead | null;
@@ -60,19 +72,30 @@ function CollapsibleSection({ title, expanded, onToggle, children }: { title: st
   </section>;
 }
 
-// Nothing here is persisted — there's no route to record which candidate the
-// user picked, so this is a plain reference list, not a picker.
-function EntityCandidateList({ candidates }: { candidates: EntityCandidate[] }) {
+// Each candidate is a button: picking one calls /entity-select, which fetches
+// that taxpayer's detail record (the registered agent included) and persists
+// it on the contact — same as the automatic path when there's only one match.
+function EntityCandidateList({ candidates, onSelect, loading }: {
+  candidates: EntityCandidate[];
+  onSelect: (candidate: EntityCandidate) => void;
+  loading: boolean;
+}) {
   return <div className="space-y-1.5">
     <p className="text-xs text-muted-foreground">
-      {candidates.length} possible matches at the Comptroller — nothing is saved automatically, so check each by hand:
+      {candidates.length} possible matches at the Comptroller — pick the right one to pull its registered agent:
     </p>
     {candidates.map((c, i) => (
-      <div key={`${c.taxpayerNumber || 'candidate'}-${i}`} className="rounded bg-muted p-2 text-xs space-y-0.5">
+      <button
+        key={`${c.taxpayerNumber || 'candidate'}-${i}`}
+        type="button"
+        disabled={loading}
+        onClick={() => onSelect(c)}
+        className="w-full text-left rounded bg-muted p-2 text-xs space-y-0.5 hover:bg-muted/70 disabled:opacity-50 disabled:pointer-events-none"
+      >
         <p className="font-medium">{c.name || '—'}</p>
         <p className="record text-muted-foreground">{[c.address, c.city, [c.state, c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'}</p>
         <p className="text-muted-foreground">Taxpayer # <span className="record">{c.taxpayerNumber || '—'}</span>{c.status && <> · {c.status}</>}</p>
-      </div>
+      </button>
     ))}
   </div>;
 }
@@ -144,10 +167,39 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
         setEntityMessage((prev) => ({ ...prev, [contact.id]: 'No matching entity found in Texas Comptroller franchise-tax records.' }));
       } else if (body.entityLookupStatus === 'failed') {
         setEntityMessage((prev) => ({ ...prev, [contact.id]: body.error || 'Comptroller lookup failed.' }));
+      } else if (body.warning) {
+        setEntityMessage((prev) => ({ ...prev, [contact.id]: body.warning }));
       }
       await refresh(details.id);
     } catch (e) {
       setEntityMessage((prev) => ({ ...prev, [contact.id]: e instanceof Error ? e.message : 'Comptroller lookup failed' }));
+    } finally {
+      setEntityLoadingId(null);
+    }
+  };
+
+  // Fires when the user picks one row off an `ambiguous` candidate list —
+  // fetches that taxpayer's detail record (registered agent included) the
+  // same way the automatic single-match path does.
+  const selectEntityCandidate = async (contact: MlsContact, candidate: EntityCandidate) => {
+    if (!details) return;
+    setEntityLoadingId(contact.id);
+    setEntityMessage((prev) => ({ ...prev, [contact.id]: '' }));
+    try {
+      const body = await mlsLeadsRequest(`/contacts/${contact.id}/entity-select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(candidate),
+      });
+      if (body.success) {
+        setEntityCandidates((prev) => ({ ...prev, [contact.id]: [] }));
+        if (body.warning) setEntityMessage((prev) => ({ ...prev, [contact.id]: body.warning }));
+      } else {
+        setEntityMessage((prev) => ({ ...prev, [contact.id]: body.error || 'Entity lookup failed.' }));
+      }
+      await refresh(details.id);
+    } catch (e) {
+      setEntityMessage((prev) => ({ ...prev, [contact.id]: e instanceof Error ? e.message : 'Entity lookup failed' }));
     } finally {
       setEntityLoadingId(null);
     }
@@ -250,19 +302,38 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Field label="Name" value={c.name}/>
             <Field label="Search Name" value={c.searchName}/>
-            <Field label="Mailing Address" value={c.mailingAddress} record/>
+            <Field label={c.nameKind === 'entity' ? "Entity's Mailing Address" : 'Mailing Address'} value={c.mailingAddress} record/>
             {c.nameKind === 'entity' && <Field label="Entity Status" value={c.entityStatus}/>}
           </div>
           {c.nameKind === 'entity' && (c.entityTaxpayerNumber || c.entityFileNumber) && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Field label="Taxpayer #" value={c.entityTaxpayerNumber} record/>
               <Field label="SOS File #" value={c.entityFileNumber} record/>
+              <Field label="State of Formation" value={c.stateOfFormation}/>
+              <Field label="Right to Transact" value={c.rightToTransact}/>
             </div>
           )}
-          {c.mailingAddress && c.nameKind === 'entity' && (
-            <p className="text-xs text-muted-foreground">
-              Mailing address only — the Comptroller doesn't return an officer or registered-agent name.
-            </p>
+          {c.nameKind === 'entity' && c.registeredAgentName && (
+            // The headline result of the Comptroller lookup: a named person,
+            // not just an address. Franchise Tax Account Status detail record
+            // — confirmed live for Mihaila Holdings Corp (Alex J Mihaila, 797
+            // Crown Jewel, Boerne, TX 78006).
+            <div className="rounded border border-primary/30 bg-primary/5 p-2.5 space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Registered Agent — the person to call</p>
+              <p className="text-base font-semibold flex items-center gap-1.5">
+                <User className="h-4 w-4"/>{c.registeredAgentName}
+              </p>
+              <p className="record text-sm text-muted-foreground">{c.registeredOfficeAddress || '—'}</p>
+              {c.registeredOfficeAddress && (
+                <button
+                  className={iconButtonClass}
+                  onClick={() => window.open(truePeopleSearchUrl(splitRegisteredOfficeAddress(c.registeredOfficeAddress)), '_blank')}
+                  title="People search for the registered agent, by their registered office address"
+                >
+                  <Search className="h-4 w-4"/> People search
+                </button>
+              )}
+            </div>
           )}
           {c.nameKind === 'entity' && (
             <div className="flex items-center gap-2 flex-wrap">
@@ -283,7 +354,13 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
             </div>
           )}
           {entityMessage[c.id] && <p className="text-xs text-muted-foreground">{entityMessage[c.id]}</p>}
-          {!!entityCandidates[c.id]?.length && <EntityCandidateList candidates={entityCandidates[c.id]}/>}
+          {!!entityCandidates[c.id]?.length && (
+            <EntityCandidateList
+              candidates={entityCandidates[c.id]}
+              onSelect={(candidate) => selectEntityCandidate(c, candidate)}
+              loading={entityLoadingId === c.id}
+            />
+          )}
         </div>
       ))}
     </section>
