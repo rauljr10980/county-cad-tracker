@@ -1113,6 +1113,12 @@ model MlsContact {
   phoneNumbers   String[] @default([])
   emails         String[] @default([])
 
+  entityTaxpayerNumber String    @default("")
+  entityFileNumber     String    @default("")
+  entityStatus         String    @default("")
+  entityLookupAt       DateTime?
+  entityLookupStatus   String?
+
   workflowStage String @default("not_started")
   workflowLog   Json   @default("[]")
   notes         String @default("") @db.Text

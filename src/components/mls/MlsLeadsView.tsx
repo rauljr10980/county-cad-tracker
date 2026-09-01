@@ -12,6 +12,11 @@ export type MlsContact = {
   mailingAddress: string;
   phoneNumbers: string[];
   emails: string[];
+  entityTaxpayerNumber: string;
+  entityFileNumber: string;
+  entityStatus: string;
+  entityLookupAt: string | null;
+  entityLookupStatus: string | null;
   workflowStage: string;
   notes: string;
 };
@@ -50,6 +55,8 @@ export type MlsLead = {
   sellingAgentPhone: string;
   lreaLreb: string;
   mlsOwnerRaw: string;
+  cadLookupAt: string | null;
+  cadLookupStatus: string | null;
   notes: string;
   hidden: boolean;
   hiddenAt: string | null;
@@ -89,12 +96,12 @@ const PILL_TONE_CLASSES: Record<string, string> = {
   danger: 'bg-destructive/15 text-destructive',
   success: 'bg-success/15 text-success',
 };
-const pillClass = (tone: string) => `${PILL_BASE} ${PILL_TONE_CLASSES[tone] ?? PILL_TONE_CLASSES.grey}`;
+export const pillClass = (tone: string) => `${PILL_BASE} ${PILL_TONE_CLASSES[tone] ?? PILL_TONE_CLASSES.grey}`;
 
 // connectMLS statuses aren't a closed enum in the data we've seen, so unknown
 // codes fall back to grey rather than breaking the pill.
 const STATUS_PILL_TONE: Record<string, string> = { ACT: 'blue', SLD: 'success', PEND: 'warn', EXP: 'danger', WD: 'danger', CS: 'grey' };
-const statusTone = (status: string) => STATUS_PILL_TONE[status] ?? 'grey';
+export const statusTone = (status: string) => STATUS_PILL_TONE[status] ?? 'grey';
 
 export default function MlsLeadsView() {
   const [items, setItems] = useState<MlsLead[]>([]);
