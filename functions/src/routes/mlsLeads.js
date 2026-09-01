@@ -6,7 +6,7 @@ const prisma = require('../lib/prisma');
 const { authenticateToken } = require('../middleware/auth');
 const { classifyOwner, searchName } = require('../lib/mlsOwner');
 const { parseSheet, dedupe } = require('../lib/mlsWorkbook');
-const { searchEntity } = require('../lib/comptroller');
+const { searchEntity, getEntity } = require('../lib/comptroller');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -149,6 +149,59 @@ const formatMailingAddress = (entity) =>
   [entity.address, [entity.city, [entity.state, entity.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')]
     .filter(Boolean)
     .join(', ');
+
+const firstTruthy = (...values) => values.find((v) => v) || '';
+
+// Given a taxpayer chosen from a `searchEntity` candidate list (either the
+// sole result, or one the caller picked off an `ambiguous` list), fetches
+// the Franchise Tax Account Status detail record and persists the full
+// thing on the contact — most importantly the registered agent, which
+// `searchEntity`'s candidate rows never carry. If the detail call fails,
+// this still persists what the search candidate already had (address,
+// taxpayer number, file number, status) rather than losing it, and simply
+// leaves the agent fields blank; `detailError` on the return value tells the
+// route whether that happened.
+async function persistEntityDetail(contact, candidate) {
+  const detail = await getEntity(candidate.taxpayerNumber);
+  const entity = detail.ok ? detail.entity : null;
+
+  const merged = {
+    taxpayerNumber: firstTruthy(entity?.taxpayerNumber, candidate.taxpayerNumber),
+    address: firstTruthy(entity?.address, candidate.address),
+    city: firstTruthy(entity?.city, candidate.city),
+    state: firstTruthy(entity?.state, candidate.state),
+    zip: firstTruthy(entity?.zip, candidate.zip),
+    fileNumber: firstTruthy(entity?.fileNumber, candidate.fileNumber),
+    status: firstTruthy(entity?.status, candidate.status),
+  };
+
+  const updated = await prisma.mlsContact.update({
+    where: { id: contact.id },
+    data: {
+      mailingAddress: formatMailingAddress(merged),
+      entityTaxpayerNumber: merged.taxpayerNumber,
+      entityFileNumber: merged.fileNumber,
+      entityStatus: merged.status,
+      registeredAgentName: entity?.registeredAgentName || '',
+      registeredOfficeAddress: entity?.registeredOfficeAddress || '',
+      stateOfFormation: entity?.stateOfFormation || '',
+      sosRegistrationStatus: entity?.sosRegistrationStatus || '',
+      sosRegistrationDate: entity?.sosRegistrationDate || '',
+      rightToTransact: entity?.rightToTransact || '',
+      entityLookupAt: new Date(),
+      entityLookupStatus: 'success',
+    },
+  });
+
+  return { contact: updated, detailError: detail.ok ? null : detail.error };
+}
+
+// A candidate as returned by `searchEntity` (see EntityCandidate in
+// MlsLeadDetails.tsx) — only a non-empty taxpayer number is required to
+// look up its detail record; the rest are used as a mailing-address fallback
+// if the detail call itself fails.
+const isValidCandidate = (body) =>
+  body && typeof body === 'object' && typeof body.taxpayerNumber === 'string' && body.taxpayerNumber.trim();
 
 router.get('/', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -304,21 +357,51 @@ router.post('/contacts/:contactId/entity-lookup', async (req, res) => {
       return res.json({ success: false, entityLookupStatus: 'ambiguous', candidates: result.results, contact: updated });
     }
 
-    const match = result.results[0];
-    const updated = await prisma.mlsContact.update({
-      where: { id: contact.id },
-      data: {
-        mailingAddress: formatMailingAddress(match),
-        entityTaxpayerNumber: match.taxpayerNumber,
-        entityFileNumber: match.fileNumber,
-        entityStatus: match.status,
-        entityLookupAt: new Date(),
-        entityLookupStatus: 'success',
-      },
+    const { contact: updated, detailError } = await persistEntityDetail(contact, result.results[0]);
+    res.json({
+      success: true,
+      entityLookupStatus: 'success',
+      contact: updated,
+      ...(detailError && { warning: `Entity matched, but the registered-agent detail lookup failed: ${detailError}` }),
     });
-    res.json({ success: true, entityLookupStatus: 'success', contact: updated });
   } catch (err) {
     console.error('[MLS] Entity lookup error:', err);
+    const updated = await prisma.mlsContact.update({
+      where: { id: contact.id },
+      data: { entityLookupStatus: 'failed', entityLookupAt: new Date() },
+    });
+    res.status(500).json({ error: 'Entity lookup failed', entityLookupStatus: 'failed', contact: updated });
+  }
+});
+
+// Resolves one candidate off an `ambiguous` search result: the caller (see
+// EntityCandidateList in MlsLeadDetails.tsx) posts the chosen candidate row
+// back, and this fetches its detail record — including the registered
+// agent — the same way the single-match branch above does.
+router.post('/contacts/:contactId/entity-select', async (req, res) => {
+  const contact = await prisma.mlsContact.findFirst({
+    where: { id: req.params.contactId, lead: { userId: req.user.id } },
+  });
+  if (!contact) return res.status(404).json({ error: 'Contact not found' });
+
+  if (contact.nameKind !== 'entity') {
+    return res.status(400).json({ error: 'Only entity contacts can be looked up with the Comptroller' });
+  }
+
+  if (!isValidCandidate(req.body)) {
+    return res.status(400).json({ error: 'A candidate with a taxpayerNumber is required' });
+  }
+
+  try {
+    const { contact: updated, detailError } = await persistEntityDetail(contact, req.body);
+    res.json({
+      success: true,
+      entityLookupStatus: 'success',
+      contact: updated,
+      ...(detailError && { warning: `Entity matched, but the registered-agent detail lookup failed: ${detailError}` }),
+    });
+  } catch (err) {
+    console.error('[MLS] Entity select error:', err);
     const updated = await prisma.mlsContact.update({
       where: { id: contact.id },
       data: { entityLookupStatus: 'failed', entityLookupAt: new Date() },
