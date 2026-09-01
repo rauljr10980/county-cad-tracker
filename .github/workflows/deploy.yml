@@ -1,8 +1,17 @@
 name: Deploy to GitHub Pages
 
 on:
+  # Every push to main deploys. Without this the site silently lags behind
+  # main until someone remembers to run the workflow by hand, which is how
+  # merged work has sat undeployed before.
+  push:
+    branches: [main]
+    # Doc-only pushes do not change the built site, so skip the ~1m build.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
-    
+
 
 permissions:
   contents: read
