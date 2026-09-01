@@ -3,6 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Building, Building2, ChevronDown, Landmark, Loader2, MapPin, Search, User } from 'lucide-react';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { truePeopleSearchUrl, taxAssessorUrl, landRecordsUrl, type ResearchAddress } from '@/lib/researchLinks';
+import { normalizeContacts, type NormalizedContacts } from '@/lib/contactsModel';
+import { ContactWorkspace } from '@/components/contacts/ContactWorkspace';
 import { fmtDate, fmtMoney, pillClass, statusTone, type MlsContact, type MlsContactOfficer, type MlsLead } from './MlsLeadsView';
 
 // The Comptroller's Registered Office Street Address (and each officer's
@@ -136,6 +138,10 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
   const [entityMessage, setEntityMessage] = useState<Record<string, string>>({});
   const [entityCandidates, setEntityCandidates] = useState<Record<string, EntityCandidate[]>>({});
 
+  // Which contact's ContactWorkspace is mid-save, so only that contact's
+  // controls disable — a note on one owner shouldn't freeze another's.
+  const [savingContactId, setSavingContactId] = useState<string | null>(null);
+
   const [propertyExpanded, setPropertyExpanded] = useState(true);
   const [countyExpanded, setCountyExpanded] = useState(false);
   const [agentsExpanded, setAgentsExpanded] = useState(false);
@@ -157,6 +163,28 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
   const refresh = async (id: string) => {
     const fresh = await mlsLeadsRequest(`/${id}`);
     if (fresh && fresh.id) setDetails(fresh);
+  };
+
+  // Persists one contact's phone/email workspace blob and folds the saved
+  // value back into `details` immediately, so ContactWorkspace's own render
+  // (which reads from the `contacts` prop, not its internal freshness ref)
+  // doesn't revert to stale data on the next unrelated re-render of this
+  // dialog (a CAD lookup on a different contact, a notes save, etc.).
+  const saveContact = async (contactId: string, next: NormalizedContacts) => {
+    setSavingContactId(contactId);
+    try {
+      const result = await mlsLeadsRequest(`/contacts/${contactId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contacts: next }),
+      });
+      if (!result?.id) return;
+      setDetails((prev) =>
+        prev ? { ...prev, contacts: prev.contacts.map((c) => (c.id === contactId ? { ...c, contacts: result.contacts } : c)) } : prev
+      );
+    } finally {
+      setSavingContactId(null);
+    }
   };
 
   const runCadLookup = async () => {
@@ -392,6 +420,15 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
               loading={entityLoadingId === c.id}
             />
           )}
+          <ContactWorkspace
+            key={c.id}
+            contacts={normalizeContacts(c.contacts)}
+            onContactsChange={(next) => saveContact(c.id, next)}
+            ownerName={c.name}
+            propertyAddress={details.address}
+            owner={c.name}
+            saving={savingContactId === c.id}
+          />
         </div>
       ))}
     </section>

@@ -1113,6 +1113,12 @@ model MlsContact {
   phoneNumbers   String[] @default([])
   emails         String[] @default([])
 
+  // Phone/email workspace blob shared with EvictionLandlord.contacts — same
+  // { phoneRows, emailRows } shape, read through normalizeContacts on every
+  // access. The flat phoneNumbers/emails arrays above are untouched by this;
+  // they remain whatever populated them before this field existed.
+  contacts Json @default("{\"phoneRows\":[],\"emailRows\":[]}")
+
   entityTaxpayerNumber String    @default("")
   entityFileNumber     String    @default("")
   entityStatus         String    @default("")

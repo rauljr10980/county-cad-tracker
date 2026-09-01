@@ -308,6 +308,28 @@ router.post('/:id/cad-lookup', async (req, res) => {
   }
 });
 
+// Persists the shared ContactWorkspace's phone/email blob for a single
+// contact. Scoped through the parent lead's userId, same as the
+// entity-lookup/entity-select routes below — MlsContact carries no userId of
+// its own, so finding a contact by id alone would let one account write into
+// another's data.
+router.patch('/contacts/:contactId', async (req, res) => {
+  const contact = await prisma.mlsContact.findFirst({
+    where: { id: req.params.contactId, lead: { userId: req.user.id } },
+  });
+  if (!contact) return res.status(404).json({ error: 'Contact not found' });
+
+  if (!Object.prototype.hasOwnProperty.call(req.body, 'contacts')) {
+    return res.status(400).json({ error: 'contacts is required' });
+  }
+
+  const updated = await prisma.mlsContact.update({
+    where: { id: contact.id },
+    data: { contacts: req.body.contacts },
+  });
+  res.json(updated);
+});
+
 // Comptroller entity lookup for a single contact. Scoped through the parent
 // lead's userId since MlsContact carries no userId of its own.
 router.post('/contacts/:contactId/entity-lookup', async (req, res) => {

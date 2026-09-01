@@ -1,20 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
-import { extractContacts } from '@/lib/contactParser';
-import {
-  normalizeContacts,
-  recordAttempt,
-  setDisposition as setContactDisposition,
-  setPhoneNote,
-  setEmailNote,
-  type NormalizedContacts,
-} from '@/lib/contactsModel';
+import { normalizeContacts, type NormalizedContacts } from '@/lib/contactsModel';
 import { truePeopleSearchUrl, taxAssessorUrl, landRecordsUrl } from '@/lib/researchLinks';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Building2, ChevronLeft, ChevronRight, ExternalLink, Loader2, Search, Upload, User } from 'lucide-react';
 import { STAGES, SERVICE_INTERESTS, mapLegacyStage, type Stage } from '@/crm-evictions/constants';
-import { SendEmailPanel } from '@/components/email/SendEmailPanel';
-import { recipientsFromEmailRows, type EmailRecipient } from '@/components/email/emailTemplate';
+import { ContactWorkspace } from '@/components/contacts/ContactWorkspace';
 
 type Landlord = {
   id: string; name: string; isCorporate: boolean; contactStage: string; serviceInterests: string[]; contacts: NormalizedContacts; notes: string;
@@ -89,14 +80,9 @@ export default function EvictionLeadsView() {
   const [uploadProgress, setUploadProgress] = useState('');
   const [search, setSearch] = useState(''), [stage, setStage] = useState(''), [service, setService] = useState('');
   const [dateFrom, setDateFrom] = useState(''), [dateTo, setDateTo] = useState(''), [status, setStatus] = useState(''), [disposition, setDisposition] = useState(''), [precinct, setPrecinct] = useState(''), [satisfied, setSatisfied] = useState('');
-  const [selected, setSelected] = useState<Detail | null>(null), [rawText, setRawText] = useState(''), [saving, setSaving] = useState(false);
+  const [selected, setSelected] = useState<Detail | null>(null), [saving, setSaving] = useState(false);
   const [activityBody, setActivityBody] = useState(''), [activityKind, setActivityKind] = useState('call'), [taskDue, setTaskDue] = useState('');
   const [opAddress, setOpAddress] = useState(''), [opCity, setOpCity] = useState(''), [opState, setOpState] = useState(''), [opZip, setOpZip] = useState(''), [opNotes, setOpNotes] = useState('');
-  // Seeded from the landlord's contacts.emailRows on open (below) and edited
-  // freely in the Send Email panel. Name/address edits here are session-only
-  // scratch state for this task — only per-email notes persist, via
-  // onNoteChange -> emailNote -> saveContacts, same as phone notes.
-  const [emailRecipients, setEmailRecipients] = useState<EmailRecipient[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -110,16 +96,7 @@ export default function EvictionLeadsView() {
   const open = async (id: string) => {
     const detail = await request(`/landlords/${id}`);
     const contacts = normalizeContacts(detail.contacts);
-    // Reset the freshness ref to what the server just returned, so edits on a
-    // newly opened landlord never build on the previous one's blob.
-    contactsRef.current = contacts;
     setSelected({ ...detail, contactStage: mapLegacyStage(detail.contactStage), contacts });
-    setRawText('');
-    // Seed one Send Email recipient per existing emailRow — not padded with
-    // blank rows. A landlord with none yet gets a single blank row so the
-    // panel is still usable to add a first address.
-    const seeded = recipientsFromEmailRows(contacts.emailRows);
-    setEmailRecipients(seeded.length > 0 ? seeded : [{ name: '', emails: [''] }]);
   };
   const patch = async (data: Partial<Detail>) => {
     if (!selected) return; setSaving(true);
@@ -168,62 +145,31 @@ export default function EvictionLeadsView() {
     else { next = next.filter((x) => x !== 'Undecided'); next = next.includes(value) ? next.filter((x) => x !== value) : [...next, value]; if (!next.length) next = ['Undecided']; }
     patch({ serviceInterests: next });
   };
-  const extract = async () => {
-    if (!selected || !rawText.trim()) return; const found = extractContacts(rawText); const contacts = selected.contacts;
-    const phoneRows = [...contacts.phoneRows], emailRows = [...contacts.emailRows];
-    const knownPhones = new Set(phoneRows.flatMap((r) => r.phones.map((p) => p.number.replace(/\D/g, '').slice(-10))));
-    const knownEmails = new Set(emailRows.flatMap((r) => r.emails.map((e) => e.address.toLowerCase())));
-    const phones = found.phones.filter((p) => !knownPhones.has(p.replace(/\D/g, '').slice(-10))).map((number) => ({ number, status: '', source: 'TruePeopleSearch', attempts: 0, lastAttemptAt: null }));
-    const emails = found.emails.filter((e) => !knownEmails.has(e.toLowerCase())).map((address) => ({ address }));
-    if (phones.length) phoneRows.push({ name: found.name || selected.name, phones });
-    if (emails.length) emailRows.push({ name: found.name || selected.name, emails });
-    await patch({ contacts: { phoneRows, emailRows } }); setRawText('');
-  };
+  // Passed to ContactWorkspace as onContactsChange: every phone/email edit
+  // (extract, attempt, disposition, note) funnels through here as a single
+  // whole-blob PATCH. The freshness ref that stops two edits inside one
+  // round trip from racing each other now lives inside ContactWorkspace
+  // itself — see its module comment.
+  const saveContacts = (contacts: NormalizedContacts) => patch({ contacts });
 
-  // Each control derives its next contacts blob from the one in state and
-  // PATCHes the whole thing. Two edits inside one round trip would both start
-  // from the same stale blob, so the second silently reverts the first —
-  // marking a number wrong and then typing a note loses the disposition.
-  // The ref holds the freshest blob, updated synchronously before the request,
-  // so a later edit builds on the earlier one instead of racing it.
-  const contactsRef = useRef<NormalizedContacts | null>(null);
-  const currentContacts = () => contactsRef.current ?? selected?.contacts ?? { phoneRows: [], emailRows: [] };
-  const saveContacts = async (contacts: NormalizedContacts) => {
-    contactsRef.current = contacts;
-    await patch({ contacts });
-  };
-
-  const callNumber = async (ri: number, pi: number, number: string) => {
+  // ContactWorkspace records the call attempt itself; this only handles what's
+  // eviction-specific about a call — logging an EvictionActivity and advancing
+  // the pipeline stage off "New Lead". Wrapped in ContactWorkspace's own
+  // try/catch (via onCallError below), so a failure here still surfaces the
+  // same way a failure recording the attempt itself would.
+  const onCallLogged = async (number: string) => {
     if (!selected) return;
-    window.open(`tel:${number}`, '_self');
-    try {
-      await saveContacts(recordAttempt(currentContacts(), ri, pi, new Date()));
-      await request(`/landlords/${selected.id}/activities`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'call', body: `Called ${number}` }),
-      });
-      await patch({
-        lastContactedAt: new Date().toISOString(),
-        contactStage: selected.contactStage === 'New Lead' ? 'Contacted' : selected.contactStage,
-      });
-      await open(selected.id);
-    } catch (e) {
-      // Partial failure here (attempt saved but the activity log or stage
-      // bump fails) must not fail silently — callNumber is the primary call
-      // action, so an unhandled rejection here is easy to miss entirely.
-      setError(e instanceof Error ? e.message : 'Unable to record this call. Refresh and try again.');
-    }
+    await request(`/landlords/${selected.id}/activities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'call', body: `Called ${number}` }),
+    });
+    await patch({
+      lastContactedAt: new Date().toISOString(),
+      contactStage: selected.contactStage === 'New Lead' ? 'Contacted' : selected.contactStage,
+    });
+    await open(selected.id);
   };
-
-  const setPhoneDisposition = (ri: number, pi: number, status: string) =>
-    selected && saveContacts(setContactDisposition(currentContacts(), ri, pi, status));
-
-  const phoneNote = (ri: number, pi: number, note: string) =>
-    selected && saveContacts(setPhoneNote(currentContacts(), ri, pi, note));
-
-  const emailNote = (ri: number, ei: number, note: string) =>
-    selected && saveContacts(setEmailNote(currentContacts(), ri, ei, note));
 
   const addOwnedProperty = async () => {
     if (!selected || !opAddress.trim()) return;
@@ -369,73 +315,20 @@ export default function EvictionLeadsView() {
           <div className="flex flex-wrap gap-2">{SERVICE_INTERESTS.map((x) => <button key={x} className={`inline-block rounded-md border px-2.5 py-1.5 text-xs transition-colors ${selected.serviceInterests?.includes(x) ? 'border-primary bg-primary text-primary-foreground font-semibold' : 'bg-card text-muted-foreground hover:border-primary/40'}`} onClick={() => toggleService(x)}>{x}</button>)}</div>
           <textarea className="min-h-[72px] w-full resize-y rounded border bg-card px-3 py-2 text-sm" placeholder="Landlord notes" value={selected.notes || ''} onChange={(e) => setSelected({ ...selected, notes: e.target.value })} onBlur={() => patch({ notes: selected.notes })}/>
         </section>
-        <section className="rounded border bg-card p-3.5 space-y-3">
-          <h3 className="text-base font-semibold">TruePeopleSearch Contact Extractor</h3>
-          <textarea className="min-h-[120px] w-full resize-y rounded border bg-card px-3 py-2 font-mono text-xs" placeholder="Paste all text from TruePeopleSearch; name, phones, and emails will be extracted." value={rawText} onChange={(e) => setRawText(e.target.value)}/>
-          <button className="inline-flex items-center gap-1.5 rounded bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none" onClick={extract} disabled={!rawText.trim() || saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : null}Extract and save</button>
-        </section>
-      </div>
-
-      <section className="rounded border bg-card p-3.5 space-y-2">
-        <h3 className="text-base font-semibold">Phone Numbers</h3>
-        {!selected.contacts.phoneRows.some((r) => r.phones.length) && (
-          <p className="text-sm text-muted-foreground">No phone numbers yet. Paste a TruePeopleSearch result above to extract them.</p>
-        )}
-        {selected.contacts.phoneRows.map((row, ri) => row.phones.map((phone, pi) => (
-          <div key={`${ri}-${pi}`} className={`grid gap-2 md:grid-cols-[minmax(0,180px)_auto_auto_minmax(0,1fr)] items-center ${phone.status === 'wrong' ? 'opacity-50' : ''}`}>
-            <button
-              className="text-left text-primary record hover:underline disabled:opacity-50 disabled:pointer-events-none"
-              onClick={() => callNumber(ri, pi, phone.number)}
-              disabled={saving}
-            >
-              {phone.number}
-            </button>
-            <span className="text-xs text-muted-foreground record" title="Call attempts">
-              {phone.attempts ? `${phone.attempts} tried` : 'not tried'}
-            </span>
-            <span className="flex gap-1">
-              <button
-                className={`rounded border px-2 py-1 text-xs disabled:opacity-50 disabled:pointer-events-none ${phone.status === 'right' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted'}`}
-                aria-pressed={phone.status === 'right'}
-                onClick={() => setPhoneDisposition(ri, pi, phone.status === 'right' ? '' : 'right')}
-                disabled={saving}
-              >Right number</button>
-              <button
-                className={`rounded border px-2 py-1 text-xs disabled:opacity-50 disabled:pointer-events-none ${phone.status === 'wrong' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted'}`}
-                aria-pressed={phone.status === 'wrong'}
-                onClick={() => setPhoneDisposition(ri, pi, phone.status === 'wrong' ? '' : 'wrong')}
-                disabled={saving}
-              >Wrong number</button>
-            </span>
-            <input
-              className="h-9 w-full rounded border bg-card px-2 text-sm disabled:opacity-50"
-              placeholder="Note for this number"
-              defaultValue={phone.note || ''}
-              onBlur={(e) => phoneNote(ri, pi, e.target.value)}
-              disabled={saving}
-            />
-          </div>
-        )))}
-      </section>
-
-      <section className="rounded border bg-card p-3.5 space-y-2">
-        <h3 className="text-base font-semibold">Emails</h3>
-        {!selected.contacts.emailRows.some((r) => r.emails.length) && (
-          <p className="text-sm text-muted-foreground">No emails yet.</p>
-        )}
-        {/* Name/address edits made in this panel are session-only for now —
-            only the per-email notes persist, through onNoteChange below. */}
-        <SendEmailPanel
-          recipients={emailRecipients}
-          onRecipientsChange={setEmailRecipients}
+        <ContactWorkspace
+          key={selected.id}
+          contacts={selected.contacts}
+          onContactsChange={saveContacts}
+          ownerName={selected.name}
           propertyAddress={selected.addresses[0]
             ? `${selected.addresses[0].address}, ${selected.addresses[0].city}, ${selected.addresses[0].state} ${selected.addresses[0].zip}`
             : ''}
           owner={selected.name}
-          showNotes
-          onNoteChange={(ri, ei, note) => emailNote(ri, ei, note)}
+          onCallLogged={onCallLogged}
+          onCallError={setError}
+          saving={saving}
         />
-      </section>
+      </div>
 
       <section className="rounded border bg-card p-3.5 space-y-3">
         <h3 className="text-base font-semibold">Outreach &amp; Follow-up</h3>
