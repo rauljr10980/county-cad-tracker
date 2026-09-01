@@ -131,6 +131,7 @@ export default function MlsLeadsView() {
   const [status, setStatus] = useState('');
   const [county, setCounty] = useState('');
   const [minUnits, setMinUnits] = useState('');
+  const [ownerKind, setOwnerKind] = useState('');
   const [showHidden, setShowHidden] = useState(false);
 
   const [selected, setSelected] = useState<MlsLead | null>(null);
@@ -138,7 +139,7 @@ export default function MlsLeadsView() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     const params = new URLSearchParams({ page: String(page), pageSize: '25' });
-    Object.entries({ search, status, county, minUnits }).forEach(([k, v]) => v && params.set(k, v));
+    Object.entries({ search, status, county, minUnits, ownerKind }).forEach(([k, v]) => v && params.set(k, v));
     if (showHidden) params.set('showHidden', 'true');
     try {
       const data = await request(`/?${params}`);
@@ -150,7 +151,7 @@ export default function MlsLeadsView() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, status, county, minUnits, showHidden]);
+  }, [page, search, status, county, minUnits, ownerKind, showHidden]);
   useEffect(() => { const timer = setTimeout(load, 250); return () => clearTimeout(timer); }, [load]);
 
   const open = async (id: string) => {
@@ -238,6 +239,19 @@ export default function MlsLeadsView() {
       <label className="grid gap-1.5">
         <span className="label">MIN UNITS</span>
         <input className="h-10 w-full rounded border bg-card px-3 text-sm" type="number" min={0} value={minUnits} onChange={(e) => { setMinUnits(e.target.value); setPage(1); }}/>
+      </label>
+      <label className="grid gap-1.5">
+        <span className="label">OWNER</span>
+        <select
+          className="h-10 w-full rounded border bg-card px-3 text-sm"
+          value={ownerKind}
+          onChange={(e) => { setOwnerKind(e.target.value); setPage(1); }}
+        >
+          <option value="">All owners</option>
+          <option value="entity">Businesses</option>
+          <option value="person">People</option>
+          <option value="unclassified">No owner captured</option>
+        </select>
       </label>
       <label className="flex h-10 items-center gap-2 whitespace-nowrap">
         <input type="checkbox" checked={showHidden} onChange={(e) => { setShowHidden(e.target.checked); setPage(1); }}/>

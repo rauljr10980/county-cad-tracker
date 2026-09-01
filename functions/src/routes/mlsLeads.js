@@ -202,6 +202,22 @@ router.get('/', async (req, res) => {
   if (req.query.status) where.status = String(req.query.status);
   if (req.query.county) where.county = String(req.query.county);
   if (req.query.minUnits) where.totalUnits = { gte: Number(req.query.minUnits) };
+
+  // Owner kind lives on the contact, not the lead, so this filters through the
+  // relation — and specifically through the `mls_owner` contact, the one the
+  // file named and the one the list's OWNER column shows. Filtering on `some`
+  // contact would let a cad_owner person pull an entity-owned lead into the
+  // person list once a CAD lookup runs.
+  //
+  // `unclassified` is the third real case: an Owner cell that was junk ("see
+  // agent"), an address, or blank produces no contact at all, so those leads
+  // match neither entity nor person and are otherwise unreachable.
+  const ownerKind = req.query.ownerKind ? String(req.query.ownerKind) : '';
+  if (ownerKind === 'entity' || ownerKind === 'person') {
+    where.contacts = { some: { role: 'mls_owner', nameKind: ownerKind } };
+  } else if (ownerKind === 'unclassified') {
+    where.contacts = { none: { role: 'mls_owner' } };
+  }
   if (req.query.search) {
     const search = String(req.query.search);
     where.OR = [
