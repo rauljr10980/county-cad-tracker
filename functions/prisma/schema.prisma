@@ -1129,6 +1129,11 @@ model MlsContact {
   sosRegistrationDate     String @default("")
   rightToTransact         String @default("")
 
+  // Officers/agents from the detail record's officerInfo[] — a clean array
+  // of { name, title, address }, deduped by name+title. Often includes
+  // people (e.g. PRESIDENT) worth calling beyond the registered agent alone.
+  officers Json @default("[]")
+
   workflowStage String @default("not_started")
   workflowLog   Json   @default("[]")
   notes         String @default("") @db.Text

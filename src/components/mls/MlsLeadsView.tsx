@@ -3,6 +3,8 @@ import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { Building2, ChevronLeft, ChevronRight, Loader2, Search, Upload, User } from 'lucide-react';
 import MlsLeadDetails from './MlsLeadDetails';
 
+export type MlsContactOfficer = { name: string; title: string; address: string };
+
 export type MlsContact = {
   id: string;
   role: string;
@@ -23,6 +25,7 @@ export type MlsContact = {
   sosRegistrationStatus: string;
   sosRegistrationDate: string;
   rightToTransact: string;
+  officers: MlsContactOfficer[];
   workflowStage: string;
   notes: string;
 };

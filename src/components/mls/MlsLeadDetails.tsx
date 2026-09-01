@@ -3,13 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Building, Building2, ChevronDown, Landmark, Loader2, MapPin, Search, User } from 'lucide-react';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { truePeopleSearchUrl, taxAssessorUrl, landRecordsUrl, type ResearchAddress } from '@/lib/researchLinks';
-import { fmtDate, fmtMoney, pillClass, statusTone, type MlsContact, type MlsLead } from './MlsLeadsView';
+import { fmtDate, fmtMoney, pillClass, statusTone, type MlsContact, type MlsContactOfficer, type MlsLead } from './MlsLeadsView';
 
-// The Comptroller's Registered Office Street Address comes back as one
-// formatted string ("797 CROWN JEWEL, BOERNE, TX 78006"), but the people
-// search needs the street separate from city/state/zip. Splits on commas,
-// then the trailing "STATE ZIP" pair on whitespace; falls back to putting
-// the whole thing in `address` if it doesn't look like that shape.
+// The Comptroller's Registered Office Street Address (and each officer's
+// address) comes back as one formatted string ("797 CROWN JEWEL, BOERNE, TX
+// 78006"), but the people search needs the street separate from
+// city/state/zip. Splits on commas, then the trailing "STATE ZIP" pair on
+// whitespace; falls back to putting the whole thing in `address` if it
+// doesn't look like that shape.
 function splitRegisteredOfficeAddress(combined: string): ResearchAddress {
   const parts = combined.split(',').map((p) => p.trim()).filter(Boolean);
   const [address, city, stateZip] = parts;
@@ -25,15 +26,13 @@ type Props = {
 
 // The Comptroller search can come back with more than one taxpayer of the
 // same name — the route refuses to guess and hands the whole list back.
+// The search endpoint only returns name/taxpayerId/zip; the rest of the
+// entity's detail (registered agent, officers, etc.) comes from the
+// follow-up detail lookup once a candidate is chosen.
 type EntityCandidate = {
-  taxpayerNumber: string;
   name: string;
-  address: string;
-  city: string;
-  state: string;
+  taxpayerId: string;
   zip: string;
-  fileNumber: string;
-  status: string;
 };
 
 const iconButtonClass =
@@ -86,17 +85,38 @@ function EntityCandidateList({ candidates, onSelect, loading }: {
     </p>
     {candidates.map((c, i) => (
       <button
-        key={`${c.taxpayerNumber || 'candidate'}-${i}`}
+        key={`${c.taxpayerId || 'candidate'}-${i}`}
         type="button"
         disabled={loading}
         onClick={() => onSelect(c)}
         className="w-full text-left rounded bg-muted p-2 text-xs space-y-0.5 hover:bg-muted/70 disabled:opacity-50 disabled:pointer-events-none"
       >
         <p className="font-medium">{c.name || '—'}</p>
-        <p className="record text-muted-foreground">{[c.address, c.city, [c.state, c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'}</p>
-        <p className="text-muted-foreground">Taxpayer # <span className="record">{c.taxpayerNumber || '—'}</span>{c.status && <> · {c.status}</>}</p>
+        <p className="text-muted-foreground">Taxpayer ID <span className="record">{c.taxpayerId || '—'}</span>{c.zip && <> · ZIP <span className="record">{c.zip}</span></>}</p>
       </button>
     ))}
+  </div>;
+}
+
+// One officer/agent row under the Registered Agent — titles like PRESIDENT
+// are as likely (or more likely) to be the person worth calling as the
+// registered agent itself, so each gets its own people-search link too.
+function OfficerRow({ officer }: { officer: MlsContactOfficer }) {
+  return <div className="space-y-1 border-t border-primary/20 pt-2 first:border-t-0 first:pt-0">
+    <p className="text-sm font-semibold flex items-center gap-1.5">
+      <User className="h-3.5 w-3.5"/>{officer.name || '—'}
+      {officer.title && <span className="text-xs font-normal text-muted-foreground">{officer.title}</span>}
+    </p>
+    <p className="record text-xs text-muted-foreground">{officer.address || '—'}</p>
+    {officer.address && (
+      <button
+        className={iconButtonClass}
+        onClick={() => window.open(truePeopleSearchUrl(splitRegisteredOfficeAddress(officer.address)), '_blank')}
+        title={`People search for ${officer.name || 'this officer'}, by their address on file`}
+      >
+        <Search className="h-4 w-4"/> People search
+      </button>
+    )}
   </div>;
 }
 
@@ -305,34 +325,45 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
             <Field label={c.nameKind === 'entity' ? "Entity's Mailing Address" : 'Mailing Address'} value={c.mailingAddress} record/>
             {c.nameKind === 'entity' && <Field label="Entity Status" value={c.entityStatus}/>}
           </div>
+          {c.nameKind === 'entity' && (c.registeredAgentName || c.officers.length > 0) && (
+            // The headline result of the Comptroller lookup: named people,
+            // not just an address — placed right under the name fields
+            // rather than buried below the taxpayer/SOS details, since
+            // these are who actually gets called. Franchise Tax Account
+            // Status detail record — confirmed live for Mihaila Holdings
+            // Corp (Alex J Mihaila, 797 Crown Jewel, Boerne, TX 78006, and
+            // listed again in officerInfo as both DIRECTOR and PRESIDENT).
+            <div className="rounded border border-primary/30 bg-primary/5 p-2.5 space-y-2.5">
+              <p className="text-xs font-medium text-muted-foreground">Registered agent &amp; officers — the people to call</p>
+              {c.registeredAgentName && (
+                <div className="space-y-1.5">
+                  <p className="text-base font-semibold flex items-center gap-1.5">
+                    <User className="h-4 w-4"/>{c.registeredAgentName}
+                    <span className="text-xs font-normal text-muted-foreground">Registered Agent</span>
+                  </p>
+                  <p className="record text-sm text-muted-foreground">{c.registeredOfficeAddress || '—'}</p>
+                  {c.registeredOfficeAddress && (
+                    <button
+                      className={iconButtonClass}
+                      onClick={() => window.open(truePeopleSearchUrl(splitRegisteredOfficeAddress(c.registeredOfficeAddress)), '_blank')}
+                      title="People search for the registered agent, by their registered office address"
+                    >
+                      <Search className="h-4 w-4"/> People search
+                    </button>
+                  )}
+                </div>
+              )}
+              {c.officers.map((o, i) => (
+                <OfficerRow key={`${o.name}-${o.title}-${i}`} officer={o}/>
+              ))}
+            </div>
+          )}
           {c.nameKind === 'entity' && (c.entityTaxpayerNumber || c.entityFileNumber) && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Field label="Taxpayer #" value={c.entityTaxpayerNumber} record/>
               <Field label="SOS File #" value={c.entityFileNumber} record/>
               <Field label="State of Formation" value={c.stateOfFormation}/>
               <Field label="Right to Transact" value={c.rightToTransact}/>
-            </div>
-          )}
-          {c.nameKind === 'entity' && c.registeredAgentName && (
-            // The headline result of the Comptroller lookup: a named person,
-            // not just an address. Franchise Tax Account Status detail record
-            // — confirmed live for Mihaila Holdings Corp (Alex J Mihaila, 797
-            // Crown Jewel, Boerne, TX 78006).
-            <div className="rounded border border-primary/30 bg-primary/5 p-2.5 space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground">Registered Agent — the person to call</p>
-              <p className="text-base font-semibold flex items-center gap-1.5">
-                <User className="h-4 w-4"/>{c.registeredAgentName}
-              </p>
-              <p className="record text-sm text-muted-foreground">{c.registeredOfficeAddress || '—'}</p>
-              {c.registeredOfficeAddress && (
-                <button
-                  className={iconButtonClass}
-                  onClick={() => window.open(truePeopleSearchUrl(splitRegisteredOfficeAddress(c.registeredOfficeAddress)), '_blank')}
-                  title="People search for the registered agent, by their registered office address"
-                >
-                  <Search className="h-4 w-4"/> People search
-                </button>
-              )}
             </div>
           )}
           {c.nameKind === 'entity' && (
