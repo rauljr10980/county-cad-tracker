@@ -14,6 +14,11 @@ export type MlsContact = {
   mailingAddress: string;
   phoneNumbers: string[];
   emails: string[];
+  // Raw, unvalidated JSON column — same { phoneRows, emailRows } shape as
+  // EvictionLandlord.contacts, but never pre-normalised by the API. Typed as
+  // `unknown` rather than NormalizedContacts so a reader can't skip
+  // normalizeContacts and let a raw payload through untyped.
+  contacts: unknown;
   entityTaxpayerNumber: string;
   entityFileNumber: string;
   entityStatus: string;
