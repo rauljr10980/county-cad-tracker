@@ -7,6 +7,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { classifyOwner, searchName } = require('../lib/mlsOwner');
 const { parseSheet, dedupe } = require('../lib/mlsWorkbook');
 const { searchEntity, getEntity } = require('../lib/comptroller');
+const { dedupeOfficers, normalizeOfficerName } = require('../lib/mlsOfficers');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -147,6 +148,53 @@ const namesMatch = (a, b) => {
 
 const firstTruthy = (...values) => values.find((v) => v) || '';
 
+// Promotes an entity's officer roster (already deduped-by-name+title by
+// comptroller.js) into one MlsContact per distinct person — see
+// mlsOfficers.js for why "distinct person" isn't the same as "distinct
+// officerInfo row". Matches an existing officer contact by normalized name
+// so re-running the lookup updates the title in place instead of creating a
+// duplicate; a match's own `contacts` blob (whatever the user has already
+// extracted for that person) is never touched here.
+async function syncOfficerContacts(mlsLeadId, parentContactId, officers) {
+  const deduped = dedupeOfficers(officers);
+  if (!deduped.length) return;
+
+  const existing = await prisma.mlsContact.findMany({
+    where: { mlsLeadId, role: 'officer', parentContactId },
+  });
+  const byName = new Map(existing.map((c) => [normalizeOfficerName(c.name), c]));
+
+  for (const officer of deduped) {
+    const match = byName.get(normalizeOfficerName(officer.name));
+    if (match) {
+      if (match.title !== officer.title || (officer.address && match.mailingAddress !== officer.address)) {
+        await prisma.mlsContact.update({
+          where: { id: match.id },
+          data: { title: officer.title, ...(officer.address && { mailingAddress: officer.address }) },
+        });
+      }
+      continue;
+    }
+    await prisma.mlsContact.create({
+      data: {
+        mlsLeadId,
+        parentContactId,
+        role: 'officer',
+        name: officer.name,
+        nameKind: 'person',
+        // Not searchName(officer.name): that helper assumes MLS/CAD's
+        // surname-first input ("Baugher Jason E") and flips it to
+        // given-name-first. officerInfo names already arrive in normal
+        // reading order ("ALEX J MIHAILA"), so running them through it would
+        // scramble a correct name instead of fixing a backwards one.
+        searchName: officer.name,
+        title: officer.title,
+        mailingAddress: officer.address,
+      },
+    });
+  }
+}
+
 // Given a taxpayer chosen from a `searchEntity` candidate list (either the
 // sole result, or one the caller picked off an `ambiguous` list), fetches
 // the Franchise Tax Account Status detail record and persists the full
@@ -182,6 +230,10 @@ async function persistEntityDetail(contact, candidate) {
       entityLookupStatus: 'success',
     },
   });
+
+  if (entity?.officers?.length) {
+    await syncOfficerContacts(contact.mlsLeadId, contact.id, entity.officers);
+  }
 
   return { contact: updated, detailError: detail.ok ? null : detail.error };
 }
@@ -300,13 +352,22 @@ router.post('/:id/cad-lookup', async (req, res) => {
     // If the CAD name is the same person/entity as the existing mls_owner
     // contact, enrich that record instead of creating a second one.
     const mlsOwner = lead.contacts.find((c) => c.role === 'mls_owner');
-    const role = mlsOwner && namesMatch(mlsOwner.name, ownerName) ? 'mls_owner' : 'cad_owner';
+    const useMlsOwner = mlsOwner && namesMatch(mlsOwner.name, ownerName);
 
-    const contact = await prisma.mlsContact.upsert({
-      where: { mlsLeadId_role: { mlsLeadId: lead.id, role } },
-      update: { name: ownerName, nameKind, searchName: searchName(ownerName), mailingAddress },
-      create: { mlsLeadId: lead.id, role, name: ownerName, nameKind, searchName: searchName(ownerName), mailingAddress },
-    });
+    // The buyer/"other party" box may already exist as an empty placeholder
+    // (created on first use, before any CAD lookup ran — see POST
+    // /:id/contacts) with its own already-extracted contacts blob. Update it
+    // in place by id rather than upserting on (mlsLeadId, role, name): the
+    // placeholder's name is '', which would never match the real ownerName
+    // key and would leave a second, orphaned cad_owner row behind.
+    const existingCadOwner = lead.contacts.find((c) => c.role === 'cad_owner');
+
+    const data = { name: ownerName, nameKind, searchName: searchName(ownerName), mailingAddress };
+    const contact = useMlsOwner
+      ? await prisma.mlsContact.update({ where: { id: mlsOwner.id }, data })
+      : existingCadOwner
+        ? await prisma.mlsContact.update({ where: { id: existingCadOwner.id }, data })
+        : await prisma.mlsContact.create({ data: { ...data, mlsLeadId: lead.id, role: 'cad_owner' } });
 
     await prisma.mlsLead.update({
       where: { id: lead.id },
@@ -321,6 +382,44 @@ router.post('/:id/cad-lookup', async (req, res) => {
       data: { cadLookupStatus: 'failed', cadLookupAt: new Date() },
     });
     res.status(500).json({ error: 'CAD lookup failed', cadLookupStatus: 'failed' });
+  }
+});
+
+// Creates a contact for a lead on demand. Exists for the always-present
+// buyer/"other party" box (see MlsLeadDetails.tsx's PersonCard): rather than
+// forcing the user to run a CAD lookup before they can paste what they
+// already know, that box calls this the first time it has something to
+// save, then switches to the normal PATCH /contacts/:contactId flow once it
+// has a real id. Scoped by req.user.id through the parent lead, like every
+// other contact route in this file — MlsContact carries no userId of its
+// own.
+router.post('/:id/contacts', async (req, res) => {
+  const lead = await prisma.mlsLead.findFirst({ where: { id: req.params.id, userId: req.user.id } });
+  if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+  const role = typeof req.body.role === 'string' && req.body.role ? req.body.role : 'cad_owner';
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+  const nameKind = typeof req.body.nameKind === 'string' && req.body.nameKind ? req.body.nameKind : 'person';
+
+  const data = { mlsLeadId: lead.id, role, name, nameKind, searchName: name ? searchName(name) : '' };
+  if (Object.prototype.hasOwnProperty.call(req.body, 'contacts')) {
+    data.contacts = req.body.contacts;
+  }
+
+  try {
+    const contact = await prisma.mlsContact.create({ data });
+    res.json(contact);
+  } catch (err) {
+    // A double-click (or two tabs) can race two creates for the same empty
+    // placeholder — (mlsLeadId, role, name) collides on the unique
+    // constraint. Hand back the row the first call already made rather than
+    // erroring the second.
+    if (err.code === 'P2002') {
+      const existing = await prisma.mlsContact.findFirst({ where: { mlsLeadId: lead.id, role, name } });
+      if (existing) return res.json(existing);
+    }
+    console.error('[MLS] create contact error:', err);
+    res.status(500).json({ error: 'Failed to create contact' });
   }
 });
 

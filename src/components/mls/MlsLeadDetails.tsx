@@ -5,7 +5,7 @@ import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { truePeopleSearchUrl, taxAssessorUrl, landRecordsUrl, type ResearchAddress } from '@/lib/researchLinks';
 import { normalizeContacts, type NormalizedContacts } from '@/lib/contactsModel';
 import { ContactWorkspace } from '@/components/contacts/ContactWorkspace';
-import { fmtDate, fmtMoney, pillClass, statusTone, type MlsContact, type MlsContactOfficer, type MlsLead } from './MlsLeadsView';
+import { fmtDate, fmtMoney, ownerRoleLabels, pillClass, statusTone, type MlsContact, type MlsLead } from './MlsLeadsView';
 
 // The Comptroller's Registered Office Street Address (and each officer's
 // address) comes back as one formatted string ("797 CROWN JEWEL, BOERNE, TX
@@ -100,24 +100,180 @@ function EntityCandidateList({ candidates, onSelect, loading }: {
   </div>;
 }
 
-// One officer/agent row under the Registered Agent — titles like PRESIDENT
-// are as likely (or more likely) to be the person worth calling as the
-// registered agent itself, so each gets its own people-search link too.
-function OfficerRow({ officer }: { officer: MlsContactOfficer }) {
-  return <div className="space-y-1 border-t border-primary/20 pt-2 first:border-t-0 first:pt-0">
-    <p className="text-sm font-semibold flex items-center gap-1.5">
-      <User className="h-3.5 w-3.5"/>{officer.name || '—'}
-      {officer.title && <span className="text-xs font-normal text-muted-foreground">{officer.title}</span>}
-    </p>
-    <p className="record text-xs text-muted-foreground">{officer.address || '—'}</p>
-    {officer.address && (
-      <button
-        className={iconButtonClass}
-        onClick={() => window.open(truePeopleSearchUrl(splitRegisteredOfficeAddress(officer.address)), '_blank')}
-        title={`People search for ${officer.name || 'this officer'}, by their address on file`}
-      >
-        <Search className="h-4 w-4"/> People search
-      </button>
+type PersonCardProps = {
+  /** Card header label: "Seller" / "Buyer" / "Owner" / "Other party" for the
+   *  two always-present boxes, or the officer's joined title(s) for a
+   *  promoted officer. */
+  label: string;
+  /** null when this box has no MlsContact behind it yet — the always-present
+   *  seller/buyer box before anything has been looked up or pasted. */
+  contact: MlsContact | null;
+  /** Role a not-yet-existing contact gets on first use. Required when
+   *  contact is null, ignored otherwise. */
+  pendingRole?: 'mls_owner' | 'cad_owner';
+  /** 'owner' cards (seller/buyer) show name/search-name/mailing-address and,
+   *  for an entity, the full Comptroller block. 'officer' cards are
+   *  deliberately smaller — just the person and their own workspace. */
+  variant: 'owner' | 'officer';
+  propertyAddress: string;
+  saving: boolean;
+  onSaveContact: (contactId: string, next: NormalizedContacts) => Promise<void>;
+  onCreateContact: (role: 'mls_owner' | 'cad_owner', next: NormalizedContacts) => Promise<void>;
+  onCallError: (message: string) => void;
+  callErrorMessage?: string;
+  entityLoading?: boolean;
+  entityMessage?: string;
+  entityCandidates?: EntityCandidate[];
+  onRunEntityLookup?: (contact: MlsContact) => void;
+  onSelectEntityCandidate?: (contact: MlsContact, candidate: EntityCandidate) => void;
+};
+
+// One person's full contact box: identity, (for an owner/buyer) the
+// Comptroller entity detail if there is one, and always their own
+// ContactWorkspace — so a paste into Laura's card only ever lands on Laura.
+// Declared at module scope, not nested inside MlsLeadDetails, so its
+// identity is stable across renders; ContactWorkspace holds its own internal
+// state (a freshness ref, the email-panel draft) that a remount would wipe.
+function PersonCard({
+  label,
+  contact,
+  pendingRole,
+  variant,
+  propertyAddress,
+  saving,
+  onSaveContact,
+  onCreateContact,
+  onCallError,
+  callErrorMessage,
+  entityLoading = false,
+  entityMessage = '',
+  entityCandidates = [],
+  onRunEntityLookup,
+  onSelectEntityCandidate,
+}: PersonCardProps) {
+  const isEntity = contact?.nameKind === 'entity';
+
+  return <div className="rounded bg-muted p-2.5 space-y-2.5">
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className={pillClass('grey')}>{label}</span>
+      {contact && (
+        <span className={pillClass('grey')}>
+          {isEntity ? <Building2 className="h-3 w-3"/> : <User className="h-3 w-3"/>}
+          {isEntity ? 'Entity' : 'Person'}
+        </span>
+      )}
+    </div>
+
+    {!contact ? (
+      <>
+        <p className="text-sm text-muted-foreground">No contact yet — paste a TruePeopleSearch result once you have one.</p>
+        <ContactWorkspace
+          key={`pending-${pendingRole}`}
+          contacts={{ phoneRows: [], emailRows: [] }}
+          onContactsChange={(next) => onCreateContact(pendingRole as 'mls_owner' | 'cad_owner', next)}
+          ownerName={label}
+          propertyAddress={propertyAddress}
+          owner={label}
+          onCallError={onCallError}
+          saving={saving}
+          compact
+        />
+      </>
+    ) : (
+      <>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Name" value={contact.name}/>
+          {variant === 'owner' && <Field label="Search Name" value={contact.searchName}/>}
+          {variant === 'owner' && (
+            <Field label={isEntity ? "Entity's Mailing Address" : 'Mailing Address'} value={contact.mailingAddress} record/>
+          )}
+          {variant === 'officer' && <Field label="Title" value={contact.title}/>}
+          {isEntity && <Field label="Entity Status" value={contact.entityStatus}/>}
+        </div>
+
+        {variant === 'officer' && contact.mailingAddress && (
+          <div className="space-y-1.5">
+            <p className="record text-xs text-muted-foreground">{contact.mailingAddress}</p>
+            <button
+              className={iconButtonClass}
+              onClick={() => window.open(truePeopleSearchUrl(splitRegisteredOfficeAddress(contact.mailingAddress)), '_blank')}
+              title={`People search for ${contact.name || 'this officer'}, by their address on file`}
+            >
+              <Search className="h-4 w-4"/> People search
+            </button>
+          </div>
+        )}
+
+        {isEntity && contact.registeredAgentName && (
+          // The headline result of the Comptroller lookup: a named person,
+          // not just an address.
+          <div className="rounded border border-primary/30 bg-primary/5 p-2.5 space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Registered agent</p>
+            <p className="text-base font-semibold flex items-center gap-1.5">
+              <User className="h-4 w-4"/>{contact.registeredAgentName}
+            </p>
+            <p className="record text-sm text-muted-foreground">{contact.registeredOfficeAddress || '—'}</p>
+            {contact.registeredOfficeAddress && (
+              <button
+                className={iconButtonClass}
+                onClick={() => window.open(truePeopleSearchUrl(splitRegisteredOfficeAddress(contact.registeredOfficeAddress)), '_blank')}
+                title="People search for the registered agent, by their registered office address"
+              >
+                <Search className="h-4 w-4"/> People search
+              </button>
+            )}
+          </div>
+        )}
+
+        {isEntity && (contact.entityTaxpayerNumber || contact.entityFileNumber) && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Taxpayer #" value={contact.entityTaxpayerNumber} record/>
+            <Field label="SOS File #" value={contact.entityFileNumber} record/>
+            <Field label="State of Formation" value={contact.stateOfFormation}/>
+            <Field label="Right to Transact" value={contact.rightToTransact}/>
+          </div>
+        )}
+
+        {isEntity && onRunEntityLookup && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              className={iconButtonClass}
+              disabled={entityLoading}
+              onClick={() => onRunEntityLookup(contact)}
+              title="Look up this entity with the Texas Comptroller"
+            >
+              {entityLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Building2 className="h-4 w-4"/>}
+              Look up business
+            </button>
+            {contact.entityLookupStatus && (
+              <span className="text-xs text-muted-foreground">
+                Last lookup: <span className="record">{fmtDate(contact.entityLookupAt)}</span> — {contact.entityLookupStatus.replace(/_/g, ' ')}
+              </span>
+            )}
+          </div>
+        )}
+        {entityMessage && <p className="text-xs text-muted-foreground">{entityMessage}</p>}
+        {!!entityCandidates.length && onSelectEntityCandidate && (
+          <EntityCandidateList
+            candidates={entityCandidates}
+            onSelect={(candidate) => onSelectEntityCandidate(contact, candidate)}
+            loading={entityLoading}
+          />
+        )}
+
+        <ContactWorkspace
+          key={contact.id}
+          contacts={normalizeContacts(contact.contacts)}
+          onContactsChange={(next) => onSaveContact(contact.id, next)}
+          ownerName={contact.name || label}
+          propertyAddress={propertyAddress}
+          owner={contact.name || label}
+          onCallError={onCallError}
+          saving={saving}
+          compact
+        />
+        {callErrorMessage && <p className="text-xs text-destructive">{callErrorMessage}</p>}
+      </>
     )}
   </div>;
 }
@@ -139,7 +295,9 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
   const [entityCandidates, setEntityCandidates] = useState<Record<string, EntityCandidate[]>>({});
 
   // Which contact's ContactWorkspace is mid-save, so only that contact's
-  // controls disable — a note on one owner shouldn't freeze another's.
+  // controls disable — a note on one owner shouldn't freeze another's. Uses
+  // a contact id, or 'pending-mls_owner' / 'pending-cad_owner' for a box that
+  // has no contact yet.
   const [savingContactId, setSavingContactId] = useState<string | null>(null);
   // Surfaces a ContactWorkspace call-recording failure per contact — MLS has
   // no activity log to fall back on, so this is the only feedback the user
@@ -187,6 +345,27 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
       setDetails((prev) =>
         prev ? { ...prev, contacts: prev.contacts.map((c) => (c.id === contactId ? { ...c, contacts: result.contacts } : c)) } : prev
       );
+    } finally {
+      setSavingContactId(null);
+    }
+  };
+
+  // Fires the first time the always-present seller/buyer box has something
+  // to save and has no MlsContact behind it yet — creates one (with this
+  // first extraction already on it, in the same call) and adds it to
+  // `details.contacts`, so the box switches to the normal saveContact path
+  // from here on.
+  const createContact = async (role: 'mls_owner' | 'cad_owner', next: NormalizedContacts) => {
+    if (!details) return;
+    setSavingContactId(`pending-${role}`);
+    try {
+      const result = await mlsLeadsRequest(`/${details.id}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, nameKind: 'person', contacts: next }),
+      });
+      if (!result?.id) return;
+      setDetails((prev) => (prev && !prev.contacts.some((c) => c.id === result.id) ? { ...prev, contacts: [...prev.contacts, result] } : prev));
     } finally {
       setSavingContactId(null);
     }
@@ -270,6 +449,13 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
     details.contacts.find((c) => c.role === 'cad_owner') ||
     details.contacts.find((c) => c.role === 'mls_owner' && c.mailingAddress);
 
+  const sellerContact = details.contacts.find((c) => c.role === 'mls_owner') || null;
+  const buyerContact = details.contacts.find((c) => c.role === 'cad_owner') || null;
+  const officerContacts = details.contacts.filter((c) => c.role === 'officer');
+  const labels = ownerRoleLabels(details.status);
+
+  const onCallErrorFor = (id: string) => (message: string) => setCallErrorMessage((prev) => ({ ...prev, [id]: message }));
+
   return <Dialog open={!!lead} onOpenChange={(v) => !v && onClose()}><DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
     <DialogHeader>
       <p className="label">MLS #<span className="record ml-1">{details.mlsNumber || '—'}</span>{details.hidden && <span className="ml-2">HIDDEN</span>}</p>
@@ -338,106 +524,61 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
     </section>
 
     <section className="rounded border bg-card p-3.5 space-y-3">
-      <h3 className="text-base font-semibold">Owner</h3>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Field label="MLS Owner (raw)" value={details.mlsOwnerRaw}/>
-      </div>
-      {!details.contacts.length && <p className="text-sm text-muted-foreground">No contact record — the owner text above didn't classify as a person or entity.</p>}
-      {details.contacts.map((c) => (
-        <div key={c.id} className="rounded bg-muted p-2.5 space-y-2">
-          <div className="flex items-center gap-1.5">
-            <span className={pillClass('grey')}>
-              {c.nameKind === 'entity' ? <Building2 className="h-3 w-3"/> : <User className="h-3 w-3"/>}
-              {c.nameKind === 'entity' ? 'Entity' : 'Person'}
-            </span>
-            <span className={pillClass('grey')}>{c.role === 'cad_owner' ? 'CAD owner of record' : 'MLS listed owner'}</span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Field label="Name" value={c.name}/>
-            <Field label="Search Name" value={c.searchName}/>
-            <Field label={c.nameKind === 'entity' ? "Entity's Mailing Address" : 'Mailing Address'} value={c.mailingAddress} record/>
-            {c.nameKind === 'entity' && <Field label="Entity Status" value={c.entityStatus}/>}
-          </div>
-          {c.nameKind === 'entity' && (c.registeredAgentName || c.officers.length > 0) && (
-            // The headline result of the Comptroller lookup: named people,
-            // not just an address — placed right under the name fields
-            // rather than buried below the taxpayer/SOS details, since
-            // these are who actually gets called. Franchise Tax Account
-            // Status detail record — confirmed live for Mihaila Holdings
-            // Corp (Alex J Mihaila, 797 Crown Jewel, Boerne, TX 78006, and
-            // listed again in officerInfo as both DIRECTOR and PRESIDENT).
-            <div className="rounded border border-primary/30 bg-primary/5 p-2.5 space-y-2.5">
-              <p className="text-xs font-medium text-muted-foreground">Registered agent &amp; officers — the people to call</p>
-              {c.registeredAgentName && (
-                <div className="space-y-1.5">
-                  <p className="text-base font-semibold flex items-center gap-1.5">
-                    <User className="h-4 w-4"/>{c.registeredAgentName}
-                    <span className="text-xs font-normal text-muted-foreground">Registered Agent</span>
-                  </p>
-                  <p className="record text-sm text-muted-foreground">{c.registeredOfficeAddress || '—'}</p>
-                  {c.registeredOfficeAddress && (
-                    <button
-                      className={iconButtonClass}
-                      onClick={() => window.open(truePeopleSearchUrl(splitRegisteredOfficeAddress(c.registeredOfficeAddress)), '_blank')}
-                      title="People search for the registered agent, by their registered office address"
-                    >
-                      <Search className="h-4 w-4"/> People search
-                    </button>
-                  )}
-                </div>
-              )}
-              {c.officers.map((o, i) => (
-                <OfficerRow key={`${o.name}-${o.title}-${i}`} officer={o}/>
-              ))}
-            </div>
-          )}
-          {c.nameKind === 'entity' && (c.entityTaxpayerNumber || c.entityFileNumber) && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Field label="Taxpayer #" value={c.entityTaxpayerNumber} record/>
-              <Field label="SOS File #" value={c.entityFileNumber} record/>
-              <Field label="State of Formation" value={c.stateOfFormation}/>
-              <Field label="Right to Transact" value={c.rightToTransact}/>
-            </div>
-          )}
-          {c.nameKind === 'entity' && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                className={iconButtonClass}
-                disabled={entityLoadingId === c.id}
-                onClick={() => runEntityLookup(c)}
-                title="Look up this entity with the Texas Comptroller"
-              >
-                {entityLoadingId === c.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Building2 className="h-4 w-4"/>}
-                Look up business
-              </button>
-              {c.entityLookupStatus && (
-                <span className="text-xs text-muted-foreground">
-                  Last lookup: <span className="record">{fmtDate(c.entityLookupAt)}</span> — {c.entityLookupStatus.replace(/_/g, ' ')}
-                </span>
-              )}
-            </div>
-          )}
-          {entityMessage[c.id] && <p className="text-xs text-muted-foreground">{entityMessage[c.id]}</p>}
-          {!!entityCandidates[c.id]?.length && (
-            <EntityCandidateList
-              candidates={entityCandidates[c.id]}
-              onSelect={(candidate) => selectEntityCandidate(c, candidate)}
-              loading={entityLoadingId === c.id}
-            />
-          )}
-          <ContactWorkspace
-            key={c.id}
-            contacts={normalizeContacts(c.contacts)}
-            onContactsChange={(next) => saveContact(c.id, next)}
-            ownerName={c.name}
+      <h3 className="text-base font-semibold">Contacts</h3>
+      <Field label="MLS Owner (raw)" value={details.mlsOwnerRaw}/>
+      {/* Left-to-right, not stacked: three people's full contact blocks
+          top-to-bottom made this dialog endless. Two columns on a wide
+          screen, one on narrow — never wider than the dialog itself. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <PersonCard
+          label={labels.primary}
+          contact={sellerContact}
+          pendingRole="mls_owner"
+          variant="owner"
+          propertyAddress={details.address}
+          saving={savingContactId === (sellerContact?.id ?? 'pending-mls_owner')}
+          onSaveContact={saveContact}
+          onCreateContact={createContact}
+          onCallError={onCallErrorFor(sellerContact?.id ?? 'pending-mls_owner')}
+          callErrorMessage={callErrorMessage[sellerContact?.id ?? 'pending-mls_owner']}
+          entityLoading={sellerContact ? entityLoadingId === sellerContact.id : false}
+          entityMessage={sellerContact ? entityMessage[sellerContact.id] : ''}
+          entityCandidates={sellerContact ? entityCandidates[sellerContact.id] : []}
+          onRunEntityLookup={runEntityLookup}
+          onSelectEntityCandidate={selectEntityCandidate}
+        />
+        <PersonCard
+          label={labels.secondary}
+          contact={buyerContact}
+          pendingRole="cad_owner"
+          variant="owner"
+          propertyAddress={details.address}
+          saving={savingContactId === (buyerContact?.id ?? 'pending-cad_owner')}
+          onSaveContact={saveContact}
+          onCreateContact={createContact}
+          onCallError={onCallErrorFor(buyerContact?.id ?? 'pending-cad_owner')}
+          callErrorMessage={callErrorMessage[buyerContact?.id ?? 'pending-cad_owner']}
+          entityLoading={buyerContact ? entityLoadingId === buyerContact.id : false}
+          entityMessage={buyerContact ? entityMessage[buyerContact.id] : ''}
+          entityCandidates={buyerContact ? entityCandidates[buyerContact.id] : []}
+          onRunEntityLookup={runEntityLookup}
+          onSelectEntityCandidate={selectEntityCandidate}
+        />
+        {officerContacts.map((officer) => (
+          <PersonCard
+            key={officer.id}
+            label={officer.title || 'Officer'}
+            contact={officer}
+            variant="officer"
             propertyAddress={details.address}
-            owner={c.name}
-            onCallError={(message) => setCallErrorMessage((prev) => ({ ...prev, [c.id]: message }))}
-            saving={savingContactId === c.id}
+            saving={savingContactId === officer.id}
+            onSaveContact={saveContact}
+            onCreateContact={createContact}
+            onCallError={onCallErrorFor(officer.id)}
+            callErrorMessage={callErrorMessage[officer.id]}
           />
-          {callErrorMessage[c.id] && <p className="text-xs text-destructive">{callErrorMessage[c.id]}</p>}
-        </div>
-      ))}
+        ))}
+      </div>
     </section>
 
     <CollapsibleSection title="Property" expanded={propertyExpanded} onToggle={() => setPropertyExpanded((v) => !v)}>

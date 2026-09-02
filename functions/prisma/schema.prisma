@@ -1104,10 +1104,31 @@ model MlsLead {
 model MlsContact {
   id         String @id @default(cuid())
   mlsLeadId  String
+  // 'mls_owner' (the MLS-listed owner — the seller on a sold row), 'cad_owner'
+  // (the CAD current-owner-of-record — the buyer on a sold row, or the "other
+  // party" box otherwise), or 'officer' (a promoted entity officer/agent —
+  // see parentContactId below). One lead may hold at most one of each of the
+  // first two roles, and several of the third.
   role       String
   name       String
   nameKind   String
   searchName String @default("")
+
+  // Officer/agent title from the Comptroller's officerInfo (e.g.
+  // "Registered Agent", "MRG MBR") — only meaningful when role is 'officer'.
+  // A person who carries more than one title in the source data is still one
+  // contact; its titles are joined with " · " rather than split into
+  // duplicate rows.
+  title String @default("")
+
+  // Set only on a role: 'officer' contact — the entity (mls_owner or
+  // cad_owner) MlsContact this officer belongs to. SetNull rather than
+  // Cascade: there is no route that deletes a contact today, but if one ever
+  // removes the parent entity, the officer's own extracted phone/email data
+  // should survive as an orphan rather than vanish with it.
+  parentContactId String?
+  parentContact   MlsContact?  @relation("MlsContactOfficers", fields: [parentContactId], references: [id], onDelete: SetNull)
+  officerContacts MlsContact[] @relation("MlsContactOfficers")
 
   mailingAddress String   @default("")
   phoneNumbers   String[] @default([])
@@ -1149,8 +1170,19 @@ model MlsContact {
 
   lead MlsLead @relation(fields: [mlsLeadId], references: [id], onDelete: Cascade)
 
-  @@unique([mlsLeadId, role])
+  // Was @@unique([mlsLeadId, role]) — one contact per role, full stop, which
+  // is exactly the constraint that forced every officer into the same shared
+  // pile as the entity itself. Adding `name` to the key is what lets a lead
+  // hold one seller, one buyer, and several distinctly-named officers, while
+  // still preventing the same named person from being promoted twice under
+  // the same role (the re-run-safety a plain drop of the constraint would
+  // have given up). Every row already satisfies this broader key, since it's
+  // a superset of the narrower one being replaced — see the schema-change
+  // note in the phase report for why that makes this safe against existing
+  // data under `prisma db push`.
+  @@unique([mlsLeadId, role, name])
   @@index([mlsLeadId])
+  @@index([parentContactId])
   @@map("mls_contacts")
 }
 
