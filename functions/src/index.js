@@ -41,6 +41,7 @@ const activityLogsRoutes = require('./routes/activityLogs');
 const crmRoutes = require('./routes/crm');
 const evictionRoutes = require('./routes/evictions');
 const mlsLeadRoutes = require('./routes/mlsLeads');
+const publicIntakeRoutes = require('./routes/publicIntake');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -60,7 +61,9 @@ app.use(compression());
 // Logging
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// CORS configuration - Allow GitHub Pages and localhost
+// CORS configuration - Allow GitHub Pages, localhost, and the public
+// marketing site (estate-essentials-co, the `public-site` Railway service)
+// whose funnel pages POST to /api/public/submissions unauthenticated.
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : [
@@ -69,7 +72,11 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       'http://localhost:8080',
       'http://localhost:8081',
       'https://rauljr10980.github.io',
-      'https://rauljr10980.github.io/county-cad-tracker'
+      'https://rauljr10980.github.io/county-cad-tracker',
+      // estate-essentials-co's current Lovable-hosted origin. A future
+      // custom domain for the public site will need adding here too (or via
+      // ALLOWED_ORIGINS).
+      'https://estate-essentials-co.lovable.app'
     ];
 
 app.use(cors({
@@ -188,6 +195,7 @@ app.use('/api/activity-logs', activityLogsRoutes);
 app.use('/api/crm', crmRoutes);
 app.use('/api/evictions', evictionRoutes);
 app.use('/api/mls-leads', mlsLeadRoutes);
+app.use('/api/public', publicIntakeRoutes);
 
 // ============================================================================
 // ERROR HANDLING

@@ -1153,3 +1153,36 @@ model MlsContact {
   @@index([mlsLeadId])
   @@map("mls_contacts")
 }
+
+// ============================================================================
+// PUBLIC LEAD INTAKE (estate-essentials-co marketing site funnel forms)
+// ============================================================================
+
+// A submission from an unauthenticated visitor on one of the public
+// marketing site's funnel pages (sell-property, distressed-property,
+// inherited-property, landlord-help). Deliberately not per-user — a public
+// submission belongs to the business, not to whoever happens to be logged in
+// when it's worked.
+model PublicSubmission {
+  id              String @id @default(cuid())
+  sourcePage      String // which funnel page it came from
+  name            String
+  email           String @default("")
+  phone           String @default("")
+  propertyAddress String @default("")
+  message         String @default("") @db.Text
+
+  status String @default("new") // new | contacted | converted | spam
+  notes  String @default("") @db.Text
+
+  userAgent String @default("")
+  ipHash    String @default("") // salted hash of the submitting IP — never the raw address
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([sourcePage])
+  @@map("public_submissions")
+}
