@@ -6,7 +6,7 @@ const prisma = require('../lib/prisma');
 const { authenticateToken } = require('../middleware/auth');
 const { classifyOwner, searchName } = require('../lib/mlsOwner');
 const { parseSheet, dedupe } = require('../lib/mlsWorkbook');
-const { searchEntity, getEntity } = require('../lib/comptroller');
+const { resolveEntity, getEntity } = require('../lib/comptroller');
 const { dedupeOfficers, normalizeOfficerName } = require('../lib/mlsOfficers');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -447,18 +447,21 @@ router.patch('/contacts/:contactId', async (req, res) => {
 
 // Comptroller entity lookup for a single contact. Scoped through the parent
 // lead's userId since MlsContact carries no userId of its own.
+//
+// Deliberately not gated on `contact.nameKind === 'entity'`: the classifier
+// is a heuristic over agent-typed free text and misses plenty of company
+// names (a typo'd suffix, an unrecognised entity word). Refusing the lookup
+// on its say-so locked the whole feature out whenever it guessed wrong. A
+// real person's name simply comes back `not_found` from `resolveEntity`,
+// which is honest and costs one extra call — cheaper than a dead button.
 router.post('/contacts/:contactId/entity-lookup', async (req, res) => {
   const contact = await prisma.mlsContact.findFirst({
     where: { id: req.params.contactId, lead: { userId: req.user.id } },
   });
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
-  if (contact.nameKind !== 'entity') {
-    return res.status(400).json({ error: 'Only entity contacts can be looked up with the Comptroller' });
-  }
-
   try {
-    const result = await searchEntity(contact.name);
+    const result = await resolveEntity(contact.name);
 
     if (!result.ok) {
       const updated = await prisma.mlsContact.update({
@@ -468,7 +471,7 @@ router.post('/contacts/:contactId/entity-lookup', async (req, res) => {
       return res.json({ success: false, entityLookupStatus: 'failed', error: result.error, contact: updated });
     }
 
-    if (result.results.length === 0) {
+    if (result.status === 'not_found') {
       const updated = await prisma.mlsContact.update({
         where: { id: contact.id },
         data: { entityLookupStatus: 'not_found', entityLookupAt: new Date() },
@@ -476,7 +479,7 @@ router.post('/contacts/:contactId/entity-lookup', async (req, res) => {
       return res.json({ success: false, entityLookupStatus: 'not_found', contact: updated });
     }
 
-    if (result.results.length > 1) {
+    if (result.status === 'ambiguous') {
       const updated = await prisma.mlsContact.update({
         where: { id: contact.id },
         data: { entityLookupStatus: 'ambiguous', entityLookupAt: new Date() },
@@ -484,7 +487,7 @@ router.post('/contacts/:contactId/entity-lookup', async (req, res) => {
       return res.json({ success: false, entityLookupStatus: 'ambiguous', candidates: result.results, contact: updated });
     }
 
-    const { contact: updated, detailError } = await persistEntityDetail(contact, result.results[0]);
+    const { contact: updated, detailError } = await persistEntityDetail(contact, result.match);
     res.json({
       success: true,
       entityLookupStatus: 'success',
@@ -511,10 +514,9 @@ router.post('/contacts/:contactId/entity-select', async (req, res) => {
   });
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
-  if (contact.nameKind !== 'entity') {
-    return res.status(400).json({ error: 'Only entity contacts can be looked up with the Comptroller' });
-  }
-
+  // Not gated on nameKind — see entity-lookup above. An `ambiguous` result
+  // (the only path that reaches this route) can now come back for a contact
+  // of any classifier opinion.
   if (!isValidCandidate(req.body)) {
     return res.status(400).json({ error: 'A candidate with a taxpayerNumber is required' });
   }
