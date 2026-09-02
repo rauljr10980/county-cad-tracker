@@ -11,6 +11,13 @@ export type MlsContact = {
   name: string;
   nameKind: string;
   searchName: string;
+  // Officer title(s) — e.g. "Registered Agent", or "DIRECTOR · PRESIDENT"
+  // when one person carries more than one — only meaningful for role
+  // 'officer'. Empty on mls_owner/cad_owner contacts.
+  title: string;
+  // Set only on a role: 'officer' contact — the entity contact (mls_owner or
+  // cad_owner) this officer was promoted from.
+  parentContactId: string | null;
   mailingAddress: string;
   phoneNumbers: string[];
   emails: string[];
@@ -116,6 +123,15 @@ export const pillClass = (tone: string) => `${PILL_BASE} ${PILL_TONE_CLASSES[ton
 // codes fall back to grey rather than breaking the pill.
 const STATUS_PILL_TONE: Record<string, string> = { ACT: 'blue', SLD: 'success', PEND: 'warn', EXP: 'danger', WD: 'danger', CS: 'grey' };
 export const statusTone = (status: string) => STATUS_PILL_TONE[status] ?? 'grey';
+
+// A closed sale is the only point at which "seller" and "buyer" are true:
+// the MLS-named owner sold to whoever the CAD now shows as current owner. On
+// any other status (active, pending, expired, withdrawn...) the property
+// hasn't sold, so the MLS owner is just the current owner and calling them a
+// "seller" would be a claim the data doesn't support — labelled Owner / Other
+// party instead.
+export const ownerRoleLabels = (status: string): { primary: string; secondary: string } =>
+  status === 'SLD' ? { primary: 'Seller', secondary: 'Buyer' } : { primary: 'Owner', secondary: 'Other party' };
 
 export default function MlsLeadsView() {
   const [items, setItems] = useState<MlsLead[]>([]);

@@ -33,6 +33,17 @@ export type ContactWorkspaceProps = {
    */
   onCallError?: (message: string) => void;
   saving?: boolean;
+  /**
+   * Forces the phone-row layout to a single stacked column regardless of
+   * viewport width. The default phone-row grid switches to 4 columns at the
+   * `md` breakpoint — keyed off the *viewport*, not this component's own
+   * container — so a caller nesting several of these side by side (MLS's
+   * per-person contact cards) would still hit that breakpoint on a normal
+   * screen while each card only has half the width, squeezing the row and
+   * risking the page scrolling horizontally. Eviction's single, full-width
+   * workspace has no such container and leaves this unset.
+   */
+  compact?: boolean;
 };
 
 /**
@@ -61,6 +72,7 @@ export function ContactWorkspace({
   onCallLogged,
   onCallError,
   saving = false,
+  compact = false,
 }: ContactWorkspaceProps) {
   const [rawText, setRawText] = useState('');
 
@@ -146,7 +158,7 @@ export function ContactWorkspace({
           <p className="text-sm text-muted-foreground">No phone numbers yet. Paste a TruePeopleSearch result above to extract them.</p>
         )}
         {contacts.phoneRows.map((row, ri) => row.phones.map((phone, pi) => (
-          <div key={`${ri}-${pi}`} className={`grid gap-2 md:grid-cols-[minmax(0,180px)_auto_auto_minmax(0,1fr)] items-center ${phone.status === 'wrong' ? 'opacity-50' : ''}`}>
+          <div key={`${ri}-${pi}`} className={`grid gap-2 ${compact ? '' : 'md:grid-cols-[minmax(0,180px)_auto_auto_minmax(0,1fr)]'} items-center ${phone.status === 'wrong' ? 'opacity-50' : ''}`}>
             <button
               className="text-left text-primary record hover:underline disabled:opacity-50 disabled:pointer-events-none"
               onClick={() => callNumber(ri, pi, phone.number)}
