@@ -234,13 +234,20 @@ function PersonCard({
           </div>
         )}
 
-        {isEntity && onRunEntityLookup && (
+        {/* Never gated on isEntity: the classifier is a heuristic over
+            agent-typed free text and misses plenty of company names. Gating
+            the button on its opinion locked the feature out whenever it
+            guessed wrong. A real person simply comes back not_found — one
+            extra call, honest, not a dead end. The Entity/Person badge above
+            still reflects the classifier's opinion; it just no longer
+            disables anything. */}
+        {onRunEntityLookup && (
           <div className="flex items-center gap-2 flex-wrap">
             <button
               className={iconButtonClass}
               disabled={entityLoading}
               onClick={() => onRunEntityLookup(contact)}
-              title="Look up this entity with the Texas Comptroller"
+              title="Look up this name with the Texas Comptroller"
             >
               {entityLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Building2 className="h-4 w-4"/>}
               Look up business

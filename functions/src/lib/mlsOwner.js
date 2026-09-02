@@ -9,7 +9,11 @@
  */
 
 const JUNK = /^(see\b|private owner|yep$|n\/?a$|unknown|owner$|agent$|call\b|tbd$|none$|[.\-*]+$)/i;
-const ENTITY = /\b(LLC|L\.L\.C|LP|L\.P|INC|TRUST|PROPERTIES|CORP|HOLDINGS|LTD|INVESTMENTS|PARTNERS|COMPANY|CO)\b/i;
+// Bare "CO" used to be in this list and false-positived on real surnames
+// ("Jason Co") — removed. "LCC" is kept for the common LLC typo, matching
+// the same fix in comptroller.js's suffix stripper.
+const ENTITY =
+  /\b(LLC|L\.L\.C|LCC|PLLC|LP|L\.P|LLP|LLLP|INC|TRUST|PROPERTIES|CORP|HOLDINGS|LTD|INVESTMENTS|PARTNERS|COMPANY|GROUP|ENTERPRISES|REALTY|RENTALS|MANAGEMENT|VENTURES|ASSOCIATES|EQUITY|CAPITAL|DEVELOPMENT|HOMES|ESTATES)\b/i;
 // A trailing single letter is a middle initial, not a surname.
 const INITIAL = /^[A-Z]$/i;
 
@@ -32,6 +36,12 @@ const searchName = (raw) => {
   if (kind !== 'person') return kind === 'entity' ? String(raw).trim() : '';
 
   const value = String(raw).trim();
+  // Defense in depth: never reorder a name that carries an entity token,
+  // even if classifyOwner somehow said "person" — a garbled surname-first
+  // flip of a company name ("ONE IN ALL LCC" -> "IN ALL LCC ONE") is worse
+  // than leaving it alone.
+  if (ENTITY.test(value)) return value;
+
   if (value.includes(',')) {
     const [surname, rest] = value.split(',', 2);
     const given = rest.trim();

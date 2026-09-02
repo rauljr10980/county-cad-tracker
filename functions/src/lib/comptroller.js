@@ -23,6 +23,19 @@
  * `error` string that gets surfaced as-is. Everything else still gets the
  * defensive treatment: an unrecognised shape logs a truncated body and
  * returns an empty/failed result rather than throwing on a live lookup.
+ *
+ * The registry itself is inconsistent about punctuation: the same kind of
+ * company is sometimes stored as "NAME, LLC" and sometimes as "NAME LLC" —
+ * and the raw MLS owner string we search with never has the comma, so the
+ * comma variant never matched under a plain single search. `resolveEntity`
+ * is the fix: a search-and-match ladder that (1) searches the full cleaned
+ * name, (2) on zero results, strips a trailing legal suffix and searches
+ * again, then (3) matches every candidate that comes back against the
+ * *original* raw name with punctuation normalised away, so "BAABCO
+ * PROPERTIES II, LLC" matches an input of "Baabco Properties II LLC" while
+ * a same-search sibling like "BAABCO PROPERTIES III, LLC" does not. Confident
+ * only on exactly one normalised match — anything else is `ambiguous` or
+ * `not_found`, never a guess.
  */
 
 const COMPTROLLER_BASE = 'https://comptroller.texas.gov/data-search/franchise-tax';
@@ -187,4 +200,87 @@ const getEntity = async (taxpayerId, options = {}) => {
   }
 };
 
-module.exports = { searchEntity, getEntity, normalizeEntity, COMPTROLLER_BASE };
+// Normalises a name for matching, not display: uppercase, strip every
+// punctuation character (this is what defeats the "NAME, LLC" vs "NAME LLC"
+// comma inconsistency), collapse whitespace runs, trim. Exported so it can
+// be unit tested directly, independent of a live search.
+const normalizeNameForMatch = (value) =>
+  str(value)
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+// Legal-entity suffixes stripped by `stripLegalSuffix`, compared against the
+// trailing token with its own punctuation removed — so "LLC", "L.L.C.", and
+// "llc." all match the same "LLC" entry below. "LCC" is kept for the common
+// typo (see mlsOwner.js's classifier, which has the same typo problem).
+const LEGAL_SUFFIXES = new Set([
+  'LLC', 'LCC', 'PLLC', 'LP', 'LLP', 'LLLP',
+  'INC', 'CORP', 'CO', 'LTD', 'COMPANY', 'INCORPORATED', 'CORPORATION',
+]);
+
+// Strips one trailing legal-entity suffix (and the punctuation it leaves
+// behind) off a company name — "Baabco Properties II LLC" -> "Baabco
+// Properties II". Only ever the *last* whitespace-delimited token is
+// checked against the suffix list, so a suffix word that happens to open the
+// name ("CO OP GROCERY") is left untouched, and only one suffix ever comes
+// off — this never keeps truncating words. Returns the input unchanged
+// (trimmed) when the last token isn't a recognised suffix.
+const stripLegalSuffix = (name) => {
+  const value = str(name);
+  const tokens = value.split(/\s+/).filter(Boolean);
+  if (tokens.length < 2) return value;
+
+  const last = tokens[tokens.length - 1];
+  const lastLetters = last.replace(/[^A-Za-z]/g, '').toUpperCase();
+  if (!LEGAL_SUFFIXES.has(lastLetters)) return value;
+
+  return tokens
+    .slice(0, -1)
+    .join(' ')
+    .replace(/[.,;:]+$/, '')
+    .trim();
+};
+
+// The search-and-match ladder described at the top of this file. Returns:
+//   { ok: false, status: 'failed', error }                — the search call itself failed
+//   { ok: true,  status: 'not_found', results: [] }        — nothing at either search step
+//   { ok: true,  status: 'ambiguous', results }             — candidates, none confidently ours
+//   { ok: true,  status: 'matched', results, match }        — exactly one normalised match
+const resolveEntity = async (rawName, options = {}) => {
+  const raw = str(rawName);
+  if (!raw) return { ok: false, status: 'failed', results: [], match: null, error: 'An entity name is required' };
+
+  const step1 = await searchEntity(raw, options);
+  if (!step1.ok) return { ok: false, status: 'failed', results: [], match: null, error: step1.error };
+
+  let results = step1.results;
+
+  if (results.length === 0) {
+    const stripped = stripLegalSuffix(raw);
+    if (stripped && stripped !== raw) {
+      const step2 = await searchEntity(stripped, options);
+      if (!step2.ok) return { ok: false, status: 'failed', results: [], match: null, error: step2.error };
+      results = step2.results;
+    }
+  }
+
+  if (results.length === 0) return { ok: true, status: 'not_found', results: [], match: null };
+
+  const target = normalizeNameForMatch(raw);
+  const matches = results.filter((r) => normalizeNameForMatch(r.name) === target);
+
+  if (matches.length === 1) return { ok: true, status: 'matched', results, match: matches[0] };
+  return { ok: true, status: 'ambiguous', results, match: null };
+};
+
+module.exports = {
+  searchEntity,
+  getEntity,
+  normalizeEntity,
+  resolveEntity,
+  normalizeNameForMatch,
+  stripLegalSuffix,
+  COMPTROLLER_BASE,
+};
