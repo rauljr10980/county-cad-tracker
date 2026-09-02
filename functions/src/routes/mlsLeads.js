@@ -6,8 +6,18 @@ const prisma = require('../lib/prisma');
 const { authenticateToken } = require('../middleware/auth');
 const { classifyOwner, searchName } = require('../lib/mlsOwner');
 const { parseSheet, dedupe } = require('../lib/mlsWorkbook');
-const { resolveEntity, getEntity } = require('../lib/comptroller');
+// Aliased: this file already has its own `normalizeNameForMatch` below (an
+// order-independent word-sort comparison for CAD-vs-MLS name matching) —
+// comptroller.js's is a different, punctuation-insensitive normaliser used
+// for entity-name grouping (see entityShare.js).
+const { resolveEntity, getEntity, normalizeNameForMatch: normalizeEntityNameForMatch } = require('../lib/comptroller');
 const { dedupeOfficers, normalizeOfficerName } = require('../lib/mlsOfficers');
+const {
+  groupContactsByNormalizedName,
+  selectLookupCandidates,
+  pickSharedEntityFields,
+  findSuccessfulSibling,
+} = require('../lib/entityShare');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -245,39 +255,121 @@ async function persistEntityDetail(contact, candidate) {
 const isValidCandidate = (body) =>
   body && typeof body === 'object' && typeof body.taxpayerId === 'string' && body.taxpayerId.trim();
 
-router.get('/', async (req, res) => {
-  const page = Math.max(1, Number(req.query.page) || 1);
-  const pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize) || 25));
-  const where = { userId: req.user.id };
+// Builds the MlsLead `where` clause shared by the list route and the bulk
+// entity-lookup route below, so "Look up all businesses" runs over exactly
+// the leads the current filters show. `query` is a plain object of string
+// values — req.query for the list route (a GET), req.body for the bulk
+// route (a POST, since it also needs the boolean `retryFailed`).
+function buildLeadWhere(userId, query) {
+  const where = { userId };
 
-  if (req.query.showHidden !== 'true') where.hidden = false;
-  if (req.query.status) where.status = String(req.query.status);
-  if (req.query.county) where.county = String(req.query.county);
-  if (req.query.minUnits) where.totalUnits = { gte: Number(req.query.minUnits) };
+  if (query.showHidden !== 'true') where.hidden = false;
+  if (query.status) where.status = String(query.status);
+  if (query.county) where.county = String(query.county);
+  if (query.minUnits) where.totalUnits = { gte: Number(query.minUnits) };
 
-  // Owner kind lives on the contact, not the lead, so this filters through the
-  // relation — and specifically through the `mls_owner` contact, the one the
-  // file named and the one the list's OWNER column shows. Filtering on `some`
-  // contact would let a cad_owner person pull an entity-owned lead into the
-  // person list once a CAD lookup runs.
+  // Owner kind and entity-lookup status both live on the contact, not the
+  // lead, so both filter through the relation — and specifically through
+  // the `mls_owner` contact, the one the list's OWNER column shows.
+  // Filtering on `some` contact would let a cad_owner person pull an
+  // entity-owned lead into the person list once a CAD lookup runs. Composed
+  // with AND (not one overwriting the other's `where.contacts`) since a
+  // user can have both set at once.
   //
-  // `unclassified` is the third real case: an Owner cell that was junk ("see
-  // agent"), an address, or blank produces no contact at all, so those leads
-  // match neither entity nor person and are otherwise unreachable.
-  const ownerKind = req.query.ownerKind ? String(req.query.ownerKind) : '';
+  // `unclassified` is the third real ownerKind case: an Owner cell that was
+  // junk ("see agent"), an address, or blank produces no contact at all, so
+  // those leads match neither entity nor person and are otherwise
+  // unreachable.
+  const contactFilters = [];
+
+  const ownerKind = query.ownerKind ? String(query.ownerKind) : '';
   if (ownerKind === 'entity' || ownerKind === 'person') {
-    where.contacts = { some: { role: 'mls_owner', nameKind: ownerKind } };
+    contactFilters.push({ contacts: { some: { role: 'mls_owner', nameKind: ownerKind } } });
   } else if (ownerKind === 'unclassified') {
-    where.contacts = { none: { role: 'mls_owner' } };
+    contactFilters.push({ contacts: { none: { role: 'mls_owner' } } });
   }
-  if (req.query.search) {
-    const search = String(req.query.search);
+
+  // `pending` means an entity-classified mls_owner contact that has never
+  // been looked up (entityLookupStatus is still null) — the set a bulk run
+  // would actually do work on.
+  const entityLookup = query.entityLookup ? String(query.entityLookup) : '';
+  if (['success', 'not_found', 'failed', 'ambiguous'].includes(entityLookup)) {
+    contactFilters.push({ contacts: { some: { role: 'mls_owner', entityLookupStatus: entityLookup } } });
+  } else if (entityLookup === 'pending') {
+    contactFilters.push({ contacts: { some: { role: 'mls_owner', nameKind: 'entity', entityLookupStatus: null } } });
+  }
+
+  if (contactFilters.length) where.AND = contactFilters;
+
+  if (query.search) {
+    const search = String(query.search);
     where.OR = [
       { address: { contains: search, mode: 'insensitive' } },
       { mlsOwnerRaw: { contains: search, mode: 'insensitive' } },
       { mlsNumber: { contains: search } },
     ];
   }
+
+  return where;
+}
+
+// Columns needed to drive the entity-result-sharing logic below: enough of
+// each contact's identity (id, mlsLeadId, name, entityLookupStatus) to
+// group and dedupe with, plus every field entityShare.js's
+// pickSharedEntityFields propagates to a sibling.
+const ENTITY_SIBLING_SELECT = {
+  id: true,
+  mlsLeadId: true,
+  name: true,
+  entityLookupStatus: true,
+  mailingAddress: true,
+  entityTaxpayerNumber: true,
+  entityFileNumber: true,
+  entityStatus: true,
+  entityLookupAt: true,
+  registeredAgentName: true,
+  registeredOfficeAddress: true,
+  stateOfFormation: true,
+  sosRegistrationStatus: true,
+  sosRegistrationDate: true,
+  rightToTransact: true,
+  officers: true,
+};
+
+// Applies a resolved entity result — fresh from the Comptroller, or copied
+// from an already-successful sibling — to one contact, and syncs its
+// officer contacts through the existing per-lead dedupe path. Officers are
+// child MlsContact rows created per lead, so a shared result has to create
+// them for every lead that receives it, not just the one that was actually
+// looked up.
+async function applySharedResult(target, shared) {
+  const updated = await prisma.mlsContact.update({ where: { id: target.id }, data: shared });
+  if (Array.isArray(shared.officers) && shared.officers.length) {
+    await syncOfficerContacts(target.mlsLeadId, target.id, shared.officers);
+  }
+  return updated;
+}
+
+// Every other entity contact this user has whose name normalises the same
+// as `contact` (itself excluded) — fetched fresh so a company resolved on a
+// listing outside the caller's current filter is still found and still
+// shares. Used both to check for an already-successful result before
+// paying for a network call (see the single-contact entity-lookup route)
+// and to know who a fresh result should be shared with afterward.
+async function findEntitySiblings(userId, contact) {
+  const normalizedName = normalizeEntityNameForMatch(contact.name);
+  if (!normalizedName) return [];
+  const all = await prisma.mlsContact.findMany({
+    where: { nameKind: 'entity', lead: { userId }, id: { not: contact.id } },
+    select: ENTITY_SIBLING_SELECT,
+  });
+  return all.filter((c) => normalizeEntityNameForMatch(c.name) === normalizedName);
+}
+
+router.get('/', async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize) || 25));
+  const where = buildLeadWhere(req.user.id, req.query);
 
   const [total, items] = await Promise.all([
     prisma.mlsLead.count({ where }),
@@ -461,6 +553,17 @@ router.post('/contacts/:contactId/entity-lookup', async (req, res) => {
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
   try {
+    // Cheap path first: another property owned by the same company (any
+    // lead this user has, not just this one) may already have a resolved
+    // result. Copying it costs nothing against the Comptroller's public
+    // endpoint — see entityShare.js.
+    const siblings = await findEntitySiblings(req.user.id, contact);
+    const successfulSibling = findSuccessfulSibling(siblings);
+    if (successfulSibling) {
+      const updated = await applySharedResult(contact, pickSharedEntityFields(successfulSibling));
+      return res.json({ success: true, entityLookupStatus: 'success', contact: updated });
+    }
+
     const result = await resolveEntity(contact.name);
 
     if (!result.ok) {
@@ -488,6 +591,14 @@ router.post('/contacts/:contactId/entity-lookup', async (req, res) => {
     }
 
     const { contact: updated, detailError } = await persistEntityDetail(contact, result.match);
+
+    // Share the freshly-resolved result with every other property this
+    // user has under the same company — see "1. Share a result across
+    // properties" in the feature spec.
+    for (const sibling of siblings) {
+      await applySharedResult(sibling, pickSharedEntityFields(updated));
+    }
+
     res.json({
       success: true,
       entityLookupStatus: 'success',
@@ -522,7 +633,14 @@ router.post('/contacts/:contactId/entity-select', async (req, res) => {
   }
 
   try {
+    const siblings = await findEntitySiblings(req.user.id, contact);
     const { contact: updated, detailError } = await persistEntityDetail(contact, req.body);
+
+    // Same sharing as the automatic path — see entity-lookup above.
+    for (const sibling of siblings) {
+      await applySharedResult(sibling, pickSharedEntityFields(updated));
+    }
+
     res.json({
       success: true,
       entityLookupStatus: 'success',
@@ -536,6 +654,125 @@ router.post('/contacts/:contactId/entity-select', async (req, res) => {
       data: { entityLookupStatus: 'failed', entityLookupAt: new Date() },
     });
     res.status(500).json({ error: 'Entity lookup failed', entityLookupStatus: 'failed', contact: updated });
+  }
+});
+
+// Bulk entity lookup: processes at most BULK_BATCH_SIZE *distinct* company
+// names per call, scoped by req.user.id and the same filters the list route
+// takes, so it runs over whatever the user is currently looking at. The
+// client (see MlsLeadsView.tsx) calls this repeatedly until `remaining` is
+// 0, showing progress between calls — a single request covering hundreds of
+// companies would risk an HTTP timeout, and this makes a dropped connection
+// lose one batch rather than the whole run.
+//
+// Grouping by normalised name (entityShare.js) before calling is what makes
+// a company owning 40 listings cost one Comptroller call, not 40 — and the
+// already-successful-sibling check (findEntitySiblings +
+// findSuccessfulSibling) makes a rerun, or a company that was already
+// resolved via the single-contact button, cost nothing at all.
+const BULK_BATCH_SIZE = 25;
+// Throttles calls to comptroller.texas.gov, a public, unauthenticated
+// endpoint — hammering it with hundreds of rapid requests risks the IP
+// getting blocked, which would break this feature (and the single-contact
+// lookup) for good. Only applied when a batch entry actually reaches the
+// network (the cheap sibling-copy path makes no call, so it doesn't wait).
+const BULK_LOOKUP_DELAY_MS = 400;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+router.post('/entity-lookup/bulk', async (req, res) => {
+  const userId = req.user.id;
+  const retryFailed = req.body?.retryFailed === true;
+
+  try {
+    // Contacts inside the current filter — decides which companies are "in
+    // view" for this run and supplies a real display name to search with.
+    // Deliberately separate from the full per-company roster fetched below:
+    // a bulk run is scoped to what the user is looking at, but sharing a
+    // result (task 1) is not — the same company's contacts outside the
+    // current filter still receive it.
+    const filteredContacts = await prisma.mlsContact.findMany({
+      where: { nameKind: 'entity', lead: buildLeadWhere(userId, req.body || {}) },
+      select: ENTITY_SIBLING_SELECT,
+    });
+
+    const eligibleGroups = groupContactsByNormalizedName(selectLookupCandidates(filteredContacts, { retryFailed }));
+    const batchGroups = eligibleGroups.slice(0, BULK_BATCH_SIZE);
+    const remaining = Math.max(0, eligibleGroups.length - batchGroups.length);
+
+    if (!batchGroups.length) {
+      return res.json({ processed: 0, succeeded: 0, failed: 0, notFound: 0, remaining });
+    }
+
+    // Every entity contact this user has, full stop — so each batch
+    // company's complete sibling set (including contacts outside the
+    // current filter) is available without a query per company.
+    const allEntityContacts = await prisma.mlsContact.findMany({
+      where: { nameKind: 'entity', lead: { userId } },
+      select: ENTITY_SIBLING_SELECT,
+    });
+    const allGroupsByName = new Map(
+      groupContactsByNormalizedName(allEntityContacts).map((g) => [g.normalizedName, g.contacts])
+    );
+
+    let succeeded = 0;
+    let failed = 0;
+    let notFound = 0;
+
+    for (let i = 0; i < batchGroups.length; i++) {
+      const group = batchGroups[i];
+      const primary = group.contacts[0];
+      const fullGroup = allGroupsByName.get(group.normalizedName) || group.contacts;
+      const others = fullGroup.filter((c) => c.id !== primary.id);
+      let calledNetwork = false;
+
+      const successfulSibling = findSuccessfulSibling(others);
+      if (successfulSibling) {
+        const shared = pickSharedEntityFields(successfulSibling);
+        await applySharedResult(primary, shared);
+        for (const other of others) {
+          if (other.id === successfulSibling.id) continue;
+          await applySharedResult(other, shared);
+        }
+        succeeded += 1;
+      } else {
+        calledNetwork = true;
+        const result = await resolveEntity(primary.name);
+
+        if (!result.ok || result.status === 'not_found' || result.status === 'ambiguous') {
+          // `ambiguous` needs a human to pick a candidate (see
+          // entity-select above) — it isn't a resolution, so it's counted
+          // with `failed` below; the response shape has no dedicated
+          // bucket for it. The contact itself still gets the real
+          // `ambiguous` status so the list filter and per-row pill (task 3)
+          // reflect it accurately, and a manual resolution from the
+          // details dialog will still share to these same siblings.
+          const status = result.ok ? result.status : 'failed';
+          const data = { entityLookupStatus: status, entityLookupAt: new Date() };
+          await prisma.mlsContact.update({ where: { id: primary.id }, data });
+          for (const other of others) {
+            await prisma.mlsContact.update({ where: { id: other.id }, data });
+          }
+          if (status === 'not_found') notFound += 1;
+          else failed += 1;
+        } else {
+          const { contact: updated } = await persistEntityDetail(primary, result.match);
+          const shared = pickSharedEntityFields(updated);
+          for (const other of others) {
+            await applySharedResult(other, shared);
+          }
+          succeeded += 1;
+        }
+      }
+
+      if (calledNetwork && i < batchGroups.length - 1) {
+        await sleep(BULK_LOOKUP_DELAY_MS);
+      }
+    }
+
+    res.json({ processed: batchGroups.length, succeeded, failed, notFound, remaining });
+  } catch (err) {
+    console.error('[MLS] Bulk entity lookup error:', err);
+    res.status(500).json({ error: 'Bulk entity lookup failed' });
   }
 });
 
