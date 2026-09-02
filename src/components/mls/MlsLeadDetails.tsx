@@ -181,7 +181,7 @@ function PersonCard({
       </>
     ) : (
       <>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Name" value={contact.name}/>
           {variant === 'owner' && <Field label="Search Name" value={contact.searchName}/>}
           {variant === 'owner' && (
@@ -226,7 +226,7 @@ function PersonCard({
         )}
 
         {isEntity && (contact.entityTaxpayerNumber || contact.entityFileNumber) && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Taxpayer #" value={contact.entityTaxpayerNumber} record/>
             <Field label="SOS File #" value={contact.entityFileNumber} record/>
             <Field label="State of Formation" value={contact.stateOfFormation}/>
@@ -445,7 +445,7 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
   };
 
   if (!details) {
-    return <Dialog open={!!lead} onOpenChange={(v) => !v && onClose()}><DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto"/></Dialog>;
+    return <Dialog open={!!lead} onOpenChange={(v) => !v && onClose()}><DialogContent className="w-full max-w-7xl max-h-[90vh] overflow-y-auto"/></Dialog>;
   }
 
   // The CAD lookup upserts a `cad_owner` contact, or — when the CAD name
@@ -463,7 +463,7 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
 
   const onCallErrorFor = (id: string) => (message: string) => setCallErrorMessage((prev) => ({ ...prev, [id]: message }));
 
-  return <Dialog open={!!lead} onOpenChange={(v) => !v && onClose()}><DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+  return <Dialog open={!!lead} onOpenChange={(v) => !v && onClose()}><DialogContent className="w-full max-w-7xl max-h-[90vh] overflow-y-auto">
     <DialogHeader>
       <p className="label">MLS #<span className="record ml-1">{details.mlsNumber || '—'}</span>{details.hidden && <span className="ml-2">HIDDEN</span>}</p>
       <DialogTitle className="pr-8 flex flex-wrap items-center gap-2">
@@ -530,13 +530,17 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
       <Field label="Legal Description" value={details.legalDescription}/>
     </section>
 
-    <section className="rounded border bg-card p-3.5 space-y-3">
+    <section className="rounded border bg-card p-3.5 space-y-4">
       <h3 className="text-base font-semibold">Contacts</h3>
       <Field label="MLS Owner (raw)" value={details.mlsOwnerRaw}/>
-      {/* Left-to-right, not stacked: three people's full contact blocks
-          top-to-bottom made this dialog endless. Two columns on a wide
-          screen, one on narrow — never wider than the dialog itself. */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+      {/* Seller/buyer get their own row, not shared with officer cards: they
+          carry the most content by far — the full Comptroller block for an
+          entity owner, plus its own Contact Extractor — and a substantially
+          wider dialog means each now gets close to half of that width
+          instead of splitting a narrower one three or more ways with
+          whatever officers came back from the lookup. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PersonCard
           label={labels.primary}
           contact={sellerContact}
@@ -571,21 +575,33 @@ export default function MlsLeadDetails({ lead, onClose, onSaveNotes }: Props) {
           onRunEntityLookup={runEntityLookup}
           onSelectEntityCandidate={selectEntityCandidate}
         />
-        {officerContacts.map((officer) => (
-          <PersonCard
-            key={officer.id}
-            label={officer.title || 'Officer'}
-            contact={officer}
-            variant="officer"
-            propertyAddress={details.address}
-            saving={savingContactId === officer.id}
-            onSaveContact={saveContact}
-            onCreateContact={createContact}
-            onCallError={onCallErrorFor(officer.id)}
-            callErrorMessage={callErrorMessage[officer.id]}
-          />
-        ))}
       </div>
+
+      {officerContacts.length > 0 && (
+        <div className="space-y-2">
+          <p className="label">Officers &amp; Registered Agent Contacts</p>
+          {/* Officer cards are much lighter (title, address, a people-search
+              link, their own extractor) than the owner cards above, so they
+              get a denser grid of their own rather than inheriting the
+              owner row's two-column width. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {officerContacts.map((officer) => (
+              <PersonCard
+                key={officer.id}
+                label={officer.title || 'Officer'}
+                contact={officer}
+                variant="officer"
+                propertyAddress={details.address}
+                saving={savingContactId === officer.id}
+                onSaveContact={saveContact}
+                onCreateContact={createContact}
+                onCallError={onCallErrorFor(officer.id)}
+                callErrorMessage={callErrorMessage[officer.id]}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </section>
 
     <CollapsibleSection title="Property" expanded={propertyExpanded} onToggle={() => setPropertyExpanded((v) => !v)}>

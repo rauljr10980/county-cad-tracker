@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { Building2, ChevronLeft, ChevronRight, Loader2, Search, Upload, User } from 'lucide-react';
 import MlsLeadDetails from './MlsLeadDetails';
@@ -124,6 +124,20 @@ export const pillClass = (tone: string) => `${PILL_BASE} ${PILL_TONE_CLASSES[ton
 const STATUS_PILL_TONE: Record<string, string> = { ACT: 'blue', SLD: 'success', PEND: 'warn', EXP: 'danger', WD: 'danger', CS: 'grey' };
 export const statusTone = (status: string) => STATUS_PILL_TONE[status] ?? 'grey';
 
+// entityLookupStatus pill tone/label — 'pending' (a null/empty status) isn't
+// itself a stored value, it's the absence of one, so it's handled by the
+// null branch of entityLookupLabel rather than living in this map.
+const ENTITY_LOOKUP_PILL_TONE: Record<string, string> = { success: 'success', ambiguous: 'warn', failed: 'danger', not_found: 'grey' };
+export const entityLookupTone = (status: string) => ENTITY_LOOKUP_PILL_TONE[status] ?? 'grey';
+export const entityLookupLabel = (status: string | null | undefined) => {
+  if (!status) return 'Not looked up';
+  if (status === 'not_found') return 'No match';
+  if (status === 'ambiguous') return 'Multiple matches';
+  if (status === 'success') return 'Resolved';
+  if (status === 'failed') return 'Failed';
+  return status;
+};
+
 // A closed sale is the only point at which "seller" and "buyer" are true:
 // the MLS-named owner sold to whoever the CAD now shows as current owner. On
 // any other status (active, pending, expired, withdrawn...) the property
@@ -148,15 +162,30 @@ export default function MlsLeadsView() {
   const [county, setCounty] = useState('');
   const [minUnits, setMinUnits] = useState('');
   const [ownerKind, setOwnerKind] = useState('');
+  const [entityLookup, setEntityLookup] = useState('');
   const [showHidden, setShowHidden] = useState(false);
 
   const [selected, setSelected] = useState<MlsLead | null>(null);
 
+  // Bulk business lookup — see runBulkLookup below. bulkStopRef (not state)
+  // carries the stop signal into the in-flight loop, which closes over it
+  // across awaits rather than re-reading React state.
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [bulkSummary, setBulkSummary] = useState<{ succeeded: number; failed: number; notFound: number } | null>(null);
+  const [bulkError, setBulkError] = useState('');
+  const bulkStopRef = useRef(false);
+
+  const filterParams = useCallback(() => {
+    const params: Record<string, string> = {};
+    Object.entries({ search, status, county, minUnits, ownerKind, entityLookup }).forEach(([k, v]) => { if (v) params[k] = v; });
+    if (showHidden) params.showHidden = 'true';
+    return params;
+  }, [search, status, county, minUnits, ownerKind, entityLookup, showHidden]);
+
   const load = useCallback(async () => {
     setLoading(true); setError('');
-    const params = new URLSearchParams({ page: String(page), pageSize: '25' });
-    Object.entries({ search, status, county, minUnits, ownerKind }).forEach(([k, v]) => v && params.set(k, v));
-    if (showHidden) params.set('showHidden', 'true');
+    const params = new URLSearchParams({ page: String(page), pageSize: '25', ...filterParams() });
     try {
       const data = await request(`/?${params}`);
       setItems(data.items);
@@ -167,7 +196,7 @@ export default function MlsLeadsView() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, status, county, minUnits, ownerKind, showHidden]);
+  }, [page, filterParams]);
   useEffect(() => { const timer = setTimeout(load, 250); return () => clearTimeout(timer); }, [load]);
 
   const open = async (id: string) => {
@@ -207,6 +236,55 @@ export default function MlsLeadsView() {
     await load();
   };
 
+  // Calls POST /entity-lookup/bulk repeatedly (each call covers at most 25
+  // distinct company names — see mlsLeads.js) until `remaining` hits 0,
+  // scoped to whatever the filter bar is currently showing. Filters are
+  // snapshotted once at the start rather than re-read each loop iteration,
+  // so a filter change mid-run doesn't shift the target out from under an
+  // in-progress run. `total` is derived from the first response
+  // (processed + remaining) since the endpoint itself only reports
+  // per-call progress.
+  const runBulkLookup = async () => {
+    setBulkRunning(true);
+    setBulkSummary(null);
+    setBulkError('');
+    setBulkProgress(null);
+    bulkStopRef.current = false;
+
+    const body = filterParams();
+    let done = 0;
+    let total: number | null = null;
+    let succeeded = 0, failed = 0, notFound = 0;
+
+    try {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        if (bulkStopRef.current) break;
+        const data = await request('/entity-lookup/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        done += data.processed || 0;
+        succeeded += data.succeeded || 0;
+        failed += data.failed || 0;
+        notFound += data.notFound || 0;
+        if (total === null) total = done + (data.remaining || 0);
+        setBulkProgress({ done, total: total ?? done });
+        if (!data.processed || !data.remaining) break;
+      }
+      setBulkSummary({ succeeded, failed, notFound });
+      await load();
+    } catch (e) {
+      setBulkError(e instanceof Error ? e.message : 'Bulk lookup failed');
+    } finally {
+      setBulkRunning(false);
+      setBulkProgress(null);
+    }
+  };
+
+  const stopBulkLookup = () => { bulkStopRef.current = true; };
+
   return <div className="min-h-full p-6 md:p-8 text-sm">
     <div className="flex flex-wrap items-end justify-between gap-4 mb-5">
       <div>
@@ -236,7 +314,36 @@ export default function MlsLeadsView() {
       </div>
     )}
 
-    <div className="rounded border bg-card grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.7fr_repeat(3,1fr)_auto] gap-[11px] p-4 mb-[18px] items-end">
+    <div className="mb-[18px] flex flex-wrap items-center gap-3 rounded border bg-card p-3.5">
+      <button
+        className="inline-flex items-center gap-2 rounded border bg-card px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
+        disabled={bulkRunning}
+        onClick={runBulkLookup}
+        title="Look up every business owner currently in view against the Texas Comptroller"
+      >
+        {bulkRunning ? <Loader2 className="h-4 w-4 animate-spin"/> : <Building2 className="h-4 w-4"/>}
+        Look up all businesses
+      </button>
+      {bulkRunning && (
+        <>
+          <span className="text-xs text-muted-foreground">
+            {bulkProgress ? <>Looked up <span className="record">{bulkProgress.done}</span> of <span className="record">{bulkProgress.total}</span> companies…</> : 'Starting…'}
+          </span>
+          <button className="text-xs text-muted-foreground underline" onClick={stopBulkLookup}>Stop</button>
+        </>
+      )}
+      {!bulkRunning && bulkSummary && (
+        <span className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="record">{bulkSummary.succeeded}</span> resolved,{' '}
+          <span className="record">{bulkSummary.notFound}</span> no match,{' '}
+          <span className="record">{bulkSummary.failed}</span> failed.
+          <button className="underline" onClick={() => setBulkSummary(null)}>Dismiss</button>
+        </span>
+      )}
+      {bulkError && <span className="text-xs text-destructive">{bulkError}</span>}
+    </div>
+
+    <div className="rounded border bg-card grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.7fr_repeat(4,1fr)_auto] gap-[11px] p-4 mb-[18px] items-end">
       <label className="grid gap-1.5">
         <span className="label">SEARCH</span>
         <span className="relative">
@@ -269,6 +376,21 @@ export default function MlsLeadsView() {
           <option value="unclassified">No owner captured</option>
         </select>
       </label>
+      <label className="grid gap-1.5">
+        <span className="label">LOOKUP STATUS</span>
+        <select
+          className="h-10 w-full rounded border bg-card px-3 text-sm"
+          value={entityLookup}
+          onChange={(e) => { setEntityLookup(e.target.value); setPage(1); }}
+        >
+          <option value="">Any lookup status</option>
+          <option value="pending">Not looked up yet</option>
+          <option value="success">Resolved</option>
+          <option value="ambiguous">Multiple matches</option>
+          <option value="not_found">No match</option>
+          <option value="failed">Failed</option>
+        </select>
+      </label>
       <label className="flex h-10 items-center gap-2 whitespace-nowrap">
         <input type="checkbox" checked={showHidden} onChange={(e) => { setShowHidden(e.target.checked); setPage(1); }}/>
         <span className="label">SHOW HIDDEN</span>
@@ -298,12 +420,17 @@ export default function MlsLeadsView() {
                 <td>{item.county || '—'}</td>
                 <td className="min-w-[200px]">
                   {owner ? (
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex flex-wrap items-center gap-1.5">
                       <span>{owner.name}</span>
                       <span className={pillClass('grey')}>
                         {owner.nameKind === 'entity' ? <Building2 className="h-3 w-3"/> : <User className="h-3 w-3"/>}
                         {owner.nameKind === 'entity' ? 'Entity' : 'Person'}
                       </span>
+                      {owner.nameKind === 'entity' && (
+                        <span className={pillClass(entityLookupTone(owner.entityLookupStatus || ''))}>
+                          {entityLookupLabel(owner.entityLookupStatus)}
+                        </span>
+                      )}
                     </span>
                   ) : <span className="text-muted-foreground">{item.mlsOwnerRaw || '—'}</span>}
                 </td>
