@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
-import { Building2, ChevronLeft, ChevronRight, Loader2, Search, Upload, User } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, Loader2, PhoneCall, Search, Upload, User } from 'lucide-react';
+import { normalizeContacts } from '@/lib/contactsModel';
 import MlsLeadDetails from './MlsLeadDetails';
+import SkipTraceQueue from './SkipTraceQueue';
 
 export type MlsContactOfficer = { name: string; title: string; address: string };
 
@@ -138,6 +140,21 @@ export const entityLookupLabel = (status: string | null | undefined) => {
   return status;
 };
 
+// nameKinds with no one to look up — see mlsOwner.js's classifyOwner and
+// functions/src/lib/skipTrace.js's own copy of this same exclusion, kept in
+// sync by hand across the CJS/ESM boundary.
+const UNSKIP_TRACEABLE_KINDS = new Set(['junk', 'addressLike', 'blank']);
+export const isSkipTraceable = (nameKind: string) => !UNSKIP_TRACEABLE_KINDS.has(nameKind);
+
+// A contact is "traced" once its normalised contacts blob carries a phone
+// number or an email — the same predicate the skip-trace queue itself uses
+// (see GET /skip-trace-queue's needsTracing), just inverted and read
+// straight off the already-loaded row rather than fetched separately.
+export const isTraced = (contact: Pick<MlsContact, 'contacts'>) => {
+  const c = normalizeContacts(contact.contacts);
+  return c.phoneRows.some((row) => row.phones.length > 0) || c.emailRows.some((row) => row.emails.length > 0);
+};
+
 // A closed sale is the only point at which "seller" and "buyer" are true:
 // the MLS-named owner sold to whoever the CAD now shows as current owner. On
 // any other status (active, pending, expired, withdrawn...) the property
@@ -163,9 +180,11 @@ export default function MlsLeadsView() {
   const [minUnits, setMinUnits] = useState('');
   const [ownerKind, setOwnerKind] = useState('');
   const [entityLookup, setEntityLookup] = useState('');
+  const [skipTrace, setSkipTrace] = useState('');
   const [showHidden, setShowHidden] = useState(false);
 
   const [selected, setSelected] = useState<MlsLead | null>(null);
+  const [skipTraceQueueOpen, setSkipTraceQueueOpen] = useState(false);
 
   // Bulk business lookup — see runBulkLookup below. bulkStopRef (not state)
   // carries the stop signal into the in-flight loop, which closes over it
@@ -178,10 +197,10 @@ export default function MlsLeadsView() {
 
   const filterParams = useCallback(() => {
     const params: Record<string, string> = {};
-    Object.entries({ search, status, county, minUnits, ownerKind, entityLookup }).forEach(([k, v]) => { if (v) params[k] = v; });
+    Object.entries({ search, status, county, minUnits, ownerKind, entityLookup, skipTrace }).forEach(([k, v]) => { if (v) params[k] = v; });
     if (showHidden) params.showHidden = 'true';
     return params;
-  }, [search, status, county, minUnits, ownerKind, entityLookup, showHidden]);
+  }, [search, status, county, minUnits, ownerKind, entityLookup, skipTrace, showHidden]);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -324,6 +343,14 @@ export default function MlsLeadsView() {
         {bulkRunning ? <Loader2 className="h-4 w-4 animate-spin"/> : <Building2 className="h-4 w-4"/>}
         Look up all businesses
       </button>
+      <button
+        className="inline-flex items-center gap-2 rounded border bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
+        onClick={() => setSkipTraceQueueOpen(true)}
+        title="Work through owners with no phone or email on file yet, one TruePeopleSearch paste at a time"
+      >
+        <PhoneCall className="h-4 w-4"/>
+        Skip-trace owners
+      </button>
       {bulkRunning && (
         <>
           <span className="text-xs text-muted-foreground">
@@ -343,7 +370,7 @@ export default function MlsLeadsView() {
       {bulkError && <span className="text-xs text-destructive">{bulkError}</span>}
     </div>
 
-    <div className="rounded border bg-card grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.7fr_repeat(4,1fr)_auto] gap-[11px] p-4 mb-[18px] items-end">
+    <div className="rounded border bg-card grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.7fr_repeat(6,1fr)_auto] gap-[11px] p-4 mb-[18px] items-end">
       <label className="grid gap-1.5">
         <span className="label">SEARCH</span>
         <span className="relative">
@@ -391,6 +418,18 @@ export default function MlsLeadsView() {
           <option value="failed">Failed</option>
         </select>
       </label>
+      <label className="grid gap-1.5">
+        <span className="label">TRACE STATUS</span>
+        <select
+          className="h-10 w-full rounded border bg-card px-3 text-sm"
+          value={skipTrace}
+          onChange={(e) => { setSkipTrace(e.target.value); setPage(1); }}
+        >
+          <option value="">Any trace status</option>
+          <option value="pending">Not traced yet</option>
+          <option value="traced">Traced</option>
+        </select>
+      </label>
       <label className="flex h-10 items-center gap-2 whitespace-nowrap">
         <input type="checkbox" checked={showHidden} onChange={(e) => { setShowHidden(e.target.checked); setPage(1); }}/>
         <span className="label">SHOW HIDDEN</span>
@@ -431,6 +470,11 @@ export default function MlsLeadsView() {
                           {entityLookupLabel(owner.entityLookupStatus)}
                         </span>
                       )}
+                      {isSkipTraceable(owner.nameKind) && (
+                        <span className={pillClass(isTraced(owner) ? 'success' : 'grey')}>
+                          {isTraced(owner) ? 'Traced' : 'Not traced'}
+                        </span>
+                      )}
                     </span>
                   ) : <span className="text-muted-foreground">{item.mlsOwnerRaw || '—'}</span>}
                 </td>
@@ -454,5 +498,10 @@ export default function MlsLeadsView() {
     </div>
 
     <MlsLeadDetails lead={selected} onClose={() => setSelected(null)} onSaveNotes={saveNotes}/>
+    <SkipTraceQueue
+      open={skipTraceQueueOpen}
+      onClose={() => { setSkipTraceQueueOpen(false); load(); }}
+      filterParams={filterParams}
+    />
   </div>;
 }

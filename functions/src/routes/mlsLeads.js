@@ -18,6 +18,15 @@ const {
   pickSharedEntityFields,
   findSuccessfulSibling,
 } = require('../lib/entityShare');
+const {
+  isSearchable,
+  needsTracing,
+  selectTracingCandidates,
+  diffNewFacts,
+  hasNewFacts,
+  applyFactsToContacts,
+  UNSEARCHABLE_KINDS,
+} = require('../lib/skipTrace');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -313,6 +322,35 @@ function buildLeadWhere(userId, query) {
   return where;
 }
 
+// Resolves the `skipTrace` filter ('traced' | 'pending') into a lead-id
+// allowlist merged onto an already-built `where` — mirroring the
+// entityLookup filter's own mls_owner-scoped, searchable-kind-scoped
+// semantics (see buildLeadWhere above), but computed in application code
+// rather than a DB-level JSON query: "no phones and no emails" is a
+// normalizeContacts judgment call (see skipTrace.js — a legacy bare-string
+// row, a present-but-empty phones array) that a raw column comparison can't
+// reliably reproduce. One user's mls_owner roster is bounded by their own
+// lead count, so this costs one extra lightweight query, not a full-table
+// scan — and it only runs when the filter is actually set.
+async function applySkipTraceFilter(userId, where, rawValue) {
+  const value = rawValue ? String(rawValue) : '';
+  if (value !== 'traced' && value !== 'pending') return;
+
+  const owners = await prisma.mlsContact.findMany({
+    where: { role: 'mls_owner', lead: { userId } },
+    select: { mlsLeadId: true, nameKind: true, contacts: true },
+  });
+
+  const ids = [];
+  for (const owner of owners) {
+    if (!isSearchable(owner)) continue;
+    const pending = needsTracing(owner);
+    if ((value === 'pending') === pending) ids.push(owner.mlsLeadId);
+  }
+
+  where.id = { in: ids };
+}
+
 // Columns needed to drive the entity-result-sharing logic below: enough of
 // each contact's identity (id, mlsLeadId, name, entityLookupStatus) to
 // group and dedupe with, plus every field entityShare.js's
@@ -366,10 +404,29 @@ async function findEntitySiblings(userId, contact) {
   return all.filter((c) => normalizeEntityNameForMatch(c.name) === normalizedName);
 }
 
+// Every other MlsContact this user has — any role, not just mls_owner —
+// whose name normalises the same as `contact` and shares its nameKind, used
+// to propagate a freshly-extracted phone/email fact to every other listing
+// this same person is attached to. Mirrors findEntitySiblings above, but
+// keyed on the contact's own nameKind rather than hard-coded to 'entity', so
+// a person's name is only ever matched against other person contacts (not
+// an unrelated company that happens to normalise the same).
+async function findTracingSiblings(userId, contact) {
+  if (!isSearchable(contact)) return [];
+  const normalizedName = normalizeEntityNameForMatch(contact.name);
+  if (!normalizedName) return [];
+  const all = await prisma.mlsContact.findMany({
+    where: { nameKind: contact.nameKind, lead: { userId }, id: { not: contact.id } },
+    select: { id: true, mlsLeadId: true, name: true, nameKind: true, contacts: true },
+  });
+  return all.filter((c) => normalizeEntityNameForMatch(c.name) === normalizedName);
+}
+
 router.get('/', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize) || 25));
   const where = buildLeadWhere(req.user.id, req.query);
+  await applySkipTraceFilter(req.user.id, where, req.query.skipTrace);
 
   const [total, items] = await Promise.all([
     prisma.mlsLead.count({ where }),
@@ -383,6 +440,56 @@ router.get('/', async (req, res) => {
   ]);
 
   res.json({ items, total, page, pageSize, pages: Math.ceil(total / pageSize) });
+});
+
+// Skip-trace queue: the distinct people (nameKind excludes junk/addressLike/
+// blank the same way the entity flow does — see skipTrace.js) who still
+// need a TruePeopleSearch pass, grouped one entry per normalised name (via
+// entityShare.js's groupContactsByNormalizedName — reused as-is, see
+// skipTrace.js's header) so a person who owns several listings is one queue
+// entry, not several. Scoped by req.user.id and the same filters the list
+// route takes (see buildLeadWhere), so the queue only covers what's
+// currently in view. Registered ahead of GET /:id so "skip-trace-queue"
+// isn't swallowed as an :id.
+router.get('/skip-trace-queue', async (req, res) => {
+  const userId = req.user.id;
+  const leadWhere = buildLeadWhere(userId, req.query);
+
+  const contacts = await prisma.mlsContact.findMany({
+    where: { nameKind: { notIn: UNSEARCHABLE_KINDS }, lead: leadWhere },
+    select: {
+      id: true,
+      mlsLeadId: true,
+      name: true,
+      searchName: true,
+      nameKind: true,
+      contacts: true,
+      lead: { select: { id: true, address: true, status: true, state: true, zip: true } },
+    },
+  });
+
+  const groups = groupContactsByNormalizedName(selectTracingCandidates(contacts));
+
+  const people = groups.map((group) => {
+    const primary = group.contacts[0];
+    const listingsByLeadId = new Map();
+    for (const contact of group.contacts) {
+      if (!listingsByLeadId.has(contact.mlsLeadId)) {
+        listingsByLeadId.set(contact.mlsLeadId, { id: contact.lead.id, address: contact.lead.address, status: contact.lead.status });
+      }
+    }
+    return {
+      normalizedName: group.normalizedName,
+      name: primary.name,
+      searchName: primary.searchName,
+      nameKind: primary.nameKind,
+      contactIds: group.contacts.map((c) => c.id),
+      listings: Array.from(listingsByLeadId.values()),
+      representativeAddress: { address: primary.lead.address, state: primary.lead.state, zip: primary.lead.zip },
+    };
+  });
+
+  res.json({ people, total: people.length });
 });
 
 router.get('/:id', async (req, res) => {
@@ -530,10 +637,35 @@ router.patch('/contacts/:contactId', async (req, res) => {
     return res.status(400).json({ error: 'contacts is required' });
   }
 
+  // Computed against the pre-update row, before it's overwritten below —
+  // the phone numbers/emails this save adds that weren't already on this
+  // contact. A note or disposition added to an already-known number
+  // produces no new facts (see skipTrace.js's diffNewFacts), so editing one
+  // never triggers a share.
+  const facts = diffNewFacts(contact.contacts, req.body.contacts);
+
   const updated = await prisma.mlsContact.update({
     where: { id: contact.id },
     data: { contacts: req.body.contacts },
   });
+
+  // A freshly-extracted phone number or email is a fact about the person,
+  // true on every listing they're attached to — not just this one. Applied
+  // to every sibling's own blob (see applyFactsToContacts), which only ever
+  // appends a new row: each sibling's existing rows, notes, dispositions,
+  // and attempt counts are left exactly as they were. Mirrors how a
+  // Comptroller result shares to every listing under the same company — see
+  // the entity-lookup routes above.
+  if (hasNewFacts(facts)) {
+    const siblings = await findTracingSiblings(req.user.id, contact);
+    for (const sibling of siblings) {
+      const merged = applyFactsToContacts(sibling.contacts, facts, sibling.name);
+      if (merged.changed) {
+        await prisma.mlsContact.update({ where: { id: sibling.id }, data: { contacts: merged.contacts } });
+      }
+    }
+  }
+
   res.json(updated);
 });
 
