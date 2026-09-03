@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { extractContacts } from '@/lib/contactParser';
 import {
@@ -44,6 +44,15 @@ export type ContactWorkspaceProps = {
    * workspace has no such container and leaves this unset.
    */
   compact?: boolean;
+  /**
+   * Focuses the paste textarea as soon as this instance mounts, so a paste
+   * needs no click first. Used by the skip-trace queue (see
+   * SkipTraceQueue.tsx), which remounts this component with a fresh `key`
+   * for every person — the mount-time effect that does the focusing fires
+   * again on every one of those remounts. Left unset (the default) by every
+   * other caller so their own focus/scroll position is undisturbed.
+   */
+  autoFocus?: boolean;
 };
 
 /**
@@ -73,8 +82,20 @@ export function ContactWorkspace({
   onCallError,
   saving = false,
   compact = false,
+  autoFocus = false,
 }: ContactWorkspaceProps) {
   const [rawText, setRawText] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Runs once per mount, not on every render — a caller that remounts this
+  // component per-record (this component's own `key` convention, see the
+  // file header) gets a fresh focus on every record change for free; a
+  // caller that keeps the same instance across records won't have this
+  // effect re-fire and steal focus back after the user has moved on.
+  useEffect(() => {
+    if (autoFocus) textareaRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Seeded once, at mount, from the incoming contacts.emailRows — not
   // re-derived on every prop change, or in-progress name/address edits
@@ -135,6 +156,7 @@ export function ContactWorkspace({
       <section className="rounded border bg-card p-3.5 space-y-3">
         <h3 className="text-base font-semibold">TruePeopleSearch Contact Extractor</h3>
         <textarea
+          ref={textareaRef}
           className="min-h-[120px] w-full resize-y rounded border bg-card px-3 py-2 font-mono text-xs"
           placeholder="Paste all text from TruePeopleSearch; name, phones, and emails will be extracted."
           value={rawText}
