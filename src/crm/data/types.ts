@@ -27,6 +27,7 @@ export type Source =
   | 'Cold Outreach'
   | 'Event'
   | 'Database'
+  | 'Business Card'
 export const SOURCES: Source[] = [
   'Referral',
   'Past Client',
@@ -36,6 +37,7 @@ export const SOURCES: Source[] = [
   'Cold Outreach',
   'Event',
   'Database',
+  'Business Card',
 ]
 
 export type WebsiteStatus = 'Immediate' | 'This Week' | 'This Month' | 'Nurture'
@@ -58,6 +60,37 @@ export const CONNECTION_RATINGS: ConnectionRating[] = [
   'great',
   'workable',
   'low-effort',
+]
+
+export type RelationshipType =
+  | ''
+  | 'Property Owner'
+  | 'Investor'
+  | 'Broker'
+  | 'Real Estate Agent'
+  | 'Lender'
+  | 'Property Manager'
+  | 'Developer'
+  | 'Contractor'
+  | 'Vendor'
+  | 'Attorney'
+  | 'CPA'
+  | 'Other'
+
+export const RELATIONSHIP_TYPES: RelationshipType[] = [
+  '',
+  'Property Owner',
+  'Investor',
+  'Broker',
+  'Real Estate Agent',
+  'Lender',
+  'Property Manager',
+  'Developer',
+  'Contractor',
+  'Vendor',
+  'Attorney',
+  'CPA',
+  'Other',
 ]
 
 export type PipelineStage =
@@ -123,6 +156,13 @@ export type Lead = {
   email: string
   industry: Industry
   city: string
+  secondaryPhone: string
+  website: string
+  streetAddress: string
+  state: string
+  zip: string
+  linkedIn: string
+  relationshipType: RelationshipType
   asset: string
   specialization: string
   metPersonally: string
