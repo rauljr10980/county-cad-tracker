@@ -22,7 +22,6 @@ export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const workerRef = useRef<Worker | null>(null)
-  const stoppedRef = useRef(false)
   const [state, setState] = useState<ScanState>('loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [showHint, setShowHint] = useState(false)
@@ -30,7 +29,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
   useEffect(() => {
     if (!open) return
 
-    stoppedRef.current = false
+    let cancelled = false
     setState('loading')
     setErrorMessage('')
     setShowHint(false)
@@ -39,7 +38,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
     let pollTimer: ReturnType<typeof setTimeout> | undefined
 
     const stopEverything = () => {
-      stoppedRef.current = true
+      cancelled = true
       if (hintTimer) clearTimeout(hintTimer)
       if (pollTimer) clearTimeout(pollTimer)
       streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -64,11 +63,11 @@ export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
     }
 
     const poll = async () => {
-      if (stoppedRef.current || !workerRef.current) return
+      if (cancelled || !workerRef.current) return
       const canvas = captureFrame(DETECTION_CANVAS_WIDTH)
       if (canvas) {
         const text = await recognizeCanvas(workerRef.current, canvas)
-        if (stoppedRef.current) return
+        if (cancelled) return
         if (hasContactSignal(text)) {
           setState('detected')
           const confirmCanvas = captureFrame(CONFIRMATION_CANVAS_WIDTH)
@@ -76,13 +75,13 @@ export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
             confirmCanvas && workerRef.current
               ? await recognizeCanvas(workerRef.current, confirmCanvas)
               : text
-          if (stoppedRef.current) return
+          if (cancelled) return
           stopEverything()
           onDetected(confirmedText)
           return
         }
       }
-      if (!stoppedRef.current) {
+      if (!cancelled) {
         pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
       }
     }
@@ -92,7 +91,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment' },
         })
-        if (stoppedRef.current) {
+        if (cancelled) {
           stream.getTracks().forEach((track) => track.stop())
           return
         }
@@ -103,7 +102,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
         }
 
         const worker = await createScannerWorker()
-        if (stoppedRef.current) {
+        if (cancelled) {
           void destroyScannerWorker(worker)
           return
         }
@@ -113,7 +112,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
         hintTimer = setTimeout(() => setShowHint(true), HINT_AFTER_MS)
         pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
       } catch (err) {
-        if (stoppedRef.current) return
+        if (cancelled) return
         setState('error')
         setErrorMessage(
           err instanceof DOMException && err.name === 'NotAllowedError'
