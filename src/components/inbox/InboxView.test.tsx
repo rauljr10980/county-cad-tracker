@@ -82,6 +82,7 @@ const makeSubmission = (overrides: Partial<PublicSubmission> = {}): PublicSubmis
   phone: '210-555-0100',
   propertyAddress: '123 Main St',
   message: 'My tenant stopped paying rent three months ago and I need this handled.',
+  situation: overrides.situation ?? '',
   status: 'new',
   notes: '',
   userAgent: '',
@@ -237,5 +238,22 @@ describe('InboxView rows', () => {
     await waitFor(() => expect(screen.getByText('Jane Doe')).toBeTruthy());
     expect(screen.getByRole('link', { name: item.phone }).getAttribute('href')).toBe(`tel:${item.phone}`);
     expect(screen.getByRole('link', { name: item.email }).getAttribute('href')).toBe(`mailto:${item.email}`);
+  });
+
+  it('shows the Situation row in the detail dialog only when one was submitted', async () => {
+    const withSituation = makeSubmission({ id: 'with-situation', name: 'Has Situation', situation: 'I need to sell a property' });
+    vi.stubGlobal('fetch', mockFetchRouter({
+      statusTotals: { new: 1, contacted: 0, converted: 0, spam: 0 },
+      bulkItems: [withSituation],
+      mainList: () => [withSituation],
+    }));
+
+    render(<InboxView />);
+
+    await waitFor(() => expect(screen.getByText('Has Situation')).toBeTruthy());
+    fireEvent.click(screen.getByText('Has Situation'));
+
+    await waitFor(() => expect(screen.getByText('I need to sell a property')).toBeTruthy());
+    expect(screen.queryByText('SITUATION')).toBeTruthy();
   });
 });
