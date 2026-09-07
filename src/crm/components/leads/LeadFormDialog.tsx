@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LeadForm } from '@/crm/components/leads/LeadForm'
+import { LeadForm, type FormValues } from '@/crm/components/leads/LeadForm'
 import {
   Select,
   SelectContent,
@@ -81,10 +81,13 @@ type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   defaultKind?: LeadKind
+  initialValues?: Partial<FormValues>
+  editLeadId?: string
 }
 
-export function LeadFormDialog({ open, onOpenChange, defaultKind = 'industry' }: Props) {
+export function LeadFormDialog({ open, onOpenChange, defaultKind = 'industry', initialValues, editLeadId }: Props) {
   const addLead = useCrmStore((state) => state.addLead)
+  const updateLead = useCrmStore((state) => state.updateLead)
   const createOpportunity = useCrmStore((state) => state.createOpportunity)
   const addActivity = useCrmStore((state) => state.addActivity)
   const defaultOutreach = useCrmStore(
@@ -104,35 +107,40 @@ export function LeadFormDialog({ open, onOpenChange, defaultKind = 'industry' }:
   }, [open, defaultKind, defaultOutreach])
 
   const kind = kindForDestination(destination)
+  const isEditing = Boolean(editLeadId)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{titleFor(destination)}</DialogTitle>
-          <DialogDescription>{descriptionFor(destination)}</DialogDescription>
+          <DialogTitle>{isEditing ? 'Update Contact' : titleFor(destination)}</DialogTitle>
+          <DialogDescription>
+            {isEditing ? 'Review and correct the scanned details before saving.' : descriptionFor(destination)}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="lead-destination">Where to put this contact?</Label>
-          <Select
-            value={destination}
-            onValueChange={(value) => setDestination(value as Destination)}
-          >
-            <SelectTrigger id="lead-destination">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DESTINATIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {isEditing ? null : (
+          <div className="space-y-1.5">
+            <Label htmlFor="lead-destination">Where to put this contact?</Label>
+            <Select
+              value={destination}
+              onValueChange={(value) => setDestination(value as Destination)}
+            >
+              <SelectTrigger id="lead-destination">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DESTINATIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-        {destination === 'opportunity' ? (
+        {!isEditing && destination === 'opportunity' ? (
           <div className="space-y-1.5">
             <Label htmlFor="opportunity-outreach">First outreach message</Label>
             <textarea
@@ -149,9 +157,16 @@ export function LeadFormDialog({ open, onOpenChange, defaultKind = 'industry' }:
         ) : null}
 
         <LeadForm
-          key={kind}
+          key={editLeadId ?? kind}
           defaultKind={kind}
+          initial={initialValues}
           onSubmit={(values) => {
+            if (editLeadId) {
+              updateLead(editLeadId, values)
+              show('Contact updated')
+              onOpenChange(false)
+              return
+            }
             const lead = addLead(values)
             if (destination === 'opportunity') {
               createOpportunity(lead.id)
@@ -164,7 +179,7 @@ export function LeadFormDialog({ open, onOpenChange, defaultKind = 'industry' }:
             onOpenChange(false)
           }}
           onCancel={() => onOpenChange(false)}
-          submitLabel={submitLabelFor(destination)}
+          submitLabel={isEditing ? 'Save Changes' : submitLabelFor(destination)}
         />
       </DialogContent>
     </Dialog>

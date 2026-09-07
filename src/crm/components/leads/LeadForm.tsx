@@ -12,11 +12,13 @@ import {
 import {
   AGE_RANGES,
   LEAD_KINDS,
+  RELATIONSHIP_TYPES,
   WEBSITE_STATUSES,
   type AgeRange,
   type ConnectionRating,
   type Lead,
   type LeadKind,
+  type RelationshipType,
   type WebsiteStatus,
 } from '@/crm/data/types'
 import {
@@ -27,7 +29,7 @@ import {
 } from '@/crm/lib/connectionRating'
 import { cn } from '@/crm/lib/utils'
 
-type FormValues = Omit<Lead, 'id' | 'createdAt' | 'lastContactedAt'>
+export type FormValues = Omit<Lead, 'id' | 'createdAt' | 'lastContactedAt'>
 
 type LeadFormProps = {
   initial?: Partial<FormValues>
@@ -70,6 +72,13 @@ export function LeadForm({
     kind: initial?.kind ?? defaultKind ?? 'industry',
     ageRange: initial?.ageRange,
     letterCadenceDays: initial?.letterCadenceDays,
+    secondaryPhone: initial?.secondaryPhone ?? '',
+    website: initial?.website ?? '',
+    streetAddress: initial?.streetAddress ?? '',
+    state: initial?.state ?? '',
+    zip: initial?.zip ?? '',
+    linkedIn: initial?.linkedIn ?? '',
+    relationshipType: initial?.relationshipType ?? '',
   })
 
   const updateField = <Key extends keyof FormValues>(key: Key, value: FormValues[Key]) =>
@@ -98,6 +107,13 @@ export function LeadForm({
             jobTitleIndustry: '',
             asset: '',
             specialization: '',
+            secondaryPhone: '',
+            website: '',
+            streetAddress: '',
+            state: '',
+            zip: '',
+            linkedIn: '',
+            relationshipType: '',
             lastConversationNotes: values.lastConversationNotes.trim(),
             notes: values.notes.trim(),
           })
@@ -265,6 +281,70 @@ export function LeadForm({
             value={values.phone}
             onChange={(event) => updateField('phone', event.target.value)}
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="secondary-phone">Secondary Phone</Label>
+          <Input
+            id="secondary-phone"
+            value={values.secondaryPhone}
+            onChange={(event) => updateField('secondaryPhone', event.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="website">Website</Label>
+          <Input
+            id="website"
+            value={values.website}
+            onChange={(event) => updateField('website', event.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="street-address">Street Address</Label>
+          <Input
+            id="street-address"
+            value={values.streetAddress}
+            onChange={(event) => updateField('streetAddress', event.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="state">State</Label>
+          <Input
+            id="state"
+            value={values.state}
+            onChange={(event) => updateField('state', event.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="zip">ZIP</Label>
+          <Input
+            id="zip"
+            value={values.zip}
+            onChange={(event) => updateField('zip', event.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="linkedin">LinkedIn</Label>
+          <Input
+            id="linkedin"
+            value={values.linkedIn}
+            onChange={(event) => updateField('linkedIn', event.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="relationship-type">Relationship Type</Label>
+          <Select
+            value={values.relationshipType}
+            onValueChange={(value) => updateField('relationshipType', value as RelationshipType)}
+          >
+            <SelectTrigger id="relationship-type">
+              <SelectValue placeholder="Not set" />
+            </SelectTrigger>
+            <SelectContent>
+              {RELATIONSHIP_TYPES.filter((option) => option !== '').map((option) => (
+                <SelectItem key={option} value={option}>{option}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="asset">Asset</Label>
