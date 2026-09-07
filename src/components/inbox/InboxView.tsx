@@ -321,9 +321,9 @@ function EmptyState({ kind, activeFilterLabels, onClearFilters }: {
         <InboxIcon className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
         <p className="mt-3 font-medium text-foreground">No submissions yet</p>
         <p className="mx-auto mt-1.5 max-w-md text-muted-foreground">
-          The inbox fills automatically from every lead-capture form on the marketing site. None
-          of those forms are live on the site yet, so nothing has come in. Submissions will show
-          up here as soon as they launch.
+          The inbox fills automatically from every lead-capture form on the marketing site.
+          Nothing has come in yet — submissions will show up here as soon as someone fills out a
+          form on the site.
         </p>
       </div>
     );

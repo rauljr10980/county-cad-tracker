@@ -156,8 +156,9 @@ describe('InboxView empty states', () => {
     render(<InboxView />);
 
     await waitFor(() => expect(screen.getByText('No submissions yet')).toBeTruthy());
-    // The real reason it's empty — no forms are live yet — must be named, not implied.
-    expect(screen.getByText(/none of those forms are live on the site yet/i)).toBeTruthy();
+    // The genuinely-empty state must explain itself without implying the forms
+    // aren't live — this feature makes all of them live from day one.
+    expect(screen.getByText(/submissions will show up here as soon as someone fills out a/i)).toBeTruthy();
     expect(screen.queryByText('No submissions match these filters')).toBeNull();
     expect(screen.queryByText('Clear filters')).toBeNull();
   });
@@ -255,5 +256,22 @@ describe('InboxView rows', () => {
 
     await waitFor(() => expect(screen.getByText('I need to sell a property')).toBeTruthy());
     expect(screen.queryByText('SITUATION')).toBeTruthy();
+  });
+
+  it('hides the Situation row in the detail dialog when none was submitted', async () => {
+    const withoutSituation = makeSubmission({ id: 'no-situation', name: 'No Situation', situation: '' });
+    vi.stubGlobal('fetch', mockFetchRouter({
+      statusTotals: { new: 1, contacted: 0, converted: 0, spam: 0 },
+      bulkItems: [withoutSituation],
+      mainList: () => [withoutSituation],
+    }));
+
+    render(<InboxView />);
+
+    await waitFor(() => expect(screen.getByText('No Situation')).toBeTruthy());
+    fireEvent.click(screen.getByText('No Situation'));
+
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+    expect(screen.queryByText('SITUATION')).toBeNull();
   });
 });
