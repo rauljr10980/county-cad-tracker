@@ -41,6 +41,7 @@ router.post('/submissions',
     body('phone').trim().optional({ checkFalsy: true }).isLength({ max: 40 }).withMessage('Phone number is too long'),
     body('propertyAddress').trim().optional({ checkFalsy: true }).isLength({ max: 300 }).withMessage('Address is too long'),
     body('message').trim().optional({ checkFalsy: true }).isLength({ max: 4000 }).withMessage('Message is too long'),
+    body('situation').trim().optional({ checkFalsy: true }).isLength({ max: 200 }).withMessage('Situation is too long'),
     body('sourcePage').custom((value) => isValidSourcePage(value)).withMessage('Unrecognized source page'),
   ],
   async (req, res) => {
@@ -58,7 +59,7 @@ router.post('/submissions',
       return res.status(400).json({ error: errors.array()[0].msg });
     }
 
-    const { name, email = '', phone = '', propertyAddress = '', message = '', sourcePage } = req.body;
+    const { name, email = '', phone = '', propertyAddress = '', message = '', situation = '', sourcePage } = req.body;
 
     // A submission we cannot reply to is not a lead.
     if (!hasContactMethod({ email, phone })) {
@@ -74,6 +75,7 @@ router.post('/submissions',
           phone: String(phone).trim(),
           propertyAddress: String(propertyAddress).trim(),
           message: String(message).trim(),
+          situation: String(situation).trim(),
           userAgent: String(req.headers['user-agent'] || '').slice(0, 500),
           // Salted hash only — never the raw IP. See functions/src/lib/publicIntake.js.
           ipHash: hashIp(req.ip),

@@ -1203,6 +1203,7 @@ model PublicSubmission {
   phone           String @default("")
   propertyAddress String @default("")
   message         String @default("") @db.Text
+  situation       String    @default("")
 
   status String @default("new") // new | contacted | converted | spam
   notes  String @default("") @db.Text

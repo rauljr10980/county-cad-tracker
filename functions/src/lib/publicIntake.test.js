@@ -10,8 +10,12 @@ import {
 } from './publicIntake.js';
 
 describe('SOURCE_PAGES / isValidSourcePage', () => {
-  it('lists exactly the four known funnel pages', () => {
-    expect(SOURCE_PAGES).toEqual(['sell-property', 'distressed-property', 'inherited-property', 'landlord-help']);
+  it('lists exactly the thirteen known pages', () => {
+    expect(SOURCE_PAGES).toEqual([
+      'sell-property', 'distressed-property', 'inherited-property', 'landlord-help',
+      'financing', 'invest', 'realtor-partners', 'rental-strategy', 'tenant-problem',
+      'homepage', 'contact', 'schedule', 'find-a-solution',
+    ]);
   });
 
   it('accepts each known page', () => {

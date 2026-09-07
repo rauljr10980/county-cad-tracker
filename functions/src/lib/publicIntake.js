@@ -11,12 +11,17 @@
 
 const crypto = require('crypto');
 
-// The four funnel pages on the public marketing site
-// (rauljr10980/estate-essentials-co) that POST here. `sourcePage` is the
-// Inbox's most important signal — someone from distressed-property is a
-// different conversation than someone from landlord-help — so anything
+// The thirteen pages on the public marketing site
+// (rauljr10980/estate-essentials-co) that POST here — 9 solution-specific
+// pages (the page itself is the situation) and 4 generic pages (Home,
+// Contact, Schedule, Find a Solution) that carry their own `situation`
+// picker instead. `sourcePage` is the Inbox's primary signal, so anything
 // outside this list is rejected rather than stored as an arbitrary string.
-const SOURCE_PAGES = ['sell-property', 'distressed-property', 'inherited-property', 'landlord-help'];
+const SOURCE_PAGES = [
+  'sell-property', 'distressed-property', 'inherited-property', 'landlord-help',
+  'financing', 'invest', 'realtor-partners', 'rental-strategy', 'tenant-problem',
+  'homepage', 'contact', 'schedule', 'find-a-solution',
+];
 
 const isValidSourcePage = (sourcePage) => SOURCE_PAGES.includes(String(sourcePage ?? ''));
 
