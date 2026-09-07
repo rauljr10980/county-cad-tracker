@@ -186,10 +186,21 @@ rules:
 7. **Street address** — a line starting with a number followed by a word
    (`123 Main St`), not already consumed by rule 6's split, claimed into
    `streetAddress`.
-8. **Company** — a line containing a legal-entity suffix (reusing the
-   `ENTITY` regex from `functions/src/lib/mlsOwner.js`, exported for this
-   purpose rather than hand-copied — same reuse decision as the original
-   design).
+8. **Company** — a line containing a legal-entity suffix. The original
+   design reused this pattern by exporting it from
+   `functions/src/lib/mlsOwner.js`, which worked because that design's
+   parser also lived in the backend (same Node/CommonJS runtime, a plain
+   `require()` away). That no longer applies: this parser lives entirely
+   in the frontend (Vite/ESM), which cannot `require()` a backend
+   CommonJS file across the frontend/backend build boundary. The pattern
+   is hand-copied instead, with a comment pointing at
+   `functions/src/lib/mlsOwner.js`'s `ENTITY` constant as the source of
+   truth to keep the two in sync by hand — the same cross-repo-duplication
+   approach already used elsewhere in this codebase (e.g. the public
+   site's `SOURCE_PAGES` list, mirrored by hand across two entirely
+   separate repositories with a "kept in sync by hand" comment on both
+   sides) for exactly this situation: two runtimes that cannot share code
+   directly.
 9. **Job title** — a line containing a role word (Manager, Director,
    President, Partner, Owner, CEO, CFO, COO, Founder, Agent, Broker, VP,
    Vice President, Associate, Principal).
