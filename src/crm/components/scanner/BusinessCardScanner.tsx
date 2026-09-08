@@ -3,11 +3,12 @@ import type { Worker } from 'tesseract.js'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { hasContactSignal } from '@/crm/lib/businessCardText'
+import { scanIdentity } from '@/crm/lib/scanReadiness'
 import { createScannerWorker, destroyScannerWorker, recognizeCanvas } from '@/crm/lib/tesseractWorker'
 
 const POLL_INTERVAL_MS = 600
 const DETECTION_CANVAS_WIDTH = 480
-const CONFIRMATION_CANVAS_WIDTH = 1280
+const CONFIRMATION_CANVAS_WIDTH = 1920
 const HINT_AFTER_MS = 20000
 
 type ScanState = 'loading' | 'scanning' | 'detected' | 'error'
@@ -31,6 +32,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel, onManualEntry 
     if (!open) return
 
     let cancelled = false
+    let previousIdentity: string | null = null
     setState('loading')
     setErrorMessage('')
     setShowHint(false)
@@ -53,6 +55,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel, onManualEntry 
     const captureFrame = (width: number): HTMLCanvasElement | null => {
       const video = videoRef.current
       if (!video || video.videoWidth === 0) return null
+      width = Math.min(width, video.videoWidth)
       const scale = width / video.videoWidth
       const canvas = document.createElement('canvas')
       canvas.width = width
@@ -78,23 +81,29 @@ export function BusinessCardScanner({ open, onDetected, onCancel, onManualEntry 
                 ? await recognizeCanvas(workerRef.current, confirmCanvas)
                 : text
             if (cancelled) return
-            if (!hasContactSignal(confirmedText)) {
-              // Confirmation pass came back too sparse to be useful — treat it
-              // like "no card found this round" and keep polling instead of
-              // opening a near-empty review screen.
+            const identity = scanIdentity(confirmedText)
+            if (!identity || identity !== previousIdentity) {
+              previousIdentity = identity
+              // Keep scanning until two readable confirmations agree.
               setState('scanning')
             } else {
               stopEverything()
               onDetected(confirmedText)
               return
             }
+          } else {
+            previousIdentity = null
           }
         }
-      } catch (err) {
+      } catch {
         // worker.terminate() (from stopEverything, e.g. on unmount) rejects
         // any in-flight recognize() call — expected and harmless when we're
         // the ones who cancelled. Anything else should still surface.
-        if (!cancelled) throw err
+        if (!cancelled) {
+          stopEverything()
+          setState('error')
+          setErrorMessage('The card could not be read. Add the contact manually or reopen the scanner to try again.')
+        }
         return
       }
       if (!cancelled) {
@@ -105,7 +114,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel, onManualEntry 
     const start = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
+          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
         })
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop())
@@ -175,7 +184,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel, onManualEntry 
             )}
             {state === 'detected' && (
               <p className="absolute inset-x-0 bottom-4 text-center text-sm font-medium text-green-400">
-                Business Card Detected ✓
+                Checking card — hold steady
               </p>
             )}
             {state === 'scanning' && showHint && (
@@ -192,6 +201,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel, onManualEntry 
             </Button>
           </div>
         )}
+        {state !== 'error' && <Button variant="outline" onClick={onManualEntry}>Add Contact Manually</Button>}
       </DialogContent>
     </Dialog>
   )

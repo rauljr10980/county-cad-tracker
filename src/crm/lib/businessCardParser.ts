@@ -160,9 +160,15 @@ export const parseBusinessCard = (rawText: string): ParsedBusinessCard => {
     }
   }
 
-  // 10. Name — the first remaining line.
-  if (lines.length) {
-    const parts = lines[0].split(/\s+/).filter(Boolean)
+  // Ignore OCR noise rather than promoting arbitrary leftover text to a name.
+  // Unicode letters, initials, apostrophes and hyphens support real names.
+  const name = lines.find((line) => {
+    const parts = line.split(/\s+/)
+    return parts.length <= 6 && parts.every(part => /^[\p{L}\p{M}]+(?:['’.-][\p{L}\p{M}]+)*\.?$/u.test(part))
+      && parts.some(part => (part.match(/\p{L}/gu)?.length ?? 0) >= 2)
+  })
+  if (name) {
+    const parts = name.split(/\s+/).filter(Boolean)
     result.firstName = parts[0] ?? ''
     result.lastName = parts.slice(1).join(' ')
   }
