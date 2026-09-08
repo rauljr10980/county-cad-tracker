@@ -1,13 +1,15 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { ScanLine } from 'lucide-react'
+import { Loader2, ScanLine } from 'lucide-react'
 import { LeadDetailDrawer } from '@/crm/components/leads/LeadDetailDrawer'
 import { LeadFormDialog } from '@/crm/components/leads/LeadFormDialog'
 import { LeadsTable } from '@/crm/components/leads/LeadsTable'
 import { ScheduleMeetingDialog } from '@/crm/components/leads/ScheduleMeetingDialog'
 import { DuplicateContactDialog } from '@/crm/components/scanner/DuplicateContactDialog'
+import { ScannerErrorBoundary } from '@/crm/components/scanner/ScannerErrorBoundary'
 import { useSearchStore } from '@/crm/lib/searchStore'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -38,6 +40,11 @@ const ANY = '__any__'
 
 export default function ContactsView() {
   const leads = useCrmStore(useShallow(selectContacts))
+  // Unfiltered lead list for duplicate detection only — `leads` above is
+  // filtered to industry-kind, non-opportunity contacts for the table, and
+  // must not change. Scanning a card for someone who is already an active
+  // opportunity or a retail contact still needs to be caught here.
+  const allLeads = useCrmStore(useShallow((state) => state.leads))
   const updateLead = useCrmStore((state) => state.updateLead)
   const query = useSearchStore((state) => state.query).trim().toLowerCase()
   const [jobTitleIndustry, setJobTitleIndustry] = useState(ANY)
@@ -112,7 +119,7 @@ export default function ContactsView() {
         ownerName: scanned.ownerName ?? '',
         firm: scanned.firm ?? '',
       },
-      leads,
+      allLeads,
     )
 
     if (match) {
@@ -121,7 +128,7 @@ export default function ContactsView() {
     } else {
       setScanForm({ initialValues: scanned })
     }
-  }, [leads])
+  }, [allLeads])
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -182,13 +189,35 @@ export default function ContactsView() {
       />
 
       {scannerOpen && (
-        <Suspense fallback={null}>
-          <BusinessCardScanner
-            open={scannerOpen}
-            onDetected={handleDetected}
-            onCancel={() => setScannerOpen(false)}
-          />
-        </Suspense>
+        <ScannerErrorBoundary
+          onError={() => {
+            setScannerOpen(false)
+            setScanForm({ initialValues: {} })
+          }}
+        >
+          <Suspense
+            fallback={
+              <Dialog open>
+                <DialogContent className="max-w-lg">
+                  <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading scanner…
+                  </div>
+                </DialogContent>
+              </Dialog>
+            }
+          >
+            <BusinessCardScanner
+              open={scannerOpen}
+              onDetected={handleDetected}
+              onCancel={() => setScannerOpen(false)}
+              onManualEntry={() => {
+                setScannerOpen(false)
+                setScanForm({ initialValues: {} })
+              }}
+            />
+          </Suspense>
+        </ScannerErrorBoundary>
       )}
 
       <DuplicateContactDialog

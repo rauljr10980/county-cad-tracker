@@ -56,6 +56,15 @@ describe('parseBusinessCard', () => {
     expect(parseBusinessCard('John Smith\nSan Antonio, TX 78205-1234').zip).toBe('78205-1234')
   })
 
+  it('extracts a phone number correctly on a card that also has a 9-digit ZIP', () => {
+    const result = parseBusinessCard('John Smith\n(210) 555-1234\n123 Main St, San Antonio, TX 78205-1234')
+    expect(result.phone).toBe('(210) 555-1234')
+    expect(result.secondaryPhone).toBe('')
+    expect(result.zip).toBe('78205-1234')
+    expect(result.streetAddress).toBe('123 Main St')
+    expect(result.city).toBe('San Antonio')
+  })
+
   it('extracts a company line by its legal suffix', () => {
     expect(parseBusinessCard('John Smith\nABC Development LLC').company).toBe('ABC Development LLC')
   })

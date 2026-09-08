@@ -16,9 +16,10 @@ type Props = {
   open: boolean
   onDetected: (rawText: string) => void
   onCancel: () => void
+  onManualEntry: () => void
 }
 
-export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
+export function BusinessCardScanner({ open, onDetected, onCancel, onManualEntry }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const workerRef = useRef<Worker | null>(null)
@@ -64,22 +65,37 @@ export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
 
     const poll = async () => {
       if (cancelled || !workerRef.current) return
-      const canvas = captureFrame(DETECTION_CANVAS_WIDTH)
-      if (canvas) {
-        const text = await recognizeCanvas(workerRef.current, canvas)
-        if (cancelled) return
-        if (hasContactSignal(text)) {
-          setState('detected')
-          const confirmCanvas = captureFrame(CONFIRMATION_CANVAS_WIDTH)
-          const confirmedText =
-            confirmCanvas && workerRef.current
-              ? await recognizeCanvas(workerRef.current, confirmCanvas)
-              : text
+      try {
+        const canvas = captureFrame(DETECTION_CANVAS_WIDTH)
+        if (canvas) {
+          const text = await recognizeCanvas(workerRef.current, canvas)
           if (cancelled) return
-          stopEverything()
-          onDetected(confirmedText)
-          return
+          if (hasContactSignal(text)) {
+            setState('detected')
+            const confirmCanvas = captureFrame(CONFIRMATION_CANVAS_WIDTH)
+            const confirmedText =
+              confirmCanvas && workerRef.current
+                ? await recognizeCanvas(workerRef.current, confirmCanvas)
+                : text
+            if (cancelled) return
+            if (!hasContactSignal(confirmedText)) {
+              // Confirmation pass came back too sparse to be useful — treat it
+              // like "no card found this round" and keep polling instead of
+              // opening a near-empty review screen.
+              setState('scanning')
+            } else {
+              stopEverything()
+              onDetected(confirmedText)
+              return
+            }
+          }
         }
+      } catch (err) {
+        // worker.terminate() (from stopEverything, e.g. on unmount) rejects
+        // any in-flight recognize() call — expected and harmless when we're
+        // the ones who cancelled. Anything else should still surface.
+        if (!cancelled) throw err
+        return
       }
       if (!cancelled) {
         pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
@@ -142,7 +158,7 @@ export function BusinessCardScanner({ open, onDetected, onCancel }: Props) {
         {state === 'error' ? (
           <div className="space-y-4 py-6 text-center">
             <p className="text-sm text-muted-foreground">{errorMessage}</p>
-            <Button onClick={onCancel}>Add Contact Manually</Button>
+            <Button onClick={onManualEntry}>Add Contact Manually</Button>
           </div>
         ) : (
           <div className="relative overflow-hidden rounded-md bg-black">
