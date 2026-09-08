@@ -19,6 +19,26 @@ vi.mock('@/lib/api', () => ({
 // dataService.save()'s fire-and-forget promise chain (fetch -> .then/.catch).
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+describe('save confirmation callback', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([true, false])('fires only when the server accepts the save (ok=%s)', async (ok) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok, json: async () => ({ error: 'rejected' }) }));
+    const saved = vi.fn();
+    dataService.save(EMPTY_STATE, saved);
+    await flush();
+    expect(saved).toHaveBeenCalledTimes(ok ? 1 : 0);
+  });
+
+  it('does not turn a callback exception into a save-error toast', async () => {
+    vi.mocked(toast.error).mockClear();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    dataService.save(EMPTY_STATE, () => { throw new Error('telemetry failed'); });
+    await flush();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+});
+
 describe('dataService.load', () => {
   const originalFetch = global.fetch;
 

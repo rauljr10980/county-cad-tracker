@@ -36,6 +36,7 @@ model User {
   activityLogs      ActivityLog[]
   evictionLandlords EvictionLandlord[] @relation("EvictionAssignee")
   crmLeads          CrmLead[]
+  scanCorrections   ScanCorrection[]
   mlsLeads          MlsLead[]
 
   @@index([email])
@@ -47,6 +48,30 @@ enum UserRole {
   ADMIN
   OPERATOR
   VIEWER
+}
+
+model ScanCorrection {
+  id         String   @id @default(cuid())
+  userId     String
+  rawOcrText String   @db.Text
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fields     ScanCorrectionField[]
+
+  @@index([userId, createdAt])
+  @@map("scan_corrections")
+}
+
+model ScanCorrectionField {
+  scanId         String
+  fieldName      String
+  predictedValue String @db.Text
+  finalValue     String @db.Text
+  scan           ScanCorrection @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@id([scanId, fieldName])
+  @@index([fieldName])
+  @@map("scan_correction_fields")
 }
 
 // ============================================================================

@@ -154,7 +154,7 @@ export const dataService = {
     }
   },
 
-  save(state: CrmState): void {
+  save(state: CrmState, onSaved?: () => void): void {
     fetch(`${API_BASE_URL}/api/crm/state`, {
       method: 'PUT',
       headers: getAuthHeaders(),
@@ -168,6 +168,9 @@ export const dataService = {
           );
           console.error('[CRM] save rejected:', message);
           toast.error(message);
+        } else if (onSaved) {
+          // Telemetry failures must never be reported as contact-save failures.
+          try { onSaved(); } catch { /* best effort */ }
         }
       })
       .catch((err) => {

@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import type { LeadKind } from '@/crm/data/types'
+import type { Lead, LeadKind } from '@/crm/data/types'
 
 type Destination = 'contacts' | 'retail' | 'opportunity'
 
@@ -83,9 +83,10 @@ type Props = {
   defaultKind?: LeadKind
   initialValues?: Partial<FormValues>
   editLeadId?: string
+  onSaved?: (lead: Lead) => void
 }
 
-export function LeadFormDialog({ open, onOpenChange, defaultKind = 'industry', initialValues, editLeadId }: Props) {
+export function LeadFormDialog({ open, onOpenChange, defaultKind = 'industry', initialValues, editLeadId, onSaved }: Props) {
   const addLead = useCrmStore((state) => state.addLead)
   const updateLead = useCrmStore((state) => state.updateLead)
   const createOpportunity = useCrmStore((state) => state.createOpportunity)
@@ -167,7 +168,7 @@ export function LeadFormDialog({ open, onOpenChange, defaultKind = 'industry', i
               onOpenChange(false)
               return
             }
-            const lead = addLead(values)
+            const lead = addLead(values, onSaved)
             if (destination === 'opportunity') {
               createOpportunity(lead.id)
               const trimmed = outreachMessage.trim()

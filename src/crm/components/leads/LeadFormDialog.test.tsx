@@ -58,6 +58,7 @@ describe('LeadFormDialog', () => {
   })
 
   it('updates the existing lead by id when editLeadId is set, and never creates a new one', () => {
+    const onSaved = vi.fn()
     const updateLeadSpy = vi.spyOn(useCrmStore.getState(), 'updateLead')
     const addLeadSpy = vi.spyOn(useCrmStore.getState(), 'addLead')
 
@@ -66,6 +67,7 @@ describe('LeadFormDialog', () => {
         open
         onOpenChange={() => {}}
         editLeadId="lead-1"
+        onSaved={onSaved}
         initialValues={{ ownerName: 'Jane Prospect', notes: 'Scanned from card' }}
       />,
     )
@@ -78,11 +80,23 @@ describe('LeadFormDialog', () => {
     expect(patch).toMatchObject({ ownerName: 'Jane Prospect', notes: 'Scanned from card' })
 
     expect(addLeadSpy).not.toHaveBeenCalled()
+    expect(onSaved).not.toHaveBeenCalled()
 
     // Confirm the write actually landed on the existing record, not a new one.
     const state = useCrmStore.getState()
     expect(state.leads).toHaveLength(1)
     expect(state.leads[0].id).toBe('lead-1')
     expect(state.leads[0].notes).toBe('Scanned from card')
+  })
+
+  it('reports the created values only after persistence confirms success', () => {
+    const onSaved = vi.fn()
+    render(<LeadFormDialog open onOpenChange={() => {}} initialValues={{ ownerName: 'Raul Medina' }} onSaved={onSaved} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Contact' }))
+    expect(onSaved).not.toHaveBeenCalled()
+    const [state, saved] = vi.mocked(dataService.save).mock.calls.at(-1)!
+    saved!()
+    expect(onSaved).toHaveBeenCalledTimes(1)
+    expect(onSaved).toHaveBeenCalledWith(state.leads.at(-1))
   })
 })

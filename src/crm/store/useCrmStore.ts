@@ -39,7 +39,7 @@ type HydrationState = {
 
 type Actions = {
   hydrate: (now: Date, ownerKey?: string) => Promise<void>
-  addLead: (input: NewLeadInput) => Lead
+  addLead: (input: NewLeadInput, onSaved?: (lead: Lead) => void) => Lead
   updateLead: (id: string, patch: Partial<Lead>) => void
   setLeadKind: (leadId: string, kind: LeadKind) => void
   deleteLead: (id: string) => void
@@ -83,12 +83,13 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
   // at EMPTY_STATE (or stale data), and the very next user action would
   // persist that over the account's real records — the server's deletes are
   // scoped correctly, so an autosave like that deletes real data with a 200.
-  const persist = (state: CrmState) => {
+  const persist = (state: CrmState, onSaved?: () => void) => {
     if (!get().hydrated) {
       console.error('[CRM] Skipping save: CRM has not finished loading, so nothing was persisted.')
       return
     }
-    dataService.save(state)
+    if (onSaved) dataService.save(state, onSaved)
+    else dataService.save(state)
   }
 
   return {
@@ -147,7 +148,7 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
       set({ ...next, hydrated: true, hydrateError: null })
     },
 
-    addLead: (input) => {
+    addLead: (input, onSaved) => {
       const createdAt = nowIso()
       const lead: Lead = {
         ...input,
@@ -172,7 +173,7 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
       }
 
       set(next)
-      persist(snapshot(next))
+      persist(snapshot(next), onSaved ? () => onSaved(lead) : undefined)
       return lead
     },
 

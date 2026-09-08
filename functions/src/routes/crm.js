@@ -2,6 +2,19 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { authenticateToken } = require('../middleware/auth');
+const { parseScanCorrection } = require('../lib/scanCorrections');
+
+router.post('/scan-corrections', authenticateToken, async (req, res) => {
+  const data = parseScanCorrection(req.body);
+  if (!data) return res.status(400).json({ error: 'Invalid scan correction' });
+  try {
+    // Nested create is atomic: one scan and all twelve field observations.
+    await prisma.scanCorrection.create({ data: { ...data, userId: req.user.id } });
+    return res.status(201).json({ success: true });
+  } catch {
+    return res.status(500).json({ error: 'Failed to record scan correction' });
+  }
+});
 const {
   leadWhere,
   childWhere,

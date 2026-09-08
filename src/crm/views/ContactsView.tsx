@@ -22,6 +22,7 @@ import { parseBusinessCard } from '@/crm/lib/businessCardParser'
 import { metPersonallyForRating } from '@/crm/lib/connectionRating'
 import { findPossibleDuplicate, mergeScannedIntoLead } from '@/crm/lib/duplicateDetection'
 import { mapScannedCardToLead } from '@/crm/lib/mapScannedCardToLead'
+import { logScanCorrection } from '@/crm/lib/scanCorrections'
 import { selectContacts } from '@/crm/store/selectors'
 import { useCrmStore } from '@/crm/store/useCrmStore'
 
@@ -34,6 +35,7 @@ const BusinessCardScanner = lazy(() =>
 type ScanFormState = {
   initialValues: Partial<Lead>
   editLeadId?: string
+  rawOcrText?: string
 }
 
 const ANY = '__any__'
@@ -56,7 +58,7 @@ export default function ContactsView() {
   const [scheduleLeadId, setScheduleLeadId] = useState<string | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [possibleDuplicate, setPossibleDuplicate] = useState<Lead | null>(null)
-  const [pendingScan, setPendingScan] = useState<Partial<Lead> | null>(null)
+  const [pendingScan, setPendingScan] = useState<ScanFormState | null>(null)
   const [scanForm, setScanForm] = useState<ScanFormState | null>(null)
 
   const jobTitleIndustries = useMemo(
@@ -124,9 +126,9 @@ export default function ContactsView() {
 
     if (match) {
       setPossibleDuplicate(match)
-      setPendingScan(scanned)
+      setPendingScan({ initialValues: scanned, rawOcrText: rawText })
     } else {
-      setScanForm({ initialValues: scanned })
+      setScanForm({ initialValues: scanned, rawOcrText: rawText })
     }
   }, [allLeads])
 
@@ -227,7 +229,7 @@ export default function ContactsView() {
           if (possibleDuplicate && pendingScan) {
             setScanForm({
               editLeadId: possibleDuplicate.id,
-              initialValues: mergeScannedIntoLead(possibleDuplicate, pendingScan),
+              initialValues: mergeScannedIntoLead(possibleDuplicate, pendingScan.initialValues),
             })
           }
           setPossibleDuplicate(null)
@@ -235,7 +237,7 @@ export default function ContactsView() {
         }}
         onCreateNew={() => {
           if (pendingScan) {
-            setScanForm({ initialValues: pendingScan })
+            setScanForm(pendingScan)
           }
           setPossibleDuplicate(null)
           setPendingScan(null)
@@ -255,6 +257,9 @@ export default function ContactsView() {
         defaultKind="industry"
         initialValues={scanForm?.initialValues}
         editLeadId={scanForm?.editLeadId}
+        onSaved={scanForm?.rawOcrText !== undefined && !scanForm.editLeadId
+          ? (lead) => { void logScanCorrection(scanForm.rawOcrText!, scanForm.initialValues, lead) }
+          : undefined}
       />
     </div>
   )
