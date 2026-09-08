@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { ScanLine } from 'lucide-react'
 import { LeadDetailDrawer } from '@/crm/components/leads/LeadDetailDrawer'
+import { LeadFormDialog } from '@/crm/components/leads/LeadFormDialog'
 import { LeadsTable } from '@/crm/components/leads/LeadsTable'
 import { ScheduleMeetingDialog } from '@/crm/components/leads/ScheduleMeetingDialog'
+import { DuplicateContactDialog } from '@/crm/components/scanner/DuplicateContactDialog'
 import { useSearchStore } from '@/crm/lib/searchStore'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,10 +15,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { ConnectionRating } from '@/crm/data/types'
+import type { ConnectionRating, Lead } from '@/crm/data/types'
+import { parseBusinessCard } from '@/crm/lib/businessCardParser'
 import { metPersonallyForRating } from '@/crm/lib/connectionRating'
+import { findPossibleDuplicate, mergeScannedIntoLead } from '@/crm/lib/duplicateDetection'
+import { mapScannedCardToLead } from '@/crm/lib/mapScannedCardToLead'
 import { selectContacts } from '@/crm/store/selectors'
 import { useCrmStore } from '@/crm/store/useCrmStore'
+
+const BusinessCardScanner = lazy(() =>
+  import('@/crm/components/scanner/BusinessCardScanner').then((m) => ({
+    default: m.BusinessCardScanner,
+  })),
+)
+
+type ScanFormState = {
+  initialValues: Partial<Lead>
+  editLeadId?: string
+}
 
 const ANY = '__any__'
 
@@ -30,6 +47,10 @@ export default function ContactsView() {
   const [specialization, setSpecialization] = useState(ANY)
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)
   const [scheduleLeadId, setScheduleLeadId] = useState<string | null>(null)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [possibleDuplicate, setPossibleDuplicate] = useState<Lead | null>(null)
+  const [pendingScan, setPendingScan] = useState<Partial<Lead> | null>(null)
+  const [scanForm, setScanForm] = useState<ScanFormState | null>(null)
 
   const jobTitleIndustries = useMemo(
     () => Array.from(new Set(leads.map((lead) => lead.jobTitleIndustry).filter(Boolean))).sort(),
@@ -80,6 +101,28 @@ export default function ContactsView() {
       })
   }, [asset, city, firm, jobTitleIndustry, leads, query, specialization])
 
+  const handleDetected = (rawText: string) => {
+    const scanned = mapScannedCardToLead(parseBusinessCard(rawText))
+    setScannerOpen(false)
+
+    const match = findPossibleDuplicate(
+      {
+        email: scanned.email ?? '',
+        phone: scanned.phone ?? '',
+        ownerName: scanned.ownerName ?? '',
+        firm: scanned.firm ?? '',
+      },
+      leads,
+    )
+
+    if (match) {
+      setPossibleDuplicate(match)
+      setPendingScan(scanned)
+    } else {
+      setScanForm({ initialValues: scanned })
+    }
+  }
+
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -90,6 +133,9 @@ export default function ContactsView() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <Button size="sm" onClick={() => setScannerOpen(true)}>
+            <ScanLine className="mr-1.5 h-4 w-4" /> Scan Business Card
+          </Button>
           <span className="rounded-md border px-3 py-1">Local workspace</span>
           <span className="rounded-md border px-3 py-1">Notes searchable</span>
         </div>
@@ -133,6 +179,53 @@ export default function ContactsView() {
       <ScheduleMeetingDialog
         leadId={scheduleLeadId}
         onClose={() => setScheduleLeadId(null)}
+      />
+
+      {scannerOpen && (
+        <Suspense fallback={null}>
+          <BusinessCardScanner
+            open={scannerOpen}
+            onDetected={handleDetected}
+            onCancel={() => setScannerOpen(false)}
+          />
+        </Suspense>
+      )}
+
+      <DuplicateContactDialog
+        open={possibleDuplicate !== null}
+        possibleDuplicate={possibleDuplicate}
+        onUpdateExisting={() => {
+          if (possibleDuplicate && pendingScan) {
+            setScanForm({
+              editLeadId: possibleDuplicate.id,
+              initialValues: mergeScannedIntoLead(possibleDuplicate, pendingScan),
+            })
+          }
+          setPossibleDuplicate(null)
+          setPendingScan(null)
+        }}
+        onCreateNew={() => {
+          if (pendingScan) {
+            setScanForm({ initialValues: pendingScan })
+          }
+          setPossibleDuplicate(null)
+          setPendingScan(null)
+        }}
+        onCancel={() => {
+          setPossibleDuplicate(null)
+          setPendingScan(null)
+          setScannerOpen(true)
+        }}
+      />
+
+      <LeadFormDialog
+        open={scanForm !== null}
+        onOpenChange={(open) => {
+          if (!open) setScanForm(null)
+        }}
+        defaultKind="industry"
+        initialValues={scanForm?.initialValues}
+        editLeadId={scanForm?.editLeadId}
       />
     </div>
   )
