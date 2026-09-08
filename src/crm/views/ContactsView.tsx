@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { ScanLine } from 'lucide-react'
 import { LeadDetailDrawer } from '@/crm/components/leads/LeadDetailDrawer'
@@ -101,7 +101,7 @@ export default function ContactsView() {
       })
   }, [asset, city, firm, jobTitleIndustry, leads, query, specialization])
 
-  const handleDetected = (rawText: string) => {
+  const handleDetected = useCallback((rawText: string) => {
     const scanned = mapScannedCardToLead(parseBusinessCard(rawText))
     setScannerOpen(false)
 
@@ -121,7 +121,7 @@ export default function ContactsView() {
     } else {
       setScanForm({ initialValues: scanned })
     }
-  }
+  }, [leads])
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
