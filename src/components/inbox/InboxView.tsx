@@ -16,6 +16,7 @@ export type PublicSubmission = {
   phone: string;
   propertyAddress: string;
   message: string;
+  situation: string;
   status: string;
   notes: string;
   userAgent: string;
@@ -33,8 +34,8 @@ const STATUS_LABELS: Record<Status, string> = {
   spam: 'Spam',
 };
 
-// Same four funnel pages the public marketing site's forms POST from — see
-// functions/src/lib/publicIntake.js's SOURCE_PAGES, which the backend
+// The thirteen source pages the public marketing site's forms POST from —
+// see functions/src/lib/publicIntake.js's SOURCE_PAGES, which the backend
 // enforces as an allow-list. Kept in sync by hand: this is a display map on
 // the frontend, that one is validation on the backend.
 const SOURCE_PAGE_LABELS: Record<string, string> = {
@@ -42,6 +43,15 @@ const SOURCE_PAGE_LABELS: Record<string, string> = {
   'distressed-property': 'Distressed Property',
   'inherited-property': 'Inherited Property',
   'landlord-help': 'Landlord Help',
+  'financing': 'Financing',
+  'invest': 'Invest',
+  'realtor-partners': 'Realtor Partners',
+  'rental-strategy': 'Rental Strategy',
+  'tenant-problem': 'Tenant Problem',
+  'homepage': 'Homepage',
+  'contact': 'Contact',
+  'schedule': 'Schedule',
+  'find-a-solution': 'Find a Solution',
 };
 const sourcePageLabel = (page: string) => SOURCE_PAGE_LABELS[page] ?? page;
 
@@ -53,6 +63,15 @@ const SOURCE_PAGE_TONE: Record<string, string> = {
   'distressed-property': 'danger',
   'inherited-property': 'warn',
   'landlord-help': 'success',
+  'financing': 'blue',
+  'invest': 'success',
+  'realtor-partners': 'warn',
+  'rental-strategy': 'blue',
+  'tenant-problem': 'danger',
+  'homepage': 'grey',
+  'contact': 'grey',
+  'schedule': 'grey',
+  'find-a-solution': 'grey',
 };
 const STATUS_TONE: Record<Status, string> = { new: 'blue', contacted: 'warn', converted: 'success', spam: 'grey' };
 
@@ -171,6 +190,12 @@ function SubmissionDetails({ submission, onClose, onSave }: {
             <p className="record">{submission.email || '—'}</p>
           </div>
         </div>
+        {submission.situation && (
+          <div>
+            <p className="label">SITUATION</p>
+            <p className="record">{submission.situation}</p>
+          </div>
+        )}
         <div>
           <p className="label">PROPERTY ADDRESS</p>
           <p className="record">{submission.propertyAddress || '—'}</p>
@@ -296,10 +321,9 @@ function EmptyState({ kind, activeFilterLabels, onClearFilters }: {
         <InboxIcon className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
         <p className="mt-3 font-medium text-foreground">No submissions yet</p>
         <p className="mx-auto mt-1.5 max-w-md text-muted-foreground">
-          The inbox fills automatically from four forms on the marketing site — Sell Property,
-          Distressed Property, Inherited Property, and Landlord Help. None of those forms are
-          live on the site yet, so nothing has come in. Submissions will show up here as soon as
-          they launch.
+          The inbox fills automatically from every lead-capture form on the marketing site.
+          Nothing has come in yet — submissions will show up here as soon as someone fills out a
+          form on the site.
         </p>
       </div>
     );

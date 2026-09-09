@@ -1223,18 +1223,21 @@ model MlsContact {
 // ============================================================================
 
 // A submission from an unauthenticated visitor on one of the public
-// marketing site's funnel pages (sell-property, distressed-property,
-// inherited-property, landlord-help). Deliberately not per-user — a public
-// submission belongs to the business, not to whoever happens to be logged in
-// when it's worked.
+// marketing site's 13 source pages: 9 solution-specific pages (sell-property,
+// distressed-property, inherited-property, landlord-help, financing, invest,
+// realtor-partners, rental-strategy, tenant-problem) plus 4 generic pages
+// that carry their own situation picker (homepage, contact, schedule,
+// find-a-solution). Deliberately not per-user — a public submission belongs
+// to the business, not to whoever happens to be logged in when it's worked.
 model PublicSubmission {
   id              String @id @default(cuid())
-  sourcePage      String // which funnel page it came from
+  sourcePage      String // which of the 13 source pages it came from
   name            String
   email           String @default("")
   phone           String @default("")
   propertyAddress String @default("")
   message         String @default("") @db.Text
+  situation       String @default("")
 
   status String @default("new") // new | contacted | converted | spam
   notes  String @default("") @db.Text
