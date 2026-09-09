@@ -5,10 +5,14 @@ import { visibleTabs } from './navItems';
 
 describe('NavRail', () => {
   it('renders every visible tab', () => {
-    render(<NavRail activeTab="dashboard" onTabChange={() => {}} />);
-    expect(screen.getByRole('button', { name: 'Dashboard' })).toBeTruthy();
+    render(<NavRail activeTab="properties" onTabChange={() => {}} />);
     expect(screen.getByRole('button', { name: /Eviction List/ })).toBeTruthy();
     expect(screen.getAllByRole('button')).toHaveLength(visibleTabs.length);
+  });
+
+  it('hides the Dashboard tab', () => {
+    render(<NavRail activeTab="properties" onTabChange={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Dashboard' })).toBeNull();
   });
 
   it('marks only the active tab with aria-current', () => {

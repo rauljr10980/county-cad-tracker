@@ -23,6 +23,7 @@ import { PropertyWorkflowTracker } from './PropertyWorkflowTracker';
 import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
 import { updatePropertyWorkflowStage } from '@/lib/api';
 import { SendEmailPanel, type EmailRecipient } from '@/components/email/SendEmailPanel';
+import { SendContactsToTeammate } from '@/components/email/SendContactsToTeammate';
 
 // Default body for the property Send Email panel. Static across properties —
 // the per-property values ({{PropertyAddress}}, {{Owner}}, etc.) are resolved
@@ -1723,10 +1724,17 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   </span>
                 )}
               </div>
-              <ChevronDown className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                !phoneExpanded && "-rotate-90"
-              )} />
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <SendContactsToTeammate
+                  phoneContacts={phoneContacts}
+                  emailRecipients={emailRecipients}
+                  propertyAddress={emailAddress}
+                />
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  !phoneExpanded && "-rotate-90"
+                )} />
+              </div>
             </div>
             {phoneExpanded && (
               <div className="space-y-2 mt-3">
