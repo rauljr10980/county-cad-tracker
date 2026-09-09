@@ -1,0 +1,6 @@
+# Shell scripts must keep Unix line endings regardless of the checkout
+# platform's autocrlf setting -- a CRLF-terminated start.sh crash-loops the
+# Railway container (Linux `sh` chokes on the trailing \r). This bit twice
+# on this exact file via `railway up`, which uploads the local working tree
+# verbatim rather than a clean server-side git clone.
+*.sh text eol=lf
