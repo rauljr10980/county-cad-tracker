@@ -78,7 +78,7 @@
     --ring:                  210 54% 16%;
 
     /* Institutional, not rounded. Hairlines carry the structure. */
-    --radius: 0.25rem;
+    --radius: 0.625rem;
 
     --chart-1: 210 54% 16%;
     --chart-2: 160 55% 27%;
