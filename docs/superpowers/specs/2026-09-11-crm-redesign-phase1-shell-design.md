@@ -42,9 +42,11 @@ match reality), and note any such deviation in the final report.
    invite link) becomes a real sidebar nav entry, ADMIN-only, instead of a
    header gear icon — matching the mockup, which lists Settings as a nav
    item.
-7. Two small reusable UI primitives the shell itself needs, built now so
-   later phases can reuse them: a pill/badge tone helper, and an
-   avatar-initials circle.
+7. A small reusable avatar-initials circle primitive, for the sidebar's
+   user footer (this phase) and later phases' contact tables. (A pill/badge
+   tone helper was considered here too, but deferred — see "Pill — deferred
+   out of this phase" below; nothing in this phase's own UI ended up needing
+   one.)
 8. One global design-token change: soften `--radius` app-wide so buttons,
    inputs, and cards on every page (including ones not yet redesigned)
    immediately look less "sharp/institutional" and more like the mockup.
@@ -86,36 +88,21 @@ adjustment, only more surface area (a wider sidebar) to read correctly.
 
 ## New shared primitives
 
-### `src/components/ui/pill.tsx` (new)
+### Pill — deferred out of this phase
 
-A small, generic status-pill component, for later phases (and the
-notification/search UI in this phase) to use instead of hand-rolling
-`bg-*/text-*` combinations per view. Generalizes the tone-mapping pattern
-already used ad hoc in `src/components/mls/MlsLeadsView.tsx` (its
-`pillClass`/`PILL_TONE_CLASSES`) — **do not modify MlsLeadsView.tsx or its
-tests**; that file is out of scope for this phase and already has a working
-local version. This is a fresh, independent component for new call sites.
-
-```tsx
-export type PillTone = 'grey' | 'blue' | 'green' | 'amber' | 'red' | 'purple'
-
-const TONE_CLASSES: Record<PillTone, string> = {
-  grey: 'bg-muted text-muted-foreground',
-  blue: 'bg-blue-100 text-blue-800',
-  green: 'bg-emerald-100 text-emerald-800',
-  amber: 'bg-amber-100 text-amber-800',
-  red: 'bg-red-100 text-red-800',
-  purple: 'bg-purple-100 text-purple-800',
-}
-
-export function Pill({ tone = 'grey', children }: { tone?: PillTone; children: React.ReactNode }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TONE_CLASSES[tone]}`}>
-      {children}
-    </span>
-  )
-}
-```
+The original draft of this spec included a generic `src/components/ui/pill.tsx`
+status-pill component here, reasoned as useful for "later phases and this
+phase's notification/search UI." Writing the implementation plan surfaced
+that nothing in this phase's actual UI (Sidebar, TopBar, GlobalSearchDialog)
+renders a status pill — search results and notifications ended up as plain
+text. Building it now with no real caller would be a speculative
+abstraction this codebase's own conventions warn against (see the app's
+"don't add abstractions beyond what the task requires" norm). **Cut from
+this phase.** A later phase that actually has status pills to render
+(Contacts' Warm/Active/Cold is the most likely first real caller) should add
+it then, generalizing `MlsLeadsView.tsx`'s existing `pillClass`/
+`PILL_TONE_CLASSES` pattern the way this section originally described — that
+reasoning still holds, it's just premature here.
 
 ### `src/components/ui/avatar-initials.tsx` (new)
 
@@ -657,8 +644,6 @@ refetch on open, poll every 2 minutes.
   calls onTabChange, renders/hides the Public Website link) onto `Sidebar`,
   plus two new ones: the Settings item renders when `user.role === 'ADMIN'`
   and does not render for `OPERATOR`/`VIEWER` (mock `useAuth`).
-- `src/components/ui/pill.test.tsx` — renders children, applies the right
-  class for each tone.
 - `src/components/ui/avatar-initials.test.tsx` — single-word name → 2-char
   initials from that word; multi-word name → first+last initials; same
   name renders the same background color across two separate renders.
