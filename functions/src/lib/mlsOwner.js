@@ -8,7 +8,10 @@
  * classifies as junk rather than as an address.
  */
 
-const JUNK = /^(see\b|private owner|yep$|n\/?a$|unknown|owner$|agent$|call\b|tbd$|none$|[.\-*]+$)/i;
+// "Builder" is what agents type for a new-construction listing still owned
+// by the builder, not a person's actual name — TruePeopleSearch can't trace
+// it, so it belongs in the queue's junk bucket alongside "owner"/"agent".
+const JUNK = /^(see\b|private owner|yep$|n\/?a$|unknown|owner$|agent$|builder$|call\b|tbd$|none$|[.\-*]+$)/i;
 // Bare "CO" used to be in this list and false-positived on real surnames
 // ("Jason Co") — removed. "LCC" is kept for the common LLC typo, matching
 // the same fix in comptroller.js's suffix stripper.

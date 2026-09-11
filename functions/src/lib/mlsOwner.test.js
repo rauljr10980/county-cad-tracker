@@ -39,6 +39,11 @@ describe('classifyOwner', () => {
     expect(classifyOwner('N/A')).toBe('junk');
   });
 
+  it('recognises a bare "Builder" placeholder as junk, not a person', () => {
+    expect(classifyOwner('Builder')).toBe('junk');
+    expect(classifyOwner('BUILDER')).toBe('junk');
+  });
+
   it('recognises an address in the owner field', () => {
     expect(classifyOwner('804 Station Street')).toBe('addressLike');
   });

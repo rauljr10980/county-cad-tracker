@@ -492,6 +492,35 @@ router.get('/skip-trace-queue', async (req, res) => {
   res.json({ people, total: people.length });
 });
 
+// One-off reclassification pass: when classifyOwner's rules change (e.g.
+// adding "Builder" to the junk list), MlsContact rows already imported still
+// carry whatever nameKind they were given at creation. This recomputes
+// nameKind and searchName from the current rules for the caller's own
+// mls_owner/cad_owner contacts, so a rule change reaches data already
+// imported instead of only future imports. Officer contacts are untouched —
+// their nameKind and searchName are deliberately fixed at creation (see
+// createOfficers's comment above) and don't come from classifyOwner at all.
+router.post('/reclassify-owners', async (req, res) => {
+  const userId = req.user.id;
+  const contacts = await prisma.mlsContact.findMany({
+    where: { role: { in: ['mls_owner', 'cad_owner'] }, lead: { userId } },
+    select: { id: true, name: true, nameKind: true },
+  });
+
+  let changed = 0;
+  for (const contact of contacts) {
+    const nameKind = classifyOwner(contact.name);
+    if (nameKind === contact.nameKind) continue;
+    await prisma.mlsContact.update({
+      where: { id: contact.id },
+      data: { nameKind, searchName: searchName(contact.name) },
+    });
+    changed += 1;
+  }
+
+  res.json({ checked: contacts.length, changed });
+});
+
 router.get('/:id', async (req, res) => {
   const item = await prisma.mlsLead.findFirst({
     where: { id: req.params.id, userId: req.user.id },
