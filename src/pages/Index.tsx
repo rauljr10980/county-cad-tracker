@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Header } from '@/components/layout/Header';
 import { TabType } from '@/components/layout/navItems';
-import { NavRail } from '@/components/layout/NavRail';
+import { AppShell } from '@/components/layout/AppShell';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { PropertiesView } from '@/components/properties/PropertiesView';
 import { TasksView } from '@/components/tasks/TasksView';
@@ -252,21 +251,17 @@ const Index = () => {
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background">
-      <NavRail activeTab={activeTab} onTabChange={setActiveTab} hiddenTabIds={hiddenTabIds} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header
-          onRefresh={handleRefresh}
-          isRefreshing={isRefreshing}
-          onTabChange={setActiveTab}
-          onHiddenTabsSaved={setHiddenTabIds}
-        />
-        <div className="flex-1 overflow-y-auto">
-          <main className="container mx-auto animate-fade-in overflow-x-hidden">
-            {renderContent()}
-          </main>
-        </div>
-      </div>
+    <>
+      <AppShell
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        hiddenTabIds={hiddenTabIds}
+        onHiddenTabsSaved={setHiddenTabIds}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
+      >
+        {renderContent()}
+      </AppShell>
       <PhoneSearchModal
         isOpen={isPhoneSearchOpen}
         onClose={() => setIsPhoneSearchOpen(false)}
@@ -280,7 +275,7 @@ const Index = () => {
         isOpen={!!phoneSearchResult}
         onClose={() => setPhoneSearchResult(null)}
       />
-    </div>
+    </>
   );
 };
 
