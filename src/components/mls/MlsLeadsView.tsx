@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { Building2, ChevronLeft, ChevronRight, Loader2, PhoneCall, Search, Upload, User } from 'lucide-react';
 import { normalizeContacts } from '@/lib/contactsModel';
+import { consumePendingSearch } from '@/lib/pendingSearch';
 import MlsLeadDetails from './MlsLeadDetails';
 import SkipTraceQueue from './SkipTraceQueue';
 
@@ -174,7 +175,7 @@ export default function MlsLeadsView() {
   const [error, setError] = useState('');
   const [importResult, setImportResult] = useState<ImportSummary | null>(null);
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => consumePendingSearch('mls') ?? '');
   const [status, setStatus] = useState('');
   const [county, setCounty] = useState('');
   const [minUnits, setMinUnits] = useState('');

@@ -34,6 +34,7 @@ import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus, markPropertyVisitedInRoute, updatePropertyDealStage, updatePropertyWorkflowStage, updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyVisited, getPreForeclosures } from '@/lib/api';
 import { VisitedWizard, VisitedWizardResult } from '@/components/shared/VisitedWizard';
 import { batchGeocodeAddresses } from '@/lib/geocoding';
+import { consumePendingSearch } from '@/lib/pendingSearch';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { FileDropZone } from '@/components/upload/FileDropZone';
@@ -360,7 +361,7 @@ export function PropertiesView() {
     lastPaymentDateTo: undefined,
   });
   const [page, setPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => consumePendingSearch('properties') ?? '');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [workflowStageFilter, setWorkflowStageFilter] = useState<WorkflowStage | null>(null);
   const [sortField, setSortField] = useState<keyof Property | 'ratio' | 'lastCallTime'>('totalAmountDue');

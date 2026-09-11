@@ -888,6 +888,37 @@ export async function setHiddenTabs(hiddenTabs: string[]): Promise<string[]> {
   return data.hiddenTabs;
 }
 
+export interface SearchResult {
+  type: 'property' | 'preforeclosure' | 'crmLead' | 'mlsLead'
+  id: string
+  label: string
+  sublabel: string
+  tab: string
+}
+
+export async function searchAll(query: string): Promise<SearchResult[]> {
+  const response = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(query)}`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) throw new Error('Search failed')
+  const data = await response.json()
+  return data.results
+}
+
+export interface Notification {
+  type: 'followup' | 'inbox'
+  id: string
+  message: string
+  timestamp: string
+  tab: string
+}
+
+export async function getNotifications(): Promise<{ notifications: Notification[]; count: number }> {
+  const response = await fetch(`${API_BASE_URL}/api/notifications`, { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error('Failed to load notifications')
+  return response.json()
+}
+
 /**
  * Get all pre-foreclosure records
  * @param filters Optional filters for address, city, zip

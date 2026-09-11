@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useCrmStore } from '@/crm/store/useCrmStore';
+import { useSearchStore } from '@/crm/lib/searchStore';
+import { consumePendingSearch } from '@/lib/pendingSearch';
 import { useAuth } from '@/contexts/AuthContext';
 import ContactsView from '@/crm/views/ContactsView';
 import CrmTasksView from '@/crm/views/CrmTasksView';
@@ -24,6 +26,11 @@ export function CrmView() {
   useEffect(() => {
     hydrate(new Date(), user?.id).then(() => setLoaded(true));
   }, [hydrate, user?.id]);
+
+  useEffect(() => {
+    const pending = consumePendingSearch('crm');
+    if (pending) useSearchStore.getState().setQuery(pending);
+  }, []);
 
   if (!loaded) {
     return (

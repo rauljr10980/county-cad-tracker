@@ -35,6 +35,7 @@ import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, geocodePreForeclosureRecords } from '@/lib/api';
 import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
+import { consumePendingSearch } from '@/lib/pendingSearch';
 
 // Local type alias to avoid runtime reference issues
 type RouteType = {
@@ -242,7 +243,7 @@ function SortableRow({
 }
 
 export function PreForeclosureView() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => consumePendingSearch('preforeclosure') ?? '');
   const [advancedFilters, setAdvancedFilters] = useState<PreForeclosureAdvancedFilters>({
     type: 'all',
     city: 'all',
