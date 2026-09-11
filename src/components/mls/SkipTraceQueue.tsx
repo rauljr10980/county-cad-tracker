@@ -75,6 +75,11 @@ export default function SkipTraceQueue({ open, onClose, filterParams }: Props) {
     setLoading(true);
     setError('');
     try {
+      // Contacts already imported before a classifyOwner rule change (e.g.
+      // "Builder" placeholders) keep their stale nameKind until reclassified
+      // — this brings them in line with the current rules on every open, so
+      // a rule fix clears the queue without a separate manual step.
+      await request('/reclassify-owners', { method: 'POST' });
       const params = new URLSearchParams(filterParams());
       const data = await request(`/skip-trace-queue?${params}`);
       setPeople((data.people as QueuePerson[]) || []);
