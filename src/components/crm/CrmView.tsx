@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useCrmStore } from '@/crm/store/useCrmStore';
 import { useSearchStore } from '@/crm/lib/searchStore';
-import { consumePendingSearch } from '@/lib/pendingSearch';
+import { consumePendingSearch, PENDING_SEARCH_EVENT, type PendingSearchEventDetail } from '@/lib/pendingSearch';
 import { useAuth } from '@/contexts/AuthContext';
 import ContactsView from '@/crm/views/ContactsView';
 import CrmTasksView from '@/crm/views/CrmTasksView';
@@ -30,6 +30,22 @@ export function CrmView() {
   useEffect(() => {
     const pending = consumePendingSearch('crm');
     if (pending) useSearchStore.getState().setQuery(pending);
+  }, []);
+
+  // Same-tab search selections don't remount this view, so the effect above
+  // never re-runs — this event (dispatched by GlobalSearchDialog alongside
+  // setPendingSearch) lets an already-mounted CRM view pick up the new query
+  // immediately, and clears the sessionStorage entry it wrote so a later
+  // mount doesn't re-apply a stale value.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<PendingSearchEventDetail>).detail;
+      if (detail.tab !== 'crm') return;
+      useSearchStore.getState().setQuery(detail.query);
+      consumePendingSearch('crm');
+    };
+    window.addEventListener(PENDING_SEARCH_EVENT, handler);
+    return () => window.removeEventListener(PENDING_SEARCH_EVENT, handler);
   }, []);
 
   if (!loaded) {

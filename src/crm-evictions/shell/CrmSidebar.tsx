@@ -14,7 +14,7 @@ type Props = { section: CrmSection; onSectionChange: (s: CrmSection) => void; on
 
 /**
  * Navy sidebar against the workspace's light content — the same treatment as
- * NavRail (src/components/layout/NavRail.tsx), which solved this first. Its
+ * Sidebar (src/components/layout/Sidebar.tsx), which solved this first. Its
  * colors are literal (hsl(var(--navy...)) tokens, plus literal white) rather
  * than the shared semantic Tailwind classes (bg-card, text-muted-foreground,
  * ...): this panel sits on navy while the rest of the workspace sits on

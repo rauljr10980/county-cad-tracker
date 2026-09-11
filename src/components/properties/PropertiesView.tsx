@@ -34,7 +34,7 @@ import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, API_BASE_URL, batchGeocodeProperties, getGeocodeStatus, markPropertyVisitedInRoute, updatePropertyDealStage, updatePropertyWorkflowStage, updatePropertyNotes, updatePropertyPhoneNumbers, updatePropertyVisited, getPreForeclosures } from '@/lib/api';
 import { VisitedWizard, VisitedWizardResult } from '@/components/shared/VisitedWizard';
 import { batchGeocodeAddresses } from '@/lib/geocoding';
-import { consumePendingSearch } from '@/lib/pendingSearch';
+import { consumePendingSearch, PENDING_SEARCH_EVENT, type PendingSearchEventDetail } from '@/lib/pendingSearch';
 import { RouteMap } from '@/components/routing/RouteMap';
 import { AreaSelectorMap } from '@/components/routing/AreaSelectorMap';
 import { FileDropZone } from '@/components/upload/FileDropZone';
@@ -363,6 +363,21 @@ export function PropertiesView() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState(() => consumePendingSearch('properties') ?? '');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  // Same-tab search selections don't remount this view, so the initializer
+  // above never re-runs — this event (dispatched by GlobalSearchDialog
+  // alongside setPendingSearch) lets an already-mounted Properties view pick
+  // up the new query immediately, and clears the sessionStorage entry it
+  // wrote so a later mount doesn't re-apply a stale value.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<PendingSearchEventDetail>).detail;
+      if (detail.tab !== 'properties') return;
+      setSearchQuery(detail.query);
+      consumePendingSearch('properties');
+    };
+    window.addEventListener(PENDING_SEARCH_EVENT, handler);
+    return () => window.removeEventListener(PENDING_SEARCH_EVENT, handler);
+  }, []);
   const [workflowStageFilter, setWorkflowStageFilter] = useState<WorkflowStage | null>(null);
   const [sortField, setSortField] = useState<keyof Property | 'ratio' | 'lastCallTime'>('totalAmountDue');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');

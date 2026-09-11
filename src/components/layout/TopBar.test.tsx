@@ -14,10 +14,10 @@ const defaultProps = {
   activeTab: 'properties' as const,
   onTabChange: noop,
   hiddenTabIds: new Set<string>(),
-  onHiddenTabsSaved: noop,
   onRefresh: noop,
   isRefreshing: false,
   onOpenSearch: noop,
+  onOpenManagerView: noop,
 }
 
 describe('TopBar', () => {
@@ -26,15 +26,15 @@ describe('TopBar', () => {
   })
   afterEach(() => vi.restoreAllMocks())
 
-  it('renders a search trigger with the mockup placeholder text', () => {
+  it('renders a search trigger button with the mockup text as its accessible name', () => {
     render(<TopBar {...defaultProps} />)
-    expect(screen.getByPlaceholderText(/search contacts, addresses, opportunities/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /search contacts, addresses, opportunities/i })).toBeTruthy()
   })
 
-  it('clicking the search trigger calls onOpenSearch', async () => {
+  it('clicking the search trigger button calls onOpenSearch', async () => {
     const onOpenSearch = vi.fn()
     render(<TopBar {...defaultProps} onOpenSearch={onOpenSearch} />)
-    screen.getByPlaceholderText(/search contacts, addresses, opportunities/i).click()
+    screen.getByRole('button', { name: /search contacts, addresses, opportunities/i }).click()
     expect(onOpenSearch).toHaveBeenCalled()
   })
 
@@ -51,6 +51,17 @@ describe('TopBar', () => {
     render(<TopBar {...defaultProps} />)
     await waitFor(() => expect(api.getNotifications).toHaveBeenCalled())
     expect(screen.queryByTestId('notification-badge')).toBeNull()
+  })
+
+  it('shows an error message, not the all-clear empty state, when the first notifications load fails', async () => {
+    vi.spyOn(api, 'getNotifications').mockRejectedValue(new Error('network error'))
+    render(<TopBar {...defaultProps} />)
+    await waitFor(() => expect(api.getNotifications).toHaveBeenCalled())
+
+    screen.getByRole('button', { name: /notifications/i }).click()
+
+    await waitFor(() => expect(screen.getByText(/couldn't load notifications/i)).toBeTruthy())
+    expect(screen.queryByText(/nothing needs attention right now/i)).toBeNull()
   })
 
   it('calls onRefresh when the refresh button is clicked', () => {

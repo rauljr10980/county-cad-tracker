@@ -1,9 +1,7 @@
-import { useState } from 'react'
-import { Building2, ChevronDown, LogOut, Settings } from 'lucide-react'
+import { Building2, ChevronDown, FileText, LogOut, Settings, Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { AvatarInitials } from '@/components/ui/avatar-initials'
-import { ManagerViewDialog } from './ManagerViewDialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,13 +29,12 @@ interface SidebarProps {
   activeTab: TabType
   onTabChange: (tab: TabType) => void
   hiddenTabIds: Set<string>
-  onHiddenTabsSaved: (ids: Set<string>) => void
+  onOpenManagerView: () => void
 }
 
-export function Sidebar({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSaved }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, hiddenTabIds, onOpenManagerView }: SidebarProps) {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
-  const [isManagerViewOpen, setIsManagerViewOpen] = useState(false)
 
   const handleLogout = async () => {
     try {
@@ -97,7 +94,7 @@ export function Sidebar({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSave
         )}
         {isAdmin && (
           <li>
-            <button type="button" onClick={() => setIsManagerViewOpen(true)} className={itemClasses(false)}>
+            <button type="button" onClick={onOpenManagerView} className={itemClasses(false)}>
               <Settings className="h-[18px] w-[18px] shrink-0" />
               Settings
             </button>
@@ -129,6 +126,14 @@ export function Sidebar({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSave
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onTabChange('upload')}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onTabChange('files')}>
+                <FileText className="h-4 w-4 mr-2" />
+                Files
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -136,14 +141,6 @@ export function Sidebar({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSave
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      )}
-
-      {isAdmin && (
-        <ManagerViewDialog
-          isOpen={isManagerViewOpen}
-          onClose={() => setIsManagerViewOpen(false)}
-          onHiddenTabsSaved={onHiddenTabsSaved}
-        />
       )}
     </nav>
   )

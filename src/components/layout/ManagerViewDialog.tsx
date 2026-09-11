@@ -12,7 +12,7 @@ import { toast } from '@/hooks/use-toast';
 interface ManagerViewDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Lets Index.tsx update NavRail immediately after a save, without a reload. */
+  /** Lets Index.tsx update Sidebar immediately after a save, without a reload. */
   onHiddenTabsSaved: (hiddenTabIds: Set<string>) => void;
 }
 

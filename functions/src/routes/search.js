@@ -41,7 +41,7 @@ router.get('/', async (req, res) => {
         select: { id: true, ownerName: true, businessName: true, phone: true, email: true },
       }),
       prisma.mlsLead.findMany({
-        where: { userId, address: contains },
+        where: { userId, hidden: false, address: contains },
         take: 5,
         select: { id: true, address: true, status: true },
       }),

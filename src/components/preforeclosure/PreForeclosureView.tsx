@@ -35,7 +35,7 @@ import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { solveVRP, getActiveRoutes, markPreForeclosureVisited, deleteRoute, removeRecordFromRoute, reorderRecordInRoute, geocodePreForeclosureRecords } from '@/lib/api';
 import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
-import { consumePendingSearch } from '@/lib/pendingSearch';
+import { consumePendingSearch, PENDING_SEARCH_EVENT, type PendingSearchEventDetail } from '@/lib/pendingSearch';
 
 // Local type alias to avoid runtime reference issues
 type RouteType = {
@@ -244,6 +244,21 @@ function SortableRow({
 
 export function PreForeclosureView() {
   const [searchQuery, setSearchQuery] = useState(() => consumePendingSearch('preforeclosure') ?? '');
+  // Same-tab search selections don't remount this view, so the initializer
+  // above never re-runs — this event (dispatched by GlobalSearchDialog
+  // alongside setPendingSearch) lets an already-mounted Pre-Foreclosure view
+  // pick up the new query immediately, and clears the sessionStorage entry
+  // it wrote so a later mount doesn't re-apply a stale value.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<PendingSearchEventDetail>).detail;
+      if (detail.tab !== 'preforeclosure') return;
+      setSearchQuery(detail.query);
+      consumePendingSearch('preforeclosure');
+    };
+    window.addEventListener(PENDING_SEARCH_EVENT, handler);
+    return () => window.removeEventListener(PENDING_SEARCH_EVENT, handler);
+  }, []);
   const [advancedFilters, setAdvancedFilters] = useState<PreForeclosureAdvancedFilters>({
     type: 'all',
     city: 'all',

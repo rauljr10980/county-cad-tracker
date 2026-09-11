@@ -7,8 +7,9 @@ import {
   CommandGroup,
   CommandItem,
 } from '@/components/ui/command'
+import { DialogTitle } from '@/components/ui/dialog'
 import { searchAll, type SearchResult } from '@/lib/api'
-import { setPendingSearch } from '@/lib/pendingSearch'
+import { setPendingSearch, dispatchPendingSearch } from '@/lib/pendingSearch'
 import type { TabType } from './navItems'
 
 const GROUP_LABELS: Record<SearchResult['type'], string> = {
@@ -58,6 +59,15 @@ export function GlobalSearchDialog({ open, onOpenChange, onNavigate }: GlobalSea
 
   const handleSelect = (result: SearchResult) => {
     setPendingSearch(result.tab, result.label)
+    // Views consume a pending search from sessionStorage on mount. If
+    // result.tab is already the active tab, the target view is already
+    // mounted and onNavigate below is a no-op (React bails the identical
+    // state update) — so nothing would remount to pick up the sessionStorage
+    // write. Dispatching this event lets an already-mounted view for this
+    // tab update its search state immediately; a view that isn't mounted yet
+    // has no listener registered, so it falls back to the existing
+    // consume-on-mount path with no double-apply.
+    dispatchPendingSearch(result.tab, result.label)
     onNavigate(result.tab as TabType)
     onOpenChange(false)
   }
@@ -68,6 +78,7 @@ export function GlobalSearchDialog({ open, onOpenChange, onNavigate }: GlobalSea
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
+      <DialogTitle className="sr-only">Search</DialogTitle>
       <CommandInput
         placeholder="Search contacts, addresses, opportunities, or anything..."
         value={query}

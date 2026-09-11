@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { Building2, ChevronLeft, ChevronRight, Loader2, PhoneCall, Search, Upload, User } from 'lucide-react';
 import { normalizeContacts } from '@/lib/contactsModel';
-import { consumePendingSearch } from '@/lib/pendingSearch';
+import { consumePendingSearch, PENDING_SEARCH_EVENT, type PendingSearchEventDetail } from '@/lib/pendingSearch';
 import MlsLeadDetails from './MlsLeadDetails';
 import SkipTraceQueue from './SkipTraceQueue';
 
@@ -176,6 +176,21 @@ export default function MlsLeadsView() {
   const [importResult, setImportResult] = useState<ImportSummary | null>(null);
 
   const [search, setSearch] = useState(() => consumePendingSearch('mls') ?? '');
+  // Same-tab search selections don't remount this view, so the initializer
+  // above never re-runs — this event (dispatched by GlobalSearchDialog
+  // alongside setPendingSearch) lets an already-mounted MLS view pick up the
+  // new query immediately, and clears the sessionStorage entry it wrote so
+  // a later mount doesn't re-apply a stale value.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<PendingSearchEventDetail>).detail;
+      if (detail.tab !== 'mls') return;
+      setSearch(detail.query);
+      consumePendingSearch('mls');
+    };
+    window.addEventListener(PENDING_SEARCH_EVENT, handler);
+    return () => window.removeEventListener(PENDING_SEARCH_EVENT, handler);
+  }, []);
   const [status, setStatus] = useState('');
   const [county, setCounty] = useState('');
   const [minUnits, setMinUnits] = useState('');

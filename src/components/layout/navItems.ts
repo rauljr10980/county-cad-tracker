@@ -22,7 +22,7 @@ export const PUBLIC_SITE_TAB_ID = 'publicSite';
 /**
  * Opens an external URL in a new tab rather than switching activeTab. Kept
  * out of `tabs` (typed to TabType, which Index.tsx's renderContent switches
- * on) since it isn't an internal view — NavRail renders it as its own case.
+ * on) since it isn't an internal view — Sidebar renders it as its own case.
  */
 export const externalNavItem = {
   id: PUBLIC_SITE_TAB_ID,

@@ -3,8 +3,7 @@ import { Bell, FileText, LogOut, Menu, RefreshCw, Search, Settings, Upload, X } 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { getNotifications, type Notification } from '@/lib/api'
-import { getVisibleTabs, type TabType } from './navItems'
-import { ManagerViewDialog } from './ManagerViewDialog'
+import { externalNavItem, getVisibleTabs, isPublicSiteVisible, type TabType } from './navItems'
 import {
   Popover,
   PopoverContent,
@@ -24,30 +23,35 @@ interface TopBarProps {
   activeTab: TabType
   onTabChange: (tab: TabType) => void
   hiddenTabIds: Set<string>
-  onHiddenTabsSaved: (ids: Set<string>) => void
   onRefresh: () => void
   isRefreshing: boolean
   onOpenSearch: () => void
+  onOpenManagerView: () => void
 }
 
-export function TopBar({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSaved, onRefresh, isRefreshing, onOpenSearch }: TopBarProps) {
+export function TopBar({ activeTab, onTabChange, hiddenTabIds, onRefresh, isRefreshing, onOpenSearch, onOpenManagerView }: TopBarProps) {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [count, setCount] = useState(0)
+  const [loadError, setLoadError] = useState(false)
   const [isNotifOpen, setIsNotifOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isManagerViewOpen, setIsManagerViewOpen] = useState(false)
 
   const loadNotifications = () => {
     getNotifications()
       .then((data) => {
         setNotifications(data.notifications)
         setCount(data.count)
+        setLoadError(false)
       })
       .catch(() => {
         // Leave the last-known badge/list in place on a transient failure
-        // rather than flashing it to empty (see this phase's spec).
+        // rather than flashing it to empty (see this phase's spec). But if
+        // this is the FIRST load (no last-known state yet), notifications
+        // stays at its initial []) — track the failure so the popover can
+        // tell "failed to load" apart from a genuine all-clear.
+        setLoadError(true)
       })
   }
 
@@ -77,15 +81,11 @@ export function TopBar({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSaved
           className="flex flex-1 max-w-md items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent/50"
         >
           <Search className="h-4 w-4 shrink-0" />
-          <span className="flex-1 truncate" data-placeholder>
+          <span className="flex-1 truncate">
             Search contacts, addresses, opportunities, or anything...
           </span>
           <kbd className="hidden sm:inline rounded border bg-muted px-1.5 py-0.5 text-xs">⌘K</kbd>
         </button>
-        {/* A visually-hidden real input carries the placeholder text so
-            screen readers and text-based test queries (getByPlaceholderText)
-            can find this trigger the same way they would a real search box. */}
-        <input readOnly placeholder="Search contacts, addresses, opportunities, or anything..." onClick={onOpenSearch} className="sr-only" tabIndex={-1} />
 
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={onRefresh} disabled={isRefreshing} aria-label="Refresh">
@@ -103,7 +103,9 @@ export function TopBar({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSaved
             </PopoverTrigger>
             <PopoverContent align="end" className="w-80">
               {notifications.length === 0 ? (
-                <p className="py-2 text-center text-sm text-muted-foreground">Nothing needs attention right now.</p>
+                <p className="py-2 text-center text-sm text-muted-foreground">
+                  {loadError ? "Couldn't load notifications" : 'Nothing needs attention right now.'}
+                </p>
               ) : (
                 <ul className="space-y-1">
                   {notifications.map((n) => (
@@ -150,6 +152,19 @@ export function TopBar({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSaved
                     </Button>
                   )
                 })}
+                {isPublicSiteVisible(hiddenTabIds) && (
+                  <Button variant="ghost" className="justify-start mobile-touch-target" asChild>
+                    <a
+                      href={externalNavItem.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <externalNavItem.icon className="h-5 w-5 mr-3" />
+                      {externalNavItem.label}
+                    </a>
+                  </Button>
+                )}
 
                 <div className="my-2 border-t" />
 
@@ -162,7 +177,7 @@ export function TopBar({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSaved
                   Files
                 </Button>
                 {isAdmin && (
-                  <Button variant="ghost" className="justify-start mobile-touch-target" onClick={() => { setIsMobileMenuOpen(false); setIsManagerViewOpen(true) }}>
+                  <Button variant="ghost" className="justify-start mobile-touch-target" onClick={() => { setIsMobileMenuOpen(false); onOpenManagerView() }}>
                     <Settings className="h-5 w-5 mr-3" />
                     Manager Settings
                   </Button>
@@ -176,13 +191,6 @@ export function TopBar({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSaved
           </Sheet>
         </div>
       </div>
-      {isAdmin && (
-        <ManagerViewDialog
-          isOpen={isManagerViewOpen}
-          onClose={() => setIsManagerViewOpen(false)}
-          onHiddenTabsSaved={onHiddenTabsSaved}
-        />
-      )}
     </header>
   )
 }

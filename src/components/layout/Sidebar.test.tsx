@@ -14,7 +14,7 @@ const defaultProps = {
   activeTab: 'properties' as const,
   onTabChange: noop,
   hiddenTabIds: new Set<string>(),
-  onHiddenTabsSaved: noop,
+  onOpenManagerView: noop,
 }
 
 describe('Sidebar', () => {

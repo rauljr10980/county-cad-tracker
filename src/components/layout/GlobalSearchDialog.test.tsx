@@ -83,6 +83,33 @@ describe('GlobalSearchDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
+  it('selecting a result for the already-active tab still calls setPendingSearch and announces it via the pending-search event, so an already-mounted view can react without remounting', async () => {
+    vi.spyOn(api, 'searchAll').mockResolvedValue([
+      { type: 'property', id: 'p1', label: '123 Main St', sublabel: 'Jane Doe', tab: 'properties' },
+    ])
+    const setPendingSearchSpy = vi.spyOn(pendingSearch, 'setPendingSearch')
+    const dispatchPendingSearchSpy = vi.spyOn(pendingSearch, 'dispatchPendingSearch')
+    // "Already active" here means onNavigate('properties') would be a no-op
+    // because the app is already on that tab — GlobalSearchDialog doesn't
+    // know or care about activeTab; it always writes + announces, and it's
+    // up to a mounted view's own event listener to react when its tab
+    // matches. This test proves GlobalSearchDialog's own contribution:
+    // both calls fire with the right (tab, query) regardless of activeness.
+    const onNavigate = vi.fn()
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<GlobalSearchDialog open onOpenChange={() => {}} onNavigate={onNavigate} />)
+
+    await user.type(screen.getByPlaceholderText(/search/i), 'main')
+    vi.advanceTimersByTime(400)
+    await waitFor(() => expect(screen.getByText('123 Main St')).toBeTruthy())
+
+    await user.click(screen.getByText('123 Main St'))
+
+    expect(setPendingSearchSpy).toHaveBeenCalledWith('properties', '123 Main St')
+    expect(dispatchPendingSearchSpy).toHaveBeenCalledWith('properties', '123 Main St')
+    expect(onNavigate).toHaveBeenCalledWith('properties')
+  })
+
   it('shows an inline error message and keeps the dialog open when the search call fails', async () => {
     vi.spyOn(api, 'searchAll').mockRejectedValue(new Error('Search failed'))
     const onOpenChange = vi.fn()
