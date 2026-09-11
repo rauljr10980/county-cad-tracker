@@ -17,18 +17,34 @@ import InboxView from '@/components/inbox/InboxView';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { SignupModal } from '@/components/auth/SignupModal';
+import { ResetPasswordCard } from '@/components/auth/ResetPasswordCard';
 import { Building2, LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PhoneSearchModal } from '@/components/phone/PhoneSearchModal';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
 import { Property } from '@/types/property';
 import { EvictionsCrmWorkspace } from '@/crm-evictions/shell/EvictionsCrmWorkspace';
+import { getHiddenTabs } from '@/lib/api';
 
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
   const hash = window.location.hash.slice(1); // Remove the #
   const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'crm', 'driving', 'evictions', 'mls', 'inbox'];
   return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
+};
+
+// '#reset-password=<token>' (from the forgot-password email) and
+// '#signup=<code>' (an admin's shared invite link, see ManagerViewDialog)
+// both use '=', which no real TabType hash contains, so getInitialTab()
+// above already falls back to 'dashboard' for either without help.
+const getResetPasswordToken = (): string | null => {
+  const hash = window.location.hash.slice(1);
+  return hash.startsWith('reset-password=') ? decodeURIComponent(hash.slice('reset-password='.length)) : null;
+};
+
+const getSignupInviteCode = (): string | null => {
+  const hash = window.location.hash.slice(1);
+  return hash.startsWith('signup=') ? decodeURIComponent(hash.slice('signup='.length)) : null;
 };
 
 const Index = () => {
@@ -39,6 +55,22 @@ const Index = () => {
   const [isSignupOpen, setIsSignupOpen] = useState(false);
   const [isPhoneSearchOpen, setIsPhoneSearchOpen] = useState(false);
   const [phoneSearchResult, setPhoneSearchResult] = useState<Property | null>(null);
+  const [resetToken, setResetToken] = useState<string | null>(getResetPasswordToken);
+  const [signupInviteCode] = useState<string | null>(getSignupInviteCode);
+  // Seeded to match the old hardcoded HIDDEN_TABS default (navItems.ts) so
+  // the rail doesn't flash Dashboard on for the moment before this loads.
+  const [hiddenTabIds, setHiddenTabIds] = useState<Set<string>>(() => new Set(['dashboard']));
+
+  useEffect(() => {
+    if (signupInviteCode) setIsSignupOpen(true);
+  }, [signupInviteCode]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    getHiddenTabs()
+      .then((ids) => setHiddenTabIds(new Set(ids)))
+      .catch((err) => console.error('Failed to load tab settings:', err));
+  }, [isAuthenticated]);
   // The Evictions CRM workspace is reached only by the '#evictions-crm' hash —
   // there is no menu entry and no password gate. It renders whenever that hash
   // is present and the user is authenticated like any other route.
@@ -131,6 +163,23 @@ const Index = () => {
     }
   };
 
+  // A reset-password link works whether or not the visitor can currently log
+  // in — that's the whole point — so this check comes before isLoading/
+  // isAuthenticated rather than being folded into either branch below.
+  if (resetToken) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <ResetPasswordCard
+          token={resetToken}
+          onDone={() => {
+            setResetToken(null);
+            window.location.hash = '';
+          }}
+        />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -192,6 +241,7 @@ const Index = () => {
             setIsSignupOpen(false);
             setIsLoginOpen(true);
           }}
+          initialInviteCode={signupInviteCode ?? undefined}
         />
       </div>
     );
@@ -203,9 +253,14 @@ const Index = () => {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
-      <NavRail activeTab={activeTab} onTabChange={setActiveTab} />
+      <NavRail activeTab={activeTab} onTabChange={setActiveTab} hiddenTabIds={hiddenTabIds} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header onRefresh={handleRefresh} isRefreshing={isRefreshing} onTabChange={setActiveTab} />
+        <Header
+          onRefresh={handleRefresh}
+          isRefreshing={isRefreshing}
+          onTabChange={setActiveTab}
+          onHiddenTabsSaved={setHiddenTabIds}
+        />
         <div className="flex-1 overflow-y-auto">
           <main className="container mx-auto animate-fade-in overflow-x-hidden">
             {renderContent()}

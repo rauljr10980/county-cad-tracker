@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { SignupModal } from '@/components/auth/SignupModal';
+import { ManagerViewDialog } from '@/components/layout/ManagerViewDialog';
 import { useState } from 'react';
 import {
   DropdownMenu,
@@ -24,13 +25,17 @@ interface HeaderProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
   onTabChange?: (tab: 'upload' | 'files') => void;
+  /** Lets Index.tsx refresh NavRail's visible tabs right after an admin saves. */
+  onHiddenTabsSaved?: (hiddenTabIds: Set<string>) => void;
 }
 
-export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
+export function Header({ onRefresh, isRefreshing, onTabChange, onHiddenTabsSaved }: HeaderProps) {
   const { user, isAuthenticated, logout } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isSignupOpen, setIsSignupOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isManagerViewOpen, setIsManagerViewOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -110,9 +115,17 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                  <Settings className="h-4 w-4" />
-                </Button>
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => setIsManagerViewOpen(true)}
+                    title="Manager settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                )}
               </>
             ) : (
               <DropdownMenu>
@@ -217,14 +230,19 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
                           </Button>
                         </>
                       )}
-                      <Button
-                        variant="ghost"
-                        className="justify-start mobile-touch-target"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        <Settings className="h-5 w-5 mr-3" />
-                        Settings
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          className="justify-start mobile-touch-target"
+                          onClick={() => {
+                            setIsMobileMenuOpen(false);
+                            setIsManagerViewOpen(true);
+                          }}
+                        >
+                          <Settings className="h-5 w-5 mr-3" />
+                          Manager Settings
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         className="justify-start text-destructive hover:text-destructive hover:bg-destructive/10 mobile-touch-target"
@@ -297,6 +315,13 @@ export function Header({ onRefresh, isRefreshing, onTabChange }: HeaderProps) {
           setIsLoginOpen(true);
         }}
       />
+      {isAdmin && (
+        <ManagerViewDialog
+          isOpen={isManagerViewOpen}
+          onClose={() => setIsManagerViewOpen(false)}
+          onHiddenTabsSaved={(ids) => onHiddenTabsSaved?.(ids)}
+        />
+      )}
     </>
   );
 }

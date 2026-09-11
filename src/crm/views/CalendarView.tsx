@@ -27,6 +27,8 @@ import { useToast } from '@/crm/components/ui/toast'
 import type { Task, TaskType } from '@/crm/data/types'
 import { cn } from '@/crm/lib/utils'
 import { useCrmStore } from '@/crm/store/useCrmStore'
+import { buildGoogleCalendarUrl, buildIcsContent, downloadIcsFile } from '@/crm/lib/calendarExport'
+import { CalendarPlus, Apple } from 'lucide-react'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 
@@ -200,6 +202,27 @@ export default function CalendarView() {
     rescheduleTask(event.taskId, (start as Date).toISOString())
   }
 
+  const addToGoogleCalendar = () => {
+    if (!selectedEvent) return
+    const url = buildGoogleCalendarUrl({
+      title: selectedEvent.title as string,
+      start: selectedEvent.start as Date,
+      end: selectedEvent.end as Date,
+    })
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const addToAppleCalendar = () => {
+    if (!selectedEvent) return
+    const ics = buildIcsContent({
+      title: selectedEvent.title as string,
+      start: selectedEvent.start as Date,
+      end: selectedEvent.end as Date,
+    })
+    const safeName = (selectedEvent.title as string).replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+    downloadIcsFile(`${safeName || 'task'}.ics`, ics)
+  }
+
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <div className="flex items-end justify-between gap-3">
@@ -264,6 +287,16 @@ export default function CalendarView() {
                 : ''}
             </DialogDescription>
           </DialogHeader>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button variant="outline" size="sm" onClick={addToGoogleCalendar}>
+              <CalendarPlus className="h-4 w-4" />
+              Add to Google Calendar
+            </Button>
+            <Button variant="outline" size="sm" onClick={addToAppleCalendar}>
+              <Apple className="h-4 w-4" />
+              Add to Apple/iCloud Calendar
+            </Button>
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button variant="ghost" onClick={() => setSelectedEvent(null)}>
               Cancel

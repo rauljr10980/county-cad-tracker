@@ -1,10 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { login as apiLogin, logout as apiLogout, checkSession } from '@/lib/api';
 
+export type UserRole = 'ADMIN' | 'OPERATOR' | 'VIEWER';
+
 interface User {
   id: string;
   username: string;
   email?: string;
+  role?: UserRole;
 }
 
 interface AuthContextType {

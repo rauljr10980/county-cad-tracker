@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Lock, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToSignup }: LoginModalProp
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,6 +98,18 @@ export function LoginModal({ isOpen, onClose, onSwitchToSignup }: LoginModalProp
               />
             </div>
           </div>
+          <div className="text-right text-sm -mt-2">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                setIsForgotPasswordOpen(true);
+              }}
+              className="text-muted-foreground hover:text-primary hover:underline"
+            >
+              Forgot password?
+            </button>
+          </div>
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <>
@@ -118,6 +132,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToSignup }: LoginModalProp
           </div>
         </form>
       </DialogContent>
+      <ForgotPasswordModal isOpen={isForgotPasswordOpen} onClose={() => setIsForgotPasswordOpen(false)} />
     </Dialog>
   );
 }

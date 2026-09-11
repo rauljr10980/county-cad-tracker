@@ -22,6 +22,12 @@ model User {
   password String // Hashed password
   role     UserRole @default(OPERATOR)
 
+  // Forgot-password flow. resetToken stores a SHA-256 hash of the token
+  // actually emailed to the user (never the raw token — same reasoning as a
+  // password hash), so a DB read alone can't produce a working reset link.
+  resetToken          String?
+  resetTokenExpiresAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -48,6 +54,17 @@ enum UserRole {
   ADMIN
   OPERATOR
   VIEWER
+}
+
+// Account-wide flags an ADMIN controls for the whole team — e.g. which nav
+// tabs are visible. One row per key rather than a growing column list, since
+// the set of manager-editable settings is expected to grow.
+model AppSetting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
 }
 
 model ScanCorrection {

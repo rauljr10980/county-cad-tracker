@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,16 +12,22 @@ interface SignupModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSwitchToLogin: () => void;
+  /** Pre-fills the invite code, e.g. from a '#signup=<code>' invite link. */
+  initialInviteCode?: string;
 }
 
-export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalProps) {
+export function SignupModal({ isOpen, onClose, onSwitchToLogin, initialInviteCode }: SignupModalProps) {
   const { loginWithToken } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCode, setInviteCode] = useState(initialInviteCode ?? '');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialInviteCode) setInviteCode(initialInviteCode);
+  }, [initialInviteCode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +84,7 @@ export function SignupModal({ isOpen, onClose, onSwitchToLogin }: SignupModalPro
     setEmail('');
     setPassword('');
     setConfirmPassword('');
-    setInviteCode('');
+    setInviteCode(initialInviteCode ?? '');
     onClose();
   };
 

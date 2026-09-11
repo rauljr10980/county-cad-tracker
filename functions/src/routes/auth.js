@@ -6,12 +6,19 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
-const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
+const { authenticateToken, requireRole, JWT_SECRET } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 const rateLimit = require('express-rate-limit');
+const { sendEmail } = require('../lib/emailService');
 
 const router = express.Router();
+
+// Where reset-password and invite links point back to. The frontend is a
+// static GitHub Pages build with hash-based routing (see src/pages/Index.tsx),
+// so these are '#'-fragment links, not real paths.
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://rauljr10980.github.io/county-cad-tracker';
 
 // ============================================================================
 // REGISTER
@@ -223,6 +230,130 @@ router.post('/logout', authenticateToken, async (req, res) => {
   // With JWT, logout is handled client-side by removing the token
   // Could implement token blacklist here if needed
   res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// ============================================================================
+// FORGOT / RESET PASSWORD
+// ============================================================================
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip,
+  message: { error: 'Too many attempts. Wait a while and try again.' }
+});
+
+router.post('/forgot-password',
+  forgotPasswordLimiter,
+  [body('email').isEmail().normalizeEmail().withMessage('Invalid email address')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: errors.array()[0].msg });
+      }
+
+      const { email } = req.body;
+      const user = await prisma.user.findUnique({ where: { email } });
+
+      // Same response whether or not the email is registered, so this
+      // endpoint can't be used to find out who has an account.
+      if (user) {
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            resetToken: hashedToken,
+            resetTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+          },
+        });
+
+        const resetUrl = `${FRONTEND_URL}/#reset-password=${rawToken}`;
+        try {
+          await sendEmail({
+            to: [user.email],
+            subject: 'Reset your password',
+            text: `We received a request to reset your password.\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, you can ignore this email.`,
+          });
+        } catch (emailError) {
+          // The token is already saved; a failed send just means this
+          // particular email didn't go out. Don't leak that to the client —
+          // the response stays generic either way.
+          console.error('[AUTH] Failed to send password reset email:', emailError);
+        }
+      }
+
+      res.json({ success: true, message: 'If that email is registered, a reset link has been sent.' });
+    } catch (error) {
+      console.error('[AUTH] Forgot password error:', error);
+      res.status(500).json({ error: 'Failed to process request' });
+    }
+  }
+);
+
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip,
+  message: { error: 'Too many attempts. Wait a while and try again.' }
+});
+
+router.post('/reset-password',
+  resetPasswordLimiter,
+  [
+    body('token').notEmpty().withMessage('Reset token is required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: errors.array()[0].msg });
+      }
+
+      const { token, password } = req.body;
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+      const user = await prisma.user.findFirst({
+        where: { resetToken: hashedToken, resetTokenExpiresAt: { gt: new Date() } },
+      });
+
+      if (!user) {
+        return res.status(400).json({ error: 'This reset link is invalid or has expired' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword, resetToken: null, resetTokenExpiresAt: null },
+      });
+
+      res.json({ success: true, message: 'Password updated. You can now log in.' });
+    } catch (error) {
+      console.error('[AUTH] Reset password error:', error);
+      res.status(500).json({ error: 'Failed to reset password' });
+    }
+  }
+);
+
+// ============================================================================
+// INVITE LINK (ADMIN only)
+// ============================================================================
+
+// Lets an admin copy a shareable signup link without having to go dig the
+// shared invite code out of Railway's env vars themselves.
+router.get('/invite-link', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  if (!process.env.INVITE_CODE) {
+    return res.status(500).json({ error: 'INVITE_CODE is not configured on the server' });
+  }
+  const inviteCode = process.env.INVITE_CODE;
+  res.json({ inviteCode, signupUrl: `${FRONTEND_URL}/#signup=${encodeURIComponent(inviteCode)}` });
 });
 
 // ============================================================================

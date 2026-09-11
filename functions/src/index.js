@@ -42,6 +42,7 @@ const crmRoutes = require('./routes/crm');
 const evictionRoutes = require('./routes/evictions');
 const mlsLeadRoutes = require('./routes/mlsLeads');
 const publicIntakeRoutes = require('./routes/publicIntake');
+const settingsRoutes = require('./routes/settings');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -196,6 +197,7 @@ app.use('/api/crm', crmRoutes);
 app.use('/api/evictions', evictionRoutes);
 app.use('/api/mls-leads', mlsLeadRoutes);
 app.use('/api/public', publicIntakeRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // ============================================================================
 // ERROR HANDLING

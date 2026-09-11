@@ -802,6 +802,93 @@ export async function verifyEmail(token: string) {
 }
 
 /**
+ * Request a password reset email
+ */
+export async function forgotPassword(email: string) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to request a password reset');
+  }
+
+  return response.json();
+}
+
+/**
+ * Reset a password using the token from a forgot-password email
+ */
+export async function resetPassword(token: string, password: string) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to reset password');
+  }
+
+  return response.json();
+}
+
+/**
+ * ADMIN-only: fetch a shareable signup link carrying the team's invite code
+ */
+export async function getInviteLink(): Promise<{ inviteCode: string; signupUrl: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/invite-link`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to load the invite link');
+  }
+
+  return response.json();
+}
+
+/**
+ * The team's nav-tab visibility, set by an ADMIN in the manager view and
+ * shared account-wide — any signed-in user can read it, only an ADMIN can
+ * change it.
+ */
+export async function getHiddenTabs(): Promise<string[]> {
+  const response = await fetch(`${API_BASE_URL}/api/settings/hidden-tabs`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to load tab settings');
+  }
+
+  const data = await response.json();
+  return data.hiddenTabs;
+}
+
+export async function setHiddenTabs(hiddenTabs: string[]): Promise<string[]> {
+  const response = await fetch(`${API_BASE_URL}/api/settings/hidden-tabs`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ hiddenTabs }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to save tab settings');
+  }
+
+  const data = await response.json();
+  return data.hiddenTabs;
+}
+
+/**
  * Get all pre-foreclosure records
  * @param filters Optional filters for address, city, zip
  */
