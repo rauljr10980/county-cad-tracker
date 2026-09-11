@@ -7,6 +7,8 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: vi.fn(() => ({ user: { id: 'u1', username: 'raul', role: 'OPERATOR' }, logout: vi.fn() })),
 }))
 
+import { useAuth } from '@/contexts/AuthContext'
+
 const noop = () => {}
 const defaultProps = {
   activeTab: 'properties' as const,
@@ -62,5 +64,21 @@ describe('TopBar', () => {
     render(<TopBar {...defaultProps} />)
     screen.getByRole('button', { name: /open menu/i }).click()
     await waitFor(() => expect(screen.getByRole('button', { name: /Calendar/ })).toBeTruthy())
+  })
+
+  it('mobile sheet also lists account actions (Upload, Files, Logout) but not Manager Settings for a non-admin', async () => {
+    render(<TopBar {...defaultProps} />)
+    screen.getByRole('button', { name: /open menu/i }).click()
+    await waitFor(() => expect(screen.getByRole('button', { name: /Upload/ })).toBeTruthy())
+    expect(screen.getByRole('button', { name: /Files/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Logout/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Manager Settings/ })).toBeNull()
+  })
+
+  it('mobile sheet lists Manager Settings for an ADMIN user', async () => {
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' }, logout: vi.fn() } as any)
+    render(<TopBar {...defaultProps} />)
+    screen.getByRole('button', { name: /open menu/i }).click()
+    await waitFor(() => expect(screen.getByRole('button', { name: /Manager Settings/ })).toBeTruthy())
   })
 })
