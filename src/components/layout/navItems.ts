@@ -16,7 +16,13 @@ export const tabs = [
   { id: 'inbox' as TabType, label: 'Inbox', icon: Inbox, shortLabel: 'Inbox' },
 ];
 
-export const PUBLIC_SITE_URL = 'https://estate-essentials-co.lovable.app';
+// Two live copies of the public site exist (confirmed 2026-09-11):
+// estate-essentials-co.lovable.app is Lovable's own hosting and has drifted
+// out of sync with the estate-site GitHub repo (missing e.g. the Find a
+// Solution page's category tabs); this Railway URL is what `railway up
+// --service public-site` actually keeps current. Point here until a real
+// custom domain is chosen.
+export const PUBLIC_SITE_URL = 'https://public-site-production-aaf1.up.railway.app';
 export const PUBLIC_SITE_TAB_ID = 'publicSite';
 
 /**

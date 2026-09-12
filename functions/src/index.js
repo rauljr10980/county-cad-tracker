@@ -65,8 +65,8 @@ app.use(compression());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // CORS configuration - Allow GitHub Pages, localhost, and the public
-// marketing site (estate-essentials-co, the `public-site` Railway service)
-// whose funnel pages POST to /api/public/submissions unauthenticated.
+// marketing site's funnel pages, which POST to /api/public/submissions
+// unauthenticated.
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : [
@@ -76,10 +76,16 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       'http://localhost:8081',
       'https://rauljr10980.github.io',
       'https://rauljr10980.github.io/county-cad-tracker',
-      // estate-essentials-co's current Lovable-hosted origin. A future
-      // custom domain for the public site will need adding here too (or via
-      // ALLOWED_ORIGINS).
-      'https://estate-essentials-co.lovable.app'
+      // Two separate live copies of the public site exist today (confirmed
+      // 2026-09-11): estate-essentials-co.lovable.app is Lovable's own
+      // hosting and has drifted out of sync with the estate-site GitHub
+      // repo; public-site-production-aaf1.up.railway.app is the Railway
+      // deployment `railway up --service public-site` actually keeps
+      // current. Both are allowed here so submissions work from whichever
+      // one is live; a real custom domain (not yet decided) should replace
+      // the Railway one when chosen.
+      'https://estate-essentials-co.lovable.app',
+      'https://public-site-production-aaf1.up.railway.app'
     ];
 
 app.use(cors({
