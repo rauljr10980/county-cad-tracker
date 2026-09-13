@@ -5,7 +5,8 @@ import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { truePeopleSearchUrl, taxAssessorUrl, landRecordsUrl, type ResearchAddress } from '@/lib/researchLinks';
 import { normalizeContacts, type NormalizedContacts } from '@/lib/contactsModel';
 import { ContactWorkspace } from '@/components/contacts/ContactWorkspace';
-import { fmtDate, fmtMoney, ownerRoleLabels, pillClass, statusTone, type MlsContact, type MlsLead } from './MlsLeadsView';
+import { pillClass } from '@/lib/pillBadge';
+import { fmtDate, fmtMoney, ownerRoleLabels, statusTone, type MlsContact, type MlsLead } from './MlsLeadsView';
 
 // The Comptroller's Registered Office Street Address (and each officer's
 // address) comes back as one formatted string ("797 CROWN JEWEL, BOERNE, TX

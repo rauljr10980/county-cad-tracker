@@ -3,6 +3,7 @@ import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { Building2, ChevronLeft, ChevronRight, Loader2, PhoneCall, Search, Upload, User } from 'lucide-react';
 import { normalizeContacts } from '@/lib/contactsModel';
 import { consumePendingSearch, PENDING_SEARCH_EVENT, type PendingSearchEventDetail } from '@/lib/pendingSearch';
+import { pillClass } from '@/lib/pillBadge';
 import MlsLeadDetails from './MlsLeadDetails';
 import SkipTraceQueue from './SkipTraceQueue';
 
@@ -109,18 +110,6 @@ const request = async (path: string, init?: RequestInit) => {
 
 export const fmtMoney = (value?: number | null) => (value == null ? '—' : `$${value.toLocaleString()}`);
 export const fmtDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString() : '—');
-
-// Pill tone keyword, translated to Tailwind classes via PILL_TONE_CLASSES.
-const PILL_BASE = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold';
-const PILL_TONE_CLASSES: Record<string, string> = {
-  '': 'bg-muted text-muted-foreground',
-  grey: 'bg-muted text-muted-foreground',
-  blue: 'bg-primary/15 text-primary',
-  warn: 'bg-warning/15 text-warning',
-  danger: 'bg-destructive/15 text-destructive',
-  success: 'bg-success/15 text-success',
-};
-export const pillClass = (tone: string) => `${PILL_BASE} ${PILL_TONE_CLASSES[tone] ?? PILL_TONE_CLASSES.grey}`;
 
 // connectMLS statuses aren't a closed enum in the data we've seen, so unknown
 // codes fall back to grey rather than breaking the pill.
