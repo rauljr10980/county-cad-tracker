@@ -126,6 +126,14 @@ router.put('/:id',
         return res.status(403).json({ error: 'Only admins can change user roles' });
       }
 
+      // Admins can't strip their own admin status — mirrors the
+      // self-deactivation guard below, for the same reason: losing this
+      // role via your own request would lock you out of the Team tab
+      // with no way back in except direct database access.
+      if (updates.role && updates.role !== 'ADMIN' && req.user.id === id) {
+        return res.status(400).json({ error: 'Cannot change your own role' });
+      }
+
       // Only admins can change account status
       if (updates.isActive !== undefined && req.user.role !== 'ADMIN') {
         return res.status(403).json({ error: 'Only admins can change account status' });
