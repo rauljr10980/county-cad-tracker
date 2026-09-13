@@ -47,6 +47,7 @@ export default function ContactsView() {
   // must not change. Scanning a card for someone who is already an active
   // opportunity or a retail contact still needs to be caught here.
   const allLeads = useCrmStore(useShallow((state) => state.leads))
+  const tasks = useCrmStore(useShallow((state) => state.tasks))
   const updateLead = useCrmStore((state) => state.updateLead)
   const query = useSearchStore((state) => state.query).trim().toLowerCase()
   const [jobTitleIndustry, setJobTitleIndustry] = useState(ANY)
@@ -174,6 +175,7 @@ export default function ContactsView() {
 
       <LeadsTable
         leads={filteredLeads}
+        tasks={tasks}
         onRowClick={(leadId) => setOpenLeadId(leadId)}
         onRateConnection={(leadId, rating: ConnectionRating) =>
           updateLead(leadId, {

@@ -113,7 +113,7 @@ export const fmtDate = (value?: string | null) => (value ? new Date(value).toLoc
 
 // connectMLS statuses aren't a closed enum in the data we've seen, so unknown
 // codes fall back to grey rather than breaking the pill.
-const STATUS_PILL_TONE: Record<string, string> = { ACT: 'blue', SLD: 'success', PEND: 'warn', EXP: 'danger', WD: 'danger', CS: 'grey' };
+const STATUS_PILL_TONE: Record<string, string> = { ACT: 'blue', SLD: 'success', CAN: 'danger', PEND: 'warn', EXP: 'danger', WD: 'danger', CS: 'grey' };
 export const statusTone = (status: string) => STATUS_PILL_TONE[status] ?? 'grey';
 
 // entityLookupStatus pill tone/label — 'pending' (a null/empty status) isn't

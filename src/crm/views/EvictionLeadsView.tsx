@@ -49,7 +49,7 @@ const fmt = (value?: string) => value ? new Date(value).toLocaleDateString() : '
 // reusing the Tailwind classes in STAGE_TONE from crm-evictions/constants.ts)
 // because stageTone()'s test coverage asserts these exact keyword strings.
 const STAGE_PILL_TONE: Record<Stage, string> = {
-  'New Lead': 'grey',
+  'New Lead': 'blue',
   Researching: 'warn',
   'Ready to Contact': 'blue',
   'Attempted Contact': 'blue',

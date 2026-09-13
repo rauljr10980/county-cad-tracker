@@ -15,8 +15,8 @@ describe('stageTone', () => {
     expect(stageTone('Do Not Contact')).toBe('danger');
   });
 
-  it('marks the untouched stage as grey', () => {
-    expect(stageTone('New Lead')).toBe('grey');
+  it('marks a new lead as blue', () => {
+    expect(stageTone('New Lead')).toBe('blue');
   });
 
   it('falls back to grey for unrecognized values', () => {
