@@ -12,6 +12,7 @@ const { authenticateToken, requireRole, JWT_SECRET } = require('../middleware/au
 const prisma = require('../lib/prisma');
 const rateLimit = require('express-rate-limit');
 const { sendEmail } = require('../lib/emailService');
+const { inviteStatus } = require('../lib/inviteStatus');
 
 const router = express.Router();
 
@@ -41,9 +42,15 @@ router.post('/register',
 
       const { username, email, password, inviteCode } = req.body;
 
-      // Verify invite code
-      if (!process.env.INVITE_CODE || inviteCode !== process.env.INVITE_CODE) {
-        return res.status(403).json({ error: 'Invalid invite code' });
+      // Verify invite code — a per-email, single-use, expiring Invite row,
+      // looked up by the SHA-256 hash of the raw token in the link (the raw
+      // token itself is never stored, same pattern as password-reset tokens
+      // below).
+      const inviteTokenHash = crypto.createHash('sha256').update(inviteCode).digest('hex');
+      const invite = await prisma.invite.findUnique({ where: { tokenHash: inviteTokenHash } });
+
+      if (!invite || invite.revokedAt || invite.usedAt || invite.expiresAt < new Date()) {
+        return res.status(403).json({ error: 'This invite link is invalid, expired, or has already been used' });
       }
 
       // Check if user already exists
@@ -83,6 +90,8 @@ router.post('/register',
           createdAt: true
         }
       });
+
+      await prisma.invite.update({ where: { id: invite.id }, data: { usedAt: new Date() } });
 
       // Generate JWT
       const token = jwt.sign(
@@ -134,6 +143,10 @@ router.post('/login',
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) {
         return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      if (!user.isActive) {
+        return res.status(403).json({ error: 'This account has been deactivated. Contact your administrator.' });
       }
 
       // Generate JWT
@@ -343,17 +356,100 @@ router.post('/reset-password',
 );
 
 // ============================================================================
-// INVITE LINK (ADMIN only)
+// INVITES (ADMIN only)
 // ============================================================================
 
-// Lets an admin copy a shareable signup link without having to go dig the
-// shared invite code out of Railway's env vars themselves.
-router.get('/invite-link', authenticateToken, requireRole('ADMIN'), async (req, res) => {
-  if (!process.env.INVITE_CODE) {
-    return res.status(500).json({ error: 'INVITE_CODE is not configured on the server' });
+const inviteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user.id,
+  message: { error: 'Too many invites sent. Wait a while and try again.' }
+});
+
+router.post('/invites',
+  authenticateToken,
+  requireRole('ADMIN'),
+  inviteLimiter,
+  [body('email').isEmail().normalizeEmail().withMessage('Invalid email address')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: errors.array()[0].msg });
+      }
+
+      const { email } = req.body;
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      const invite = await prisma.invite.create({
+        data: { email, tokenHash, invitedById: req.user.id, expiresAt },
+        select: { id: true, email: true, expiresAt: true, createdAt: true },
+      });
+
+      const signupUrl = `${FRONTEND_URL}/#signup=${rawToken}`;
+      try {
+        await sendEmail({
+          to: [email],
+          subject: "You're invited to Bexar CRE Acquisition CRM",
+          text: `${req.user.username} has invited you to join the team.\n\n${signupUrl}\n\nThis link expires in 7 days and can only be used once.`,
+        });
+      } catch (emailError) {
+        // The invite row is already saved; a failed send just means this
+        // particular email didn't go out. The admin can see it's still
+        // "pending" on the Team tab and re-invite the same address if needed.
+        console.error('[AUTH] Failed to send invite email:', emailError);
+      }
+
+      res.status(201).json({ success: true, invite });
+    } catch (error) {
+      console.error('[AUTH] Create invite error:', error);
+      res.status(500).json({ error: 'Failed to send invite' });
+    }
   }
-  const inviteCode = process.env.INVITE_CODE;
-  res.json({ inviteCode, signupUrl: `${FRONTEND_URL}/#signup=${encodeURIComponent(inviteCode)}` });
+);
+
+router.get('/invites', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const invites = await prisma.invite.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        expiresAt: true,
+        usedAt: true,
+        revokedAt: true,
+        invitedBy: { select: { username: true } },
+      },
+    });
+
+    res.json({
+      invites: invites.map((invite) => ({ ...invite, status: inviteStatus(invite) })),
+    });
+  } catch (error) {
+    console.error('[AUTH] List invites error:', error);
+    res.status(500).json({ error: 'Failed to load invites' });
+  }
+});
+
+router.delete('/invites/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    await prisma.invite.update({
+      where: { id: req.params.id },
+      data: { revokedAt: new Date() },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Invite not found' });
+    }
+    console.error('[AUTH] Revoke invite error:', error);
+    res.status(500).json({ error: 'Failed to revoke invite' });
+  }
 });
 
 // ============================================================================
