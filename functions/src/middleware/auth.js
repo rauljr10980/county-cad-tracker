@@ -34,12 +34,17 @@ async function authenticateToken(req, res, next) {
         id: true,
         username: true,
         email: true,
-        role: true
+        role: true,
+        isActive: true
       }
     });
 
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ error: 'This account has been deactivated' });
     }
 
     // Attach user to request
