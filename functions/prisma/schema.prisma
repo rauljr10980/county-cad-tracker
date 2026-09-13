@@ -21,6 +21,7 @@ model User {
   email    String   @unique
   password String // Hashed password
   role     UserRole @default(OPERATOR)
+  isActive Boolean  @default(true)
 
   // Forgot-password flow. resetToken stores a SHA-256 hash of the token
   // actually emailed to the user (never the raw token — same reasoning as a
@@ -44,6 +45,7 @@ model User {
   crmLeads          CrmLead[]
   scanCorrections   ScanCorrection[]
   mlsLeads          MlsLead[]
+  invitesSent       Invite[]
 
   @@index([email])
   @@index([username])
@@ -65,6 +67,24 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 
   @@map("app_settings")
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  email       String
+  // SHA-256 of the raw token. Same reasoning as User.resetToken: the raw
+  // token only ever exists in the emailed link, never in the database, so a
+  // DB read alone can't produce a working invite link.
+  tokenHash   String    @unique
+  invitedById String
+  invitedBy   User      @relation(fields: [invitedById], references: [id])
+  expiresAt   DateTime
+  usedAt      DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@map("invites")
 }
 
 model ScanCorrection {
