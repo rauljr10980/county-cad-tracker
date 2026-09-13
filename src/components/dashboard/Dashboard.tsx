@@ -13,13 +13,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEvictionLeadsCount, useMlsLeadsCount } from '@/hooks/useLeadCounts';
 import { useFollowUps } from '@/hooks/useFollowUps';
 import { useCrmStore } from '@/crm/store/useCrmStore';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow, isToday } from 'date-fns';
+import { useCalendarEvents } from '@/hooks/useCalendarEvents';
+import { ScanLine, UploadCloud, Search as SearchIcon, Building2 as ScrapeIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface DashboardProps {
   onFilterChange?: (filter: { from?: PropertyStatus; to?: PropertyStatus }) => void;
+  onNavigateToTab?: (tab: string) => void;
 }
 
-export function Dashboard({ onFilterChange }: DashboardProps) {
+export function Dashboard({ onFilterChange, onNavigateToTab }: DashboardProps) {
   const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats();
   const { data: preForeclosureRecords, isLoading: isLoadingPreForeclosures } = usePreForeclosures();
   const { data: callStats } = useCallStats();
@@ -85,6 +89,19 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
   const currentMonthKey = format(new Date(), 'yyyy-MM');
   const { data: monthFollowUps = [] } = useFollowUps(currentMonthKey);
   const followUpsDueCount = monthFollowUps.filter((f) => !f.completed && new Date(f.date) <= new Date()).length;
+
+  const activities = useCrmStore((s) => s.activities);
+  const crmLeads = useCrmStore((s) => s.leads);
+  const crmLeadById = new Map(crmLeads.map((l) => [l.id, l]));
+  const calendarEvents = useCalendarEvents(currentMonthKey);
+  const todaysEvents = calendarEvents.filter((e) => isToday(e.start as Date)).sort((a, b) => (a.start as Date).getTime() - (b.start as Date).getTime());
+  const startOfThisWeek = new Date();
+  startOfThisWeek.setDate(startOfThisWeek.getDate() - startOfThisWeek.getDay());
+  startOfThisWeek.setHours(0, 0, 0, 0);
+  const endOfThisWeek = new Date(startOfThisWeek);
+  endOfThisWeek.setDate(endOfThisWeek.getDate() + 7);
+  const meetingsThisWeekCount = calendarEvents.filter((e) => e.kind === 'crm' && (e.start as Date) >= startOfThisWeek && (e.start as Date) < endOfThisWeek).length;
+  const recentActivities = [...activities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 5);
 
   const greeting = (() => {
     const hour = new Date().getHours();
@@ -175,9 +192,76 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
         <StatCard title="MLS Leads" value={mlsLeadsCount ?? 0} icon={Building2} variant="primary" />
         <StatCard title="Key Relationships" value={industryLeadsCount} icon={Users2} variant="success" />
         <StatCard title="Follow-ups Due" value={followUpsDueCount} icon={CalendarClock} variant="warning" />
-        <StatCard title="Meetings This Week" value={0} icon={Handshake} variant="primary" />
+        <StatCard title="Meetings This Week" value={meetingsThisWeekCount} icon={Handshake} variant="primary" />
         <StatCard title="Deals in Pipeline" value={pipelineData.activeDeals} icon={Wallet} variant="success" />
         <StatCard title="Est. Acquisition Value" value={`$${pipelineData.totalValue.toLocaleString()}`} icon={Wallet} variant="success" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Today's Schedule</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {todaysEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nothing scheduled today.</p>
+            ) : (
+              todaysEvents.map((event) => (
+                <div key={event.id} className="flex items-start gap-2 text-sm">
+                  <span className="w-14 shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {event.allDay ? 'All day' : (event.start as Date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  </span>
+                  <span className="truncate">{event.title as string}</span>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {recentActivities.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No activity logged yet.</p>
+            ) : (
+              recentActivities.map((activity) => (
+                <div key={activity.id} className="text-sm">
+                  <p className="truncate">{activity.body}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {crmLeadById.get(activity.leadId)?.ownerName || crmLeadById.get(activity.leadId)?.businessName || 'Unknown contact'}
+                    {' · '}
+                    {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                  </p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            <Button variant="outline" size="sm" className="justify-start" onClick={() => onNavigateToTab?.('crm')}>
+              <ScanLine className="h-4 w-4 mr-2" /> Add Contact
+            </Button>
+            <Button variant="outline" size="sm" className="justify-start" onClick={() => onNavigateToTab?.('mls')}>
+              <UploadCloud className="h-4 w-4 mr-2" /> Import connectMLS Export
+            </Button>
+            <Button variant="outline" size="sm" className="justify-start" onClick={() => onNavigateToTab?.('upload')}>
+              <UploadCloud className="h-4 w-4 mr-2" /> Upload Records
+            </Button>
+            <Button variant="outline" size="sm" className="justify-start" onClick={() => onNavigateToTab?.('preforeclosure')}>
+              <ScrapeIcon className="h-4 w-4 mr-2" /> Scrape Data
+            </Button>
+            <Button variant="outline" size="sm" className="justify-start" onClick={() => onNavigateToTab?.('mls')}>
+              <SearchIcon className="h-4 w-4 mr-2" /> Look up all businesses
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Call Activity */}

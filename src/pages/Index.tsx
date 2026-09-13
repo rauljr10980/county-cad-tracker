@@ -134,7 +134,7 @@ const Index = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard onFilterChange={() => setActiveTab('properties')} />;
+        return <Dashboard onFilterChange={() => setActiveTab('properties')} onNavigateToTab={setActiveTab} />;
       case 'calendar':
         return <CalendarView />;
       case 'properties':
@@ -158,7 +158,7 @@ const Index = () => {
       case 'inbox':
         return <InboxView />;
       default:
-        return <Dashboard />;
+        return <Dashboard onNavigateToTab={setActiveTab} />;
     }
   };
 

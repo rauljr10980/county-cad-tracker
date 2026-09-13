@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { Dashboard } from './Dashboard';
 
 // jsdom has no ResizeObserver; recharts' ResponsiveContainer (used by the
@@ -52,12 +52,17 @@ vi.mock('@/hooks/useFollowUps', () => ({
 }));
 
 vi.mock('@/hooks/useCalendarEvents', () => ({
-  useCalendarEvents: () => [],
+  useCalendarEvents: () => [
+    { id: 'crm-1', kind: 'crm', title: 'Meeting · Jane Doe', start: new Date(), end: new Date(), allDay: false, completed: false, payload: {} },
+  ],
 }));
 
 vi.mock('@/crm/store/useCrmStore', () => ({
   useCrmStore: (selector: (s: any) => unknown) =>
-    selector({ leads: [{ id: 'l1', kind: 'industry' }, { id: 'l2', kind: 'retail' }], activities: [] }),
+    selector({
+      leads: [{ id: 'l1', kind: 'industry', ownerName: 'Jane Doe' }, { id: 'l2', kind: 'retail' }],
+      activities: [{ id: 'a1', leadId: 'l1', kind: 'note', body: 'Left a voicemail', timestamp: new Date().toISOString() }],
+    }),
 }));
 
 describe('Dashboard KPI row', () => {
@@ -79,10 +84,25 @@ describe('Dashboard KPI row', () => {
     expect(screen.getByText('MLS Leads')).toBeTruthy();
     expect(screen.getByText('2,321')).toBeTruthy();
     expect(screen.getByText('Key Relationships')).toBeTruthy();
-    expect(screen.getByText('1')).toBeTruthy(); // one 'industry' lead in the mock
+    // Scoped to the Key Relationships card: Task 7's Today's Schedule mock
+    // adds a 'crm' calendar event dated `new Date()`, which now also makes
+    // Meetings This Week equal 1, so an unscoped getByText('1') would match
+    // two cards.
+    const keyRelationshipsCard = screen.getByText('Key Relationships').closest('.stat-card') as HTMLElement;
+    expect(within(keyRelationshipsCard).getByText('1')).toBeTruthy(); // one 'industry' lead in the mock
     expect(screen.getByText('Deals in Pipeline')).toBeTruthy();
     expect(screen.getByText('8')).toBeTruthy();
     expect(screen.getByText('Est. Acquisition Value')).toBeTruthy();
     expect(screen.getByText('$12,400,000')).toBeTruthy();
+  });
+
+  it("renders Today's Schedule, Recent Activity, and Quick Actions", () => {
+    render(<Dashboard />);
+    expect(screen.getByText("Today's Schedule")).toBeTruthy();
+    expect(screen.getByText(/Meeting · Jane Doe/)).toBeTruthy();
+    expect(screen.getByText('Recent Activity')).toBeTruthy();
+    expect(screen.getByText('Left a voicemail')).toBeTruthy();
+    expect(screen.getByText('Quick Actions')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Scan Business Card|Add Contact/ })).toBeTruthy();
   });
 });
