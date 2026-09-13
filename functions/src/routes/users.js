@@ -26,6 +26,7 @@ router.get('/',
           username: true,
           email: true,
           role: true,
+          isActive: true,
           createdAt: true,
           updatedAt: true,
           _count: {
@@ -102,7 +103,8 @@ router.put('/:id',
   [
     body('email').optional().isEmail().normalizeEmail(),
     body('password').optional().isLength({ min: 6 }),
-    body('role').optional().isIn(['ADMIN', 'OPERATOR', 'VIEWER'])
+    body('role').optional().isIn(['ADMIN', 'OPERATOR', 'VIEWER']),
+    body('isActive').optional().isBoolean()
   ],
   async (req, res) => {
     try {
@@ -124,6 +126,14 @@ router.put('/:id',
         return res.status(403).json({ error: 'Only admins can change user roles' });
       }
 
+      // Only admins can change account status
+      if (updates.isActive !== undefined && req.user.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Only admins can change account status' });
+      }
+      if (updates.isActive === false && req.user.id === id) {
+        return res.status(400).json({ error: 'Cannot deactivate your own account' });
+      }
+
       // Hash password if provided
       if (updates.password) {
         updates.password = await bcrypt.hash(updates.password, 10);
@@ -137,6 +147,7 @@ router.put('/:id',
           username: true,
           email: true,
           role: true,
+          isActive: true,
           updatedAt: true
         }
       });
