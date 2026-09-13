@@ -4,7 +4,6 @@ import {
   Calendar,
   dateFnsLocalizer,
   Views,
-  type Event,
   type NavigateAction,
   type SlotInfo,
   type ToolbarProps,
@@ -18,8 +17,7 @@ import { ChevronLeft, ChevronRight, Briefcase, Home, Car, Building2, Check, Undo
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useFollowUps, useUpdateFollowUp, useDeleteFollowUp } from '@/hooks/useFollowUps';
-import { useDrivingLeads } from '@/hooks/useDrivingLeads';
+import { useUpdateFollowUp, useDeleteFollowUp } from '@/hooks/useFollowUps';
 import { WORKFLOW_STAGES } from '@/types/property';
 import type { FollowUp, WorkflowStage, Property, PreForeclosureRecord, DrivingLead } from '@/types/property';
 import { cn } from '@/lib/utils';
@@ -28,7 +26,7 @@ import { getProperties, getPreForeclosures } from '@/lib/api';
 import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsModal';
 import { FullDetailsModal } from '@/components/preforeclosure/FullDetailsModal';
 import { useCrmStore } from '@/crm/store/useCrmStore';
-import { useAuth } from '@/contexts/AuthContext';
+import { useCalendarEvents, followUpTitle, type CalendarEvent as CalEvent, type CalendarEventKind } from '@/hooks/useCalendarEvents';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
@@ -47,17 +45,7 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
-// ── Event types ────────────────────────────────────────────────────────────
-type EventKind = 'followup' | 'd4d' | 'crm';
-
-type CalEvent = Event & {
-  id: string;
-  kind: EventKind;
-  completed: boolean;
-  payload: FollowUp | DrivingLead | { id: string; leadId: string; type: string; dueAt: string; completed: boolean; notes: string; completedAt: string | null };
-};
-
-const KIND_COLORS: Record<EventKind, { bg: string; border: string; text: string; badge: string }> = {
+export const KIND_COLORS: Record<CalendarEventKind, { bg: string; border: string; text: string; badge: string }> = {
   followup: { bg: '#1e3a5f',  border: '#3b82f6', text: '#93c5fd', badge: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
   d4d:      { bg: '#3b1f6b',  border: '#8b5cf6', text: '#c4b5fd', badge: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
   crm:      { bg: '#78350f',  border: '#f59e0b', text: '#fcd34d', badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
@@ -111,18 +99,6 @@ function Toolbar({ label, onNavigate, onView, view, views }: ToolbarProps<CalEve
   );
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function followUpTitle(fu: FollowUp): string {
-  if (fu.drivingLead) return fu.drivingLead.street || fu.drivingLead.rawAddress || 'D4$ Lead';
-  if (fu.property) return fu.property.propertyAddress || fu.property.ownerName || 'Property';
-  if (fu.preForeclosure) return fu.preForeclosure.address || 'Pre-FC';
-  return 'Follow-up';
-}
-
-function crmTaskDuration(type: string) {
-  return type === 'Meeting' || type === 'Property Tour' ? 60 * 60 * 1000 : 30 * 60 * 1000;
-}
-
 // ── Main component ─────────────────────────────────────────────────────────
 export function CalendarView() {
   const [view, setView] = useState<View>(Views.MONTH);
@@ -132,82 +108,14 @@ export function CalendarView() {
   const [selectedPreForeclosure, setSelectedPreForeclosure] = useState<PreForeclosureRecord | null>(null);
 
   const monthKey = format(date, 'yyyy-MM');
-  const { data: followUps = [] } = useFollowUps(monthKey);
-  const { data: drivingLeads = [] } = useDrivingLeads();
   const updateMutation = useUpdateFollowUp();
   const deleteMutation = useDeleteFollowUp();
 
   // CRM
-  const { user } = useAuth();
-  const crmHydrate = useCrmStore((s) => s.hydrate);
-  const crmTasks = useCrmStore((s) => s.tasks);
   const crmLeads = useCrmStore((s) => s.leads);
   const crmReschedule = useCrmStore((s) => s.rescheduleTask);
-  useEffect(() => { crmHydrate(new Date(), user?.id); }, [crmHydrate, user?.id]);
   const crmLeadById = useMemo(() => new Map(crmLeads.map((l) => [l.id, l])), [crmLeads]);
-
-  // ── Build unified event list ─────────────────────────────────────────────
-  const events = useMemo<CalEvent[]>(() => {
-    const list: CalEvent[] = [];
-
-    // Follow-ups (all-day)
-    for (const fu of followUps) {
-      const day = new Date(fu.date);
-      day.setHours(0, 0, 0, 0);
-      const end = new Date(day);
-      end.setHours(23, 59, 59);
-      list.push({
-        id: fu.id,
-        kind: fu.drivingLeadId ? 'd4d' : 'followup',
-        title: followUpTitle(fu),
-        start: day,
-        end,
-        allDay: true,
-        completed: fu.completed,
-        payload: fu,
-      });
-    }
-
-    // D4$ scheduled (all-day)
-    for (const lead of drivingLeads) {
-      const wf = (lead.metadata as any) || {};
-      if (!wf.scheduledFollowUpAt) continue;
-      const day = new Date(wf.scheduledFollowUpAt);
-      day.setHours(0, 0, 0, 0);
-      const end = new Date(day);
-      end.setHours(23, 59, 59);
-      const done = wf.lastFollowUpAt && new Date(wf.lastFollowUpAt) >= new Date(wf.scheduledFollowUpAt);
-      list.push({
-        id: `d4d-sched-${lead.id}`,
-        kind: 'd4d',
-        title: `D4$ ${lead.street || lead.rawAddress}`,
-        start: day,
-        end,
-        allDay: true,
-        completed: !!done,
-        payload: lead,
-      });
-    }
-
-    // CRM tasks (timed)
-    for (const task of crmTasks) {
-      const lead = crmLeadById.get(task.leadId);
-      const start = new Date(task.dueAt);
-      const end = new Date(start.getTime() + crmTaskDuration(task.type));
-      list.push({
-        id: `crm-${task.id}`,
-        kind: 'crm',
-        title: `${task.type} · ${lead?.ownerName || lead?.businessName || 'Unknown'}`,
-        start,
-        end,
-        allDay: false,
-        completed: task.completed,
-        payload: task,
-      });
-    }
-
-    return list;
-  }, [followUps, drivingLeads, crmTasks, crmLeadById]);
+  const events = useCalendarEvents(monthKey);
 
   // ── Event styling ────────────────────────────────────────────────────────
   const eventStyleGetter = useCallback((event: CalEvent) => {
