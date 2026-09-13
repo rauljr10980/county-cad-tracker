@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { D4dKanbanBoard } from './D4dKanbanBoard';
 import type { DrivingLead } from '@/types/property';
 
@@ -27,9 +27,12 @@ describe('D4dKanbanBoard', () => {
 
   it('places each lead card under its own stage column', () => {
     render(<D4dKanbanBoard leads={leads} />);
-    expect(screen.getByText('1 Main St')).toBeTruthy();
-    expect(screen.getByText('2 Main St')).toBeTruthy();
-    expect(screen.getByText('3 Main St')).toBeTruthy();
+    const leadsColumn = screen.getByText('Leads').closest('section') as HTMLElement;
+    const researchingColumn = screen.getByText('Researching').closest('section') as HTMLElement;
+    const deadColumn = screen.getByText('Dead Deal').closest('section') as HTMLElement;
+    expect(within(leadsColumn).getByText('1 Main St')).toBeTruthy();
+    expect(within(researchingColumn).getByText('2 Main St')).toBeTruthy();
+    expect(within(deadColumn).getByText('3 Main St')).toBeTruthy();
   });
 
   it('shows an empty-state message for a stage with no leads', () => {
