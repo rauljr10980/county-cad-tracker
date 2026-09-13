@@ -49,7 +49,7 @@ router.post('/register',
       const inviteTokenHash = crypto.createHash('sha256').update(inviteCode).digest('hex');
       const invite = await prisma.invite.findUnique({ where: { tokenHash: inviteTokenHash } });
 
-      if (!invite || invite.revokedAt || invite.usedAt || invite.expiresAt < new Date()) {
+      if (!invite || invite.revokedAt || invite.usedAt || invite.expiresAt < new Date() || invite.email !== email) {
         return res.status(403).json({ error: 'This invite link is invalid, expired, or has already been used' });
       }
 
