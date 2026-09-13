@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2, Users, DollarSign, Package, ShoppingCart, Target, TrendingUp as Pipeline, Phone, X, CalendarClock, Handshake, Home, Users2, Wallet } from 'lucide-react';
+import type { TabType } from '@/components/layout/navItems';
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyStatus } from '@/types/property';
@@ -20,7 +21,7 @@ import { Button } from '@/components/ui/button';
 
 interface DashboardProps {
   onFilterChange?: (filter: { from?: PropertyStatus; to?: PropertyStatus }) => void;
-  onNavigateToTab?: (tab: string) => void;
+  onNavigateToTab?: (tab: TabType) => void;
 }
 
 export function Dashboard({ onFilterChange, onNavigateToTab }: DashboardProps) {

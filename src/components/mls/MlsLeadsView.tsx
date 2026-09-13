@@ -483,16 +483,18 @@ export default function MlsLeadsView() {
                     </span>
                   ) : <span className="text-muted-foreground">{item.mlsOwnerRaw || '—'}</span>}
                 </td>
-                <td onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label="View details"
-                    className="rounded p-1.5 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                    onClick={() => open(item.id)}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                  </button>
-                  <button className="rounded border bg-card px-2 py-1 text-xs hover:bg-muted" onClick={(e) => toggleHidden(item, e)}>{item.hidden ? 'Unhide' : 'Hide'}</button>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label="View details"
+                      className="rounded p-1.5 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                      onClick={() => open(item.id)}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
+                    <button className="rounded border bg-card px-2 py-1 text-xs hover:bg-muted" onClick={(e) => toggleHidden(item, e)}>{item.hidden ? 'Unhide' : 'Hide'}</button>
+                  </div>
                 </td>
               </tr>;
             })}

@@ -37,6 +37,13 @@ vi.mock('@/hooks/useFollowUps', () => ({
   usePropertyFollowUps: () => ({ data: [], refetch: vi.fn() }),
 }));
 
+// DrivingView calls getProperties() directly (outside the mocked hooks above)
+// in a "check all leads against the properties DB" useEffect on mount — left
+// unmocked, this hits the real production API on every test run.
+vi.mock('@/lib/api', () => ({
+  getProperties: vi.fn().mockResolvedValue({ properties: [] }),
+}));
+
 describe('DrivingView pipeline toggle', () => {
   it('shows the funnel (Table) view by default', () => {
     renderDrivingView();

@@ -1,5 +1,5 @@
 import type { CalendarEvent } from '@/hooks/useCalendarEvents';
-import { KIND_COLORS } from './CalendarView';
+import { KIND_COLORS } from './calendarColors';
 
 type UpcomingEventsPanelProps = {
   events: CalendarEvent[];
