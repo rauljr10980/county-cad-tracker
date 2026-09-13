@@ -27,6 +27,7 @@ import { PropertyDetailsModal } from '@/components/properties/PropertyDetailsMod
 import { FullDetailsModal } from '@/components/preforeclosure/FullDetailsModal';
 import { useCrmStore } from '@/crm/store/useCrmStore';
 import { useCalendarEvents, followUpTitle, type CalendarEvent as CalEvent, type CalendarEventKind } from '@/hooks/useCalendarEvents';
+import { UpcomingEventsPanel } from './UpcomingEventsPanel';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
@@ -283,28 +284,31 @@ export function CalendarView() {
 
   return (
     <div className="p-4 lg:p-6 space-y-4">
-      <div className="rounded-md border border-border/70 bg-card p-3 shadow-sm calendar-container">
-        <DragAndDropCalendar
-          localizer={localizer}
-          events={events}
-          startAccessor="start"
-          endAccessor="end"
-          view={view}
-          onView={setView}
-          date={date}
-          onNavigate={setDate}
-          views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
-          onSelectEvent={setSelectedEvent}
-          onSelectSlot={onSelectSlot}
-          onEventDrop={onEventDrop}
-          onEventResize={onEventResize}
-          resizable
-          selectable
-          eventPropGetter={eventStyleGetter}
-          components={{ toolbar: Toolbar }}
-          style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}
-          popup
-        />
+      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+        <div className="rounded-md border border-border/70 bg-card p-3 shadow-sm calendar-container">
+          <DragAndDropCalendar
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            view={view}
+            onView={setView}
+            date={date}
+            onNavigate={setDate}
+            views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
+            onSelectEvent={setSelectedEvent}
+            onSelectSlot={onSelectSlot}
+            onEventDrop={onEventDrop}
+            onEventResize={onEventResize}
+            resizable
+            selectable
+            eventPropGetter={eventStyleGetter}
+            components={{ toolbar: Toolbar }}
+            style={{ height: 'calc(100vh - 200px)', minHeight: '600px' }}
+            popup
+          />
+        </div>
+        <UpcomingEventsPanel events={events} />
       </div>
 
       {/* Event detail dialog */}
