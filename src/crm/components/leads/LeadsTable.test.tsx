@@ -34,4 +34,11 @@ describe('LeadsTable status badge', () => {
     render(<LeadsTable leads={[stale]} onRowClick={noop} onRateConnection={noop} onScheduleMeeting={noop} />);
     expect(screen.getByText('Inactive')).toBeTruthy();
   });
+
+  it('shows Active for a lead last contacted exactly 90 days ago', () => {
+    const boundary = new Date(Date.now() - 89.99 * 24 * 60 * 60 * 1000);
+    const exactEdge: Lead = { ...baseLead, lastContactedAt: boundary.toISOString() };
+    render(<LeadsTable leads={[exactEdge]} onRowClick={noop} onRateConnection={noop} onScheduleMeeting={noop} />);
+    expect(screen.getByText('Active')).toBeTruthy();
+  });
 });
