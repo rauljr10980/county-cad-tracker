@@ -36,9 +36,16 @@ describe('LeadsTable status badge', () => {
   });
 
   it('shows Active for a lead last contacted exactly 90 days ago', () => {
-    const boundary = new Date(Date.now() - 89.99 * 24 * 60 * 60 * 1000);
-    const exactEdge: Lead = { ...baseLead, lastContactedAt: boundary.toISOString() };
-    render(<LeadsTable leads={[exactEdge]} onRowClick={noop} onRateConnection={noop} onScheduleMeeting={noop} />);
-    expect(screen.getByText('Active')).toBeTruthy();
+    vi.useFakeTimers();
+    try {
+      const fixedNow = new Date('2026-06-01T12:00:00.000Z');
+      vi.setSystemTime(fixedNow);
+      const boundary = new Date(fixedNow.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const exactEdge: Lead = { ...baseLead, lastContactedAt: boundary.toISOString() };
+      render(<LeadsTable leads={[exactEdge]} onRowClick={noop} onRateConnection={noop} onScheduleMeeting={noop} />);
+      expect(screen.getByText('Active')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
