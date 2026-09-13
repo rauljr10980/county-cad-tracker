@@ -112,7 +112,22 @@ status badge at all) imports the same `pillClass()` for a new Active/Inactive
 column — `pillClass('success')` / `pillClass('grey')` — rather than
 introducing a third badge convention.
 
-### `src/components/ui/kpi-stat-card.tsx` — `KpiStatCard` (new)
+### `StatCard` (revived, not `KpiStatCard`) — deviation from this spec
+
+**As implemented:** the plan (`docs/superpowers/plans/2026-09-12-modern-saas-redesign.md`,
+Task 3) revived the existing but dead `src/components/dashboard/StatCard.tsx`
+(imported in `Dashboard.tsx` but never rendered anywhere) instead of building
+a new `KpiStatCard` component as originally specified below. Discovered while
+writing the plan: `StatCard` already had ~90% of this shape (icon, value,
+trend, variant-tinted styling) sitting unused, so extending it was lower-risk
+and less code than a parallel component. Its final props:
+`{ title, value, subtitle?, icon?, trend?: { direction: 'up'|'down'; label: string },
+variant?: 'default'|'primary'|'success'|'warning'|'danger', onClick? }` — same
+icon-circle-plus-arrow-trend look this section describes, reusing the same
+tone tokens. The spec's original text for `KpiStatCard` is kept below for
+historical context but was not built as its own file.
+
+### `src/components/ui/kpi-stat-card.tsx` — `KpiStatCard` (original spec, superseded above)
 
 ```ts
 interface KpiStatCardProps {
@@ -130,7 +145,6 @@ token at 15% opacity, icon = token at full — reuse `--success`/`--warning`/
 the same tokens already in the palette), big bold number, label beneath,
 optional trend pill (green up-arrow / red down-arrow + text) top-right —
 matching the mock's KPI tiles (icon circle + number + label + trend row).
-This is the one genuinely new shared component this project adds.
 
 ### `src/components/ui/search-filter-bar.tsx` — `SearchFilterBar` (new)
 
@@ -226,13 +240,20 @@ like the existing `src/crm/components/pipeline/KanbanBoard.tsx`:
   nextStage } })` (`useUpdateDrivingLead` already exists at
   `src/hooks/useDrivingLeads.ts:34`, wraps `updateDrivingLead(id, { status })`
   from `src/lib/api.ts:1722`).
-- Card content: reuse the existing per-stage card renderers
-  (`renderNewCard`, `renderResearchCard`, `renderObitCard`,
-  `renderContactedCard`, `renderUnderContractCard`, `renderDeadCard`) already
-  defined in `D4dPipelineView.tsx` — extract them to a shared file
-  (`src/components/driving/d4dCardRenderers.tsx`) so both the existing funnel
-  view and the new board view render identical cards, rather than
-  duplicating that JSX.
+- **Card content — deviation from this spec:** the plan (Task 8) does NOT
+  extract `D4dPipelineView.tsx`'s per-stage card renderers
+  (`renderNewCard`/`renderResearchCard`/etc.) into a shared
+  `d4dCardRenderers.tsx` as originally specified here. Discovered while
+  writing the plan: those renderers are closures capturing a dozen pieces of
+  local state and mutation handlers from inside `D4dPipelineView`, and safely
+  extracting them would have been a much larger, riskier refactor of working
+  production code than this task warranted. Instead, `D4dKanbanBoard` gets
+  its own new, deliberately simpler `D4dKanbanCard` (address, city/state, a
+  relative "added" time) — matching the mock's simpler Kanban card content,
+  which was never as detailed as the funnel view's interactive cards anyway.
+  **Net effect:** the Board and Table views now render the same lead with two
+  different card designs. Accepted as a reasonable tradeoff at plan-writing
+  time; unifying them later is a legitimate follow-up if it's ever wanted.
 - Add a **Board / Table** toggle (simple two-button segmented control) in
   `DrivingView.tsx` that switches between the existing `D4dPipelineView`
   (renamed conceptually to "Table"/funnel view — no behavior change) and the
