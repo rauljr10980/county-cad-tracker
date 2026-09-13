@@ -837,19 +837,92 @@ export async function resetPassword(token: string, password: string) {
   return response.json();
 }
 
-/**
- * ADMIN-only: fetch a shareable signup link carrying the team's invite code
- */
-export async function getInviteLink(): Promise<{ inviteCode: string; signupUrl: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/invite-link`, {
-    headers: getAuthHeaders(),
-  });
+export interface TeamInvite {
+  id: string;
+  email: string;
+  status: 'pending' | 'used' | 'expired' | 'revoked';
+  invitedBy: { username: string };
+  createdAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+  revokedAt: string | null;
+}
 
+export async function createInvite(email: string): Promise<{ success: true; invite: { id: string; email: string; expiresAt: string; createdAt: string } }> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/invites`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ email }),
+  });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to load the invite link');
+    throw new Error(error.error || 'Failed to send invite');
   }
+  return response.json();
+}
 
+export async function getInvites(): Promise<{ invites: TeamInvite[] }> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/invites`, { headers: getAuthHeaders() });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to load invites');
+  }
+  return response.json();
+}
+
+export async function revokeInvite(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/invites/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to revoke invite');
+  }
+}
+
+export interface TeamMember {
+  id: string;
+  username: string;
+  email: string;
+  role: 'ADMIN' | 'OPERATOR' | 'VIEWER';
+  isActive: boolean;
+  createdAt: string;
+}
+
+export async function getUsers(): Promise<{ users: TeamMember[] }> {
+  const response = await fetch(`${API_BASE_URL}/api/users`, { headers: getAuthHeaders() });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to load team members');
+  }
+  return response.json();
+}
+
+// The PUT /api/users/:id response shape (Task 5's route select) — deliberately
+// not typed as TeamMember, since the backend returns updatedAt here, not
+// createdAt. TeamView doesn't use this return value (it reloads via
+// getUsers() after every mutation instead), but the type should still
+// describe what the endpoint actually sends back.
+interface UpdatedTeamMember {
+  id: string;
+  username: string;
+  email: string;
+  role: TeamMember['role'];
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export async function setUserActive(id: string, isActive: boolean): Promise<UpdatedTeamMember> {
+  const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ isActive }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to update account status');
+  }
   return response.json();
 }
 
