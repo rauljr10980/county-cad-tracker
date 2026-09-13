@@ -926,6 +926,19 @@ export async function setUserActive(id: string, isActive: boolean): Promise<Upda
   return response.json();
 }
 
+export async function setUserRole(id: string, role: 'ADMIN' | 'OPERATOR'): Promise<UpdatedTeamMember> {
+  const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ role }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to update role');
+  }
+  return response.json();
+}
+
 /**
  * The team's nav-tab visibility, set by an ADMIN in the manager view and
  * shared account-wide — any signed-in user can read it, only an ADMIN can

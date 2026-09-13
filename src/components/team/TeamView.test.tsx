@@ -3,6 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TeamView from './TeamView';
 
+// jsdom has no hasPointerCapture/scrollIntoView, which Radix's Select
+// (the new role dropdown below) calls internally when it opens/closes.
+Element.prototype.hasPointerCapture = Element.prototype.hasPointerCapture ?? (() => false);
+Element.prototype.releasePointerCapture = Element.prototype.releasePointerCapture ?? (() => {});
+Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => {});
+
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'me', username: 'raul', role: 'ADMIN' } }),
 }));
@@ -12,6 +18,7 @@ const mockUsers = vi.fn();
 const mockCreateInvite = vi.fn();
 const mockRevokeInvite = vi.fn();
 const mockSetUserActive = vi.fn();
+const mockSetUserRole = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   getInvites: () => mockInvites(),
@@ -19,6 +26,7 @@ vi.mock('@/lib/api', () => ({
   createInvite: (email: string) => mockCreateInvite(email),
   revokeInvite: (id: string) => mockRevokeInvite(id),
   setUserActive: (id: string, isActive: boolean) => mockSetUserActive(id, isActive),
+  setUserRole: (id: string, role: string) => mockSetUserRole(id, role),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({ toast: vi.fn() }));
@@ -85,5 +93,25 @@ describe('TeamView', () => {
     // This repo doesn't have @testing-library/jest-dom wired into vitest, so
     // assert the native DOM property directly instead of using toBeDisabled().
     expect(screen.getByRole('button', { name: /deactivate raul/i })).toHaveProperty('disabled', true);
+  });
+
+  it('changes a teammate\'s role and refreshes the list', async () => {
+    const user = userEvent.setup();
+    mockSetUserRole.mockResolvedValue({ id: 'u2', username: 'luciano', email: 'luciano@example.com', role: 'ADMIN', isActive: true, updatedAt: '2026-02-02T00:00:00.000Z' });
+    render(<TeamView />);
+    await waitFor(() => expect(screen.getByText('luciano')).toBeTruthy());
+
+    await user.click(screen.getByRole('combobox', { name: /luciano.*role/i }));
+    await user.click(await screen.findByRole('option', { name: 'Manager' }));
+
+    await waitFor(() => expect(mockSetUserRole).toHaveBeenCalledWith('u2', 'ADMIN'));
+    expect(mockUsers).toHaveBeenCalledTimes(2); // initial load + refresh after change
+  });
+
+  it('disables the role control for the signed-in admin\'s own row', async () => {
+    render(<TeamView />);
+    await waitFor(() => expect(screen.getByText('luciano')).toBeTruthy());
+
+    expect(screen.getByRole('combobox', { name: /raul.*role/i })).toHaveProperty('disabled', true);
   });
 });

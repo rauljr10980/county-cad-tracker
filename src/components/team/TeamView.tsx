@@ -3,6 +3,7 @@ import { Loader2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { pillClass } from '@/lib/pillBadge';
@@ -12,6 +13,7 @@ import {
   getUsers,
   revokeInvite,
   setUserActive,
+  setUserRole,
   type TeamInvite,
   type TeamMember,
 } from '@/lib/api';
@@ -21,6 +23,11 @@ const INVITE_STATUS_TONE: Record<TeamInvite['status'], string> = {
   used: 'success',
   expired: 'grey',
   revoked: 'danger',
+};
+
+const ROLE_LABELS: Record<'ADMIN' | 'OPERATOR', string> = {
+  ADMIN: 'Manager',
+  OPERATOR: 'Normal User',
 };
 
 function formatDate(value: string): string {
@@ -36,6 +43,7 @@ export default function TeamView() {
   const [sending, setSending] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
 
   const load = async () => {
     const [invitesRes, usersRes] = await Promise.all([getInvites(), getUsers()]);
@@ -89,6 +97,19 @@ export default function TeamView() {
       toast({ title: 'Failed to update account status', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const handleRoleChange = async (member: TeamMember, role: 'ADMIN' | 'OPERATOR') => {
+    if (role === member.role) return;
+    setChangingRoleId(member.id);
+    try {
+      await setUserRole(member.id, role);
+      await load();
+    } catch (err) {
+      toast({ title: 'Failed to update role', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+    } finally {
+      setChangingRoleId(null);
     }
   };
 
@@ -192,7 +213,25 @@ export default function TeamView() {
                   <tr key={member.id} className="border-t">
                     <td className="px-4 py-2 font-medium">{member.username}</td>
                     <td className="px-4 py-2 text-muted-foreground">{member.email}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{member.role}</td>
+                    <td className="px-4 py-2">
+                      <Select
+                        value={member.role === 'VIEWER' ? 'OPERATOR' : member.role}
+                        disabled={isSelf || changingRoleId === member.id}
+                        onValueChange={(value) => handleRoleChange(member, value as 'ADMIN' | 'OPERATOR')}
+                      >
+                        <SelectTrigger
+                          aria-label={`${member.username}'s role`}
+                          className="h-8 w-[140px] text-xs"
+                          title={isSelf ? "You can't change your own role" : undefined}
+                        >
+                          <SelectValue>{ROLE_LABELS[member.role === 'VIEWER' ? 'OPERATOR' : member.role]}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ADMIN">Manager</SelectItem>
+                          <SelectItem value="OPERATOR">Normal User</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </td>
                     <td className="px-4 py-2">
                       <span className={pillClass(member.isActive ? 'success' : 'grey')}>
                         {member.isActive ? 'Active' : 'Inactive'}
