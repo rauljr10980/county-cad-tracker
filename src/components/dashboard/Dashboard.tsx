@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2, Users, DollarSign, Package, ShoppingCart, Target, TrendingUp as Pipeline, Phone, X } from 'lucide-react';
+import { Building2, TrendingUp, TrendingDown, AlertTriangle, Plus, Minus, Gavel, CheckCircle, Clock, Loader2, Users, DollarSign, Package, ShoppingCart, Target, TrendingUp as Pipeline, Phone, X, CalendarClock, Handshake, Home, Users2, Wallet } from 'lucide-react';
 import { StatCard } from './StatCard';
 import { StatusTransitionBadge } from '@/components/ui/StatusBadge';
 import { PropertyStatus } from '@/types/property';
@@ -9,6 +9,11 @@ import type { WorkflowStage, PreForeclosureRecord } from '@/types/property';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEvictionLeadsCount, useMlsLeadsCount } from '@/hooks/useLeadCounts';
+import { useFollowUps } from '@/hooks/useFollowUps';
+import { useCrmStore } from '@/crm/store/useCrmStore';
+import { format } from 'date-fns';
 
 interface DashboardProps {
   onFilterChange?: (filter: { from?: PropertyStatus; to?: PropertyStatus }) => void;
@@ -72,6 +77,21 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
     const activeStages = SALES_FUNNEL_STAGES.map(s => workflowStageCounts[s.key]);
     return Math.max(1, ...activeStages);
   }, [workflowStageCounts]);
+
+  const { user } = useAuth();
+  const { data: evictionLeadsCount } = useEvictionLeadsCount();
+  const { data: mlsLeadsCount } = useMlsLeadsCount();
+  const industryLeadsCount = useCrmStore((s) => s.leads.filter((l) => l.kind === 'industry').length);
+  const currentMonthKey = format(new Date(), 'yyyy-MM');
+  const { data: monthFollowUps = [] } = useFollowUps(currentMonthKey);
+  const followUpsDueCount = monthFollowUps.filter((f) => !f.completed && new Date(f.date) <= new Date()).length;
+
+  const greeting = (() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'morning';
+    if (hour < 18) return 'afternoon';
+    return 'evening';
+  })();
 
   if (error) {
     return (
@@ -143,6 +163,23 @@ export function Dashboard({ onFilterChange }: DashboardProps) {
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+      {/* Greeting + KPI row */}
+      <div>
+        <h1 className="text-xl font-semibold md:text-2xl">Good {greeting}, {user?.username ?? 'there'}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{format(new Date(), 'EEEE, MMM d, yyyy')}</p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard title="Eviction Leads" value={evictionLeadsCount ?? 0} icon={Home} variant="primary" />
+        <StatCard title="Pre-Foreclosures" value={preForeclosureRecords?.length ?? 0} icon={Building2} variant="warning" />
+        <StatCard title="MLS Leads" value={mlsLeadsCount ?? 0} icon={Building2} variant="primary" />
+        <StatCard title="Key Relationships" value={industryLeadsCount} icon={Users2} variant="success" />
+        <StatCard title="Follow-ups Due" value={followUpsDueCount} icon={CalendarClock} variant="warning" />
+        <StatCard title="Meetings This Week" value={0} icon={Handshake} variant="primary" />
+        <StatCard title="Deals in Pipeline" value={pipelineData.activeDeals} icon={Wallet} variant="success" />
+        <StatCard title="Est. Acquisition Value" value={`$${pipelineData.totalValue.toLocaleString()}`} icon={Wallet} variant="success" />
+      </div>
+
       {/* Call Activity */}
       <Card>
         <CardHeader className="pb-2">
