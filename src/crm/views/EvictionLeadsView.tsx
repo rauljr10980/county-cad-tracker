@@ -3,8 +3,9 @@ import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { normalizeContacts, type NormalizedContacts } from '@/lib/contactsModel';
 import { truePeopleSearchUrl, taxAssessorUrl, landRecordsUrl } from '@/lib/researchLinks';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Building2, ChevronLeft, ChevronRight, ExternalLink, Loader2, Search, Upload, User } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, ExternalLink, Eye, Loader2, Search, Upload, User } from 'lucide-react';
 import { STAGES, SERVICE_INTERESTS, mapLegacyStage, type Stage } from '@/crm-evictions/constants';
+import { pillClass } from '@/lib/pillBadge';
 import { ContactWorkspace } from '@/components/contacts/ContactWorkspace';
 
 type Landlord = {
@@ -62,17 +63,6 @@ const STAGE_PILL_TONE: Record<Stage, string> = {
   'Do Not Contact': 'danger',
 };
 export const stageTone = (stage: string) => STAGE_PILL_TONE[stage as Stage] ?? 'grey';
-
-// Shared pill styling: layout stays fixed, tone controls background/text.
-const PILL_BASE = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold';
-const PILL_TONE_CLASSES: Record<string, string> = {
-  '': 'bg-muted text-muted-foreground',
-  grey: 'bg-muted text-muted-foreground',
-  blue: 'bg-primary/15 text-primary',
-  warn: 'bg-warning/15 text-warning',
-  danger: 'bg-destructive/15 text-destructive',
-};
-const pillClass = (tone: string) => `${PILL_BASE} ${PILL_TONE_CLASSES[tone] ?? PILL_TONE_CLASSES.grey}`;
 
 export default function EvictionLeadsView() {
   const [items, setItems] = useState<Landlord[]>([]), [total, setTotal] = useState(0), [pages, setPages] = useState(1), [page, setPage] = useState(1);
@@ -270,9 +260,9 @@ export default function EvictionLeadsView() {
     <div className="rounded border bg-card overflow-hidden">
       <div className="overflow-x-auto">
         <table className="data-table">
-          <thead><tr>{['Landlord', 'Entity', 'Filings', 'Addresses Represented', 'Properties', 'Latest Filing', 'Contact Stage', 'Service Interest', 'Next Follow-up'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+          <thead><tr>{['Landlord', 'Entity', 'Filings', 'Addresses Represented', 'Properties', 'Latest Filing', 'Contact Stage', 'Service Interest', 'Next Follow-up', 'Actions'].map((h) => <th key={h}>{h}</th>)}</tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={9} className="py-[45px] px-2.5 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></td></tr> : items.map((item) => <tr key={item.id} className="cursor-pointer" onClick={() => open(item.id)}>
+            {loading ? <tr><td colSpan={10} className="py-[45px] px-2.5 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></td></tr> : items.map((item) => <tr key={item.id} className="cursor-pointer" onClick={() => open(item.id)}>
               <td className="font-semibold min-w-[240px]">{item.name}</td>
               <td><span className={pillClass('grey')}>{item.isCorporate ? <Building2 className="h-3 w-3"/> : <User className="h-3 w-3"/>}{item.isCorporate ? 'Corporate' : 'Person'}</span></td>
               <td className="record">{item.filingCount}</td>
@@ -282,8 +272,18 @@ export default function EvictionLeadsView() {
               <td><span className={pillClass(stageTone(item.contactStage))}>{item.contactStage}</span></td>
               <td className="min-w-[170px] text-muted-foreground">{item.serviceInterests?.join(', ')}</td>
               <td className="whitespace-nowrap record">{fmt(item.nextTask?.dueAt)}</td>
+              <td onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  aria-label="View details"
+                  className="rounded p-1.5 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                  onClick={() => open(item.id)}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+              </td>
             </tr>)}
-            {!loading && !items.length && <tr><td colSpan={9} className="py-[45px] px-2.5 text-center text-muted-foreground">No eviction leads match these filters.</td></tr>}
+            {!loading && !items.length && <tr><td colSpan={10} className="py-[45px] px-2.5 text-center text-muted-foreground">No eviction leads match these filters.</td></tr>}
           </tbody>
         </table>
       </div>

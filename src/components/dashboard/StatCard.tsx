@@ -7,9 +7,8 @@ interface StatCardProps {
   subtitle?: string;
   icon?: LucideIcon;
   trend?: {
-    value: number;
+    direction: 'up' | 'down';
     label: string;
-    isPositive?: boolean;
   };
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger';
   onClick?: () => void;
@@ -23,17 +22,25 @@ const variantStyles = {
   danger: 'border-judgment/30 bg-judgment/5',
 };
 
-export function StatCard({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon, 
-  trend, 
+const iconCircleStyles = {
+  default: 'bg-muted text-muted-foreground',
+  primary: 'bg-primary/15 text-primary',
+  success: 'bg-success/15 text-success',
+  warning: 'bg-warning/15 text-warning',
+  danger: 'bg-judgment/15 text-judgment',
+};
+
+export function StatCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  trend,
   variant = 'default',
-  onClick 
+  onClick,
 }: StatCardProps) {
   return (
-    <div 
+    <div
       className={cn(
         'stat-card animate-fade-in',
         variantStyles[variant],
@@ -46,16 +53,12 @@ export function StatCard({
           {title}
         </span>
         {Icon && (
-          <Icon className={cn(
-            'h-4 w-4',
-            variant === 'primary' && 'text-primary',
-            variant === 'success' && 'text-success',
-            variant === 'warning' && 'text-warning',
-            variant === 'danger' && 'text-judgment'
-          )} />
+          <span className={cn('flex size-9 items-center justify-center rounded-full', iconCircleStyles[variant])}>
+            <Icon className="size-4" />
+          </span>
         )}
       </div>
-      
+
       <div className="flex items-end justify-between">
         <div>
           <p className="text-2xl font-semibold font-mono tracking-tight">
@@ -65,15 +68,15 @@ export function StatCard({
             <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
           )}
         </div>
-        
+
         {trend && (
           <div className={cn(
-            'text-xs font-medium px-2 py-1 rounded',
-            trend.isPositive 
-              ? 'bg-success/20 text-success' 
+            'text-xs font-medium px-2 py-1 rounded-full',
+            trend.direction === 'up'
+              ? 'bg-success/20 text-success'
               : 'bg-judgment/20 text-judgment'
           )}>
-            {trend.isPositive ? '+' : ''}{trend.value} {trend.label}
+            {trend.direction === 'up' ? '▲' : '▼'} {trend.label}
           </div>
         )}
       </div>

@@ -5,7 +5,8 @@ import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
 import { truePeopleSearchUrl } from '@/lib/researchLinks';
 import type { NormalizedContacts } from '@/lib/contactsModel';
 import { ContactWorkspace } from '@/components/contacts/ContactWorkspace';
-import { pillClass, statusTone } from './MlsLeadsView';
+import { pillClass } from '@/lib/pillBadge';
+import { statusTone } from './MlsLeadsView';
 
 type QueueListing = { id: string; address: string; status: string };
 

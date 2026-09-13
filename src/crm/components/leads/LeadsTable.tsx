@@ -13,12 +13,21 @@ import {
   relationshipRatingMeta,
 } from '@/crm/lib/connectionRating'
 import { cn } from '@/crm/lib/utils'
+import { pillClass } from '@/lib/pillBadge'
 
 type LeadsTableProps = {
   leads: Lead[]
   onRowClick: (leadId: string) => void
   onRateConnection: (leadId: string, rating: ConnectionRating) => void
   onScheduleMeeting: (leadId: string) => void
+}
+
+const ACTIVE_WINDOW_DAYS = 90
+
+function isActiveLead(lead: Lead): boolean {
+  if (!lead.lastContactedAt) return false
+  const daysSinceContact = (Date.now() - new Date(lead.lastContactedAt).getTime()) / 86_400_000
+  return daysSinceContact <= ACTIVE_WINDOW_DAYS
 }
 
 export function LeadsTable({ leads, onRowClick, onRateConnection, onScheduleMeeting }: LeadsTableProps) {
@@ -37,6 +46,7 @@ export function LeadsTable({ leads, onRowClick, onRateConnection, onScheduleMeet
             <th className="px-4 py-3 text-left font-medium">Specialization</th>
             <th className="min-w-[260px] px-4 py-3 text-left font-medium">Updated Notes</th>
             <th className="px-4 py-3 text-left font-medium">Met personally</th>
+            <th className="px-4 py-3 text-left font-medium">Status</th>
             <th className="px-4 py-3 text-left font-medium">Schedule</th>
           </tr>
         </thead>
@@ -89,6 +99,11 @@ export function LeadsTable({ leads, onRowClick, onRateConnection, onScheduleMeet
                   </Select>
                 </div>
               </td>
+              <td className="px-4 py-3">
+                <span className={pillClass(isActiveLead(lead) ? 'success' : 'grey')}>
+                  {isActiveLead(lead) ? 'Active' : 'Inactive'}
+                </span>
+              </td>
               <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                 <Button
                   variant="outline"
@@ -103,7 +118,7 @@ export function LeadsTable({ leads, onRowClick, onRateConnection, onScheduleMeet
           ))}
           {leads.length === 0 ? (
             <tr>
-              <td colSpan={11} className="px-4 py-16 text-center text-muted-foreground">
+              <td colSpan={12} className="px-4 py-16 text-center text-muted-foreground">
                 No contacts match your filters.
               </td>
             </tr>

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { MapPin, Trash2, Loader2, StickyNote, Plus, Camera, X, FileText, Search, ChevronDown, Phone } from 'lucide-react';
 import { D4dPipelineView } from './D4dPipelineView';
+import { D4dKanbanBoard } from './D4dKanbanBoard';
 import { HeirsCallTrackerView } from './HeirsCallTrackerView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,6 +110,7 @@ export function DrivingView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddresses, setShowAddresses] = useState(false);
   const [activeTab, setActiveTab] = useState<'pipeline' | 'heirs'>('pipeline');
+  const [pipelineViewMode, setPipelineViewMode] = useState<'table' | 'board'>('table');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [callSort, setCallSort] = useState<'latest' | 'earliest' | null>(null);
 
@@ -373,15 +375,46 @@ export function DrivingView() {
       {activeTab === 'pipeline' && (
         <>
           {/* D4$ Pipeline */}
-          {leads.length > 0 && <D4dPipelineView
-            leads={leads as any}
-            onViewDetails={handleViewDetails}
-            activeFilter={statusFilter}
-            onStageFilter={(s) => {
-              setStatusFilter(s);
-              if (s) setShowAddresses(true);
-            }}
-          />}
+          {leads.length > 0 && (
+            <>
+              <div className="flex gap-1 bg-muted/40 rounded-lg p-1 w-fit">
+                <button
+                  type="button"
+                  onClick={() => setPipelineViewMode('table')}
+                  className={cn(
+                    'px-3 py-1.5 text-xs rounded-md font-medium transition-colors',
+                    pipelineViewMode === 'table' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Table
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPipelineViewMode('board')}
+                  className={cn(
+                    'px-3 py-1.5 text-xs rounded-md font-medium transition-colors',
+                    pipelineViewMode === 'board' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Board
+                </button>
+              </div>
+
+              {pipelineViewMode === 'table' ? (
+                <D4dPipelineView
+                  leads={leads as any}
+                  onViewDetails={handleViewDetails}
+                  activeFilter={statusFilter}
+                  onStageFilter={(s) => {
+                    setStatusFilter(s);
+                    if (s) setShowAddresses(true);
+                  }}
+                />
+              ) : (
+                <D4dKanbanBoard leads={leads as any} onViewDetails={handleViewDetails} />
+              )}
+            </>
+          )}
 
           {/* Count + collapsible addresses */}
           <div className="flex items-center gap-2 flex-wrap">
