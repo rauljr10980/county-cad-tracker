@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE_URL, getAuthHeaders } from '@/lib/api';
-import { Building2, ChevronLeft, ChevronRight, Loader2, PhoneCall, Search, Upload, User } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, Eye, Loader2, PhoneCall, Search, Upload, User } from 'lucide-react';
 import { normalizeContacts } from '@/lib/contactsModel';
 import { consumePendingSearch, PENDING_SEARCH_EVENT, type PendingSearchEventDetail } from '@/lib/pendingSearch';
 import { pillClass } from '@/lib/pillBadge';
@@ -483,7 +483,15 @@ export default function MlsLeadsView() {
                     </span>
                   ) : <span className="text-muted-foreground">{item.mlsOwnerRaw || '—'}</span>}
                 </td>
-                <td>
+                <td onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="View details"
+                    className="rounded p-1.5 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                    onClick={() => open(item.id)}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </button>
                   <button className="rounded border bg-card px-2 py-1 text-xs hover:bg-muted" onClick={(e) => toggleHidden(item, e)}>{item.hidden ? 'Unhide' : 'Hide'}</button>
                 </td>
               </tr>;
