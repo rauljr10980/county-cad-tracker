@@ -48,7 +48,7 @@ const getSignupInviteCode = (): string | null => {
 };
 
 const Index = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -159,7 +159,7 @@ const Index = () => {
       case 'inbox':
         return <InboxView />;
       case 'team':
-        return <TeamView />;
+        return user?.role === 'ADMIN' ? <TeamView /> : <Dashboard onNavigateToTab={setActiveTab} />;
       default:
         return <Dashboard onNavigateToTab={setActiveTab} />;
     }

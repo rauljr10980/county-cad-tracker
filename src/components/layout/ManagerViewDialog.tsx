@@ -16,9 +16,8 @@ interface ManagerViewDialogProps {
 }
 
 /**
- * ADMIN-only. One account-wide setting a manager controls for the whole
- * team (see navItems.ts and functions/src/routes/settings.js) plus a
- * shareable signup link, so neither requires a code change to maintain.
+ * ADMIN-only. Lets a manager control which tabs are visible to the whole
+ * team (see navItems.ts and functions/src/routes/settings.js).
  */
 export function ManagerViewDialog({ isOpen, onClose, onHiddenTabsSaved }: ManagerViewDialogProps) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());

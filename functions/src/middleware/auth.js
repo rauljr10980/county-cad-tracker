@@ -90,9 +90,9 @@ async function optionalAuth(req, res, next) {
       const decoded = jwt.verify(token, JWT_SECRET);
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { id: true, username: true, email: true, role: true }
+        select: { id: true, username: true, email: true, role: true, isActive: true }
       });
-      if (user) {
+      if (user && user.isActive) {
         req.user = user;
       }
     }
