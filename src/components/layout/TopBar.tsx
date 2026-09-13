@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, FileText, LogOut, Menu, RefreshCw, Search, Settings, Upload, X } from 'lucide-react'
+import { Bell, FileText, LogOut, Menu, RefreshCw, Search, Settings, Upload, Users, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { getNotifications, type Notification } from '@/lib/api'
@@ -176,6 +176,12 @@ export function TopBar({ activeTab, onTabChange, hiddenTabIds, onRefresh, isRefr
                   <FileText className="h-5 w-5 mr-3" />
                   Files
                 </Button>
+                {isAdmin && (
+                  <Button variant="ghost" className="justify-start mobile-touch-target" onClick={() => { setIsMobileMenuOpen(false); onTabChange('team') }}>
+                    <Users className="h-5 w-5 mr-3" />
+                    Team
+                  </Button>
+                )}
                 {isAdmin && (
                   <Button variant="ghost" className="justify-start mobile-touch-target" onClick={() => { setIsMobileMenuOpen(false); onOpenManagerView() }}>
                     <Settings className="h-5 w-5 mr-3" />
