@@ -15,6 +15,7 @@ const defaultProps = {
   onTabChange: noop,
   hiddenTabIds: new Set<string>(),
   onOpenManagerView: noop,
+  onOpenEmailSettings: noop,
 }
 
 describe('Sidebar', () => {
