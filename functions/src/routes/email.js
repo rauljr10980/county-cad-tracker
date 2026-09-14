@@ -3,7 +3,8 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 const prisma = require('../lib/prisma');
-const { sendEmail, sendEmailSmtp } = require('../lib/emailService');
+const { sendEmail } = require('../lib/emailService');
+const { sendTestEmailWith } = require('../lib/sendTestEmail');
 const { authenticateToken } = require('../middleware/auth');
 
 const testEmailLimiter = rateLimit({
@@ -143,12 +144,7 @@ router.post('/test',
       }
       const recipient = req.body.to || user.email;
       try {
-        await sendEmailSmtp({
-          to: [recipient],
-          subject: 'Test email from Bexar CRE Acquisition CRM',
-          text: 'If you got this, your email is set up correctly.',
-          auth: { user: user.smtpUsername, pass: user.smtpAppPassword },
-        });
+        await sendTestEmailWith({ smtpUsername: user.smtpUsername, smtpAppPassword: user.smtpAppPassword, to: recipient });
         res.json({ success: true });
       } catch (err) {
         res.status(200).json({ success: false, error: String(err.message || err) });
