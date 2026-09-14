@@ -1,4 +1,4 @@
-import { Building2, ChevronDown, FileText, LogOut, Settings, Upload, Users } from 'lucide-react'
+import { Building2, ChevronDown, FileText, LogOut, Mail, Settings, Upload, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { AvatarInitials } from '@/components/ui/avatar-initials'
@@ -30,9 +30,10 @@ interface SidebarProps {
   onTabChange: (tab: TabType) => void
   hiddenTabIds: Set<string>
   onOpenManagerView: () => void
+  onOpenEmailSettings: () => void
 }
 
-export function Sidebar({ activeTab, onTabChange, hiddenTabIds, onOpenManagerView }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, hiddenTabIds, onOpenManagerView, onOpenEmailSettings }: SidebarProps) {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
 
@@ -141,6 +142,10 @@ export function Sidebar({ activeTab, onTabChange, hiddenTabIds, onOpenManagerVie
               <DropdownMenuItem onClick={() => onTabChange('files')}>
                 <FileText className="h-4 w-4 mr-2" />
                 Files
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenEmailSettings}>
+                <Mail className="h-4 w-4 mr-2" />
+                Email Settings
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />

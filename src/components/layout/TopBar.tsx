@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, FileText, LogOut, Menu, RefreshCw, Search, Settings, Upload, Users, X } from 'lucide-react'
+import { Bell, FileText, LogOut, Mail, Menu, RefreshCw, Search, Settings, Upload, Users, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { getNotifications, type Notification } from '@/lib/api'
@@ -27,9 +27,10 @@ interface TopBarProps {
   isRefreshing: boolean
   onOpenSearch: () => void
   onOpenManagerView: () => void
+  onOpenEmailSettings: () => void
 }
 
-export function TopBar({ activeTab, onTabChange, hiddenTabIds, onRefresh, isRefreshing, onOpenSearch, onOpenManagerView }: TopBarProps) {
+export function TopBar({ activeTab, onTabChange, hiddenTabIds, onRefresh, isRefreshing, onOpenSearch, onOpenManagerView, onOpenEmailSettings }: TopBarProps) {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -175,6 +176,10 @@ export function TopBar({ activeTab, onTabChange, hiddenTabIds, onRefresh, isRefr
                 <Button variant="ghost" className="justify-start mobile-touch-target" onClick={() => { setIsMobileMenuOpen(false); onTabChange('files') }}>
                   <FileText className="h-5 w-5 mr-3" />
                   Files
+                </Button>
+                <Button variant="ghost" className="justify-start mobile-touch-target" onClick={() => { setIsMobileMenuOpen(false); onOpenEmailSettings() }}>
+                  <Mail className="h-5 w-5 mr-3" />
+                  Email Settings
                 </Button>
                 {isAdmin && (
                   <Button variant="ghost" className="justify-start mobile-touch-target" onClick={() => { setIsMobileMenuOpen(false); onTabChange('team') }}>

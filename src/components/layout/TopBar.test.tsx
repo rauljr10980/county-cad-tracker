@@ -18,6 +18,7 @@ const defaultProps = {
   isRefreshing: false,
   onOpenSearch: noop,
   onOpenManagerView: noop,
+  onOpenEmailSettings: noop,
 }
 
 describe('TopBar', () => {

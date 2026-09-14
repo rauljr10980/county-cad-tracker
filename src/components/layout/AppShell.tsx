@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { GlobalSearchDialog } from './GlobalSearchDialog'
 import { ManagerViewDialog } from './ManagerViewDialog'
+import EmailSettingsDialog from './EmailSettingsDialog'
 import type { TabType } from './navItems'
 
 interface AppShellProps {
@@ -18,6 +19,7 @@ interface AppShellProps {
 export function AppShell({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSaved, onRefresh, isRefreshing, children }: AppShellProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isManagerViewOpen, setIsManagerViewOpen] = useState(false)
+  const [isEmailSettingsOpen, setIsEmailSettingsOpen] = useState(false)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -37,6 +39,7 @@ export function AppShell({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSav
         onTabChange={onTabChange}
         hiddenTabIds={hiddenTabIds}
         onOpenManagerView={() => setIsManagerViewOpen(true)}
+        onOpenEmailSettings={() => setIsEmailSettingsOpen(true)}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar
@@ -47,6 +50,7 @@ export function AppShell({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSav
           isRefreshing={isRefreshing}
           onOpenSearch={() => setIsSearchOpen(true)}
           onOpenManagerView={() => setIsManagerViewOpen(true)}
+          onOpenEmailSettings={() => setIsEmailSettingsOpen(true)}
         />
         <div className="flex-1 overflow-y-auto">
           <main className="container mx-auto animate-fade-in overflow-x-hidden">{children}</main>
@@ -57,6 +61,10 @@ export function AppShell({ activeTab, onTabChange, hiddenTabIds, onHiddenTabsSav
         isOpen={isManagerViewOpen}
         onClose={() => setIsManagerViewOpen(false)}
         onHiddenTabsSaved={onHiddenTabsSaved}
+      />
+      <EmailSettingsDialog
+        isOpen={isEmailSettingsOpen}
+        onClose={() => setIsEmailSettingsOpen(false)}
       />
     </div>
   )

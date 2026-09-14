@@ -29,6 +29,12 @@ model User {
   resetToken          String?
   resetTokenExpiresAt DateTime?
 
+  // Per-user SMTP credentials (self-service). When both are set, the
+  // compose endpoint sends from this account instead of the shared system
+  // Gmail account. smtpAppPassword is never returned in any API response.
+  smtpUsername    String?
+  smtpAppPassword String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -85,6 +91,25 @@ model Invite {
 
   @@index([email])
   @@map("invites")
+}
+
+model EmailMessage {
+  id             String    @id @default(cuid())
+  templateKey    String    // 'password_reset' | 'invite'
+  dedupeKey      String    // hashed reset token, or the Invite's id
+  recipientEmail String
+  subject        String
+  bodyText       String    @db.Text
+  status         String    @default("queued") // queued | sent | failed
+  errorMessage   String?   @db.Text
+  createdAt      DateTime  @default(now())
+  sentAt         DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([templateKey, dedupeKey])
+  @@index([recipientEmail])
+  @@index([status])
+  @@map("email_messages")
 }
 
 model ScanCorrection {
