@@ -7,12 +7,18 @@ const mockGetSettings = vi.fn();
 const mockSetSettings = vi.fn();
 const mockClearSettings = vi.fn();
 const mockSendTest = vi.fn();
+const mockSetUserSettings = vi.fn();
+const mockClearUserSettings = vi.fn();
+const mockSendTestForUser = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   getMyEmailSettings: () => mockGetSettings(),
   setMyEmailSettings: (u: string, p: string) => mockSetSettings(u, p),
   clearMyEmailSettings: () => mockClearSettings(),
   sendTestEmail: (to?: string) => mockSendTest(to),
+  setUserEmailSettings: (id: string, u: string, p: string) => mockSetUserSettings(id, u, p),
+  clearUserEmailSettings: (id: string) => mockClearUserSettings(id),
+  sendTestEmailForUser: (id: string, to?: string) => mockSendTestForUser(id, to),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({ toast: vi.fn() }));
@@ -82,5 +88,96 @@ describe('EmailSettingsDialog', () => {
     await user.click(screen.getByRole('button', { name: /deactivate/i }));
 
     await waitFor(() => expect(mockClearSettings).toHaveBeenCalled());
+  });
+
+  it('admin mode: shows the teammate\'s name in the title and seeds fields without an extra load call', async () => {
+    render(
+      <EmailSettingsDialog
+        isOpen
+        onClose={() => {}}
+        targetUser={{ id: 'u9', username: 'jane', email: 'jane@example.com', smtpUsername: 'jane@gmail.com', smtpConfigured: true }}
+      />
+    );
+
+    expect(await screen.findByText('Email Settings — jane')).toBeTruthy();
+    expect(mockGetSettings).not.toHaveBeenCalled();
+    const usernameField = screen.getByLabelText(/gmail address/i) as HTMLInputElement;
+    expect(usernameField.value).toBe('jane@gmail.com');
+  });
+
+  it('admin mode: Save calls setUserEmailSettings with the target id, not the self-service function', async () => {
+    const user = userEvent.setup();
+    mockSetUserSettings.mockResolvedValue({ smtpConfigured: true, smtpUsername: 'jane@gmail.com' });
+    render(
+      <EmailSettingsDialog
+        isOpen
+        onClose={() => {}}
+        targetUser={{ id: 'u9', username: 'jane', email: 'jane@example.com', smtpUsername: null, smtpConfigured: false }}
+      />
+    );
+
+    await user.type(screen.getByLabelText(/gmail address/i), 'jane@gmail.com');
+    await user.type(screen.getByLabelText(/app password/i), 'abcd efgh ijkl mnop');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => expect(mockSetUserSettings).toHaveBeenCalledWith('u9', 'jane@gmail.com', 'abcd efgh ijkl mnop'));
+    expect(mockSetSettings).not.toHaveBeenCalled();
+  });
+
+  it('admin mode: Deactivate calls clearUserEmailSettings with the target id', async () => {
+    const user = userEvent.setup();
+    mockClearUserSettings.mockResolvedValue({ smtpConfigured: false });
+    render(
+      <EmailSettingsDialog
+        isOpen
+        onClose={() => {}}
+        targetUser={{ id: 'u9', username: 'jane', email: 'jane@example.com', smtpUsername: 'jane@gmail.com', smtpConfigured: true }}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /deactivate/i })).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: /deactivate/i }));
+
+    await waitFor(() => expect(mockClearUserSettings).toHaveBeenCalledWith('u9'));
+    expect(mockClearSettings).not.toHaveBeenCalled();
+  });
+
+  it('admin mode: Send test email calls sendTestEmailForUser with the target id and the typed address', async () => {
+    const user = userEvent.setup();
+    mockSendTestForUser.mockResolvedValue({ success: true });
+    render(
+      <EmailSettingsDialog
+        isOpen
+        onClose={() => {}}
+        targetUser={{ id: 'u9', username: 'jane', email: 'jane@example.com', smtpUsername: 'jane@gmail.com', smtpConfigured: true }}
+      />
+    );
+
+    const testToField = screen.getByLabelText(/send test to/i) as HTMLInputElement;
+    expect(testToField.value).toBe('jane@gmail.com');
+    await user.click(screen.getByRole('button', { name: /send test email/i }));
+
+    await waitFor(() => expect(mockSendTestForUser).toHaveBeenCalledWith('u9', 'jane@gmail.com'));
+    expect(mockSendTest).not.toHaveBeenCalled();
+  });
+
+  it('admin mode: calls onChanged after a successful save', async () => {
+    const user = userEvent.setup();
+    const onChanged = vi.fn();
+    mockSetUserSettings.mockResolvedValue({ smtpConfigured: true, smtpUsername: 'jane@gmail.com' });
+    render(
+      <EmailSettingsDialog
+        isOpen
+        onClose={() => {}}
+        targetUser={{ id: 'u9', username: 'jane', email: 'jane@example.com', smtpUsername: null, smtpConfigured: false }}
+        onChanged={onChanged}
+      />
+    );
+
+    await user.type(screen.getByLabelText(/gmail address/i), 'jane@gmail.com');
+    await user.type(screen.getByLabelText(/app password/i), 'abcd efgh ijkl mnop');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 });

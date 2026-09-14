@@ -4,34 +4,46 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Mail } from 'lucide-react';
-import { getMyEmailSettings, setMyEmailSettings, clearMyEmailSettings, sendTestEmail } from '@/lib/api';
+import {
+  getMyEmailSettings, setMyEmailSettings, clearMyEmailSettings, sendTestEmail,
+  setUserEmailSettings, clearUserEmailSettings, sendTestEmailForUser,
+  type TeamEmailStatus,
+} from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
 interface EmailSettingsDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Admin-only: edit this teammate's credentials instead of the caller's own. */
+  targetUser?: Pick<TeamEmailStatus, 'id' | 'username' | 'email' | 'smtpUsername' | 'smtpConfigured'>;
+  /** Admin-only: called after a successful save or deactivate, so the roster badge can refresh. */
+  onChanged?: () => void;
 }
 
-/**
- * Lets any signed-in user paste in their own Gmail address + App
- * Password so the "compose and send" feature goes out from their own
- * address instead of the shared system account. Not admin-gated —
- * every user's own setting.
- */
-export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDialogProps) {
+export default function EmailSettingsDialog({ isOpen, onClose, targetUser, onChanged }: EmailSettingsDialogProps) {
   const [configured, setConfigured] = useState(false);
   const [smtpUsername, setSmtpUsername] = useState('');
   const [smtpAppPassword, setSmtpAppPassword] = useState('');
   const [testTo, setTestTo] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!targetUser);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-    setLoading(true);
     setTestResult(null);
+
+    if (targetUser) {
+      setConfigured(targetUser.smtpConfigured);
+      setSmtpUsername(targetUser.smtpUsername ?? '');
+      setSmtpAppPassword('');
+      setTestTo(targetUser.smtpUsername ?? targetUser.email);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     getMyEmailSettings()
       .then((settings) => {
         setConfigured(settings.configured);
@@ -46,15 +58,20 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
         });
       })
       .finally(() => setLoading(false));
-  }, [isOpen]);
+  }, [isOpen, targetUser]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await setMyEmailSettings(smtpUsername, smtpAppPassword);
+      if (targetUser) {
+        await setUserEmailSettings(targetUser.id, smtpUsername, smtpAppPassword);
+      } else {
+        await setMyEmailSettings(smtpUsername, smtpAppPassword);
+      }
       setConfigured(true);
       setSmtpAppPassword('');
       toast({ title: 'Email settings saved' });
+      onChanged?.();
     } catch (err) {
       toast({
         title: 'Failed to save',
@@ -70,7 +87,9 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
     setTesting(true);
     setTestResult(null);
     try {
-      const result = await sendTestEmail(testTo);
+      const result = targetUser
+        ? await sendTestEmailForUser(targetUser.id, testTo)
+        : await sendTestEmail(testTo);
       setTestResult(result);
     } catch (err) {
       setTestResult({ success: false, error: err instanceof Error ? err.message : 'Failed to send test email' });
@@ -82,13 +101,18 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
   const handleDeactivate = async () => {
     setSaving(true);
     try {
-      await clearMyEmailSettings();
+      if (targetUser) {
+        await clearUserEmailSettings(targetUser.id);
+      } else {
+        await clearMyEmailSettings();
+      }
       setConfigured(false);
       setSmtpUsername('');
       setSmtpAppPassword('');
       setTestTo('');
       setTestResult(null);
       toast({ title: 'Email deactivated' });
+      onChanged?.();
     } catch (err) {
       toast({
         title: 'Failed to deactivate',
@@ -106,10 +130,12 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            Email Settings
+            {targetUser ? `Email Settings — ${targetUser.username}` : 'Email Settings'}
           </DialogTitle>
           <DialogDescription>
-            Send emails from your own Gmail address instead of the shared account.
+            {targetUser
+              ? `Set or clear ${targetUser.username}'s Gmail address and App Password for sending email.`
+              : 'Send emails from your own Gmail address instead of the shared account.'}
           </DialogDescription>
         </DialogHeader>
 
