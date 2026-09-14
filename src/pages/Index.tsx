@@ -72,6 +72,20 @@ const Index = () => {
       .then((ids) => setHiddenTabIds(new Set(ids)))
       .catch((err) => console.error('Failed to load tab settings:', err));
   }, [isAuthenticated]);
+
+  // Dashboard is admin-only (see renderContent()'s 'dashboard' case). getInitialTab()
+  // runs before `user` is known, so a non-admin's fresh login still initializes
+  // activeTab to 'dashboard' — correct that once role is available, so they land
+  // on Calendar instead. Only corrects the *initial* landing tab; a non-admin who
+  // later navigates to '#dashboard' by hand sees the same gated fallback content
+  // in renderContent(), same as '#team'/'#management' already behave.
+  useEffect(() => {
+    if (isLoading || !user) return;
+    if (user.role !== 'ADMIN' && activeTab === 'dashboard') {
+      setActiveTab('calendar');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, user]);
   // The Evictions CRM workspace is reached only by the '#evictions-crm' hash —
   // there is no menu entry and no password gate. It renders whenever that hash
   // is present and the user is authenticated like any other route.
@@ -136,7 +150,9 @@ const Index = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard onFilterChange={() => setActiveTab('properties')} onNavigateToTab={setActiveTab} />;
+        return user?.role === 'ADMIN'
+          ? <Dashboard onFilterChange={() => setActiveTab('properties')} onNavigateToTab={setActiveTab} />
+          : <CalendarView />;
       case 'calendar':
         return <CalendarView />;
       case 'properties':
@@ -160,11 +176,13 @@ const Index = () => {
       case 'inbox':
         return <InboxView />;
       case 'team':
-        return user?.role === 'ADMIN' ? <TeamView /> : <Dashboard onNavigateToTab={setActiveTab} />;
+        return user?.role === 'ADMIN' ? <TeamView /> : <CalendarView />;
       case 'management':
-        return user?.role === 'ADMIN' ? <ManagementView /> : <Dashboard onNavigateToTab={setActiveTab} />;
+        return user?.role === 'ADMIN' ? <ManagementView /> : <CalendarView />;
       default:
-        return <Dashboard onNavigateToTab={setActiveTab} />;
+        return user?.role === 'ADMIN'
+          ? <Dashboard onNavigateToTab={setActiveTab} />
+          : <CalendarView />;
     }
   };
 

@@ -45,7 +45,9 @@ export function Sidebar({ activeTab, onTabChange, hiddenTabIds, onOpenManagerVie
     }
   }
 
-  const visibleTabs = getVisibleTabs(hiddenTabIds)
+  // Dashboard is admin-only content (see Index.tsx's renderContent()), so it's
+  // never a valid nav entry point for a non-admin regardless of hiddenTabIds.
+  const visibleTabs = getVisibleTabs(hiddenTabIds).filter((tab) => tab.id !== 'dashboard' || isAdmin)
 
   return (
     <nav

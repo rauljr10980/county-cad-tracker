@@ -22,14 +22,28 @@ describe('Sidebar', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('renders every tab when nothing is hidden', () => {
+    // ADMIN, so Dashboard's role-gating (see below) doesn't shrink the count
+    // this test is actually checking: every entry in `tabs` renders.
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' } } as any)
     render(<Sidebar {...defaultProps} />)
     expect(screen.getByRole('button', { name: /Eviction List/ })).toBeTruthy()
     expect(screen.getAllByRole('button').length).toBeGreaterThanOrEqual(tabs.length)
   })
 
   it('hides tabs named in hiddenTabIds', () => {
-    render(<Sidebar {...defaultProps} hiddenTabIds={new Set(['dashboard'])} />)
+    render(<Sidebar {...defaultProps} hiddenTabIds={new Set(['calendar'])} />)
+    expect(screen.queryByRole('button', { name: /Calendar/ })).toBeNull()
+  })
+
+  it('does not render a Dashboard item for a non-ADMIN user, regardless of hiddenTabIds', () => {
+    render(<Sidebar {...defaultProps} />)
     expect(screen.queryByRole('button', { name: /Dashboard/ })).toBeNull()
+  })
+
+  it('renders a Dashboard item for an ADMIN user', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' } } as any)
+    render(<Sidebar {...defaultProps} />)
+    expect(screen.getByRole('button', { name: /Dashboard/ })).toBeTruthy()
   })
 
   it('marks only the active tab with aria-current', () => {
