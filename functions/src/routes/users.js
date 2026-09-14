@@ -134,14 +134,20 @@ router.put('/:id',
         return res.status(400).json({ error: 'Cannot deactivate your own account' });
       }
 
-      // Hash password if provided
-      if (updates.password) {
-        updates.password = await bcrypt.hash(updates.password, 10);
-      }
+      // Explicit allowlist — this route must never pass req.body straight
+      // through to Prisma. It only ever supported these four fields; this
+      // just stops that being implicit. In particular, smtpUsername and
+      // smtpAppPassword are deliberately excluded — those are self-service
+      // only, via PUT /api/email/settings.
+      const data = {};
+      if (updates.email !== undefined) data.email = updates.email;
+      if (updates.password) data.password = await bcrypt.hash(updates.password, 10);
+      if (updates.role !== undefined) data.role = updates.role;
+      if (updates.isActive !== undefined) data.isActive = updates.isActive;
 
       const user = await prisma.user.update({
         where: { id },
-        data: updates,
+        data,
         select: {
           id: true,
           username: true,
