@@ -29,6 +29,12 @@ model User {
   resetToken          String?
   resetTokenExpiresAt DateTime?
 
+  // Per-user SMTP credentials (self-service). When both are set, the
+  // compose endpoint sends from this account instead of the shared system
+  // Gmail account. smtpAppPassword is never returned in any API response.
+  smtpUsername    String?
+  smtpAppPassword String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
