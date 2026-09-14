@@ -2011,10 +2011,11 @@ export async function clearMyEmailSettings(): Promise<{ configured: false }> {
   return response.json();
 }
 
-export async function sendTestEmail(): Promise<{ success: boolean; error?: string }> {
+export async function sendTestEmail(to?: string): Promise<{ success: boolean; error?: string }> {
   const response = await fetch(`${API_BASE_URL}/api/email/test`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(to ? { to } : {}),
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));

@@ -12,7 +12,7 @@ vi.mock('@/lib/api', () => ({
   getMyEmailSettings: () => mockGetSettings(),
   setMyEmailSettings: (u: string, p: string) => mockSetSettings(u, p),
   clearMyEmailSettings: () => mockClearSettings(),
-  sendTestEmail: () => mockSendTest(),
+  sendTestEmail: (to?: string) => mockSendTest(to),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({ toast: vi.fn() }));
@@ -52,6 +52,24 @@ describe('EmailSettingsDialog', () => {
     await user.click(screen.getByRole('button', { name: /send test email/i }));
 
     expect(await screen.findByText('Invalid login: 535-5.7.8')).toBeTruthy();
+    expect(mockSendTest).toHaveBeenCalledWith('me@gmail.com');
+  });
+
+  it('prefills the test-to field with the configured address but lets it be changed', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue({ configured: true, smtpUsername: 'me@gmail.com' });
+    mockSendTest.mockResolvedValue({ success: true });
+    render(<EmailSettingsDialog isOpen onClose={() => {}} />);
+    await waitFor(() => expect(mockGetSettings).toHaveBeenCalled());
+
+    const testToField = screen.getByLabelText(/send test to/i) as HTMLInputElement;
+    expect(testToField.value).toBe('me@gmail.com');
+
+    await user.clear(testToField);
+    await user.type(testToField, 'someone-else@example.com');
+    await user.click(screen.getByRole('button', { name: /send test email/i }));
+
+    await waitFor(() => expect(mockSendTest).toHaveBeenCalledWith('someone-else@example.com'));
   });
 
   it('shows a Deactivate button once configured, and clears settings when clicked', async () => {

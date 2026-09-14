@@ -22,6 +22,7 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
   const [configured, setConfigured] = useState(false);
   const [smtpUsername, setSmtpUsername] = useState('');
   const [smtpAppPassword, setSmtpAppPassword] = useState('');
+  const [testTo, setTestTo] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -35,6 +36,7 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
       .then((settings) => {
         setConfigured(settings.configured);
         setSmtpUsername(settings.smtpUsername ?? '');
+        setTestTo(settings.smtpUsername ?? '');
       })
       .catch((err) => {
         toast({
@@ -68,7 +70,7 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
     setTesting(true);
     setTestResult(null);
     try {
-      const result = await sendTestEmail();
+      const result = await sendTestEmail(testTo);
       setTestResult(result);
     } catch (err) {
       setTestResult({ success: false, error: err instanceof Error ? err.message : 'Failed to send test email' });
@@ -84,6 +86,7 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
       setConfigured(false);
       setSmtpUsername('');
       setSmtpAppPassword('');
+      setTestTo('');
       setTestResult(null);
       toast({ title: 'Email deactivated' });
     } catch (err) {
@@ -137,6 +140,19 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
               />
             </div>
 
+            {configured && (
+              <div className="space-y-1.5">
+                <Label htmlFor="test-email-to">Send test to</Label>
+                <Input
+                  id="test-email-to"
+                  type="email"
+                  value={testTo}
+                  onChange={(e) => setTestTo(e.target.value)}
+                  placeholder="you@example.com"
+                />
+              </div>
+            )}
+
             {testResult && (
               <p className={testResult.success ? 'text-sm text-green-600' : 'text-sm text-destructive'}>
                 {testResult.success ? 'Test email sent successfully.' : testResult.error}
@@ -153,7 +169,7 @@ export default function EmailSettingsDialog({ isOpen, onClose }: EmailSettingsDi
                 {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Save
               </Button>
-              <Button size="sm" variant="outline" onClick={handleTest} disabled={testing || !configured}>
+              <Button size="sm" variant="outline" onClick={handleTest} disabled={testing || !configured || !testTo}>
                 {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Send test email
               </Button>

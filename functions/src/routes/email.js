@@ -119,33 +119,45 @@ router.delete('/settings', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/email/test — sends one email to the caller's own account
-// email, using their saved SMTP credentials. Reports the exact error on
-// failure, so a wrong port/password is immediately visible.
-router.post('/test', authenticateToken, testEmailLimiter, async (req, res) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { email: true, smtpUsername: true, smtpAppPassword: true },
-    });
-    if (!user.smtpUsername || !user.smtpAppPassword) {
-      return res.status(400).json({ error: 'Set up your email first' });
-    }
+// POST /api/email/test — sends one email using the caller's saved SMTP
+// credentials, to their own account email by default or to `to` in the
+// body when provided. Reports the exact error on failure, so a wrong
+// port/password is immediately visible.
+router.post('/test',
+  authenticateToken,
+  testEmailLimiter,
+  [
+    body('to').optional().isEmail().withMessage('Enter a valid email address').normalizeEmail(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
     try {
-      await sendEmailSmtp({
-        to: [user.email],
-        subject: 'Test email from Bexar CRE Acquisition CRM',
-        text: 'If you got this, your email is set up correctly.',
-        auth: { user: user.smtpUsername, pass: user.smtpAppPassword },
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { email: true, smtpUsername: true, smtpAppPassword: true },
       });
-      res.json({ success: true });
-    } catch (err) {
-      res.status(200).json({ success: false, error: String(err.message || err) });
+      if (!user.smtpUsername || !user.smtpAppPassword) {
+        return res.status(400).json({ error: 'Set up your email first' });
+      }
+      const recipient = req.body.to || user.email;
+      try {
+        await sendEmailSmtp({
+          to: [recipient],
+          subject: 'Test email from Bexar CRE Acquisition CRM',
+          text: 'If you got this, your email is set up correctly.',
+          auth: { user: user.smtpUsername, pass: user.smtpAppPassword },
+        });
+        res.json({ success: true });
+      } catch (err) {
+        res.status(200).json({ success: false, error: String(err.message || err) });
+      }
+    } catch (error) {
+      console.error('[EMAIL] Test send failed unexpectedly:', error.message);
+      res.status(500).json({ error: 'Failed to send test email' });
     }
-  } catch (error) {
-    console.error('[EMAIL] Test send failed unexpectedly:', error.message);
-    res.status(500).json({ error: 'Failed to send test email' });
   }
-});
+);
 
 module.exports = router;
