@@ -2023,3 +2023,56 @@ export async function sendTestEmail(to?: string): Promise<{ success: boolean; er
   }
   return response.json();
 }
+
+export interface TeamEmailStatus {
+  id: string;
+  username: string;
+  email: string;
+  role: 'ADMIN' | 'OPERATOR' | 'VIEWER';
+  smtpUsername: string | null;
+  smtpConfigured: boolean;
+}
+
+export async function getTeamEmailSettings(): Promise<{ users: TeamEmailStatus[] }> {
+  const response = await fetch(`${API_BASE_URL}/api/users/email-settings`, { headers: getAuthHeaders() });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to load email settings');
+  }
+  return response.json();
+}
+
+export async function setUserEmailSettings(id: string, smtpUsername: string, smtpAppPassword: string): Promise<{ smtpConfigured: true; smtpUsername: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/users/${id}/email-settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ smtpUsername, smtpAppPassword }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to save email settings');
+  }
+  return response.json();
+}
+
+export async function clearUserEmailSettings(id: string): Promise<{ smtpConfigured: false }> {
+  const response = await fetch(`${API_BASE_URL}/api/users/${id}/email-settings`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to clear email settings');
+  return response.json();
+}
+
+export async function sendTestEmailForUser(id: string, to?: string): Promise<{ success: boolean; error?: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/users/${id}/email-settings/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(to ? { to } : {}),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to send test email');
+  }
+  return response.json();
+}
