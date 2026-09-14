@@ -1,4 +1,4 @@
-import { Building2, ChevronDown, FileText, LogOut, Mail, Settings, Upload, Users } from 'lucide-react'
+import { Building2, ChevronDown, FileText, LogOut, Mail, Settings, Upload, UserCog, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { AvatarInitials } from '@/components/ui/avatar-initials'
@@ -98,6 +98,14 @@ export function Sidebar({ activeTab, onTabChange, hiddenTabIds, onOpenManagerVie
             <button type="button" onClick={() => onTabChange('team')} className={itemClasses(activeTab === 'team')}>
               <Users className="h-[18px] w-[18px] shrink-0" />
               Team
+            </button>
+          </li>
+        )}
+        {isAdmin && (
+          <li>
+            <button type="button" onClick={() => onTabChange('management')} className={itemClasses(activeTab === 'management')}>
+              <UserCog className="h-[18px] w-[18px] shrink-0" />
+              Management
             </button>
           </li>
         )}

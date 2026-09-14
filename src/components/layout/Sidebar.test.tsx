@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Sidebar } from './Sidebar'
 import { tabs, getVisibleTabs } from './navItems'
@@ -19,6 +19,8 @@ const defaultProps = {
 }
 
 describe('Sidebar', () => {
+  afterEach(() => vi.restoreAllMocks())
+
   it('renders every tab when nothing is hidden', () => {
     render(<Sidebar {...defaultProps} />)
     expect(screen.getByRole('button', { name: /Eviction List/ })).toBeTruthy()
@@ -65,5 +67,16 @@ describe('Sidebar', () => {
     vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' } } as any)
     render(<Sidebar {...defaultProps} />)
     expect(screen.getByRole('button', { name: /Settings/ })).toBeTruthy()
+  })
+
+  it('does not render a Management item for a non-ADMIN user', () => {
+    render(<Sidebar {...defaultProps} />)
+    expect(screen.queryByRole('button', { name: /Management/ })).toBeNull()
+  })
+
+  it('renders a Management item for an ADMIN user', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' } } as any)
+    render(<Sidebar {...defaultProps} />)
+    expect(screen.getByRole('button', { name: /Management/ })).toBeTruthy()
   })
 })

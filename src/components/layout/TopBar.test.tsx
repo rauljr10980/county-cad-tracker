@@ -93,4 +93,18 @@ describe('TopBar', () => {
     screen.getByRole('button', { name: /open menu/i }).click()
     await waitFor(() => expect(screen.getByRole('button', { name: /Manager Settings/ })).toBeTruthy())
   })
+
+  it('mobile sheet does not list Management for a non-admin', async () => {
+    render(<TopBar {...defaultProps} />)
+    screen.getByRole('button', { name: /open menu/i }).click()
+    await waitFor(() => expect(screen.getByRole('button', { name: /Upload/ })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: /Management/ })).toBeNull()
+  })
+
+  it('mobile sheet lists Management for an ADMIN user', async () => {
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' }, logout: vi.fn() } as any)
+    render(<TopBar {...defaultProps} />)
+    screen.getByRole('button', { name: /open menu/i }).click()
+    await waitFor(() => expect(screen.getByRole('button', { name: /Management/ })).toBeTruthy())
+  })
 })

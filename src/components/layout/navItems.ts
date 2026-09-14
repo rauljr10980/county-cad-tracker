@@ -2,7 +2,7 @@ import { LayoutDashboard, CalendarDays, List, Home, Car, Gavel, Briefcase, Build
 
 export type TabType =
   | 'dashboard' | 'calendar' | 'properties' | 'tasks' | 'upload'
-  | 'files' | 'preforeclosure' | 'driving' | 'crm' | 'evictions' | 'mls' | 'inbox' | 'team';
+  | 'files' | 'preforeclosure' | 'driving' | 'crm' | 'evictions' | 'mls' | 'inbox' | 'team' | 'management';
 
 export const tabs = [
   { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard, shortLabel: 'Dash' },
