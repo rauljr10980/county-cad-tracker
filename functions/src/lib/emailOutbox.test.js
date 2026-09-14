@@ -81,6 +81,43 @@ describe('sendOnce', () => {
     expect(result.status).toBe('failed');
   });
 
+  it('forwards auth to send when provided, for a sender\'s own configured credentials', async () => {
+    const db = makeFakeDb();
+    const send = vi.fn().mockResolvedValue([{ messageId: 'x' }]);
+    const auth = { user: 'sender@gmail.com', pass: 'app-password' };
+
+    await sendOnce({
+      templateKey: 'invite',
+      dedupeKey: 'invite-3',
+      to: ['e@example.com'],
+      subject: 'You are invited',
+      text: 'body',
+      auth,
+      db,
+      send,
+    });
+
+    expect(send).toHaveBeenCalledWith({ to: ['e@example.com'], subject: 'You are invited', text: 'body', auth });
+  });
+
+  it('omits auth from the send call when not provided, matching current password-reset behavior', async () => {
+    const db = makeFakeDb();
+    const send = vi.fn().mockResolvedValue([{ messageId: 'x' }]);
+
+    await sendOnce({
+      templateKey: 'password_reset',
+      dedupeKey: 'reset-1',
+      to: ['f@example.com'],
+      subject: 'Reset your password',
+      text: 'body',
+      db,
+      send,
+    });
+
+    expect(send).toHaveBeenCalledWith({ to: ['f@example.com'], subject: 'Reset your password', text: 'body' });
+    expect(send.mock.calls[0][0]).not.toHaveProperty('auth');
+  });
+
   it('falls back to findUnique instead of throwing, when create hits a concurrent duplicate (P2002)', async () => {
     const existingRow = { id: 'row-1', status: 'sent' };
     const findUnique = vi.fn()

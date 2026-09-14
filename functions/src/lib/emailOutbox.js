@@ -16,8 +16,12 @@
  * Prisma's native query-engine binary and any module-mocking setup.
  * Node caches `require()` results, so a real call site that omits `db`/
  * `send` still resolves the same singleton on every invocation.
+ *
+ * `auth`, when given, overrides the system Gmail account with a specific
+ * user's own SMTP credentials (e.g. the admin sending an invite) — omit
+ * it to use the shared system account, unchanged (password resets).
  */
-async function sendOnce({ templateKey, dedupeKey, to, subject, text, db, send }) {
+async function sendOnce({ templateKey, dedupeKey, to, subject, text, auth, db, send }) {
   const resolvedDb = db || require('./prisma');
   const resolvedSend = send || require('./emailService').sendEmailSmtp;
 
@@ -47,7 +51,7 @@ async function sendOnce({ templateKey, dedupeKey, to, subject, text, db, send })
   let status = 'sent';
   let errorMessage = null;
   try {
-    await resolvedSend({ to, subject, text });
+    await resolvedSend({ to, subject, text, ...(auth ? { auth } : {}) });
   } catch (err) {
     status = 'failed';
     errorMessage = String(err.message || err).slice(0, 500);

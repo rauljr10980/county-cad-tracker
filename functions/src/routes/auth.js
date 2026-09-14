@@ -394,12 +394,24 @@ router.post('/invites',
 
       const signupUrl = `${FRONTEND_URL}/#signup=${rawToken}`;
       try {
+        // Sends from the inviting admin's own Gmail when they've configured
+        // one (same lookup as POST /api/email/send), falling back to the
+        // shared system GMAIL_USER/GMAIL_APP_PASSWORD otherwise.
+        const sender = await prisma.user.findUnique({
+          where: { id: req.user.id },
+          select: { smtpUsername: true, smtpAppPassword: true },
+        });
+        const auth = (sender.smtpUsername && sender.smtpAppPassword)
+          ? { user: sender.smtpUsername, pass: sender.smtpAppPassword }
+          : undefined;
+
         await sendOnce({
           templateKey: 'invite',
           dedupeKey: invite.id,
           to: [email],
           subject: "You're invited to Bexar CRE Acquisition CRM",
           text: `${req.user.username} has invited you to join the team.\n\n${signupUrl}\n\nThis link expires in 7 days and can only be used once.`,
+          auth,
         });
       } catch (emailError) {
         // The invite row is already saved; a failed send just means this
