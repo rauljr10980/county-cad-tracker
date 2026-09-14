@@ -5,7 +5,10 @@ const prisma = require('../lib/prisma');
 const { createCalendarEvent } = require('../lib/googleCalendar');
 
 // GET /api/followups?month=2026-02
-router.get('/', optionalAuth, async (req, res) => {
+// Each Team Member's calendar is private to them — only a Manager (ADMIN)
+// sees everyone's follow-ups here, for their Dashboard's monthly overview
+// (Dashboard is itself Manager-only; see src/pages/Index.tsx).
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { month } = req.query;
     if (!month || !/^\d{4}-\d{2}$/.test(month)) {
@@ -19,6 +22,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const followUps = await prisma.followUp.findMany({
       where: {
         date: { gte: startDate, lt: endDate },
+        ...(req.user.role === 'ADMIN' ? {} : { createdById: req.user.id }),
       },
       include: {
         property: {
