@@ -87,6 +87,25 @@ model Invite {
   @@map("invites")
 }
 
+model EmailMessage {
+  id             String    @id @default(cuid())
+  templateKey    String    // 'password_reset' | 'invite'
+  dedupeKey      String    // hashed reset token, or the Invite's id
+  recipientEmail String
+  subject        String
+  bodyText       String    @db.Text
+  status         String    @default("queued") // queued | sent | failed
+  errorMessage   String?   @db.Text
+  createdAt      DateTime  @default(now())
+  sentAt         DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([templateKey, dedupeKey])
+  @@index([recipientEmail])
+  @@index([status])
+  @@map("email_messages")
+}
+
 model ScanCorrection {
   id         String   @id @default(cuid())
   userId     String
