@@ -8,8 +8,19 @@ const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
+const rateLimit = require('express-rate-limit');
+const { sendTestEmailWith } = require('../lib/sendTestEmail');
 
 const router = express.Router();
+
+const adminTestEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user.id,
+  message: { error: 'Too many test emails. Wait a while and try again.' }
+});
 
 // ============================================================================
 // GET ALL USERS (Admin only)
@@ -44,6 +55,50 @@ router.get('/',
     } catch (error) {
       console.error('[USERS] Fetch error:', error);
       res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  }
+);
+
+// ============================================================================
+// GET ALL USERS' EMAIL-SENDING STATUS (Admin only)
+// Registered before GET /:id — a literal path segment here would
+// otherwise be captured by the :id param route below.
+//
+// smtpConfigured is derived from smtpUsername alone, never from
+// smtpAppPassword — every write path in this file and in
+// routes/email.js sets or clears both fields together, so this is a
+// safe proxy that keeps the password out of every list response.
+// ============================================================================
+
+router.get('/email-settings',
+  authenticateToken,
+  requireRole('ADMIN'),
+  async (req, res) => {
+    try {
+      const users = await prisma.user.findMany({
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          role: true,
+          smtpUsername: true,
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      res.json({
+        users: users.map((u) => ({
+          id: u.id,
+          username: u.username,
+          email: u.email,
+          role: u.role,
+          smtpUsername: u.smtpUsername,
+          smtpConfigured: !!u.smtpUsername,
+        })),
+      });
+    } catch (error) {
+      console.error('[USERS] Failed to fetch email settings:', error);
+      res.status(500).json({ error: 'Failed to fetch email settings' });
     }
   }
 );
@@ -204,6 +259,98 @@ router.delete('/:id',
       }
       console.error('[USERS] Delete error:', error);
       res.status(500).json({ error: 'Failed to delete user' });
+    }
+  }
+);
+
+// ============================================================================
+// SET / CLEAR / TEST A TEAMMATE'S EMAIL SETTINGS (Admin only)
+// Mirrors routes/email.js's self-service /settings and /test routes, but
+// scoped to any :id rather than req.user.id. Never returns
+// smtpAppPassword in any response, matching the self-service routes —
+// this is a write/clear/test surface, not a read surface.
+// ============================================================================
+
+router.put('/:id/email-settings',
+  authenticateToken,
+  requireRole('ADMIN'),
+  [
+    body('smtpUsername').isEmail().normalizeEmail().withMessage('A valid email address is required'),
+    body('smtpAppPassword').isLength({ min: 1 }).withMessage('App password is required'),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+    try {
+      const { smtpUsername, smtpAppPassword } = req.body;
+      await prisma.user.update({
+        where: { id: req.params.id },
+        data: { smtpUsername, smtpAppPassword },
+      });
+      res.json({ smtpConfigured: true, smtpUsername });
+    } catch (error) {
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      console.error('[USERS] Failed to save email settings:', error);
+      res.status(500).json({ error: 'Failed to save email settings' });
+    }
+  }
+);
+
+router.delete('/:id/email-settings',
+  authenticateToken,
+  requireRole('ADMIN'),
+  async (req, res) => {
+    try {
+      await prisma.user.update({
+        where: { id: req.params.id },
+        data: { smtpUsername: null, smtpAppPassword: null },
+      });
+      res.json({ smtpConfigured: false });
+    } catch (error) {
+      if (error.code === 'P2025') {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      console.error('[USERS] Failed to clear email settings:', error);
+      res.status(500).json({ error: 'Failed to clear email settings' });
+    }
+  }
+);
+
+router.post('/:id/email-settings/test',
+  authenticateToken,
+  requireRole('ADMIN'),
+  adminTestEmailLimiter,
+  [
+    body('to').optional().isEmail().withMessage('Enter a valid email address').normalizeEmail(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+    try {
+      const target = await prisma.user.findUnique({
+        where: { id: req.params.id },
+        select: { email: true, smtpUsername: true, smtpAppPassword: true },
+      });
+      if (!target) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      if (!target.smtpUsername || !target.smtpAppPassword) {
+        return res.status(400).json({ error: 'This teammate has not set up their email yet' });
+      }
+      const recipient = req.body.to || target.email;
+      try {
+        await sendTestEmailWith({ smtpUsername: target.smtpUsername, smtpAppPassword: target.smtpAppPassword, to: recipient });
+        res.json({ success: true });
+      } catch (err) {
+        res.status(200).json({ success: false, error: String(err.message || err) });
+      }
+    } catch (error) {
+      console.error('[USERS] Test send failed unexpectedly:', error);
+      res.status(500).json({ error: 'Failed to send test email' });
     }
   }
 );
