@@ -1,6 +1,3 @@
-const defaultPrisma = require('./prisma');
-const { sendEmailSmtp: defaultSendEmailSmtp } = require('./emailService');
-
 /**
  * Write-first send: the row is inserted as 'queued' and committed before
  * any network call, so a slow or down mail server never loses the record
@@ -11,12 +8,20 @@ const { sendEmailSmtp: defaultSendEmailSmtp } = require('./emailService');
  *
  * `db` and `send` default to the real Prisma client and the real SMTP
  * sender — every production call site omits them and gets those
- * defaults. Tests pass fakes for both instead, which avoids ever loading
- * Prisma's native query-engine binary in the test process and avoids
- * needing any module-mocking setup.
+ * defaults. Both are resolved lazily, inside the function body, only when
+ * the corresponding parameter is actually omitted — never at module load
+ * time — so requiring this module never constructs a real PrismaClient.
+ * Tests pass fakes for both instead, which means `require('./prisma')`
+ * never executes in the test process at all, avoiding both a load of
+ * Prisma's native query-engine binary and any module-mocking setup.
+ * Node caches `require()` results, so a real call site that omits `db`/
+ * `send` still resolves the same singleton on every invocation.
  */
-async function sendOnce({ templateKey, dedupeKey, to, subject, text, db = defaultPrisma, send = defaultSendEmailSmtp }) {
-  const existing = await db.emailMessage.findUnique({
+async function sendOnce({ templateKey, dedupeKey, to, subject, text, db, send }) {
+  const resolvedDb = db || require('./prisma');
+  const resolvedSend = send || require('./emailService').sendEmailSmtp;
+
+  const existing = await resolvedDb.emailMessage.findUnique({
     where: { templateKey_dedupeKey: { templateKey, dedupeKey } },
   });
   if (existing) return existing;
@@ -24,7 +29,7 @@ async function sendOnce({ templateKey, dedupeKey, to, subject, text, db = defaul
   const recipientEmail = Array.isArray(to) ? to[0] : to;
   let row;
   try {
-    row = await db.emailMessage.create({
+    row = await resolvedDb.emailMessage.create({
       data: { templateKey, dedupeKey, recipientEmail, subject, bodyText: text, status: 'queued' },
     });
   } catch (err) {
@@ -32,7 +37,7 @@ async function sendOnce({ templateKey, dedupeKey, to, subject, text, db = defaul
     // unique constraint is the real guarantee, this just avoids a
     // duplicate-send if two requests for the same event land together.
     if (err.code === 'P2002') {
-      return db.emailMessage.findUnique({
+      return resolvedDb.emailMessage.findUnique({
         where: { templateKey_dedupeKey: { templateKey, dedupeKey } },
       });
     }
@@ -42,13 +47,13 @@ async function sendOnce({ templateKey, dedupeKey, to, subject, text, db = defaul
   let status = 'sent';
   let errorMessage = null;
   try {
-    await send({ to, subject, text });
+    await resolvedSend({ to, subject, text });
   } catch (err) {
     status = 'failed';
     errorMessage = String(err.message || err).slice(0, 500);
   }
 
-  return db.emailMessage.update({
+  return resolvedDb.emailMessage.update({
     where: { id: row.id },
     data: { status, errorMessage, sentAt: status === 'sent' ? new Date() : null },
   });
