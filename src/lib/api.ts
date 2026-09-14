@@ -1964,3 +1964,48 @@ export async function sendEmail(data: { to: string[]; subject: string; body: str
   }
   return response.json();
 }
+
+export interface EmailSettings {
+  configured: boolean;
+  smtpUsername: string | null;
+}
+
+export async function getMyEmailSettings(): Promise<EmailSettings> {
+  const response = await fetch(`${API_BASE_URL}/api/email/settings`, { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error('Failed to load email settings');
+  return response.json();
+}
+
+export async function setMyEmailSettings(smtpUsername: string, smtpAppPassword: string): Promise<{ configured: true }> {
+  const response = await fetch(`${API_BASE_URL}/api/email/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ smtpUsername, smtpAppPassword }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to save email settings');
+  }
+  return response.json();
+}
+
+export async function clearMyEmailSettings(): Promise<{ configured: false }> {
+  const response = await fetch(`${API_BASE_URL}/api/email/settings`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to clear email settings');
+  return response.json();
+}
+
+export async function sendTestEmail(): Promise<{ success: boolean; error?: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/email/test`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to send test email');
+  }
+  return response.json();
+}
