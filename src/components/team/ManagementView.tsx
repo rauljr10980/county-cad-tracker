@@ -22,6 +22,12 @@ export default function ManagementView() {
     setMembers(users);
   };
 
+  const reload = () => {
+    load().catch((err) => {
+      toast({ title: 'Failed to load team email settings', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+    });
+  };
+
   useEffect(() => {
     setLoading(true);
     load()
@@ -89,7 +95,7 @@ export default function ManagementView() {
           isOpen
           onClose={() => setEditing(null)}
           targetUser={editing}
-          onChanged={load}
+          onChanged={reload}
         />
       )}
     </div>
