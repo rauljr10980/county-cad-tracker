@@ -287,12 +287,27 @@ router.post('/forgot-password',
 
         const resetUrl = `${FRONTEND_URL}/#reset-password=${rawToken}`;
         try {
+          // No specific person is "sending" a password-reset (the account
+          // holder triggers it themselves), so there's no req.user to look
+          // up like /invites does. Instead, use any Manager's configured
+          // Gmail credentials as the sending account — falls back to the
+          // shared system GMAIL_USER/GMAIL_APP_PASSWORD only if no admin
+          // has set one up.
+          const adminSender = await prisma.user.findFirst({
+            where: { role: 'ADMIN', smtpUsername: { not: null }, smtpAppPassword: { not: null } },
+            select: { smtpUsername: true, smtpAppPassword: true },
+          });
+          const auth = adminSender
+            ? { user: adminSender.smtpUsername, pass: adminSender.smtpAppPassword }
+            : undefined;
+
           await sendOnce({
             templateKey: 'password_reset',
             dedupeKey: hashedToken,
             to: [user.email],
             subject: 'Reset your password',
             text: `We received a request to reset your password.\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, you can ignore this email.`,
+            auth,
           });
         } catch (emailError) {
           // The token is already saved; a failed send just means this
