@@ -11,7 +11,7 @@ const { body, validationResult } = require('express-validator');
 const { authenticateToken, requireRole, JWT_SECRET } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 const rateLimit = require('express-rate-limit');
-const { sendEmail } = require('../lib/emailService');
+const { sendOnce } = require('../lib/emailOutbox');
 const { inviteStatus } = require('../lib/inviteStatus');
 
 const router = express.Router();
@@ -287,7 +287,9 @@ router.post('/forgot-password',
 
         const resetUrl = `${FRONTEND_URL}/#reset-password=${rawToken}`;
         try {
-          await sendEmail({
+          await sendOnce({
+            templateKey: 'password_reset',
+            dedupeKey: hashedToken,
             to: [user.email],
             subject: 'Reset your password',
             text: `We received a request to reset your password.\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, you can ignore this email.`,
@@ -392,7 +394,9 @@ router.post('/invites',
 
       const signupUrl = `${FRONTEND_URL}/#signup=${rawToken}`;
       try {
-        await sendEmail({
+        await sendOnce({
+          templateKey: 'invite',
+          dedupeKey: invite.id,
           to: [email],
           subject: "You're invited to Bexar CRE Acquisition CRM",
           text: `${req.user.username} has invited you to join the team.\n\n${signupUrl}\n\nThis link expires in 7 days and can only be used once.`,
