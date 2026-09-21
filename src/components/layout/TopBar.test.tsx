@@ -7,7 +7,17 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: vi.fn(() => ({ user: { id: 'u1', username: 'raul', role: 'OPERATOR' }, logout: vi.fn() })),
 }))
 
+vi.mock('@/contexts/ViewAsContext', () => ({
+  useViewAs: vi.fn(() => ({
+    viewAsUserId: null,
+    viewAsUser: null,
+    teamMembers: [],
+    setViewAs: vi.fn(),
+  })),
+}))
+
 import { useAuth } from '@/contexts/AuthContext'
+import { useViewAs } from '@/contexts/ViewAsContext'
 
 const noop = () => {}
 const defaultProps = {
@@ -120,5 +130,49 @@ describe('TopBar', () => {
     render(<TopBar {...defaultProps} />)
     screen.getByRole('button', { name: /open menu/i }).click()
     await waitFor(() => expect(screen.getByRole('button', { name: /Dashboard/ })).toBeTruthy())
+  })
+})
+
+describe('TopBar view-as picker', () => {
+  const asViewAs = (value: unknown) =>
+    (useViewAs as unknown as ReturnType<typeof vi.fn>).mockReturnValue(value)
+
+  const teammates = [
+    { id: 'op1', username: 'raul', email: 'a@x.com', role: 'OPERATOR' as const, isActive: true, createdAt: '' },
+  ]
+
+  beforeEach(() => {
+    vi.spyOn(api, 'getNotifications').mockResolvedValue({ notifications: [], count: 0 })
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('shows the picker to a Manager who has teammates', () => {
+    ;(useAuth as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      user: { id: 'mgr1', username: 'robbie', role: 'ADMIN' },
+      logout: vi.fn(),
+    })
+    asViewAs({ viewAsUserId: null, viewAsUser: null, teamMembers: teammates, setViewAs: vi.fn() })
+    render(<TopBar {...defaultProps} />)
+    expect(screen.getByLabelText(/view as teammate/i)).toBeTruthy()
+  })
+
+  it('hides the picker from a non-Manager', () => {
+    ;(useAuth as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      user: { id: 'op1', username: 'raul', role: 'OPERATOR' },
+      logout: vi.fn(),
+    })
+    asViewAs({ viewAsUserId: null, viewAsUser: null, teamMembers: teammates, setViewAs: vi.fn() })
+    render(<TopBar {...defaultProps} />)
+    expect(screen.queryByLabelText(/view as teammate/i)).toBeNull()
+  })
+
+  it('hides the picker from a Manager with no teammates', () => {
+    ;(useAuth as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      user: { id: 'mgr1', username: 'robbie', role: 'ADMIN' },
+      logout: vi.fn(),
+    })
+    asViewAs({ viewAsUserId: null, viewAsUser: null, teamMembers: [], setViewAs: vi.fn() })
+    render(<TopBar {...defaultProps} />)
+    expect(screen.queryByLabelText(/view as teammate/i)).toBeNull()
   })
 })
