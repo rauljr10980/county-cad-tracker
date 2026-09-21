@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { authenticateToken } = require('../middleware/auth');
+const { resolveViewAs } = require('../middleware/viewAs');
 const { parseScanCorrection } = require('../lib/scanCorrections');
 
 router.post('/scan-corrections', authenticateToken, async (req, res) => {
@@ -26,9 +27,9 @@ const {
 } = require('../lib/crmScope');
 
 // GET /api/crm/state - fetch full CRM state
-router.get('/state', authenticateToken, async (req, res) => {
+router.get('/state', authenticateToken, resolveViewAs, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.effectiveUserId;
     const [leads, deals, tasks, activities] = await Promise.all([
       prisma.crmLead.findMany({ where: leadWhere(userId), orderBy: { createdAt: 'asc' } }),
       prisma.crmDeal.findMany({ where: childWhere(userId), orderBy: { createdAt: 'asc' } }),
@@ -95,9 +96,9 @@ async function assertChildrenOwned(tx, model, ids, userId) {
 }
 
 // PUT /api/crm/state - bulk sync full CRM state
-router.put('/state', authenticateToken, async (req, res) => {
+router.put('/state', authenticateToken, resolveViewAs, async (req, res) => {
   const { leads = [], deals = [], tasks = [], activities = [] } = req.body;
-  const userId = req.user.id;
+  const userId = req.effectiveUserId;
 
   try {
     await prisma.$transaction(async (tx) => {
