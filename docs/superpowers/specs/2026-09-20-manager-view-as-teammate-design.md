@@ -61,7 +61,7 @@ never built and is superseded by this document.
   `src/crm/data/dataService.ts` and `src/components/mls/MlsLeadsView.tsx:97`
   (itself a single fetch wrapper for all MLS calls). One edit here reaches
   every authenticated request the app makes.
-- **CORS pins an explicit header allowlist.** `functions/src/index.js:137`:
+- **CORS pins an explicit header allowlist.** `functions/src/index.js:138`:
   `allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']`. A new
   custom header **must** be added here or every request from the deployed
   GitHub Pages origin fails preflight.
@@ -262,7 +262,7 @@ That is correct and intended under full-edit view-as.
 
 ### CORS
 
-`functions/src/index.js:137`:
+`functions/src/index.js:138`:
 
 ```js
 allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-View-As-User'],

@@ -149,7 +149,7 @@ git commit -m "feat: add the view-as rule for Manager account switching"
 
 **Files:**
 - Create: `functions/src/middleware/viewAs.js`
-- Modify: `functions/src/index.js:137` (the `allowedHeaders` array)
+- Modify: `functions/src/index.js:138` (the `allowedHeaders` array)
 
 **Interfaces:**
 - Consumes: `decideEffectiveUserId`, `FORBIDDEN_VIEW_AS_CODE` from Task 1.
@@ -201,7 +201,7 @@ module.exports = { resolveViewAs };
 
 - [ ] **Step 2: Allow the header through CORS**
 
-In `functions/src/index.js`, find line 137:
+In `functions/src/index.js`, find line 138:
 
 ```js
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
