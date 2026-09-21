@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
+const { resolveViewAs } = require('../middleware/viewAs');
 const prisma = require('../lib/prisma');
 const { createCalendarEvent } = require('../lib/googleCalendar');
 
@@ -8,9 +9,10 @@ const { createCalendarEvent } = require('../lib/googleCalendar');
 // Each Team Member's calendar is private to them — only a Manager (ADMIN)
 // sees everyone's follow-ups here, for their Dashboard's monthly overview
 // (Dashboard is itself Manager-only; see src/pages/Index.tsx).
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, resolveViewAs, async (req, res) => {
   try {
     const { month } = req.query;
+    const isImpersonating = req.effectiveUserId !== req.user.id;
     if (!month || !/^\d{4}-\d{2}$/.test(month)) {
       return res.status(400).json({ error: 'month query param required (YYYY-MM format)' });
     }
@@ -22,7 +24,11 @@ router.get('/', authenticateToken, async (req, res) => {
     const followUps = await prisma.followUp.findMany({
       where: {
         date: { gte: startDate, lt: endDate },
-        ...(req.user.role === 'ADMIN' ? {} : { createdById: req.user.id }),
+        // A Manager with nobody selected keeps seeing everyone (Dashboard's
+        // monthly overview depends on it). A Manager viewing one teammate must
+        // see only that teammate, or the switch would do nothing here — the
+        // unfiltered admin view already includes them.
+        ...(req.user.role === 'ADMIN' && !isImpersonating ? {} : { createdById: req.effectiveUserId }),
       },
       include: {
         property: {
@@ -124,7 +130,7 @@ router.get('/by-property/:propertyId', optionalAuth, async (req, res) => {
 });
 
 // POST /api/followups
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, resolveViewAs, async (req, res) => {
   try {
     const { date, note, propertyId, documentNumber, drivingLeadId } = req.body;
 
@@ -164,7 +170,7 @@ router.post('/', authenticateToken, async (req, res) => {
         propertyId: propertyId || null,
         preforeclosureId: preforeclosureId,
         drivingLeadId: drivingLeadId || null,
-        createdById: req.user.id,
+        createdById: req.effectiveUserId,
       },
       include: {
         property: { select: { id: true, propertyAddress: true, ownerName: true, workflowStage: true } },
@@ -196,7 +202,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/followups/:id
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, resolveViewAs, async (req, res) => {
   try {
     const { id } = req.params;
     const { completed, note, date } = req.body;
@@ -233,7 +239,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/followups/:id
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, resolveViewAs, async (req, res) => {
   try {
     const { id } = req.params;
 
