@@ -1,8 +1,36 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getAuthHeaders, getViewAsUserId, VIEW_AS_STORAGE_KEY } from './api';
 
+function stubLocalStorage() {
+  const store: Record<string, string> = {};
+
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => {
+      return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null;
+    },
+    setItem: (key: string, value: string) => {
+      store[key] = String(value);
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      Object.keys(store).forEach(key => delete store[key]);
+    },
+    key: (index: number) => {
+      const keys = Object.keys(store);
+      return keys[index] || null;
+    },
+    length: 0,
+  });
+}
+
+beforeEach(() => {
+  stubLocalStorage();
+});
+
 afterEach(() => {
-  localStorage.clear();
+  vi.unstubAllGlobals();
 });
 
 describe('getViewAsUserId', () => {
