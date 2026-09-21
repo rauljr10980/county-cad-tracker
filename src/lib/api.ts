@@ -30,6 +30,23 @@ function getAuthToken(): string | null {
   return localStorage.getItem('authToken');
 }
 
+/** The teammate a Manager is currently viewing as, or null for their own account. */
+export const VIEW_AS_STORAGE_KEY = 'viewAsUserId';
+
+/**
+ * Read straight from localStorage rather than React context: getAuthHeaders is
+ * a plain function called from non-React code paths (the CRM dataService, the
+ * MLS fetch wrapper), so it cannot use a hook. localStorage is therefore the
+ * single source of truth; ViewAsContext only mirrors it for rendering.
+ */
+export function getViewAsUserId(): string | null {
+  try {
+    return localStorage.getItem(VIEW_AS_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 // Helper function to get headers with auth
 export function getAuthHeaders(): HeadersInit {
   const token = getAuthToken();
@@ -38,6 +55,12 @@ export function getAuthHeaders(): HeadersInit {
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+  // One edit here reaches all 16 modules that import getAuthHeaders. The
+  // backend ignores this header except on the three opted-in routers.
+  const viewAs = getViewAsUserId();
+  if (viewAs) {
+    headers['X-View-As-User'] = viewAs;
   }
   return headers;
 }

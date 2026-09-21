@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useCrmStore } from './useCrmStore';
 import { dataService } from '../data/dataService';
 import { EMPTY_STATE, type Lead } from '../data/types';
+import { VIEW_AS_STORAGE_KEY } from '@/lib/api';
 
 vi.mock('../data/dataService', () => ({
   dataService: {
@@ -13,6 +14,28 @@ vi.mock('../data/dataService', () => ({
 
 const now = new Date('2026-08-25T12:00:00Z');
 const ownerKey = 'user-1';
+
+// Mirrors src/lib/api.test.ts's stub: a fresh in-memory store per test, kept
+// local via vi.stubGlobal rather than a shared setupFiles entry (rejected
+// earlier in this plan).
+function stubLocalStorage(initial: Record<string, string> = {}) {
+  const store: Record<string, string> = { ...initial };
+
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => (Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null),
+    setItem: (key: string, value: string) => {
+      store[key] = String(value);
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      Object.keys(store).forEach((key) => delete store[key]);
+    },
+    key: (index: number) => Object.keys(store)[index] || null,
+    length: 0,
+  });
+}
 
 const newLeadInput: Omit<Lead, 'id' | 'createdAt' | 'lastContactedAt' | 'kind'> = {
   businessName: 'Acme Co',
@@ -174,5 +197,78 @@ describe('useCrmStore.hydrate', () => {
     expect(state.hydrated).toBe(true);
     // Only the account's own real lead — no network-* leads were merged in.
     expect(state.leads).toEqual([existingLead]);
+  });
+});
+
+describe('useCrmStore.hydrate while a Manager is viewing a teammate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useCrmStore.setState({ ...EMPTY_STATE, hydrated: false, hydrateError: null });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('namespaces merged network ids under the viewed teammate, not the passed-in ownerKey', async () => {
+    stubLocalStorage({ [VIEW_AS_STORAGE_KEY]: 'teammate-9' });
+
+    const existingLead: Lead = {
+      id: 'lead-1',
+      ...newLeadInput,
+      kind: 'industry',
+      lastContactedAt: null,
+      createdAt: now.toISOString(),
+    };
+    vi.mocked(dataService.load).mockResolvedValue({
+      ok: true,
+      state: { leads: [existingLead], deals: [], tasks: [], activities: [], settings: undefined as never },
+    });
+
+    // ownerKey here is the Manager's own id — hydrate must not use it to mint
+    // network-* ids while a teammate is being viewed.
+    await useCrmStore.getState().hydrate(now, 'manager-1');
+
+    const state = useCrmStore.getState();
+    expect(state.hydrated).toBe(true);
+    const networkLeads = state.leads.filter((lead) => lead.id.startsWith('network-'));
+    expect(networkLeads.length).toBeGreaterThan(0);
+    expect(networkLeads.every((lead) => lead.id.startsWith('network-teammate-9-'))).toBe(true);
+    expect(networkLeads.some((lead) => lead.id.startsWith('network-manager-1-'))).toBe(false);
+  });
+
+  it('does not seed demo data into a genuinely empty account while viewing a teammate', async () => {
+    stubLocalStorage({ [VIEW_AS_STORAGE_KEY]: 'teammate-9' });
+
+    vi.mocked(dataService.load).mockResolvedValue({
+      ok: true,
+      state: { leads: [], deals: [], tasks: [], activities: [], settings: undefined as never },
+    });
+
+    await useCrmStore.getState().hydrate(now, 'manager-1');
+
+    const state = useCrmStore.getState();
+    expect(state.hydrated).toBe(true);
+    expect(state.hydrateError).toBeNull();
+    expect(state.leads).toEqual([]);
+    expect(state.deals).toEqual([]);
+    expect(state.tasks).toEqual([]);
+    expect(state.activities).toEqual([]);
+  });
+
+  it('still seeds demo data for a genuinely empty account when no teammate is being viewed', async () => {
+    stubLocalStorage();
+
+    vi.mocked(dataService.load).mockResolvedValue({
+      ok: true,
+      state: { leads: [], deals: [], tasks: [], activities: [], settings: undefined as never },
+    });
+
+    await useCrmStore.getState().hydrate(now, ownerKey);
+
+    const state = useCrmStore.getState();
+    expect(state.hydrated).toBe(true);
+    expect(state.leads.length).toBeGreaterThan(0);
+    expect(state.leads.every((lead) => lead.id.startsWith(`network-${ownerKey}-`))).toBe(true);
   });
 });

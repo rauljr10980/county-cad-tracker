@@ -7,6 +7,7 @@ import {
 } from '../data/networkContacts'
 import { generateSeed } from '../data/seed'
 import { removeLegacyFakeFollowUps } from '../lib/tasks'
+import { getViewAsUserId } from '@/lib/api'
 import {
   EMPTY_STATE,
   type Activity,
@@ -98,6 +99,14 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
     hydrateError: null,
 
     hydrate: async (now, ownerKey) => {
+      // While a Manager is viewing a teammate, every network-* id must be minted in
+      // THAT teammate's namespace: mergeNetworkState drops every /^network-/ row it
+      // finds and rebuilds from this key, so a Manager-namespaced rebuild would wipe
+      // the teammate's seeded leads and the next save would be rejected as foreign.
+      // Read here rather than at the call sites so the three of them cannot disagree.
+      const viewingUserId = getViewAsUserId()
+      const effectiveOwnerKey = viewingUserId ?? ownerKey
+
       const result = await dataService.load()
       if (!result.ok) {
         // Do not touch leads/deals/tasks/activities: on a first-ever hydrate
@@ -120,11 +129,15 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
         // without an ownerKey there is nothing safe to seed with — leave the
         // account empty rather than mint globally-constant ids. The next
         // hydrate that does have an ownerKey will seed normally.
-        if (!ownerKey) {
+        //
+        // Never seed demo data into an account that isn't ours. A Manager checking on
+        // a teammate's empty CRM must see a real empty state, not fake starter leads
+        // that the next edit would persist into that teammate's account.
+        if (!effectiveOwnerKey || viewingUserId) {
           set({ ...EMPTY_STATE, hydrated: true, hydrateError: null })
           return
         }
-        const seed = generateSeed(now, ownerKey)
+        const seed = generateSeed(now, effectiveOwnerKey)
         set({ ...seed, hydrated: true, hydrateError: null })
         return
       }
@@ -144,7 +157,7 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
             "Hi, it was great meeting you. You mentioned you were thinking about buying — I'd love to sit down and chat to see how I can help. When would be a good time to connect?",
         },
       }
-      const next = mergeNetworkState(normalized, now, ownerKey)
+      const next = mergeNetworkState(normalized, now, effectiveOwnerKey)
       set({ ...next, hydrated: true, hydrateError: null })
     },
 

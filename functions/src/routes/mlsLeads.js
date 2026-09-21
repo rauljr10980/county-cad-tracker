@@ -4,6 +4,7 @@ const XLSX = require('xlsx');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { authenticateToken } = require('../middleware/auth');
+const { resolveViewAs } = require('../middleware/viewAs');
 const { classifyOwner, searchName } = require('../lib/mlsOwner');
 const { parseSheet, dedupe } = require('../lib/mlsWorkbook');
 // Aliased: this file already has its own `normalizeNameForMatch` below (an
@@ -31,13 +32,14 @@ const {
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 router.use(authenticateToken);
+router.use(resolveViewAs);
 
 // Import. Batched rather than one transaction per row: the eviction importer
 // originally ran 294 transactions against a 5-second default timeout and never
 // completed on a large workbook.
 router.post('/import', upload.array('files'), async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.effectiveUserId;
     const rows = [];
     for (const file of req.files || []) {
       const wb = XLSX.read(file.buffer, { type: 'buffer' });
@@ -425,8 +427,8 @@ async function findTracingSiblings(userId, contact) {
 router.get('/', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize) || 25));
-  const where = buildLeadWhere(req.user.id, req.query);
-  await applySkipTraceFilter(req.user.id, where, req.query.skipTrace);
+  const where = buildLeadWhere(req.effectiveUserId, req.query);
+  await applySkipTraceFilter(req.effectiveUserId, where, req.query.skipTrace);
 
   const [total, items] = await Promise.all([
     prisma.mlsLead.count({ where }),
@@ -447,12 +449,12 @@ router.get('/', async (req, res) => {
 // need a TruePeopleSearch pass, grouped one entry per normalised name (via
 // entityShare.js's groupContactsByNormalizedName — reused as-is, see
 // skipTrace.js's header) so a person who owns several listings is one queue
-// entry, not several. Scoped by req.user.id and the same filters the list
+// entry, not several. Scoped by req.effectiveUserId and the same filters the list
 // route takes (see buildLeadWhere), so the queue only covers what's
 // currently in view. Registered ahead of GET /:id so "skip-trace-queue"
 // isn't swallowed as an :id.
 router.get('/skip-trace-queue', async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.effectiveUserId;
   const leadWhere = buildLeadWhere(userId, req.query);
 
   const contacts = await prisma.mlsContact.findMany({
@@ -501,7 +503,7 @@ router.get('/skip-trace-queue', async (req, res) => {
 // their nameKind and searchName are deliberately fixed at creation (see
 // createOfficers's comment above) and don't come from classifyOwner at all.
 router.post('/reclassify-owners', async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.effectiveUserId;
   const contacts = await prisma.mlsContact.findMany({
     where: { role: { in: ['mls_owner', 'cad_owner'] }, lead: { userId } },
     select: { id: true, name: true, nameKind: true },
@@ -523,7 +525,7 @@ router.post('/reclassify-owners', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   const item = await prisma.mlsLead.findFirst({
-    where: { id: req.params.id, userId: req.user.id },
+    where: { id: req.params.id, userId: req.effectiveUserId },
     include: { contacts: { orderBy: { role: 'asc' } } },
   });
   if (!item) return res.status(404).json({ error: 'Lead not found' });
@@ -539,7 +541,7 @@ router.patch('/:id', async (req, res) => {
   if (Object.prototype.hasOwnProperty.call(data, 'hidden')) {
     data.hiddenAt = data.hidden ? new Date() : null;
   }
-  const result = await prisma.mlsLead.updateMany({ where: { id: req.params.id, userId: req.user.id }, data });
+  const result = await prisma.mlsLead.updateMany({ where: { id: req.params.id, userId: req.effectiveUserId }, data });
   if (!result.count) return res.status(404).json({ error: 'Lead not found' });
   res.json({ ok: true });
 });
@@ -549,7 +551,7 @@ router.patch('/:id', async (req, res) => {
 // route is deliberately single-lead rather than looping over a filtered set.
 router.post('/:id/cad-lookup', async (req, res) => {
   const lead = await prisma.mlsLead.findFirst({
-    where: { id: req.params.id, userId: req.user.id },
+    where: { id: req.params.id, userId: req.effectiveUserId },
     include: { contacts: true },
   });
   if (!lead) return res.status(404).json({ error: 'Lead not found' });
@@ -618,11 +620,11 @@ router.post('/:id/cad-lookup', async (req, res) => {
 // forcing the user to run a CAD lookup before they can paste what they
 // already know, that box calls this the first time it has something to
 // save, then switches to the normal PATCH /contacts/:contactId flow once it
-// has a real id. Scoped by req.user.id through the parent lead, like every
+// has a real id. Scoped by req.effectiveUserId through the parent lead, like every
 // other contact route in this file — MlsContact carries no userId of its
 // own.
 router.post('/:id/contacts', async (req, res) => {
-  const lead = await prisma.mlsLead.findFirst({ where: { id: req.params.id, userId: req.user.id } });
+  const lead = await prisma.mlsLead.findFirst({ where: { id: req.params.id, userId: req.effectiveUserId } });
   if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
   const role = typeof req.body.role === 'string' && req.body.role ? req.body.role : 'cad_owner';
@@ -658,7 +660,7 @@ router.post('/:id/contacts', async (req, res) => {
 // another's data.
 router.patch('/contacts/:contactId', async (req, res) => {
   const contact = await prisma.mlsContact.findFirst({
-    where: { id: req.params.contactId, lead: { userId: req.user.id } },
+    where: { id: req.params.contactId, lead: { userId: req.effectiveUserId } },
   });
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
@@ -686,7 +688,7 @@ router.patch('/contacts/:contactId', async (req, res) => {
   // Comptroller result shares to every listing under the same company — see
   // the entity-lookup routes above.
   if (hasNewFacts(facts)) {
-    const siblings = await findTracingSiblings(req.user.id, contact);
+    const siblings = await findTracingSiblings(req.effectiveUserId, contact);
     for (const sibling of siblings) {
       const merged = applyFactsToContacts(sibling.contacts, facts, sibling.name);
       if (merged.changed) {
@@ -709,7 +711,7 @@ router.patch('/contacts/:contactId', async (req, res) => {
 // which is honest and costs one extra call — cheaper than a dead button.
 router.post('/contacts/:contactId/entity-lookup', async (req, res) => {
   const contact = await prisma.mlsContact.findFirst({
-    where: { id: req.params.contactId, lead: { userId: req.user.id } },
+    where: { id: req.params.contactId, lead: { userId: req.effectiveUserId } },
   });
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
@@ -718,7 +720,7 @@ router.post('/contacts/:contactId/entity-lookup', async (req, res) => {
     // lead this user has, not just this one) may already have a resolved
     // result. Copying it costs nothing against the Comptroller's public
     // endpoint — see entityShare.js.
-    const siblings = await findEntitySiblings(req.user.id, contact);
+    const siblings = await findEntitySiblings(req.effectiveUserId, contact);
     const successfulSibling = findSuccessfulSibling(siblings);
     if (successfulSibling) {
       const updated = await applySharedResult(contact, pickSharedEntityFields(successfulSibling));
@@ -782,7 +784,7 @@ router.post('/contacts/:contactId/entity-lookup', async (req, res) => {
 // agent — the same way the single-match branch above does.
 router.post('/contacts/:contactId/entity-select', async (req, res) => {
   const contact = await prisma.mlsContact.findFirst({
-    where: { id: req.params.contactId, lead: { userId: req.user.id } },
+    where: { id: req.params.contactId, lead: { userId: req.effectiveUserId } },
   });
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
@@ -794,7 +796,7 @@ router.post('/contacts/:contactId/entity-select', async (req, res) => {
   }
 
   try {
-    const siblings = await findEntitySiblings(req.user.id, contact);
+    const siblings = await findEntitySiblings(req.effectiveUserId, contact);
     const { contact: updated, detailError } = await persistEntityDetail(contact, req.body);
 
     // Same sharing as the automatic path — see entity-lookup above.
@@ -819,7 +821,7 @@ router.post('/contacts/:contactId/entity-select', async (req, res) => {
 });
 
 // Bulk entity lookup: processes at most BULK_BATCH_SIZE *distinct* company
-// names per call, scoped by req.user.id and the same filters the list route
+// names per call, scoped by req.effectiveUserId and the same filters the list route
 // takes, so it runs over whatever the user is currently looking at. The
 // client (see MlsLeadsView.tsx) calls this repeatedly until `remaining` is
 // 0, showing progress between calls — a single request covering hundreds of
@@ -841,7 +843,7 @@ const BULK_LOOKUP_DELAY_MS = 400;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 router.post('/entity-lookup/bulk', async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.effectiveUserId;
   const retryFailed = req.body?.retryFailed === true;
 
   try {

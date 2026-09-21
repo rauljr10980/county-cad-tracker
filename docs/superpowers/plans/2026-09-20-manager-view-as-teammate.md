@@ -14,7 +14,7 @@
 
 - **Header name is exactly `X-View-As-User`.** Express lowercases incoming headers, so backend code reads `req.headers['x-view-as-user']`.
 - **localStorage key is exactly `viewAsUserId`**, exported as `VIEW_AS_STORAGE_KEY` from `src/lib/api.ts`.
-- **`req.effectiveUserId` is opt-in.** Only `crm.js`, `followUps.js`, and `mlsLeads.js` may read it. Never add `resolveViewAs` globally in `functions/src/index.js`.
+- **`req.effectiveUserId` is opt-in.** Only `crm.js`, `followups.js`, and `mlsLeads.js` may read it. Never add `resolveViewAs` globally in `functions/src/index.js`.
 - **`crm.js:12` (`scanCorrection`) keeps `req.user.id`.** It is OCR training-data attribution — an identity use, not an ownership use.
 - **Backend test files live in `functions/src/lib/` only.** Anything importing `../lib/prisma` constructs a `PrismaClient` at require time, which eagerly loads a native query-engine binary and cannot be imported under vitest.
 - **Run all tests from the repo root** with `npm test` (`vitest run`). There is no test script in `functions/package.json`.
@@ -149,7 +149,7 @@ git commit -m "feat: add the view-as rule for Manager account switching"
 
 **Files:**
 - Create: `functions/src/middleware/viewAs.js`
-- Modify: `functions/src/index.js:137` (the `allowedHeaders` array)
+- Modify: `functions/src/index.js:138` (the `allowedHeaders` array)
 
 **Interfaces:**
 - Consumes: `decideEffectiveUserId`, `FORBIDDEN_VIEW_AS_CODE` from Task 1.
@@ -201,7 +201,7 @@ module.exports = { resolveViewAs };
 
 - [ ] **Step 2: Allow the header through CORS**
 
-In `functions/src/index.js`, find line 137:
+In `functions/src/index.js`, find line 138:
 
 ```js
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -469,7 +469,7 @@ git commit -m "feat: scope CRM state to the effective user"
 ### Task 5: Scope the Calendar to the effective user
 
 **Files:**
-- Modify: `functions/src/routes/followUps.js:11`, `:25`, `:127`, `:167`, `:199`, `:236`
+- Modify: `functions/src/routes/followups.js:11`, `:25`, `:127`, `:167`, `:199`, `:236`
 
 **Interfaces:**
 - Consumes: `resolveViewAs` from Task 2.
@@ -477,7 +477,7 @@ git commit -m "feat: scope CRM state to the effective user"
 
 - [ ] **Step 1: Import the middleware**
 
-In `functions/src/routes/followUps.js`, after line 3:
+In `functions/src/routes/followups.js`, after line 3:
 
 ```js
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
@@ -548,14 +548,14 @@ So a follow-up created while viewing Raul appears in Raul's calendar, which is t
 
 - [ ] **Step 5: Verify and commit**
 
-Run: `grep -n "req.user.id\|req.user.role\|req.effectiveUserId" functions/src/routes/followUps.js`
+Run: `grep -n "req.user.id\|req.user.role\|req.effectiveUserId" functions/src/routes/followups.js`
 Expected: line 25's ternary still reads `req.user.role === 'ADMIN'`, its fallback now `req.effectiveUserId`; line 167 now `req.effectiveUserId`; the `isImpersonating` line compares both.
 
 Run: `npm test`
 Expected: PASS.
 
 ```bash
-git add functions/src/routes/followUps.js
+git add functions/src/routes/followups.js
 git commit -m "feat: scope the Calendar to one teammate when a Manager views as them"
 ```
 
@@ -1166,7 +1166,7 @@ Expected: PASS, with the new files included — `functions/src/lib/viewAs.test.j
 - [ ] **Step 3: Confirm the opt-in boundary held**
 
 Run: `grep -rn "effectiveUserId" functions/src/routes/`
-Expected: matches in exactly three files — `crm.js`, `followUps.js`, `mlsLeads.js`. Any match in another route file means the middleware leaked beyond its intended scope and must be reverted there.
+Expected: matches in exactly three files — `crm.js`, `followups.js`, `mlsLeads.js`. Any match in another route file means the middleware leaked beyond its intended scope and must be reverted there.
 
 Run: `grep -rn "resolveViewAs" functions/src/index.js`
 Expected: no output. The middleware must never be mounted globally.
