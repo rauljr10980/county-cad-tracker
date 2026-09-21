@@ -100,43 +100,88 @@ function and cannot read React context, so it reads the key directly — the sam
 pattern `getAuthToken` already uses. The React context exists only so the picker
 and banner re-render; it never holds authoritative state.
 
-## Part 1: Backend — `resolveViewAs` middleware
+## Part 1: Backend — pure rule + thin middleware
 
-New file `functions/src/middleware/viewAs.js`:
+The decision logic and the database lookup live in **two** files, mirroring how
+`functions/src/lib/crmScope.js` is already split from `functions/src/routes/crm.js`.
+That file's header comment states the reason directly: a module that constructs
+a `PrismaClient` at require time "eagerly loads a native query-engine binary"
+and cannot be imported in the test environment. All 15 existing backend test
+files sit in `functions/src/lib/`; none sits in `functions/src/middleware/`.
+Putting the rule in `lib/` is what makes it testable.
+
+### `functions/src/lib/viewAs.js` (new, dependency-free)
+
+```js
+/**
+ * The rule for which account a request acts on.
+ *
+ * Dependency-free on purpose, exactly like crmScope.js: middleware/viewAs.js
+ * constructs Prisma at require time and so cannot be imported under vitest.
+ * Keeping the decision here is what makes it testable; the caller performs the
+ * database existence check, which is the one part that needs I/O.
+ */
+
+const FORBIDDEN_VIEW_AS_CODE = 'FORBIDDEN_VIEW_AS';
+
+/**
+ * Returns the id of the account this request should act on.
+ *
+ * A caller always acts as themselves unless they explicitly ask for another
+ * account via the X-View-As-User header (set by the global "viewing as"
+ * switch — see src/lib/api.ts:34), which only an ADMIN may do.
+ *
+ * Whether the requested account exists is a database question the caller
+ * answers separately.
+ */
+const decideEffectiveUserId = (user, rawHeader) => {
+  const target = typeof rawHeader === 'string' ? rawHeader : undefined;
+  if (!target || target === user.id) return user.id;
+
+  if (user.role !== 'ADMIN') {
+    const err = new Error("Only a Manager can view another account's data");
+    err.code = FORBIDDEN_VIEW_AS_CODE;
+    throw err;
+  }
+
+  return target;
+};
+
+module.exports = { decideEffectiveUserId, FORBIDDEN_VIEW_AS_CODE };
+```
+
+### `functions/src/middleware/viewAs.js` (new, thin)
 
 ```js
 const prisma = require('../lib/prisma');
+const { decideEffectiveUserId, FORBIDDEN_VIEW_AS_CODE } = require('../lib/viewAs');
 
 /**
- * Resolves the account a request should act on. Runs AFTER authenticateToken.
- *
- * Every request defaults to the caller's own id. Only an ADMIN may redirect a
- * request at another account, and only by explicitly sending X-View-As-User
- * (set by the global "viewing as" switch — see src/lib/api.ts:34).
+ * Resolves the account a request acts on. Runs AFTER authenticateToken.
  *
  * Routes opt in by reading req.effectiveUserId instead of req.user.id. Routes
- * that keep reading req.user.id are unaffected by this middleware, which is
- * what makes an implicit header safe: nothing changes behavior unless it was
- * deliberately edited to.
+ * that keep reading req.user.id are unaffected, which is what makes an
+ * implicit header safe: nothing changes behavior unless it was deliberately
+ * edited to.
  */
 async function resolveViewAs(req, res, next) {
-  req.effectiveUserId = req.user.id;
+  try {
+    const userId = decideEffectiveUserId(req.user, req.headers['x-view-as-user']);
 
-  const target = req.headers['x-view-as-user'];
-  if (!target || target === req.user.id) return next();
+    if (userId !== req.user.id) {
+      const exists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+      if (!exists) return res.status(404).json({ error: 'Team member not found' });
+    }
 
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ error: "Only a Manager can view another account's data" });
+    req.effectiveUserId = userId;
+    next();
+  } catch (err) {
+    if (err.code === FORBIDDEN_VIEW_AS_CODE) {
+      return res.status(403).json({ error: err.message });
+    }
+    console.error('[viewAs] resolve error:', err);
+    return res.status(500).json({ error: 'Failed to resolve account' });
   }
-
-  const exists = await prisma.user.findUnique({
-    where: { id: String(target) },
-    select: { id: true },
-  });
-  if (!exists) return res.status(404).json({ error: 'Team member not found' });
-
-  req.effectiveUserId = String(target);
-  next();
 }
 
 module.exports = { resolveViewAs };
@@ -341,12 +386,19 @@ combination, and is the reason no audit log is specified (see below).
 
 ## Testing plan
 
-- **`functions/src/middleware/viewAs.test.js`** (new) — the five branches: no
-  header sets `effectiveUserId` to self; header equal to self sets self;
-  non-`ADMIN` with a header gets 403; `ADMIN` with an unknown target gets 404;
-  `ADMIN` with a valid target sets `effectiveUserId` to the target. Prisma is
-  mocked; this mirrors the pure-logic test style of
-  `functions/src/lib/crmScope.test.js`.
+- **`functions/src/lib/viewAs.test.js`** (new) — `decideEffectiveUserId`'s
+  branches: no header returns self; a non-string header returns self; a header
+  equal to self returns self; a non-`ADMIN` with a different target throws with
+  `FORBIDDEN_VIEW_AS_CODE`; an `ADMIN` with a different target returns that
+  target; and the exported code string is stable. Pure function, no Prisma,
+  mirroring `functions/src/lib/crmScope.test.js` exactly.
+
+  The middleware wrapper itself (`middleware/viewAs.js`) is **not** unit-tested:
+  it imports Prisma at require time and cannot be loaded under vitest, which is
+  the whole reason the rule was extracted. Its two remaining
+  responsibilities — the 404 existence check and mapping
+  `FORBIDDEN_VIEW_AS_CODE` to a 403 — are verified by reading, consistent with
+  this repo's convention that route-level I/O is untested.
 - **`src/contexts/ViewAsContext.test.tsx`** (new) — restores from `localStorage`
   on mount; clears the key for a non-`ADMIN` user; clears a stored self-id;
   clears on logout.
