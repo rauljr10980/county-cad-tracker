@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUsers, VIEW_AS_STORAGE_KEY, type TeamMember } from '@/lib/api';
+import { getUsers, getViewAsUserId, VIEW_AS_STORAGE_KEY, type TeamMember } from '@/lib/api';
 
 interface ViewAsContextType {
   viewAsUserId: string | null;
@@ -10,14 +10,6 @@ interface ViewAsContextType {
 }
 
 const ViewAsContext = createContext<ViewAsContextType | undefined>(undefined);
-
-const readStored = (): string | null => {
-  try {
-    return localStorage.getItem(VIEW_AS_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-};
 
 const clearStored = () => {
   try {
@@ -48,7 +40,7 @@ export function ViewAsProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const stored = readStored();
+    const stored = getViewAsUserId();
     if (!stored) {
       setViewAsUserId(null);
       return;
@@ -71,7 +63,23 @@ export function ViewAsProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     getUsers()
       .then((res) => {
-        if (!cancelled) setTeamMembers(res.users.filter((m) => m.id !== user.id));
+        if (cancelled) return;
+        const members = res.users.filter((m) => m.id !== user.id);
+        setTeamMembers(members);
+
+        // Prune a stale selection (e.g. the impersonated teammate was
+        // deleted) only on a SUCCEEDED fetch. This must not key off an empty
+        // teamMembers list or off viewAsUser === null: the `.catch()` below
+        // also produces an empty list on any transient network error or
+        // offline moment, and that must never drop a valid selection. Read
+        // localStorage directly rather than the `viewAsUserId` state closed
+        // over by this effect, since the sync-from-storage effect above may
+        // not have flushed its state update yet.
+        const stored = getViewAsUserId();
+        if (stored && !members.some((m) => m.id === stored)) {
+          clearStored();
+          setViewAsUserId(null);
+        }
       })
       .catch(() => {
         if (!cancelled) setTeamMembers([]);
@@ -80,6 +88,18 @@ export function ViewAsProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [isAdmin, user]);
+
+  // localStorage is shared across tabs but mirrored into React state once, at
+  // mount. Without this, another tab's switch leaves this tab's banner naming one
+  // account while getAuthHeaders() already sends another — the banner is this
+  // feature's only safeguard, so it must never be able to lie.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === VIEW_AS_STORAGE_KEY) window.location.reload();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   /**
    * Reloads so every cached record in the app refetches under the new account

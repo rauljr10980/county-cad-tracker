@@ -117,4 +117,94 @@ describe('ViewAsContext', () => {
     )
     await waitFor(() => expect(screen.getByTestId('names').textContent).toBe('raul'))
   })
+
+  it('clears a stored id that is absent from a successfully fetched team list', async () => {
+    localStorage.setItem(VIEW_AS_STORAGE_KEY, 'deleted-teammate')
+    vi.spyOn(api, 'getUsers').mockResolvedValue({
+      users: [
+        { id: 'mgr1', username: 'robbie', email: 'r@x.com', role: 'ADMIN', isActive: true, createdAt: '' },
+        { id: 'op1', username: 'raul', email: 'a@x.com', role: 'OPERATOR', isActive: true, createdAt: '' },
+      ],
+    })
+    asAuth({ user: { id: 'mgr1', username: 'robbie', role: 'ADMIN' }, isLoading: false })
+    renderProbe()
+
+    await waitFor(() => expect(screen.getByTestId('viewing').textContent).toBe('self'))
+    expect(localStorage.getItem(VIEW_AS_STORAGE_KEY)).toBeNull()
+  })
+
+  it('retains a stored id when getUsers() rejects (a transient network error must not drop a valid selection)', async () => {
+    localStorage.setItem(VIEW_AS_STORAGE_KEY, 'teammate-1')
+    vi.spyOn(api, 'getUsers').mockRejectedValue(new Error('network error'))
+    asAuth({ user: { id: 'mgr1', username: 'robbie', role: 'ADMIN' }, isLoading: false })
+    renderProbe()
+
+    await waitFor(() => expect(screen.getByTestId('viewing').textContent).toBe('teammate-1'))
+    expect(localStorage.getItem(VIEW_AS_STORAGE_KEY)).toBe('teammate-1')
+  })
+})
+
+describe('ViewAsContext.setViewAs', () => {
+  beforeEach(() => {
+    stubLocalStorage()
+    vi.spyOn(api, 'getUsers').mockResolvedValue({ users: [] })
+  })
+  afterEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('writes the id to storage and reloads when switching to a teammate', async () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { ...window.location, reload })
+    asAuth({ user: { id: 'mgr1', username: 'robbie', role: 'ADMIN' }, isLoading: false })
+
+    function Switcher() {
+      const { setViewAs } = useViewAs()
+      return (
+        <button data-testid="switch" onClick={() => setViewAs('teammate-1')}>
+          switch
+        </button>
+      )
+    }
+    render(
+      <ViewAsProvider>
+        <Switcher />
+      </ViewAsProvider>
+    )
+    await waitFor(() => expect(api.getUsers).toHaveBeenCalled())
+
+    screen.getByTestId('switch').click()
+
+    expect(localStorage.getItem(VIEW_AS_STORAGE_KEY)).toBe('teammate-1')
+    expect(reload).toHaveBeenCalled()
+  })
+
+  it('clears storage and reloads when switching back to self via null', async () => {
+    localStorage.setItem(VIEW_AS_STORAGE_KEY, 'teammate-1')
+    const reload = vi.fn()
+    vi.stubGlobal('location', { ...window.location, reload })
+    asAuth({ user: { id: 'mgr1', username: 'robbie', role: 'ADMIN' }, isLoading: false })
+
+    function Switcher() {
+      const { setViewAs } = useViewAs()
+      return (
+        <button data-testid="switch" onClick={() => setViewAs(null)}>
+          switch
+        </button>
+      )
+    }
+    render(
+      <ViewAsProvider>
+        <Switcher />
+      </ViewAsProvider>
+    )
+    await waitFor(() => expect(api.getUsers).toHaveBeenCalled())
+
+    screen.getByTestId('switch').click()
+
+    expect(localStorage.getItem(VIEW_AS_STORAGE_KEY)).toBeNull()
+    expect(reload).toHaveBeenCalled()
+  })
 })

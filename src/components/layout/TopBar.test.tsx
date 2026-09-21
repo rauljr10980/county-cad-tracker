@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { TopBar } from './TopBar'
 import * as api from '@/lib/api'
 
@@ -174,5 +174,33 @@ describe('TopBar view-as picker', () => {
     asViewAs({ viewAsUserId: null, viewAsUser: null, teamMembers: [], setViewAs: vi.fn() })
     render(<TopBar {...defaultProps} />)
     expect(screen.queryByLabelText(/view as teammate/i)).toBeNull()
+  })
+
+  it('calls setViewAs(null) when the __self__ option is chosen', () => {
+    ;(useAuth as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      user: { id: 'mgr1', username: 'robbie', role: 'ADMIN' },
+      logout: vi.fn(),
+    })
+    const setViewAs = vi.fn()
+    asViewAs({ viewAsUserId: 'op1', viewAsUser: teammates[0], teamMembers: teammates, setViewAs })
+    render(<TopBar {...defaultProps} />)
+
+    fireEvent.change(screen.getByLabelText(/view as teammate/i), { target: { value: '__self__' } })
+
+    expect(setViewAs).toHaveBeenCalledWith(null)
+  })
+
+  it('calls setViewAs(<id>) when a teammate is chosen — the __self__ sentinel must never reach storage as a string', () => {
+    ;(useAuth as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      user: { id: 'mgr1', username: 'robbie', role: 'ADMIN' },
+      logout: vi.fn(),
+    })
+    const setViewAs = vi.fn()
+    asViewAs({ viewAsUserId: null, viewAsUser: null, teamMembers: teammates, setViewAs })
+    render(<TopBar {...defaultProps} />)
+
+    fireEvent.change(screen.getByLabelText(/view as teammate/i), { target: { value: 'op1' } })
+
+    expect(setViewAs).toHaveBeenCalledWith('op1')
   })
 })
