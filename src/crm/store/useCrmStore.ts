@@ -1,11 +1,9 @@
 import { create } from 'zustand'
 import { dataService } from '../data/dataService'
 import {
-  mergeNetworkState,
   replaceNetworkContacts,
   type NetworkContactRecord,
 } from '../data/networkContacts'
-import { generateSeed } from '../data/seed'
 import { removeLegacyFakeFollowUps } from '../lib/tasks'
 import {
   EMPTY_STATE,
@@ -115,17 +113,15 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
         stored.tasks.length === 0 &&
         stored.activities.length === 0
 
+      // A genuinely empty account stays empty — this used to auto-seed a
+      // hardcoded personal contact list (NETWORK_CONTACTS in
+      // networkContacts.ts), which was fine when there was exactly one real
+      // user, but meant every new teammate's CRM silently filled up with
+      // someone else's real contacts. Nothing in the UI exposes an opt-in
+      // "import my network" action, so there is no legitimate case where
+      // this should happen automatically.
       if (isGenuinelyEmpty) {
-        // Seed ids are namespaced per owner (see networkContacts.ts), so
-        // without an ownerKey there is nothing safe to seed with — leave the
-        // account empty rather than mint globally-constant ids. The next
-        // hydrate that does have an ownerKey will seed normally.
-        if (!ownerKey) {
-          set({ ...EMPTY_STATE, hydrated: true, hydrateError: null })
-          return
-        }
-        const seed = generateSeed(now, ownerKey)
-        set({ ...seed, hydrated: true, hydrateError: null })
+        set({ ...EMPTY_STATE, hydrated: true, hydrateError: null })
         return
       }
 
@@ -144,8 +140,7 @@ export const useCrmStore = create<CrmState & Actions & HydrationState>((set, get
             "Hi, it was great meeting you. You mentioned you were thinking about buying — I'd love to sit down and chat to see how I can help. When would be a good time to connect?",
         },
       }
-      const next = mergeNetworkState(normalized, now, ownerKey)
-      set({ ...next, hydrated: true, hydrateError: null })
+      set({ ...normalized, hydrated: true, hydrateError: null })
     },
 
     addLead: (input, onSaved) => {

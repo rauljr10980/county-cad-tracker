@@ -67,7 +67,12 @@ describe('useCrmStore.hydrate', () => {
     expect(dataService.save).not.toHaveBeenCalled();
   });
 
-  it('seeds demo data only when the load succeeds and the account is genuinely empty', async () => {
+  it('stays genuinely empty on a successful load, even with an owner key — no demo/network seeding', async () => {
+    // Regression coverage: this used to auto-inject a hardcoded personal
+    // contact list (NETWORK_CONTACTS) into every genuinely-empty account,
+    // which meant every new teammate's CRM silently filled up with the same
+    // real names/companies/notes belonging to whoever the list was scraped
+    // from. Seeding must never happen automatically, regardless of ownerKey.
     vi.mocked(dataService.load).mockResolvedValue({
       ok: true,
       state: { leads: [], deals: [], tasks: [], activities: [], settings: undefined as never },
@@ -78,9 +83,10 @@ describe('useCrmStore.hydrate', () => {
     const state = useCrmStore.getState();
     expect(state.hydrated).toBe(true);
     expect(state.hydrateError).toBeNull();
-    expect(state.leads.length).toBeGreaterThan(0);
-    // Every seeded id is namespaced under this owner's key.
-    expect(state.leads.every((lead) => lead.id.startsWith(`network-${ownerKey}-`))).toBe(true);
+    expect(state.leads).toEqual([]);
+    expect(state.deals).toEqual([]);
+    expect(state.tasks).toEqual([]);
+    expect(state.activities).toEqual([]);
   });
 
   it('allows saves again once a hydrate succeeds after an earlier failure', async () => {
@@ -142,14 +148,15 @@ describe('useCrmStore.hydrate', () => {
     await useCrmStore.getState().hydrate(now);
 
     const state = useCrmStore.getState();
-    // Hydrated (and therefore save-eligible) even though nothing was injected —
-    // injecting un-namespaced network ids would be the bug; injecting nothing
-    // is safe and recoverable on the next hydrate.
     expect(state.hydrated).toBe(true);
     expect(state.leads).toEqual([]);
   });
 
-  it('does not merge network contacts into an existing account when no owner key is available', async () => {
+  it('does not merge network contacts into an existing account, with or without an owner key', async () => {
+    // Regression coverage: this used to unconditionally re-inject the same
+    // hardcoded NETWORK_CONTACTS list into every account's data on every
+    // hydrate (not just a genuinely-empty one), which is why the contacts
+    // kept reappearing even after being deleted. Must never merge, period.
     const existingLead: Lead = {
       id: 'lead-1',
       ...newLeadInput,
@@ -168,11 +175,15 @@ describe('useCrmStore.hydrate', () => {
       },
     });
 
-    await useCrmStore.getState().hydrate(now);
+    await useCrmStore.getState().hydrate(now); // no ownerKey
+    expect(useCrmStore.getState().leads).toEqual([existingLead]);
 
+    useCrmStore.setState({ ...EMPTY_STATE, hydrated: false, hydrateError: null });
+    await useCrmStore.getState().hydrate(now, ownerKey); // with ownerKey
     const state = useCrmStore.getState();
     expect(state.hydrated).toBe(true);
-    // Only the account's own real lead — no network-* leads were merged in.
+    // Only the account's own real lead — no network-* leads were merged in,
+    // even though an ownerKey was supplied this time.
     expect(state.leads).toEqual([existingLead]);
   });
 });
