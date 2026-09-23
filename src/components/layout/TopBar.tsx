@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Bell, FileText, LogOut, Mail, Menu, RefreshCw, Search, Settings, Upload, UserCog, Users, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
+import { useViewAs } from '@/contexts/ViewAsContext'
 import { getNotifications, type Notification } from '@/lib/api'
 import { externalNavItem, getVisibleTabs, isPublicSiteVisible, type TabType } from './navItems'
 import {
@@ -33,6 +34,7 @@ interface TopBarProps {
 export function TopBar({ activeTab, onTabChange, hiddenTabIds, onRefresh, isRefreshing, onOpenSearch, onOpenManagerView, onOpenEmailSettings }: TopBarProps) {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
+  const { viewAsUserId, teamMembers, setViewAs } = useViewAs()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [count, setCount] = useState(0)
   const [loadError, setLoadError] = useState(false)
@@ -91,6 +93,21 @@ export function TopBar({ activeTab, onTabChange, hiddenTabIds, onRefresh, isRefr
         </button>
 
         <div className="ml-auto flex items-center gap-1">
+          {isAdmin && teamMembers.length > 0 && (
+            <select
+              aria-label="View as teammate"
+              className="mr-1 h-8 rounded-md border border-input bg-background px-2 text-xs"
+              value={viewAsUserId ?? '__self__'}
+              onChange={(e) => setViewAs(e.target.value === '__self__' ? null : e.target.value)}
+            >
+              <option value="__self__">My account</option>
+              {teamMembers.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.username}
+                </option>
+              ))}
+            </select>
+          )}
           <Button variant="ghost" size="icon" onClick={onRefresh} disabled={isRefreshing} aria-label="Refresh">
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>

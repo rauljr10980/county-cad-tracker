@@ -45,7 +45,7 @@ never built and is superseded by this document.
   `const userId = req.user.id;` and feed it to `leadWhere`/`childWhere` from
   `functions/src/lib/crmScope.js`. A Manager has no way to see a teammate's CRM.
 - **Calendar is private per user, but a Manager sees everyone merged.**
-  `functions/src/routes/followUps.js:25` reads
+  `functions/src/routes/followups.js:25` reads
   `...(req.user.role === 'ADMIN' ? {} : { createdById: req.user.id })`. A
   Manager gets every teammate's follow-ups in one undifferentiated list, with
   no way to isolate one person.
@@ -61,7 +61,7 @@ never built and is superseded by this document.
   `src/crm/data/dataService.ts` and `src/components/mls/MlsLeadsView.tsx:97`
   (itself a single fetch wrapper for all MLS calls). One edit here reaches
   every authenticated request the app makes.
-- **CORS pins an explicit header allowlist.** `functions/src/index.js:137`:
+- **CORS pins an explicit header allowlist.** `functions/src/index.js:138`:
   `allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']`. A new
   custom header **must** be added here or every request from the deployed
   GitHub Pages origin fails preflight.
@@ -92,7 +92,7 @@ localStorage['viewAsUserId']
                                                            │
                             ┌──────────────────────────────┼──────────────────┐
                             ▼                              ▼                  ▼
-                        crm.js                      followUps.js         mlsLeads.js
+                        crm.js                      followups.js         mlsLeads.js
 ```
 
 `localStorage` is the single source of truth. `getAuthHeaders` is a plain
@@ -197,7 +197,7 @@ Only on the three opted-in routers. **Not** applied globally.
 - **`functions/src/routes/crm.js`** — per-route. Insert `resolveViewAs` after
   `authenticateToken` on the two `/state` handlers only (`:29` and `:98`).
   **Do not add it to `POST /scan-corrections` (`:7`).**
-- **`functions/src/routes/followUps.js`** — per-route. Insert `resolveViewAs`
+- **`functions/src/routes/followups.js`** — per-route. Insert `resolveViewAs`
   after `authenticateToken` on the four authenticated routes: `:11` (`GET /`),
   `:127` (`POST /`), `:199` (`PUT /:id`), `:236` (`DELETE /:id`).
 
@@ -213,7 +213,7 @@ not user-scoped application data — it should record the human who actually mad
 the correction, not the account being inspected. This is the one place in these
 three files where `req.user.id` is an identity use rather than an ownership use.
 
-**`followUps.js`** — two lines:
+**`followups.js`** — two lines:
 
 - `:25`: `...(req.user.role === 'ADMIN' ? {} : { createdById: req.user.id })`
   → guarded by an explicit impersonation test:
@@ -262,7 +262,7 @@ That is correct and intended under full-edit view-as.
 
 ### CORS
 
-`functions/src/index.js:137`:
+`functions/src/index.js:138`:
 
 ```js
 allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-View-As-User'],
@@ -352,9 +352,15 @@ comment at `:81-85` notes such a save "deletes real data with a 200". A user
 switch is exactly the scenario that gate protects against, and a reload is the
 most reliable way to honor it.
 
-Consequently **`useCrmStore` and `useCalendarEvents` need no changes at all.**
+Any client-side value derived from the signed-in user that ends up inside saved
+data — not just read from it — must come from the effective user, not from
+`useAuth()`. `useCrmStore.hydrate` reads `getViewAsUserId()` itself for exactly
+this reason: its `ownerKey` mints `network-*` primary keys. The call sites need
+no changes, but only because `hydrate` resolves the effective user internally.
 `useCalendarEvents.ts:47-49` keeps calling `crmHydrate(new Date(), user?.id)`;
-after a reload it simply loads whatever the header now resolves to.
+after a reload it simply loads whatever the header now resolves to, and
+`hydrate` itself substitutes the impersonated teammate's id wherever it
+matters.
 
 ## Part 4: Frontend — switch and banner
 
@@ -420,7 +426,7 @@ combination, and is the reason no audit log is specified (see below).
   `docs/superpowers/specs/2026-09-14-private-properties-per-user-claim-design.md`
   adds a fourth private module. `resolveViewAs` extends to it in one line once
   that ships, but it is not built here.
-- **The `followUps.js` `PUT`/`DELETE` ownership gap** described in Part 1.
+- **The `followups.js` `PUT`/`DELETE` ownership gap** described in Part 1.
 - **Pre-Foreclosure, Driving (D4$), Evictions, Tasks, Notes.** These are shared
   team-wide today and have no per-user scoping to redirect.
 - **Renaming the `UserRole` enum**, and any behavior for the unused `VIEWER`

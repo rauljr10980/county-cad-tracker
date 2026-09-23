@@ -180,6 +180,15 @@ Add the needed imports (`Select`, `SelectContent`, `SelectItem`,
 
 ## Part 2: Manager "View As" Override for CRM Data
 
+> **Superseded and never implemented.** This part was planned but no code was
+> ever written for it — `asUserId` and `resolveRequestedUserId` appear only in
+> this document. It is replaced by
+> `docs/superpowers/specs/2026-09-20-manager-view-as-teammate-design.md`, which
+> covers CRM, Calendar, and MLS Leads through an `X-View-As-User` header and a
+> global switch rather than a CRM-only query parameter.
+>
+> Part 1 of this spec (the role dropdown) **was** implemented and is live.
+
 ### The problem
 
 The CRM loads and saves as one whole-state blob, always scoped to

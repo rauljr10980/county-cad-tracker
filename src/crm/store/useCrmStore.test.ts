@@ -187,3 +187,35 @@ describe('useCrmStore.hydrate', () => {
     expect(state.leads).toEqual([existingLead]);
   });
 });
+
+describe('useCrmStore.hydrate while a Manager is viewing a teammate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useCrmStore.setState({ ...EMPTY_STATE, hydrated: false, hydrateError: null });
+  });
+
+  // hydrate() no longer seeds or merges network-contact demo data for
+  // anyone, under any ownerKey — so there is nothing left for view-as state
+  // to influence here. The actual view-as data scoping (which account's
+  // real records get loaded) lives entirely server-side, in the
+  // resolveViewAs middleware / req.effectiveUserId — see functions/src.
+  it('loads the account whatever data dataService.load() returns, unaffected by any local view-as state', async () => {
+    const existingLead: Lead = {
+      id: 'lead-1',
+      ...newLeadInput,
+      kind: 'industry',
+      lastContactedAt: null,
+      createdAt: now.toISOString(),
+    };
+    vi.mocked(dataService.load).mockResolvedValue({
+      ok: true,
+      state: { leads: [existingLead], deals: [], tasks: [], activities: [], settings: undefined as never },
+    });
+
+    await useCrmStore.getState().hydrate(now, 'manager-1');
+
+    const state = useCrmStore.getState();
+    expect(state.hydrated).toBe(true);
+    expect(state.leads).toEqual([existingLead]);
+  });
+});
