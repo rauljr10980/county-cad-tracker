@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, CalendarDays, ChevronDown, Home, Building, AlertTriangle, Copy, Search, User, Mail, ClipboardPaste } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,8 +18,8 @@ import { toast } from '@/hooks/use-toast';
 import { markPreForeclosureVisited, createFollowUp, logActivity } from '@/lib/api';
 import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
 import { extractContacts } from '@/lib/contactParser';
-import { WorkflowTracker } from './WorkflowTracker';
 import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
+import { SendEmailPanel, type EmailRecipient } from '@/components/email/SendEmailPanel';
 
 interface FullDetailsModalProps {
   record: PreForeclosureRecord | null;
@@ -63,6 +63,17 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [savingFollowUp, setSavingFollowUp] = useState(false);
   const [contactExtractorExpanded, setContactExtractorExpanded] = useState(false);
   const [rawContactText, setRawContactText] = useState('');
+  const [emailRecipients, setEmailRecipients] = useState<EmailRecipient[]>([{ name: '', emails: [''] }]);
+  const [emailExpanded, setEmailExpanded] = useState(false);
+  // Kept in sync with emailRecipients on every write via updateEmailRecipients
+  // (never via a useEffect) so a synchronous read right after a write — e.g.
+  // SendEmailPanel's onPersist('post-send'), called right after it reports
+  // updated "sent" flags via onRecipientsChange — never sees a stale value.
+  const emailRecipientsRef = useRef<EmailRecipient[]>(emailRecipients);
+  const updateEmailRecipients = (next: EmailRecipient[]) => {
+    emailRecipientsRef.current = next;
+    setEmailRecipients(next);
+  };
   const lookupMutation = useOwnerLookup();
 
   // Parse visit details from workflow log
@@ -101,8 +112,30 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
       setAssignedTo(record.assignedTo || '');
       setLoanAmountLocal(record.loan_amount ?? null);
       setAppraisedValueLocal(record.appraised_value ?? null);
+      updateEmailRecipients(
+        record.emails && record.emails.length > 0
+          ? [{ name: record.ownerName || '', emails: record.emails }]
+          : [{ name: record.ownerName || '', emails: [''] }]
+      );
     }
   }, [record]);
+
+  // Persists Send Email's recipient emails for this record. Passed to
+  // SendEmailPanel as onPersist — called once before "Send to All" starts
+  // (so unsaved row edits survive a failure partway through) and once after
+  // (so "sent" flags are recorded). PreForeclosure has no rich contacts JSON
+  // like Property does — just the flat `emails` column also fed by the
+  // Contact Extractor above — so per-recipient names live only in this
+  // modal's own session state, not persisted.
+  const persistEmailContacts = async () => {
+    if (!viewRecord) return;
+    const allEmails = emailRecipientsRef.current.flatMap(r => r.emails.filter(e => e.includes('@')));
+    await updateMutation.mutateAsync({
+      document_number: viewRecord.document_number,
+      emails: allEmails,
+    });
+    setViewRecord(prev => prev ? { ...prev, emails: allEmails } : prev);
+  };
 
   const handleMarkVisited = async (documentNumber: string, driver: 'Luciano' | 'Raul', visited: boolean) => {
     setMarkingVisited(documentNumber);
@@ -293,19 +326,20 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 !actionsExpanded && "-rotate-90"
               )} />
             </div>
-            {actionsExpanded && <div className="flex gap-2 mt-3">
+            {actionsExpanded && <div className="flex flex-wrap gap-2 mt-3">
               <Button
                 variant="default"
                 size="sm"
-                className="flex-1 bg-primary text-primary-foreground"
+                className="flex-1 min-w-[100px] bg-primary text-primary-foreground"
                 disabled
               >
-                <Eye className="h-4 w-4" />
+                <Eye className="h-4 w-4 mr-1.5" />
+                View
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1"
+                className="flex-1 min-w-[100px]"
                 onClick={() => {
                   if (viewRecord.latitude != null && viewRecord.longitude != null) {
                     const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(viewRecord.address)},+${encodeURIComponent(viewRecord.city)},+TX+${viewRecord.zip}/@${viewRecord.latitude},${viewRecord.longitude},16z`;
@@ -321,23 +355,25 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 disabled={viewRecord.latitude == null || viewRecord.longitude == null}
                 title="Open in Google Maps"
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-4 w-4 mr-1.5" />
+                Maps
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1"
+                className="flex-1 min-w-[100px]"
                 onClick={() => {
                   window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
                 }}
                 title="Tax Assessor"
               >
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink className="h-4 w-4 mr-1.5" />
+                Tax Assessor
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1"
+                className="flex-1 min-w-[100px]"
                 onClick={() => {
                   const address = viewRecord.address || '';
                   const cityStateZip = `${viewRecord.city || 'San Antonio'}, TX ${viewRecord.zip || ''}`.trim();
@@ -345,12 +381,13 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 }}
                 title="TruePeopleSearch"
               >
-                <User className="h-4 w-4" />
+                <User className="h-4 w-4 mr-1.5" />
+                TruePeopleSearch
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1"
+                className="flex-1 min-w-[100px]"
                 onClick={() => {
                   const raw = (viewRecord.address || '').split(',')[0].trim();
                   const streetMatch = raw.match(/^.*?\b(AVE|DR|ST|BLVD|LN|CT|PL|RD|WAY|TRL|CIR|HWY|PKWY|LOOP|EXPY|PASS|ROW|SQ|TER|TERR|TRACE|VIA|WALK)\b/i);
@@ -362,7 +399,8 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 }}
                 title="Land Records"
               >
-                <Building className="h-4 w-4" />
+                <Building className="h-4 w-4 mr-1.5" />
+                Land Records
               </Button>
             </div>}
           </div>
@@ -673,30 +711,67 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
             </div>}
           </div>
 
-          {/* Workflow Tracker */}
-          <WorkflowTracker
-            record={viewRecord}
-            onRecordUpdate={(updates) => setViewRecord(prev => prev ? { ...prev, ...updates } : prev)}
-          />
+          {/* Sales Activity & Contact Status */}
+          <div className="bg-card border border-border/60 rounded-lg p-3 space-y-3">
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Log Sales Activity</p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { type: 'CONTACT_MADE'    as const, label: 'Contact Made',    color: 'border-blue-500/50 text-blue-400 hover:bg-blue-500/10' },
+                  { type: 'APPOINTMENT_SET' as const, label: 'Appt Set',        color: 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10' },
+                  { type: 'CONTRACT_SIGNED' as const, label: 'Contract Signed', color: 'border-green-500/50 text-green-400 hover:bg-green-500/10' },
+                ]).map(({ type, label, color }) => (
+                  <Button key={type} size="sm" variant="outline"
+                    className={`h-9 text-xs ${color}`}
+                    onClick={async () => {
+                      await logActivity(type, { drivingLeadId: undefined });
+                      toast({ title: label + ' logged', description: 'Saved to team stats.' });
+                    }}>
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </div>
 
-          {/* Sales Activity Logging */}
-          <div className="bg-card border border-border/60 rounded-lg p-3 space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Log Sales Activity</p>
-            <div className="grid grid-cols-3 gap-2">
-              {([
-                { type: 'CONTACT_MADE'    as const, label: 'Contact Made',    color: 'border-blue-500/50 text-blue-400 hover:bg-blue-500/10' },
-                { type: 'APPOINTMENT_SET' as const, label: 'Appt Set',        color: 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10' },
-                { type: 'CONTRACT_SIGNED' as const, label: 'Contract Signed', color: 'border-green-500/50 text-green-400 hover:bg-green-500/10' },
-              ]).map(({ type, label, color }) => (
-                <Button key={type} size="sm" variant="outline"
-                  className={`h-9 text-xs ${color}`}
-                  onClick={async () => {
-                    await logActivity(type, { drivingLeadId: undefined });
-                    toast({ title: label + ' logged', description: 'Saved to team stats.' });
-                  }}>
-                  {label}
-                </Button>
-              ))}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide block">Contact Status</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { label: 'Contacted', value: 'Contact Attempted', color: 'bg-blue-600 hover:bg-blue-700' },
+                  { label: 'Not Contacted', value: 'New', color: 'bg-zinc-600 hover:bg-zinc-700' },
+                  { label: 'Wants to Make a Deal', value: 'Wants to Make a Deal', color: 'bg-green-600 hover:bg-green-700' },
+                  { label: 'Dead', value: 'Dead', color: 'bg-red-700 hover:bg-red-800' },
+                ] as { label: string; value: PreForeclosureStatus; color: string }[]).map(({ label, value, color }) => {
+                  const isActive = viewRecord.internal_status === value;
+                  return (
+                    <Button
+                      key={value}
+                      size="sm"
+                      className={cn(
+                        'text-white text-xs h-9',
+                        isActive ? color : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                      )}
+                      onClick={async () => {
+                        setViewRecord(prev => prev ? { ...prev, internal_status: value } : prev);
+                        try {
+                          await updateMutation.mutateAsync({
+                            document_number: viewRecord.document_number,
+                            internal_status: value,
+                          });
+                          queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+                          toast({ title: 'Status updated', description: label });
+                        } catch {
+                          toast({ title: 'Error saving status', variant: 'destructive' });
+                        }
+                      }}
+                      disabled={updateMutation.isPending}
+                    >
+                      {isActive && <CheckCircle className="h-3.5 w-3.5 mr-1.5" />}
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -767,48 +842,6 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               </Button>
             </div>
           )}
-
-          {/* Status Quick-Actions */}
-          <div className="bg-secondary/30 rounded-lg p-3">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wide mb-2 block">Contact Status</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {([
-                { label: 'Contacted', value: 'Contact Attempted', color: 'bg-blue-600 hover:bg-blue-700' },
-                { label: 'Not Contacted', value: 'New', color: 'bg-zinc-600 hover:bg-zinc-700' },
-                { label: 'Wants to Make a Deal', value: 'Wants to Make a Deal', color: 'bg-green-600 hover:bg-green-700' },
-                { label: 'Dead', value: 'Dead', color: 'bg-red-700 hover:bg-red-800' },
-              ] as { label: string; value: PreForeclosureStatus; color: string }[]).map(({ label, value, color }) => {
-                const isActive = viewRecord.internal_status === value;
-                return (
-                  <Button
-                    key={value}
-                    size="sm"
-                    className={cn(
-                      'text-white text-xs h-9',
-                      isActive ? color : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
-                    )}
-                    onClick={async () => {
-                      setViewRecord(prev => prev ? { ...prev, internal_status: value } : prev);
-                      try {
-                        await updateMutation.mutateAsync({
-                          document_number: viewRecord.document_number,
-                          internal_status: value,
-                        });
-                        queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
-                        toast({ title: 'Status updated', description: label });
-                      } catch {
-                        toast({ title: 'Error saving status', variant: 'destructive' });
-                      }
-                    }}
-                    disabled={updateMutation.isPending}
-                  >
-                    {isActive && <CheckCircle className="h-3.5 w-3.5 mr-1.5" />}
-                    {label}
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
 
           {/* Owner Information - hidden */}
 
@@ -964,29 +997,65 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   onClick={async () => {
                     if (!viewRecord) return;
                     const result = extractContacts(rawContactText);
+
+                    // Phones — existing behavior, unchanged.
                     const existingDigits = new Set(
                       (viewRecord.phoneNumbers || []).map(p => p.replace(/\D/g, '').slice(-10))
                     );
                     const newPhones = result.phones.filter(p => !existingDigits.has(p.replace(/\D/g, '').slice(-10)));
-                    const merged = [...(viewRecord.phoneNumbers || []).filter(p => p.trim()), ...newPhones];
-                    setViewRecord(prev => prev ? { ...prev, phoneNumbers: merged } : prev);
+                    const mergedPhones = [...(viewRecord.phoneNumbers || []).filter(p => p.trim()), ...newPhones];
+
+                    // Emails — same smart-row-placement pattern as the Properties
+                    // tab's Contact Extractor: find a same-name or empty row, or
+                    // append a new one, so multiple contacts (owner, heirs, etc.)
+                    // can each get their own named row for Send Email below.
+                    const existingEmailSet = new Set(
+                      emailRecipientsRef.current.flatMap(r => r.emails.filter(e => e.includes('@')).map(e => e.toLowerCase().trim()))
+                    );
+                    const newEmails = result.emails.filter(e => !existingEmailSet.has(e.toLowerCase().trim()));
+                    let finalEmailRows = emailRecipientsRef.current;
+                    if (newEmails.length > 0 || result.name) {
+                      const updated = [...emailRecipientsRef.current];
+                      const row1Empty = !updated[0].name.trim() && !updated[0].emails.some(e => e.includes('@'));
+                      const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
+                      let targetRow: number;
+                      if (row1Empty || row1SameName) {
+                        targetRow = 0;
+                      } else {
+                        const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.emails.some(e => e.includes('@')));
+                        targetRow = emptyIdx !== -1 ? emptyIdx : updated.length;
+                        if (emptyIdx === -1) updated.push({ name: '', emails: [''] });
+                      }
+                      updated[targetRow] = {
+                        name: result.name || '',
+                        emails: newEmails.length > 0 ? newEmails : [''],
+                      };
+                      finalEmailRows = updated;
+                      updateEmailRecipients(updated);
+                    }
+                    const allEmails = finalEmailRows.flatMap(r => r.emails.filter(e => e.includes('@')));
+
+                    setViewRecord(prev => prev ? { ...prev, phoneNumbers: mergedPhones, emails: allEmails } : prev);
                     try {
                       await updateMutation.mutateAsync({
                         document_number: viewRecord.document_number,
-                        phoneNumbers: merged,
+                        phoneNumbers: mergedPhones,
                         ownerPhoneIndex: viewRecord.ownerPhoneIndex,
+                        emails: allEmails,
                       });
                       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
                       const parts: string[] = [];
                       if (result.name) parts.push(`Name: ${result.name}`);
                       if (newPhones.length > 0) parts.push(`${newPhones.length} phone(s) added`);
-                      const dupes = result.phones.length - newPhones.length;
+                      if (newEmails.length > 0) parts.push(`${newEmails.length} email(s) added`);
+                      const dupes = (result.phones.length - newPhones.length) + (result.emails.length - newEmails.length);
                       if (dupes > 0) parts.push(`${dupes} duplicate(s) skipped`);
                       toast({
                         title: parts.length > 0 ? 'Contacts Extracted' : 'No new contacts found',
                         description: parts.join(', ') || 'Try pasting more text',
                         variant: parts.length > 0 ? 'default' : 'destructive',
                       });
+                      if (newEmails.length > 0) setEmailExpanded(true);
                     } catch {
                       toast({ title: 'Error saving contacts', variant: 'destructive' });
                     }
@@ -997,6 +1066,33 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 </Button>
               </div>
             )}
+          </div>
+
+          {/* Send Email Section */}
+          <div className="bg-secondary/30 rounded-lg p-3">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setEmailExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Send Email</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !emailExpanded && "-rotate-90"
+              )} />
+            </div>
+            <SendEmailPanel
+              hidden={!emailExpanded}
+              recipients={emailRecipients}
+              onRecipientsChange={updateEmailRecipients}
+              propertyAddress={viewRecord.address || ''}
+              owner={viewRecord.ownerName || 'Property Owner'}
+              phoneNumber={viewRecord.phoneNumbers?.[viewRecord.ownerPhoneIndex ?? 0] || ''}
+              onPersist={persistEmailContacts}
+              resetKey={`${viewRecord.document_number}:${isOpen}`}
+            />
           </div>
 
           {/* Tasks Section */}

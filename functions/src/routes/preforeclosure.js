@@ -1404,6 +1404,11 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
         : [];
       dbUpdates.phoneNumbers = phoneNumbers;
     }
+    if (updates.emails !== undefined) {
+      dbUpdates.emails = Array.isArray(updates.emails)
+        ? updates.emails.filter(e => e && e.trim())
+        : [];
+    }
     if (updates.ownerPhoneIndex !== undefined) {
       dbUpdates.ownerPhoneIndex = updates.ownerPhoneIndex !== null && updates.ownerPhoneIndex >= 0 && updates.ownerPhoneIndex < 6
         ? updates.ownerPhoneIndex

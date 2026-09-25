@@ -1089,6 +1089,7 @@ export async function updatePreForeclosure(updates: {
   notes?: string;
   phoneNumbers?: string[];
   ownerPhoneIndex?: number;
+  emails?: string[];
   last_action_date?: string;
   next_follow_up_date?: string;
   actionType?: 'call' | 'text' | 'mail' | 'driveby' | null;
