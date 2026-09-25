@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { markPreForeclosureVisited, createFollowUp, logActivity } from '@/lib/api';
 import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
-import { extractContacts } from '@/lib/contactParser';
+import { extractContacts, extractForewarnContacts, type ExtractedContact } from '@/lib/contactParser';
 import { PreForeclosureVisitWizard, PreForeclosureVisitResult } from './PreForeclosureVisitWizard';
 import { SendEmailPanel, type EmailRecipient } from '@/components/email/SendEmailPanel';
 
@@ -71,6 +71,8 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [savingFollowUp, setSavingFollowUp] = useState(false);
   const [contactExtractorExpanded, setContactExtractorExpanded] = useState(false);
   const [rawContactText, setRawContactText] = useState('');
+  const [forewarnExtractorExpanded, setForewarnExtractorExpanded] = useState(false);
+  const [rawForewarnText, setRawForewarnText] = useState('');
   const [emailRecipients, setEmailRecipients] = useState<EmailRecipient[]>([{ name: '', emails: [''] }]);
   const [emailExpanded, setEmailExpanded] = useState(false);
   const [phoneContacts, setPhoneContacts] = useState<PhoneContactRow[]>([{ name: '', phones: [''] }]);
@@ -200,6 +202,101 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
       emails: allEmails,
     });
     setViewRecord(prev => prev ? { ...prev, emails: allEmails } : prev);
+  };
+
+  // Shared by both Contact Extractor sections (True People Search and
+  // Forewarn) — they differ only in which parser reads the pasted text.
+  // Smart row placement: land extracted phones/emails under an existing
+  // same-name or empty row rather than a new one, so re-pasting a corrected
+  // TruePeopleSearch dump or a follow-up Forewarn lookup for the same
+  // person merges into that person's row instead of duplicating it.
+  const runContactExtraction = async (
+    parser: (text: string) => ExtractedContact,
+    rawText: string,
+    clearRawText: () => void,
+  ) => {
+    if (!viewRecord) return;
+    const result = parser(rawText);
+
+    const existingDigits = new Set(
+      phoneContacts.flatMap(r => r.phones.filter(p => p.trim()).map(p => p.replace(/\D/g, '').slice(-10)))
+    );
+    const newPhones = result.phones.filter(p => !existingDigits.has(p.replace(/\D/g, '').slice(-10)));
+    let finalPhoneRows = phoneContacts;
+    if (newPhones.length > 0 || result.name) {
+      const updated = [...phoneContacts];
+      const row1Empty = !updated[0].name.trim() && !updated[0].phones.some(p => p.trim());
+      const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
+      let targetRow: number;
+      if (row1Empty || row1SameName) {
+        targetRow = 0;
+      } else {
+        const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.phones.some(p => p.trim()));
+        targetRow = emptyIdx !== -1 ? emptyIdx : updated.length;
+        if (emptyIdx === -1) updated.push({ name: '', phones: [''] });
+      }
+      updated[targetRow] = {
+        name: result.name || '',
+        phones: newPhones.length > 0 ? newPhones : [''],
+      };
+      finalPhoneRows = updated;
+      setPhoneContacts(updated);
+    }
+    const mergedPhones = flattenPhones(finalPhoneRows);
+
+    const existingEmailSet = new Set(
+      emailRecipientsRef.current.flatMap(r => r.emails.filter(e => e.includes('@')).map(e => e.toLowerCase().trim()))
+    );
+    const newEmails = result.emails.filter(e => !existingEmailSet.has(e.toLowerCase().trim()));
+    let finalEmailRows = emailRecipientsRef.current;
+    if (newEmails.length > 0 || result.name) {
+      const updated = [...emailRecipientsRef.current];
+      const row1Empty = !updated[0].name.trim() && !updated[0].emails.some(e => e.includes('@'));
+      const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
+      let targetRow: number;
+      if (row1Empty || row1SameName) {
+        targetRow = 0;
+      } else {
+        const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.emails.some(e => e.includes('@')));
+        targetRow = emptyIdx !== -1 ? emptyIdx : updated.length;
+        if (emptyIdx === -1) updated.push({ name: '', emails: [''] });
+      }
+      updated[targetRow] = {
+        name: result.name || '',
+        emails: newEmails.length > 0 ? newEmails : [''],
+      };
+      finalEmailRows = updated;
+      updateEmailRecipients(updated);
+    }
+    const allEmails = finalEmailRows.flatMap(r => r.emails.filter(e => e.includes('@')));
+    const ownerIdx = ownerPhoneValue ? mergedPhones.indexOf(ownerPhoneValue) : -1;
+    const ownerPhoneIndex = ownerIdx >= 0 ? ownerIdx : undefined;
+
+    setViewRecord(prev => prev ? { ...prev, phoneNumbers: mergedPhones, ownerPhoneIndex, emails: allEmails } : prev);
+    try {
+      await updateMutation.mutateAsync({
+        document_number: viewRecord.document_number,
+        phoneNumbers: mergedPhones,
+        ownerPhoneIndex,
+        emails: allEmails,
+      });
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+      const parts: string[] = [];
+      if (result.name) parts.push(`Name: ${result.name}`);
+      if (newPhones.length > 0) parts.push(`${newPhones.length} phone(s) added`);
+      if (newEmails.length > 0) parts.push(`${newEmails.length} email(s) added`);
+      const dupes = (result.phones.length - newPhones.length) + (result.emails.length - newEmails.length);
+      if (dupes > 0) parts.push(`${dupes} duplicate(s) skipped`);
+      toast({
+        title: parts.length > 0 ? 'Contacts Extracted' : 'No new contacts found',
+        description: parts.join(', ') || 'Try pasting more text',
+        variant: parts.length > 0 ? 'default' : 'destructive',
+      });
+      if (newEmails.length > 0) setEmailExpanded(true);
+    } catch {
+      toast({ title: 'Error saving contacts', variant: 'destructive' });
+    }
+    clearRawText();
   };
 
   const handleMarkVisited = async (documentNumber: string, driver: 'Luciano' | 'Raul', visited: boolean) => {
@@ -1032,7 +1129,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
             </div>
           </div>
 
-          {/* Contact Extractor Section */}
+          {/* True People Search Contact Extractor Section */}
           <div className="bg-secondary/30 rounded-lg p-3">
             <div
               className="flex items-center justify-between cursor-pointer"
@@ -1040,7 +1137,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
             >
               <div className="flex items-center gap-2">
                 <ClipboardPaste className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Contact Extractor</span>
+                <span className="text-sm font-medium">True People Search Contact Extractor</span>
               </div>
               <ChevronDown className={cn(
                 "h-4 w-4 text-muted-foreground transition-transform duration-200",
@@ -1059,97 +1156,42 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   size="sm"
                   variant="outline"
                   disabled={!rawContactText.trim()}
-                  onClick={async () => {
-                    if (!viewRecord) return;
-                    const result = extractContacts(rawContactText);
+                  onClick={() => runContactExtraction(extractContacts, rawContactText, () => setRawContactText(''))}
+                >
+                  Extract Contacts
+                </Button>
+              </div>
+            )}
+          </div>
 
-                    // Phones — same smart-row-placement pattern as emails below,
-                    // so extracted numbers land under a named contact instead of
-                    // an undifferentiated flat list.
-                    const existingDigits = new Set(
-                      phoneContacts.flatMap(r => r.phones.filter(p => p.trim()).map(p => p.replace(/\D/g, '').slice(-10)))
-                    );
-                    const newPhones = result.phones.filter(p => !existingDigits.has(p.replace(/\D/g, '').slice(-10)));
-                    let finalPhoneRows = phoneContacts;
-                    if (newPhones.length > 0 || result.name) {
-                      const updated = [...phoneContacts];
-                      const row1Empty = !updated[0].name.trim() && !updated[0].phones.some(p => p.trim());
-                      const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
-                      let targetRow: number;
-                      if (row1Empty || row1SameName) {
-                        targetRow = 0;
-                      } else {
-                        const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.phones.some(p => p.trim()));
-                        targetRow = emptyIdx !== -1 ? emptyIdx : updated.length;
-                        if (emptyIdx === -1) updated.push({ name: '', phones: [''] });
-                      }
-                      updated[targetRow] = {
-                        name: result.name || '',
-                        phones: newPhones.length > 0 ? newPhones : [''],
-                      };
-                      finalPhoneRows = updated;
-                      setPhoneContacts(updated);
-                    }
-                    const mergedPhones = flattenPhones(finalPhoneRows);
-
-                    // Emails — same smart-row-placement pattern as the Properties
-                    // tab's Contact Extractor: find a same-name or empty row, or
-                    // append a new one, so multiple contacts (owner, heirs, etc.)
-                    // can each get their own named row for Send Email below.
-                    const existingEmailSet = new Set(
-                      emailRecipientsRef.current.flatMap(r => r.emails.filter(e => e.includes('@')).map(e => e.toLowerCase().trim()))
-                    );
-                    const newEmails = result.emails.filter(e => !existingEmailSet.has(e.toLowerCase().trim()));
-                    let finalEmailRows = emailRecipientsRef.current;
-                    if (newEmails.length > 0 || result.name) {
-                      const updated = [...emailRecipientsRef.current];
-                      const row1Empty = !updated[0].name.trim() && !updated[0].emails.some(e => e.includes('@'));
-                      const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
-                      let targetRow: number;
-                      if (row1Empty || row1SameName) {
-                        targetRow = 0;
-                      } else {
-                        const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.emails.some(e => e.includes('@')));
-                        targetRow = emptyIdx !== -1 ? emptyIdx : updated.length;
-                        if (emptyIdx === -1) updated.push({ name: '', emails: [''] });
-                      }
-                      updated[targetRow] = {
-                        name: result.name || '',
-                        emails: newEmails.length > 0 ? newEmails : [''],
-                      };
-                      finalEmailRows = updated;
-                      updateEmailRecipients(updated);
-                    }
-                    const allEmails = finalEmailRows.flatMap(r => r.emails.filter(e => e.includes('@')));
-                    const ownerIdx = ownerPhoneValue ? mergedPhones.indexOf(ownerPhoneValue) : -1;
-                    const ownerPhoneIndex = ownerIdx >= 0 ? ownerIdx : undefined;
-
-                    setViewRecord(prev => prev ? { ...prev, phoneNumbers: mergedPhones, ownerPhoneIndex, emails: allEmails } : prev);
-                    try {
-                      await updateMutation.mutateAsync({
-                        document_number: viewRecord.document_number,
-                        phoneNumbers: mergedPhones,
-                        ownerPhoneIndex,
-                        emails: allEmails,
-                      });
-                      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
-                      const parts: string[] = [];
-                      if (result.name) parts.push(`Name: ${result.name}`);
-                      if (newPhones.length > 0) parts.push(`${newPhones.length} phone(s) added`);
-                      if (newEmails.length > 0) parts.push(`${newEmails.length} email(s) added`);
-                      const dupes = (result.phones.length - newPhones.length) + (result.emails.length - newEmails.length);
-                      if (dupes > 0) parts.push(`${dupes} duplicate(s) skipped`);
-                      toast({
-                        title: parts.length > 0 ? 'Contacts Extracted' : 'No new contacts found',
-                        description: parts.join(', ') || 'Try pasting more text',
-                        variant: parts.length > 0 ? 'default' : 'destructive',
-                      });
-                      if (newEmails.length > 0) setEmailExpanded(true);
-                    } catch {
-                      toast({ title: 'Error saving contacts', variant: 'destructive' });
-                    }
-                    setRawContactText('');
-                  }}
+          {/* Forewarn Contact Extractor Section */}
+          <div className="bg-secondary/30 rounded-lg p-3">
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setForewarnExtractorExpanded(prev => !prev)}
+            >
+              <div className="flex items-center gap-2">
+                <ClipboardPaste className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Forewarn Contact Extractor</span>
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                !forewarnExtractorExpanded && "-rotate-90"
+              )} />
+            </div>
+            {forewarnExtractorExpanded && (
+              <div className="space-y-3 mt-3">
+                <Textarea
+                  value={rawForewarnText}
+                  onChange={(e) => setRawForewarnText(e.target.value)}
+                  placeholder="Paste raw text from Forewarn (Ctrl+A, Ctrl+C on the record page)..."
+                  className="min-h-[120px] text-xs font-mono"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!rawForewarnText.trim()}
+                  onClick={() => runContactExtraction(extractForewarnContacts, rawForewarnText, () => setRawForewarnText(''))}
                 >
                   Extract Contacts
                 </Button>

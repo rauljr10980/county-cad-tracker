@@ -126,3 +126,39 @@ export function extractContacts(rawText: string): ExtractedContact {
     emails: extractEmails(cleaned),
   };
 }
+
+// Forewarn's page prints the (possibly incomplete) search query as
+// "Full Name: X" near the top, then the actual matched record's name as its
+// own ALL-CAPS line a few lines below (e.g. "LISA MARIE MARTINEZ") — that
+// caps line is the more accurate/complete one, so it's preferred. The
+// generic extractName() isn't used here because Forewarn's own page chrome
+// ("Recent Searches", "Phone Records") is title-cased text that would
+// otherwise false-positive against its name heuristic.
+function extractForewarnName(lines: string[]): string | null {
+  const candidates = lines.slice(0, 15);
+  for (const line of candidates) {
+    if (/^[A-Z][A-Z'-]*(\s+[A-Z][A-Z'-]*){1,3}$/.test(line)) {
+      return line;
+    }
+  }
+  for (const line of candidates) {
+    const match = line.match(/^Full Name:\s*(.+)$/i);
+    if (match) return match[1].trim();
+  }
+  return null;
+}
+
+// Forewarn never lists emails (it's a phone-lookup service), and its phone
+// table rows ("830-344-0060  Mobile  08/05/2026") already match the generic
+// phone regex cleanly with no other numeric noise on the page to collide
+// with, so only name extraction needs a Forewarn-specific path.
+export function extractForewarnContacts(rawText: string): ExtractedContact {
+  const cleaned = rawText.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  const lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
+
+  return {
+    name: extractForewarnName(lines),
+    phones: extractPhones(cleaned),
+    emails: extractEmails(cleaned),
+  };
+}
