@@ -21,6 +21,14 @@ import { extractContacts } from '@/lib/contactParser';
 import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
 import { SendEmailPanel, type EmailRecipient } from '@/components/email/SendEmailPanel';
 
+// Mirrors EmailRecipient's shape — PreForeclosure only stores a flat
+// phoneNumbers: string[] in the database (no per-phone name), so like
+// emailRecipients, the `name` here is session-only grouping, not persisted.
+interface PhoneContactRow {
+  name: string;
+  phones: string[];
+}
+
 interface FullDetailsModalProps {
   record: PreForeclosureRecord | null;
   isOpen: boolean;
@@ -65,6 +73,11 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [rawContactText, setRawContactText] = useState('');
   const [emailRecipients, setEmailRecipients] = useState<EmailRecipient[]>([{ name: '', emails: [''] }]);
   const [emailExpanded, setEmailExpanded] = useState(false);
+  const [phoneContacts, setPhoneContacts] = useState<PhoneContactRow[]>([{ name: '', phones: [''] }]);
+  // The starred phone's own value, not a row/position index — stays correct
+  // no matter how rows get reordered/added by the user or the extractor.
+  // Converted to the persisted flat ownerPhoneIndex only at save time.
+  const [ownerPhoneValue, setOwnerPhoneValue] = useState('');
   // Kept in sync with emailRecipients on every write via updateEmailRecipients
   // (never via a useEffect) so a synchronous read right after a write — e.g.
   // SendEmailPanel's onPersist('post-send'), called right after it reports
@@ -117,6 +130,16 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
           ? [{ name: record.ownerName || '', emails: record.emails }]
           : [{ name: record.ownerName || '', emails: [''] }]
       );
+      setPhoneContacts(
+        record.phoneNumbers && record.phoneNumbers.length > 0
+          ? [{ name: record.ownerName || '', phones: record.phoneNumbers }]
+          : [{ name: record.ownerName || '', phones: [''] }]
+      );
+      setOwnerPhoneValue(
+        record.ownerPhoneIndex != null && record.phoneNumbers?.[record.ownerPhoneIndex]
+          ? record.phoneNumbers[record.ownerPhoneIndex]
+          : ''
+      );
     }
   }, [record]);
 
@@ -127,6 +150,48 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   // like Property does — just the flat `emails` column also fed by the
   // Contact Extractor above — so per-recipient names live only in this
   // modal's own session state, not persisted.
+  const flattenPhones = (rows: PhoneContactRow[]): string[] =>
+    rows.flatMap(r => r.phones.filter(p => p.trim()));
+
+  const handleSavePhones = async () => {
+    if (!viewRecord) return;
+    try {
+      const allPhones = flattenPhones(phoneContacts);
+      const ownerIdx = ownerPhoneValue ? allPhones.indexOf(ownerPhoneValue) : -1;
+      const ownerPhoneIndex = ownerIdx >= 0 ? ownerIdx : undefined;
+      await updateMutation.mutateAsync({
+        document_number: viewRecord.document_number,
+        phoneNumbers: allPhones,
+        ownerPhoneIndex,
+      });
+      setViewRecord(prev => prev ? { ...prev, phoneNumbers: allPhones, ownerPhoneIndex } : prev);
+      toast({ title: 'Phone Numbers Saved', description: 'Phone numbers have been saved successfully.' });
+      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
+    } catch (error) {
+      console.error('Error saving phone numbers:', error);
+      toast({ title: 'Error', description: 'Failed to save phone numbers. Please try again.', variant: 'destructive' });
+    }
+  };
+
+  const handleToggleOwnerPhone = async (phone: string) => {
+    if (!viewRecord || !phone.trim()) return;
+    const nextOwnerValue = ownerPhoneValue === phone ? '' : phone;
+    setOwnerPhoneValue(nextOwnerValue);
+    const allPhones = flattenPhones(phoneContacts);
+    const ownerIdx = nextOwnerValue ? allPhones.indexOf(nextOwnerValue) : -1;
+    const ownerPhoneIndex = ownerIdx >= 0 ? ownerIdx : undefined;
+    try {
+      await updateMutation.mutateAsync({
+        document_number: viewRecord.document_number,
+        phoneNumbers: allPhones,
+        ownerPhoneIndex,
+      });
+      setViewRecord(prev => prev ? { ...prev, phoneNumbers: allPhones, ownerPhoneIndex } : prev);
+    } catch (error) {
+      console.error('Error saving owner phone index:', error);
+    }
+  };
+
   const persistEmailContacts = async () => {
     if (!viewRecord) return;
     const allEmails = emailRecipientsRef.current.flatMap(r => r.emails.filter(e => e.includes('@')));
@@ -867,93 +932,80 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               </Button>
             </div>
             <div className="space-y-2">
-              {(() => {
-                const phoneNumbersArray = Array.isArray(viewRecord.phoneNumbers) ? viewRecord.phoneNumbers : [];
-                // Show at least 6 fields, or more if we have more numbers
-                const fieldCount = Math.max(6, phoneNumbersArray.length);
-                return Array.from({ length: fieldCount }, (_, index) => {
-                  const phoneValue = phoneNumbersArray[index] || '';
-                  const isOwnerPhone = viewRecord.ownerPhoneIndex === index;
-                  return (
-                    <div key={index} className="flex items-center gap-1.5 sm:gap-2">
-                      <span className="text-xs text-muted-foreground w-8 sm:w-16 shrink-0">
-                        <span className="hidden sm:inline">Phone </span>{index + 1}:
-                      </span>
-                      <Input
-                        type="tel"
-                        value={phoneValue}
-                        onChange={(e) => {
-                          const currentPhones = viewRecord.phoneNumbers || [];
-                          const newPhoneNumbers = [...currentPhones];
-                          newPhoneNumbers[index] = e.target.value;
-                          setViewRecord({
-                            ...viewRecord,
-                            phoneNumbers: newPhoneNumbers,
-                          });
-                        }}
-                        placeholder="Enter phone number"
-                        className="flex-1"
-                      />
+              {phoneContacts.map((row, rowIdx) => (
+                <div key={rowIdx} className="flex items-center gap-2">
+                  <span className="text-xs w-6 shrink-0 flex items-center justify-center text-muted-foreground">
+                    {rowIdx + 1}.
+                  </span>
+                  <Input
+                    value={row.name}
+                    onChange={(e) => {
+                      const updated = [...phoneContacts];
+                      updated[rowIdx] = { ...updated[rowIdx], name: e.target.value };
+                      setPhoneContacts(updated);
+                    }}
+                    placeholder="Name"
+                    className="w-28 shrink-0"
+                  />
+                  <div className="flex-1 overflow-x-auto">
+                    <div className="flex items-center gap-1.5">
+                      {row.phones.map((phone, phoneIdx) => {
+                        const isOwnerPhone = !!phone.trim() && phone === ownerPhoneValue;
+                        return (
+                          <div key={phoneIdx} className="flex items-center gap-1 shrink-0">
+                            <Input
+                              type="tel"
+                              value={phone}
+                              onChange={(e) => {
+                                const updated = [...phoneContacts];
+                                const newPhones = [...updated[rowIdx].phones];
+                                newPhones[phoneIdx] = e.target.value;
+                                updated[rowIdx] = { ...updated[rowIdx], phones: newPhones };
+                                setPhoneContacts(updated);
+                              }}
+                              placeholder={`Phone ${phoneIdx + 1}`}
+                              className="w-[150px] shrink-0 text-xs"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={cn("h-7 w-7 shrink-0", isOwnerPhone && "text-yellow-500")}
+                              onClick={() => handleToggleOwnerPhone(phone)}
+                              disabled={!phone.trim()}
+                              title={isOwnerPhone ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                            >
+                              <Star className={cn("h-3.5 w-3.5", isOwnerPhone ? "fill-yellow-500" : "fill-none")} />
+                            </Button>
+                          </div>
+                        );
+                      })}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={cn(
-                          "h-8 w-8 shrink-0",
-                          isOwnerPhone && "text-yellow-500"
-                        )}
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
                         onClick={() => {
-                          const newOwnerPhoneIndex = isOwnerPhone ? undefined : index;
-                          setViewRecord({
-                            ...viewRecord,
-                            ownerPhoneIndex: newOwnerPhoneIndex,
-                          });
-                          const currentPhones = Array.isArray(viewRecord.phoneNumbers) ? viewRecord.phoneNumbers : [];
-                          updateMutation.mutateAsync({
-                            document_number: viewRecord.document_number,
-                            phoneNumbers: currentPhones,
-                            ownerPhoneIndex: newOwnerPhoneIndex,
-                          }).catch((error) => {
-                            console.error('Error saving owner phone index:', error);
-                          });
+                          const updated = [...phoneContacts];
+                          updated[rowIdx] = { ...updated[rowIdx], phones: [...updated[rowIdx].phones, ''] };
+                          setPhoneContacts(updated);
                         }}
-                        title={isOwnerPhone ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                        title="Add phone field"
                       >
-                        <Star className={cn(
-                          "h-4 w-4",
-                          isOwnerPhone ? "fill-yellow-500" : "fill-none"
-                        )} />
+                        <span className="text-lg leading-none">+</span>
                       </Button>
                     </div>
-                  );
-                });
-              })()}
+                  </div>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={() => setPhoneContacts([...phoneContacts, { name: '', phones: [''] }])}
+              >
+                + Add contact
+              </Button>
               <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      const currentPhones = Array.isArray(viewRecord.phoneNumbers) ? viewRecord.phoneNumbers : [];
-                      await updateMutation.mutateAsync({
-                        document_number: viewRecord.document_number,
-                        phoneNumbers: currentPhones,
-                        ownerPhoneIndex: viewRecord.ownerPhoneIndex,
-                      });
-                      toast({
-                        title: 'Phone Numbers Saved',
-                        description: 'Phone numbers have been saved successfully.',
-                      });
-                      queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
-                    } catch (error) {
-                      console.error('Error saving phone numbers:', error);
-                      toast({
-                        title: 'Error',
-                        description: 'Failed to save phone numbers. Please try again.',
-                        variant: 'destructive',
-                      });
-                    }
-                  }}
-                  disabled={updateMutation.isPending}
-                >
+                <Button size="sm" onClick={handleSavePhones} disabled={updateMutation.isPending}>
                   {updateMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -998,12 +1050,34 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                     if (!viewRecord) return;
                     const result = extractContacts(rawContactText);
 
-                    // Phones — existing behavior, unchanged.
+                    // Phones — same smart-row-placement pattern as emails below,
+                    // so extracted numbers land under a named contact instead of
+                    // an undifferentiated flat list.
                     const existingDigits = new Set(
-                      (viewRecord.phoneNumbers || []).map(p => p.replace(/\D/g, '').slice(-10))
+                      phoneContacts.flatMap(r => r.phones.filter(p => p.trim()).map(p => p.replace(/\D/g, '').slice(-10)))
                     );
                     const newPhones = result.phones.filter(p => !existingDigits.has(p.replace(/\D/g, '').slice(-10)));
-                    const mergedPhones = [...(viewRecord.phoneNumbers || []).filter(p => p.trim()), ...newPhones];
+                    let finalPhoneRows = phoneContacts;
+                    if (newPhones.length > 0 || result.name) {
+                      const updated = [...phoneContacts];
+                      const row1Empty = !updated[0].name.trim() && !updated[0].phones.some(p => p.trim());
+                      const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
+                      let targetRow: number;
+                      if (row1Empty || row1SameName) {
+                        targetRow = 0;
+                      } else {
+                        const emptyIdx = updated.findIndex((r, i) => i > 0 && !r.name.trim() && !r.phones.some(p => p.trim()));
+                        targetRow = emptyIdx !== -1 ? emptyIdx : updated.length;
+                        if (emptyIdx === -1) updated.push({ name: '', phones: [''] });
+                      }
+                      updated[targetRow] = {
+                        name: result.name || '',
+                        phones: newPhones.length > 0 ? newPhones : [''],
+                      };
+                      finalPhoneRows = updated;
+                      setPhoneContacts(updated);
+                    }
+                    const mergedPhones = flattenPhones(finalPhoneRows);
 
                     // Emails — same smart-row-placement pattern as the Properties
                     // tab's Contact Extractor: find a same-name or empty row, or
@@ -1034,13 +1108,15 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                       updateEmailRecipients(updated);
                     }
                     const allEmails = finalEmailRows.flatMap(r => r.emails.filter(e => e.includes('@')));
+                    const ownerIdx = ownerPhoneValue ? mergedPhones.indexOf(ownerPhoneValue) : -1;
+                    const ownerPhoneIndex = ownerIdx >= 0 ? ownerIdx : undefined;
 
-                    setViewRecord(prev => prev ? { ...prev, phoneNumbers: mergedPhones, emails: allEmails } : prev);
+                    setViewRecord(prev => prev ? { ...prev, phoneNumbers: mergedPhones, ownerPhoneIndex, emails: allEmails } : prev);
                     try {
                       await updateMutation.mutateAsync({
                         document_number: viewRecord.document_number,
                         phoneNumbers: mergedPhones,
-                        ownerPhoneIndex: viewRecord.ownerPhoneIndex,
+                        ownerPhoneIndex,
                         emails: allEmails,
                       });
                       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
