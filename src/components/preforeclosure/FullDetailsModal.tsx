@@ -11,14 +11,14 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useUpdatePreForeclosure, useOwnerLookup } from '@/hooks/usePreForeclosure';
-import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus, WORKFLOW_STAGES, FOLLOWUP_ELIGIBLE_STAGES } from '@/types/property';
+import { PreForeclosureRecord, PreForeclosureType, PreForeclosureStatus, WORKFLOW_STAGES, FOLLOWUP_ELIGIBLE_STAGES, WorkflowStage } from '@/types/property';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { markPreForeclosureVisited, createFollowUp, logActivity } from '@/lib/api';
 import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
 import { extractContacts } from '@/lib/contactParser';
-import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
+import { PreForeclosureVisitWizard, PreForeclosureVisitResult } from './PreForeclosureVisitWizard';
 import { SendEmailPanel, type EmailRecipient } from '@/components/email/SendEmailPanel';
 
 // Mirrors EmailRecipient's shape — PreForeclosure only stores a flat
@@ -466,6 +466,19 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               >
                 <Building className="h-4 w-4 mr-1.5" />
                 Land Records
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 min-w-[100px]"
+                onClick={() => {
+                  const url = `https://bexar.tx.publicsearch.us/results?department=FC&instrumentDateRange=20000404%2C20270406&keywordSearch=false&searchOcrText=false&searchType=quickSearch&searchValue=${encodeURIComponent(viewRecord.document_number)}`;
+                  window.open(url, '_blank');
+                }}
+                title="Foreclosure Notice (search by document number, e.g. for loan amount)"
+              >
+                <Search className="h-4 w-4 mr-1.5" />
+                Foreclosure Notice
               </Button>
             </div>}
           </div>
@@ -1381,16 +1394,16 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                   Visit Questions
                 </h3>
-                <VisitedWizard
-                  address={viewRecord.address || ''}
-                  onComplete={async (result: VisitedWizardResult) => {
+                <PreForeclosureVisitWizard
+                  onComplete={async (result: PreForeclosureVisitResult) => {
                     setWizardPending(true);
                     try {
+                      const currentStage = (viewRecord.workflow_stage || 'not_started') as WorkflowStage;
                       const logEntry = {
                         id: crypto.randomUUID(),
                         timestamp: new Date().toISOString(),
-                        fromStage: viewRecord.workflow_stage || 'new',
-                        toStage: result.nextWorkflowStage,
+                        fromStage: currentStage,
+                        toStage: currentStage,
                         outcome: result.outcomeLabel,
                         note: result.note || undefined,
                       };
@@ -1399,16 +1412,8 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
 
                       const updates: any = {
                         document_number: viewRecord.document_number,
-                        workflow_stage: result.nextWorkflowStage,
                         workflow_log: newLog,
                       };
-                      if (result.phoneProvided && result.phoneNumber) {
-                        const currentPhones = Array.isArray(viewRecord.phoneNumbers) ? [...viewRecord.phoneNumbers] : [];
-                        if (!currentPhones.includes(result.phoneNumber)) {
-                          currentPhones.push(result.phoneNumber);
-                        }
-                        updates.phoneNumbers = currentPhones;
-                      }
                       if (result.note) {
                         updates.notes = viewRecord.notes
                           ? `${viewRecord.notes}\n[Visit] ${result.note}`
@@ -1420,9 +1425,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
 
                       setViewRecord(prev => prev ? {
                         ...prev,
-                        workflow_stage: result.nextWorkflowStage,
                         workflow_log: newLog,
-                        phoneNumbers: updates.phoneNumbers || prev.phoneNumbers,
                         notes: updates.notes || prev.notes,
                         visited: true,
                         visited_at: new Date().toISOString(),
