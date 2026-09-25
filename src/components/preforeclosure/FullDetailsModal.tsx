@@ -1033,19 +1033,30 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 <Phone className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">Phone Numbers</span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => {
-                  const address = viewRecord.address || '';
-                  const cityStateZip = `${viewRecord.city || 'San Antonio'}, TX ${viewRecord.zip || ''}`.trim();
-                  window.open(`https://www.truepeoplesearch.com/results?name=${encodeURIComponent(address)}&citystatezip=${encodeURIComponent(cityStateZip)}`, '_blank');
-                }}
-              >
-                <ExternalLink className="h-3 w-3 mr-1.5" />
-                TruePeopleSearch
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    const address = viewRecord.address || '';
+                    const cityStateZip = `${viewRecord.city || 'San Antonio'}, TX ${viewRecord.zip || ''}`.trim();
+                    window.open(`https://www.truepeoplesearch.com/results?name=${encodeURIComponent(address)}&citystatezip=${encodeURIComponent(cityStateZip)}`, '_blank');
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1.5" />
+                  TruePeopleSearch
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => window.open('https://app.forewarn.com/search', '_blank')}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1.5" />
+                  Forewarn
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               {phoneContacts.map((row, rowIdx) => (
