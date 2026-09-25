@@ -27,6 +27,9 @@ import { SendEmailPanel, type EmailRecipient } from '@/components/email/SendEmai
 interface PhoneContactRow {
   name: string;
   phones: string[];
+  /** Normalized phone -> "MM/DD/YYYY" it was last seen, from the Forewarn
+   *  extractor. Session-only, like the row name itself — not persisted. */
+  phoneLastSeen?: Record<string, string>;
 }
 
 interface FullDetailsModalProps {
@@ -238,6 +241,9 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
       updated[targetRow] = {
         name: result.name || '',
         phones: newPhones.length > 0 ? newPhones : [''],
+        phoneLastSeen: result.phoneLastSeen
+          ? { ...updated[targetRow].phoneLastSeen, ...result.phoneLastSeen }
+          : updated[targetRow].phoneLastSeen,
       };
       finalPhoneRows = updated;
       setPhoneContacts(updated);
@@ -1061,31 +1067,37 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                     <div className="flex items-center gap-1.5">
                       {row.phones.map((phone, phoneIdx) => {
                         const isOwnerPhone = !!phone.trim() && phone === ownerPhoneValue;
+                        const lastSeen = row.phoneLastSeen?.[phone];
                         return (
-                          <div key={phoneIdx} className="flex items-center gap-1 shrink-0">
-                            <Input
-                              type="tel"
-                              value={phone}
-                              onChange={(e) => {
-                                const updated = [...phoneContacts];
-                                const newPhones = [...updated[rowIdx].phones];
-                                newPhones[phoneIdx] = e.target.value;
-                                updated[rowIdx] = { ...updated[rowIdx], phones: newPhones };
-                                setPhoneContacts(updated);
-                              }}
-                              placeholder={`Phone ${phoneIdx + 1}`}
-                              className="w-[150px] shrink-0 text-xs"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn("h-7 w-7 shrink-0", isOwnerPhone && "text-yellow-500")}
-                              onClick={() => handleToggleOwnerPhone(phone)}
-                              disabled={!phone.trim()}
-                              title={isOwnerPhone ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
-                            >
-                              <Star className={cn("h-3.5 w-3.5", isOwnerPhone ? "fill-yellow-500" : "fill-none")} />
-                            </Button>
+                          <div key={phoneIdx} className="flex flex-col gap-0.5 shrink-0">
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="tel"
+                                value={phone}
+                                onChange={(e) => {
+                                  const updated = [...phoneContacts];
+                                  const newPhones = [...updated[rowIdx].phones];
+                                  newPhones[phoneIdx] = e.target.value;
+                                  updated[rowIdx] = { ...updated[rowIdx], phones: newPhones };
+                                  setPhoneContacts(updated);
+                                }}
+                                placeholder={`Phone ${phoneIdx + 1}`}
+                                className="w-[150px] shrink-0 text-xs"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn("h-7 w-7 shrink-0", isOwnerPhone && "text-yellow-500")}
+                                onClick={() => handleToggleOwnerPhone(phone)}
+                                disabled={!phone.trim()}
+                                title={isOwnerPhone ? "Owner's phone (click to unmark)" : "Click star for owner phone number"}
+                              >
+                                <Star className={cn("h-3.5 w-3.5", isOwnerPhone ? "fill-yellow-500" : "fill-none")} />
+                              </Button>
+                            </div>
+                            {lastSeen && (
+                              <span className="text-[10px] text-muted-foreground px-1">Last seen {lastSeen}</span>
+                            )}
                           </div>
                         );
                       })}

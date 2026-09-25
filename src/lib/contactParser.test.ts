@@ -68,6 +68,27 @@ describe('extractForewarnContacts', () => {
     expect(result.emails).toEqual([]);
   });
 
+  it('pairs each phone with its own "Last Seen" date from the same table row', () => {
+    const result = extractForewarnContacts(FOREWARN_PASTE);
+    expect(result.phoneLastSeen).toEqual({
+      '(830) 344-0060': '08/05/2026',
+      '(210) 204-0441': '06/05/2025',
+      '(830) 344-8400': '09/07/2023',
+      '(346) 276-0366': '10/10/2023',
+      '(346) 276-0367': '10/20/2021',
+      '(830) 344-8303': '06/01/2022',
+      '(281) 839-4016': '09/18/2015',
+      '(210) 254-2490': '08/10/2015',
+      '(210) 248-9115': '04/27/2024',
+      '(713) 649-6869': '07/01/2015',
+      '(210) 635-9509': '01/28/2006',
+      '(713) 391-0930': '06/23/2025',
+      '(210) 257-0626': '06/15/2022',
+      '(830) 899-5633': '08/01/2026',
+      '(512) 262-0619': '08/01/2026',
+    });
+  });
+
   it('falls back to the "Full Name:" line when no ALL-CAPS record name is present', () => {
     const result = extractForewarnContacts('Full Name: Lisa Martinez\nZip: 78244\nNo matches found');
     expect(result.name).toBe('Lisa Martinez');

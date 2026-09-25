@@ -2,6 +2,10 @@ export interface ExtractedContact {
   name: string | null;
   phones: string[];
   emails: string[];
+  /** Normalized phone -> "MM/DD/YYYY" it was last seen. Forewarn only —
+   *  TruePeopleSearch pastes don't carry this, so extractContacts() never
+   *  populates it. */
+  phoneLastSeen?: Record<string, string>;
 }
 
 // Use word-boundary regex patterns to avoid false matches (e.g. "Nagel" containing "age")
@@ -148,6 +152,22 @@ function extractForewarnName(lines: string[]): string | null {
   return null;
 }
 
+// Each Forewarn phone-table row is "<phone>\t<Type>\t<Last Seen>" on its own
+// line (e.g. "830-344-0060  Mobile  08/05/2026") — pull the date off that
+// same line and key it by the normalized phone so callers can look it up
+// against extractPhones()'s output.
+function extractForewarnPhoneDates(text: string): Record<string, string> {
+  const rowRegex = /^((?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4})\b.*?(\d{1,2}\/\d{1,2}\/\d{4})/;
+  const result: Record<string, string> = {};
+  for (const line of text.split(/\r?\n/)) {
+    const match = line.trim().match(rowRegex);
+    if (match) {
+      result[normalizePhone(match[1])] = match[2];
+    }
+  }
+  return result;
+}
+
 // Forewarn never lists emails (it's a phone-lookup service), and its phone
 // table rows ("830-344-0060  Mobile  08/05/2026") already match the generic
 // phone regex cleanly with no other numeric noise on the page to collide
@@ -160,5 +180,6 @@ export function extractForewarnContacts(rawText: string): ExtractedContact {
     name: extractForewarnName(lines),
     phones: extractPhones(cleaned),
     emails: extractEmails(cleaned),
+    phoneLastSeen: extractForewarnPhoneDates(cleaned),
   };
 }
