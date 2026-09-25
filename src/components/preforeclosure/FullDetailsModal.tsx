@@ -498,7 +498,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               <Button
                 variant="default"
                 size="sm"
-                className="flex-1 min-w-[100px] bg-primary text-primary-foreground"
+                className="min-w-[100px] bg-primary text-primary-foreground"
                 disabled
               >
                 <Eye className="h-4 w-4 mr-1.5" />
@@ -507,7 +507,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 min-w-[100px]"
+                className="min-w-[100px]"
                 onClick={() => {
                   if (viewRecord.latitude != null && viewRecord.longitude != null) {
                     const mapsUrl = `https://www.google.com/maps/place/${encodeURIComponent(viewRecord.address)},+${encodeURIComponent(viewRecord.city)},+TX+${viewRecord.zip}/@${viewRecord.latitude},${viewRecord.longitude},16z`;
@@ -529,7 +529,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 min-w-[100px]"
+                className="min-w-[100px]"
                 onClick={() => {
                   window.open('https://bexar.acttax.com/act_webdev/bexar/index.jsp', '_blank');
                 }}
@@ -541,7 +541,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 min-w-[100px]"
+                className="min-w-[100px]"
                 onClick={() => {
                   const address = viewRecord.address || '';
                   const cityStateZip = `${viewRecord.city || 'San Antonio'}, TX ${viewRecord.zip || ''}`.trim();
@@ -555,7 +555,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 min-w-[100px]"
+                className="min-w-[100px]"
                 onClick={() => {
                   const raw = (viewRecord.address || '').split(',')[0].trim();
                   const streetMatch = raw.match(/^.*?\b(AVE|DR|ST|BLVD|LN|CT|PL|RD|WAY|TRL|CIR|HWY|PKWY|LOOP|EXPY|PASS|ROW|SQ|TER|TERR|TRACE|VIA|WALK)\b/i);
@@ -573,7 +573,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 min-w-[100px]"
+                className="min-w-[100px]"
                 onClick={() => {
                   const url = `https://bexar.tx.publicsearch.us/results?department=FC&instrumentDateRange=20000404%2C20270406&keywordSearch=false&searchOcrText=false&searchType=quickSearch&searchValue=${encodeURIComponent(viewRecord.document_number)}`;
                   window.open(url, '_blank');
