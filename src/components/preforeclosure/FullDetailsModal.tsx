@@ -1169,12 +1169,6 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
             </div>
             {contactExtractorExpanded && (
               <div className="space-y-3 mt-3">
-                <Textarea
-                  value={rawContactText}
-                  onChange={(e) => setRawContactText(e.target.value)}
-                  placeholder="Paste raw text from TruePeopleSearch or similar site..."
-                  className="min-h-[120px] text-xs font-mono"
-                />
                 <Button
                   size="sm"
                   variant="outline"
@@ -1183,6 +1177,12 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 >
                   Extract Contacts
                 </Button>
+                <Textarea
+                  value={rawContactText}
+                  onChange={(e) => setRawContactText(e.target.value)}
+                  placeholder="Paste raw text from TruePeopleSearch or similar site..."
+                  className="min-h-[120px] text-xs font-mono"
+                />
               </div>
             )}
           </div>
@@ -1204,12 +1204,6 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
             </div>
             {forewarnExtractorExpanded && (
               <div className="space-y-3 mt-3">
-                <Textarea
-                  value={rawForewarnText}
-                  onChange={(e) => setRawForewarnText(e.target.value)}
-                  placeholder="Paste raw text from Forewarn (Ctrl+A, Ctrl+C on the record page)..."
-                  className="min-h-[120px] text-xs font-mono"
-                />
                 <Button
                   size="sm"
                   variant="outline"
@@ -1218,6 +1212,12 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 >
                   Extract Contacts
                 </Button>
+                <Textarea
+                  value={rawForewarnText}
+                  onChange={(e) => setRawForewarnText(e.target.value)}
+                  placeholder="Paste raw text from Forewarn (Ctrl+A, Ctrl+C on the record page)..."
+                  className="min-h-[120px] text-xs font-mono"
+                />
               </div>
             )}
           </div>
