@@ -1033,30 +1033,6 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 <Phone className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">Phone Numbers</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => {
-                    const address = viewRecord.address || '';
-                    const cityStateZip = `${viewRecord.city || 'San Antonio'}, TX ${viewRecord.zip || ''}`.trim();
-                    window.open(`https://www.truepeoplesearch.com/results?name=${encodeURIComponent(address)}&citystatezip=${encodeURIComponent(cityStateZip)}`, '_blank');
-                  }}
-                >
-                  <ExternalLink className="h-3 w-3 mr-1.5" />
-                  TruePeopleSearch
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => window.open('https://app.forewarn.com/search', '_blank')}
-                >
-                  <ExternalLink className="h-3 w-3 mr-1.5" />
-                  Forewarn
-                </Button>
-              </div>
             </div>
             <div className="space-y-2">
               {phoneContacts.map((row, rowIdx) => (
@@ -1162,13 +1138,35 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 <ClipboardPaste className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">True People Search Contact Extractor</span>
               </div>
-              <ChevronDown className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                !contactExtractorExpanded && "-rotate-90"
-              )} />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const address = viewRecord.address || '';
+                    const cityStateZip = `${viewRecord.city || 'San Antonio'}, TX ${viewRecord.zip || ''}`.trim();
+                    window.open(`https://www.truepeoplesearch.com/results?name=${encodeURIComponent(address)}&citystatezip=${encodeURIComponent(cityStateZip)}`, '_blank');
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1.5" />
+                  TruePeopleSearch
+                </Button>
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  !contactExtractorExpanded && "-rotate-90"
+                )} />
+              </div>
             </div>
             {contactExtractorExpanded && (
               <div className="space-y-3 mt-3">
+                <Textarea
+                  value={rawContactText}
+                  onChange={(e) => setRawContactText(e.target.value)}
+                  placeholder="Paste raw text from TruePeopleSearch or similar site..."
+                  className="min-h-[120px] text-xs font-mono"
+                />
                 <Button
                   size="sm"
                   variant="outline"
@@ -1177,12 +1175,6 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 >
                   Extract Contacts
                 </Button>
-                <Textarea
-                  value={rawContactText}
-                  onChange={(e) => setRawContactText(e.target.value)}
-                  placeholder="Paste raw text from TruePeopleSearch or similar site..."
-                  className="min-h-[120px] text-xs font-mono"
-                />
               </div>
             )}
           </div>
@@ -1197,13 +1189,33 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 <ClipboardPaste className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">Forewarn Contact Extractor</span>
               </div>
-              <ChevronDown className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                !forewarnExtractorExpanded && "-rotate-90"
-              )} />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open('https://app.forewarn.com/search', '_blank');
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1.5" />
+                  Forewarn
+                </Button>
+                <ChevronDown className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                  !forewarnExtractorExpanded && "-rotate-90"
+                )} />
+              </div>
             </div>
             {forewarnExtractorExpanded && (
               <div className="space-y-3 mt-3">
+                <Textarea
+                  value={rawForewarnText}
+                  onChange={(e) => setRawForewarnText(e.target.value)}
+                  placeholder="Paste raw text from Forewarn (Ctrl+A, Ctrl+C on the record page)..."
+                  className="min-h-[120px] text-xs font-mono"
+                />
                 <Button
                   size="sm"
                   variant="outline"
@@ -1212,12 +1224,6 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                 >
                   Extract Contacts
                 </Button>
-                <Textarea
-                  value={rawForewarnText}
-                  onChange={(e) => setRawForewarnText(e.target.value)}
-                  placeholder="Paste raw text from Forewarn (Ctrl+A, Ctrl+C on the record page)..."
-                  className="min-h-[120px] text-xs font-mono"
-                />
               </div>
             )}
           </div>
