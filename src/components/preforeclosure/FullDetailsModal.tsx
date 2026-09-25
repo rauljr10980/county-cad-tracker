@@ -217,8 +217,10 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
     parser: (text: string) => ExtractedContact,
     rawText: string,
     clearRawText: () => void,
+    opts: { extractsPhones?: boolean; extractsEmails?: boolean } = {},
   ) => {
     if (!viewRecord) return;
+    const { extractsPhones = true, extractsEmails = true } = opts;
     const result = parser(rawText);
 
     const existingDigits = new Set(
@@ -226,7 +228,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
     );
     const newPhones = result.phones.filter(p => !existingDigits.has(p.replace(/\D/g, '').slice(-10)));
     let finalPhoneRows = phoneContacts;
-    if (newPhones.length > 0 || result.name) {
+    if (extractsPhones && (newPhones.length > 0 || result.name)) {
       const updated = [...phoneContacts];
       const row1Empty = !updated[0].name.trim() && !updated[0].phones.some(p => p.trim());
       const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
@@ -255,7 +257,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
     );
     const newEmails = result.emails.filter(e => !existingEmailSet.has(e.toLowerCase().trim()));
     let finalEmailRows = emailRecipientsRef.current;
-    if (newEmails.length > 0 || result.name) {
+    if (extractsEmails && (newEmails.length > 0 || result.name)) {
       const updated = [...emailRecipientsRef.current];
       const row1Empty = !updated[0].name.trim() && !updated[0].emails.some(e => e.includes('@'));
       const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
@@ -1176,6 +1178,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                     (text) => ({ ...extractContacts(text), phones: [] }),
                     rawContactText,
                     () => setRawContactText(''),
+                    { extractsPhones: false },
                   )}
                 >
                   Extract Contacts
@@ -1230,6 +1233,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                     (text) => ({ ...extractForewarnContacts(text), emails: [] }),
                     rawForewarnText,
                     () => setRawForewarnText(''),
+                    { extractsEmails: false },
                   )}
                 >
                   Extract Contacts
