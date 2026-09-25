@@ -1171,7 +1171,12 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   size="sm"
                   variant="outline"
                   disabled={!rawContactText.trim()}
-                  onClick={() => runContactExtraction(extractContacts, rawContactText, () => setRawContactText(''))}
+                  onClick={() => runContactExtraction(
+                    // Emails only here -- Forewarn is the phone source (more accurate numbers).
+                    (text) => ({ ...extractContacts(text), phones: [] }),
+                    rawContactText,
+                    () => setRawContactText(''),
+                  )}
                 >
                   Extract Contacts
                 </Button>
@@ -1220,7 +1225,12 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   size="sm"
                   variant="outline"
                   disabled={!rawForewarnText.trim()}
-                  onClick={() => runContactExtraction(extractForewarnContacts, rawForewarnText, () => setRawForewarnText(''))}
+                  onClick={() => runContactExtraction(
+                    // Phones only here -- True People Search is the email source.
+                    (text) => ({ ...extractForewarnContacts(text), emails: [] }),
+                    rawForewarnText,
+                    () => setRawForewarnText(''),
+                  )}
                 >
                   Extract Contacts
                 </Button>
