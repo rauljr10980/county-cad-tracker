@@ -393,16 +393,17 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   // Persists the Send Email panel's recipient/contacts data for this
   // property. Passed to SendEmailPanel as onPersist — it's called once
   // before "Send to All" starts sending (so row data that hasn't
-  // auto-saved yet survives a failure partway through), and once after
-  // (so "sent" flags are recorded), matching the original inline handler.
-  const persistEmailContacts = async (phase: 'pre-send' | 'post-send') => {
+  // auto-saved yet survives a failure partway through), once after (so
+  // "sent" flags are recorded), and by the panel's standalone "Save" button
+  // ('manual'), which lets an edit or deletion persist without sending.
+  const persistEmailContacts = async (phase: 'pre-send' | 'post-send' | 'manual') => {
     const contacts = buildContactsJson();
     const allEmails = emailRecipientsRef.current.flatMap(r => r.emails.filter(e => e.includes('@')));
     if (!isD4d) {
       await updatePropertyEmails(property.id, allEmails, contacts);
     } else {
       await updateDrivingLeadEmails(d4dLeadId, allEmails, contacts, ownerOverride);
-      if (phase === 'post-send') queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
+      if (phase !== 'pre-send') queryClient.invalidateQueries({ queryKey: ['driving-leads'] });
     }
     property.emails = allEmails;
     property.contacts = contacts;

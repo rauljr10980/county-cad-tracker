@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle, Loader2, Mail, Send } from 'lucide-react';
+import { CheckCircle, Loader2, Mail, Save, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,9 +31,12 @@ export type SendEmailPanelProps = {
    * Called by "Send to All" — once before any email goes out (so row data
    * that hasn't autosaved yet is captured even if sending fails partway),
    * and again after the send loop finishes (so per-recipient "sent" flags
-   * are persisted). Callers that don't need persistence can omit it.
+   * are persisted) — and by the standalone "Save" button ('manual'), which
+   * lets a name/email edit or deletion persist without sending anything.
+   * Callers that don't need persistence can omit it, which also hides the
+   * Save button.
    */
-  onPersist?: (phase: 'pre-send' | 'post-send') => Promise<void>;
+  onPersist?: (phase: 'pre-send' | 'post-send' | 'manual') => Promise<void>;
   defaultSubject?: string;
   defaultBody?: string;
   /**
@@ -73,6 +76,7 @@ export function SendEmailPanel({
   const [body, setBody] = useState(defaultBody);
   const [sendingIndex, setSendingIndex] = useState<number | null>(null);
   const [sendingAll, setSendingAll] = useState(false);
+  const [savingContacts, setSavingContacts] = useState(false);
 
   // Reset subject/body whenever resetKey changes (e.g. a different property
   // was opened in the same long-lived modal instance). Deliberately does not
@@ -108,6 +112,19 @@ export function SendEmailPanel({
     const resolved = substituteBody(body, vars);
     navigator.clipboard.writeText(resolved);
     toast({ title: 'Email copied to clipboard' });
+  };
+
+  const handleSaveContacts = async () => {
+    if (!onPersist) return;
+    setSavingContacts(true);
+    try {
+      await onPersist('manual');
+      toast({ title: 'Contacts saved' });
+    } catch (err) {
+      toast({ title: 'Failed to save', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setSavingContacts(false);
+    }
   };
 
   const handleSendToAll = async () => {
@@ -256,13 +273,19 @@ export function SendEmailPanel({
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
+        {onPersist && (
+          <Button size="sm" variant="outline" onClick={handleSaveContacts} disabled={savingContacts || sendingAll}>
+            {savingContacts ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+            {savingContacts ? 'Saving...' : 'Save'}
+          </Button>
+        )}
         <Button size="sm" variant="outline" onClick={handleCopyText}>
           Copy Text
         </Button>
         <Button
           size="sm"
           onClick={handleSendToAll}
-          disabled={!recipients.some((r) => r.emails.some((e) => e.includes('@'))) || sendingAll}
+          disabled={!recipients.some((r) => r.emails.some((e) => e.includes('@'))) || sendingAll || savingContacts}
         >
           {sendingAll ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-1.5" />}
           {sendingAll ? 'Sending...' : 'Send to All'}
