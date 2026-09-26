@@ -157,6 +157,17 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const flattenPhones = (rows: PhoneContactRow[]): string[] =>
     rows.flatMap(r => r.phones.filter(p => p.trim()));
 
+  // True if `phone` also appears in some OTHER contact's row (e.g. a shared
+  // landline) — used to highlight it rather than silently drop it from
+  // whichever row it was extracted into second.
+  const isDuplicatePhone = (phone: string, rowIdx: number): boolean => {
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    if (!digits) return false;
+    return phoneContacts.some((r, i) =>
+      i !== rowIdx && r.phones.some(p => p.trim() && p.replace(/\D/g, '').slice(-10) === digits)
+    );
+  };
+
   // Builds the persisted {phoneRows, emailRows} JSON (contact names +
   // per-row values) so the Phone Numbers / Send Email row grouping survives
   // a reload instead of collapsing back to a single row named after
@@ -245,12 +256,9 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
     const { extractsPhones = true, extractsEmails = true } = opts;
     const result = parser(rawText);
 
-    const existingDigits = new Set(
-      phoneContacts.flatMap(r => r.phones.filter(p => p.trim()).map(p => p.replace(/\D/g, '').slice(-10)))
-    );
-    const newPhones = result.phones.filter(p => !existingDigits.has(p.replace(/\D/g, '').slice(-10)));
     let finalPhoneRows = phoneContacts;
-    if (extractsPhones && (newPhones.length > 0 || result.name)) {
+    let newPhonesForRow: string[] = [];
+    if (extractsPhones && (result.phones.length > 0 || result.name)) {
       const updated = [...phoneContacts];
       const row1Empty = !updated[0].name.trim() && !updated[0].phones.some(p => p.trim());
       const row1SameName = result.name && updated[0].name.trim().toLowerCase() === result.name.toLowerCase();
@@ -262,9 +270,20 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
         targetRow = emptyIdx !== -1 ? emptyIdx : updated.length;
         if (emptyIdx === -1) updated.push({ name: '', phones: [''] });
       }
+      // Dedup only against THIS row's own existing phones (a re-paste of the
+      // same source shouldn't double them up) — never against other rows.
+      // Two people can share a number (e.g. a landline), and filtering it
+      // out of the second person's row would silently drop it and throw off
+      // their own number order. Cross-row duplicates are shown highlighted
+      // instead (see isDuplicatePhone below), never hidden.
+      const existingRowDigits = new Set(
+        updated[targetRow].phones.filter(p => p.trim()).map(p => p.replace(/\D/g, '').slice(-10))
+      );
+      newPhonesForRow = result.phones.filter(p => !existingRowDigits.has(p.replace(/\D/g, '').slice(-10)));
+      const mergedRowPhones = [...updated[targetRow].phones.filter(p => p.trim()), ...newPhonesForRow];
       updated[targetRow] = {
         name: result.name || '',
-        phones: newPhones.length > 0 ? newPhones : [''],
+        phones: mergedRowPhones.length > 0 ? mergedRowPhones : [''],
         phoneLastSeen: result.phoneLastSeen
           ? { ...updated[targetRow].phoneLastSeen, ...result.phoneLastSeen }
           : updated[targetRow].phoneLastSeen,
@@ -325,10 +344,12 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
       const parts: string[] = [];
       if (result.name) parts.push(`Name: ${result.name}`);
-      if (newPhones.length > 0) parts.push(`${newPhones.length} phone(s) added`);
+      if (newPhonesForRow.length > 0) parts.push(`${newPhonesForRow.length} phone(s) added`);
       if (newEmails.length > 0) parts.push(`${newEmails.length} email(s) added`);
-      const dupes = (result.phones.length - newPhones.length) + (result.emails.length - newEmails.length);
-      if (dupes > 0) parts.push(`${dupes} duplicate(s) skipped`);
+      const rowDupes = result.phones.length - newPhonesForRow.length;
+      if (rowDupes > 0) parts.push(`${rowDupes} already in this row (skipped)`);
+      const emailDupes = result.emails.length - newEmails.length;
+      if (emailDupes > 0) parts.push(`${emailDupes} duplicate email(s) skipped`);
       toast({
         title: parts.length > 0 ? 'Contacts Extracted' : 'No new contacts found',
         description: parts.join(', ') || 'Try pasting more text',
@@ -1090,6 +1111,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                     <div className="flex items-center gap-1.5">
                       {row.phones.map((phone, phoneIdx) => {
                         const isOwnerPhone = !!phone.trim() && phone === ownerPhoneValue;
+                        const isDup = isDuplicatePhone(phone, rowIdx);
                         const lastSeen = row.phoneLastSeen?.[phone];
                         return (
                           <div key={phoneIdx} className="flex flex-col gap-0.5 shrink-0">
@@ -1105,7 +1127,11 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                                   setPhoneContacts(updated);
                                 }}
                                 placeholder={`Phone ${phoneIdx + 1}`}
-                                className="w-[150px] shrink-0 text-xs"
+                                className={cn(
+                                  "w-[150px] shrink-0 text-xs",
+                                  isDup && "bg-blue-500/20 border-blue-500/40 focus-visible:ring-blue-500/40"
+                                )}
+                                title={isDup ? "Also appears under another contact" : undefined}
                               />
                               <Button
                                 variant="ghost"
