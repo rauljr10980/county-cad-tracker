@@ -393,6 +393,13 @@ export interface PreForeclosureRecord {
   loan_amount?: number | null;
   appraised_value?: number | null;
   land_type?: 'Home' | 'Vacant Land' | null;
+  // Named phone/email rows (with contact names), so the Phone Numbers /
+  // Send Email row grouping survives a reload instead of collapsing back to
+  // a single row named after ownerName. Mirrors Property.contacts.
+  contacts?: {
+    phoneRows?: { name: string; phones: string[] }[];
+    emailRows?: { name: string; emails: string[]; sent?: boolean }[];
+  } | null;
 }
 
 // Type alias for backward compatibility

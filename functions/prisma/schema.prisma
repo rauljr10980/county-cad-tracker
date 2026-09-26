@@ -513,6 +513,7 @@ model PreForeclosure {
   emails            String[]  @default([])
   ownerLookupAt     DateTime?
   ownerLookupStatus String? // "success", "partial", "failed", "pending"
+  contacts          Json? // Structured contacts: {phoneRows: [{name, phones}], emailRows: [{name, emails}]}
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -130,15 +130,21 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
       setAssignedTo(record.assignedTo || '');
       setLoanAmountLocal(record.loan_amount ?? null);
       setAppraisedValueLocal(record.appraised_value ?? null);
+      const savedEmailRows = record.contacts?.emailRows;
       updateEmailRecipients(
-        record.emails && record.emails.length > 0
-          ? [{ name: record.ownerName || '', emails: record.emails }]
-          : [{ name: record.ownerName || '', emails: [''] }]
+        savedEmailRows && savedEmailRows.length > 0
+          ? savedEmailRows.map(r => ({ name: r.name, emails: r.emails.length > 0 ? r.emails : [''], sent: r.sent || false }))
+          : record.emails && record.emails.length > 0
+            ? [{ name: record.ownerName || '', emails: record.emails }]
+            : [{ name: record.ownerName || '', emails: [''] }]
       );
+      const savedPhoneRows = record.contacts?.phoneRows;
       setPhoneContacts(
-        record.phoneNumbers && record.phoneNumbers.length > 0
-          ? [{ name: record.ownerName || '', phones: record.phoneNumbers }]
-          : [{ name: record.ownerName || '', phones: [''] }]
+        savedPhoneRows && savedPhoneRows.length > 0
+          ? savedPhoneRows.map(r => ({ name: r.name, phones: r.phones.length > 0 ? r.phones : [''] }))
+          : record.phoneNumbers && record.phoneNumbers.length > 0
+            ? [{ name: record.ownerName || '', phones: record.phoneNumbers }]
+            : [{ name: record.ownerName || '', phones: [''] }]
       );
       setOwnerPhoneValue(
         record.ownerPhoneIndex != null && record.phoneNumbers?.[record.ownerPhoneIndex]
@@ -148,15 +154,25 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
     }
   }, [record]);
 
-  // Persists Send Email's recipient emails for this record. Passed to
-  // SendEmailPanel as onPersist — called once before "Send to All" starts
-  // (so unsaved row edits survive a failure partway through) and once after
-  // (so "sent" flags are recorded). PreForeclosure has no rich contacts JSON
-  // like Property does — just the flat `emails` column also fed by the
-  // Contact Extractor above — so per-recipient names live only in this
-  // modal's own session state, not persisted.
   const flattenPhones = (rows: PhoneContactRow[]): string[] =>
     rows.flatMap(r => r.phones.filter(p => p.trim()));
+
+  // Builds the persisted {phoneRows, emailRows} JSON (contact names +
+  // per-row values) so the Phone Numbers / Send Email row grouping survives
+  // a reload instead of collapsing back to a single row named after
+  // ownerName. Mirrors Property's buildContactsJson(). Reads
+  // emailRecipientsRef (kept in sync by updateEmailRecipients) rather than
+  // the emailRecipients state variable directly, so a call made
+  // synchronously right after an onRecipientsChange never reads a stale
+  // pre-update value.
+  const buildContactsJson = () => ({
+    phoneRows: phoneContacts
+      .filter(r => r.name.trim() || r.phones.some(p => p.trim()))
+      .map(r => ({ name: r.name, phones: r.phones.filter(p => p.trim()) })),
+    emailRows: emailRecipientsRef.current
+      .filter(r => r.name.trim() || r.emails.some(e => e.trim()))
+      .map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: r.sent || false })),
+  });
 
   const handleSavePhones = async () => {
     if (!viewRecord) return;
@@ -164,12 +180,14 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
       const allPhones = flattenPhones(phoneContacts);
       const ownerIdx = ownerPhoneValue ? allPhones.indexOf(ownerPhoneValue) : -1;
       const ownerPhoneIndex = ownerIdx >= 0 ? ownerIdx : undefined;
+      const contacts = buildContactsJson();
       await updateMutation.mutateAsync({
         document_number: viewRecord.document_number,
         phoneNumbers: allPhones,
         ownerPhoneIndex,
+        contacts,
       });
-      setViewRecord(prev => prev ? { ...prev, phoneNumbers: allPhones, ownerPhoneIndex } : prev);
+      setViewRecord(prev => prev ? { ...prev, phoneNumbers: allPhones, ownerPhoneIndex, contacts } : prev);
       toast({ title: 'Phone Numbers Saved', description: 'Phone numbers have been saved successfully.' });
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
     } catch (error) {
@@ -186,12 +204,14 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
     const ownerIdx = nextOwnerValue ? allPhones.indexOf(nextOwnerValue) : -1;
     const ownerPhoneIndex = ownerIdx >= 0 ? ownerIdx : undefined;
     try {
+      const contacts = buildContactsJson();
       await updateMutation.mutateAsync({
         document_number: viewRecord.document_number,
         phoneNumbers: allPhones,
         ownerPhoneIndex,
+        contacts,
       });
-      setViewRecord(prev => prev ? { ...prev, phoneNumbers: allPhones, ownerPhoneIndex } : prev);
+      setViewRecord(prev => prev ? { ...prev, phoneNumbers: allPhones, ownerPhoneIndex, contacts } : prev);
     } catch (error) {
       console.error('Error saving owner phone index:', error);
     }
@@ -200,11 +220,13 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const persistEmailContacts = async () => {
     if (!viewRecord) return;
     const allEmails = emailRecipientsRef.current.flatMap(r => r.emails.filter(e => e.includes('@')));
+    const contacts = buildContactsJson();
     await updateMutation.mutateAsync({
       document_number: viewRecord.document_number,
       emails: allEmails,
+      contacts,
     });
-    setViewRecord(prev => prev ? { ...prev, emails: allEmails } : prev);
+    setViewRecord(prev => prev ? { ...prev, emails: allEmails, contacts } : prev);
   };
 
   // Shared by both Contact Extractor sections (True People Search and
@@ -279,14 +301,26 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
     const allEmails = finalEmailRows.flatMap(r => r.emails.filter(e => e.includes('@')));
     const ownerIdx = ownerPhoneValue ? mergedPhones.indexOf(ownerPhoneValue) : -1;
     const ownerPhoneIndex = ownerIdx >= 0 ? ownerIdx : undefined;
+    // Built from the freshly-computed row arrays above, not buildContactsJson()
+    // -- setPhoneContacts/updateEmailRecipients just fired and haven't
+    // necessarily landed in state/ref yet at this point in the same tick.
+    const contacts = {
+      phoneRows: finalPhoneRows
+        .filter(r => r.name.trim() || r.phones.some(p => p.trim()))
+        .map(r => ({ name: r.name, phones: r.phones.filter(p => p.trim()) })),
+      emailRows: finalEmailRows
+        .filter(r => r.name.trim() || r.emails.some(e => e.trim()))
+        .map(r => ({ name: r.name, emails: r.emails.filter(e => e.trim()), sent: r.sent || false })),
+    };
 
-    setViewRecord(prev => prev ? { ...prev, phoneNumbers: mergedPhones, ownerPhoneIndex, emails: allEmails } : prev);
+    setViewRecord(prev => prev ? { ...prev, phoneNumbers: mergedPhones, ownerPhoneIndex, emails: allEmails, contacts } : prev);
     try {
       await updateMutation.mutateAsync({
         document_number: viewRecord.document_number,
         phoneNumbers: mergedPhones,
         ownerPhoneIndex,
         emails: allEmails,
+        contacts,
       });
       queryClient.invalidateQueries({ queryKey: ['preforeclosure'] });
       const parts: string[] = [];

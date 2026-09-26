@@ -79,6 +79,7 @@ router.get('/', optionalAuth, async (req, res) => {
       ownerName: record.ownerName,
       ownerAddress: record.ownerAddress,
       emails: record.emails || [],
+      contacts: record.contacts || null,
       ownerLookupAt: record.ownerLookupAt ? record.ownerLookupAt.toISOString() : null,
       ownerLookupStatus: record.ownerLookupStatus,
       loan_amount: record.loanAmount ?? null,
@@ -1408,6 +1409,9 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
         ? updates.emails.filter(e => e && e.trim())
         : [];
     }
+    if (updates.contacts !== undefined) {
+      dbUpdates.contacts = updates.contacts;
+    }
     if (updates.ownerPhoneIndex !== undefined) {
       dbUpdates.ownerPhoneIndex = updates.ownerPhoneIndex !== null && updates.ownerPhoneIndex >= 0
         ? updates.ownerPhoneIndex
@@ -1551,6 +1555,7 @@ router.put('/:documentNumber', optionalAuth, async (req, res) => {
       ownerName: record.ownerName,
       ownerAddress: record.ownerAddress,
       emails: record.emails || [],
+      contacts: record.contacts || null,
       ownerLookupAt: record.ownerLookupAt ? record.ownerLookupAt.toISOString() : null,
       ownerLookupStatus: record.ownerLookupStatus,
       loan_amount: record.loanAmount ?? null,
