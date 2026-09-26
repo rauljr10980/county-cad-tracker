@@ -1126,6 +1126,28 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                                   updated[rowIdx] = { ...updated[rowIdx], phones: newPhones };
                                   setPhoneContacts(updated);
                                 }}
+                                onPaste={(e) => {
+                                  // Guards against a raw multi-number copy (e.g. a whole
+                                  // TruePeopleSearch/Forewarn dump) landing verbatim in this
+                                  // one field -- a plain text input has no parsing of its
+                                  // own, so without this it just stores everything pasted as
+                                  // a single value. If the clipboard has more than one
+                                  // recognizable number, split it across fields starting
+                                  // here instead of letting it all land in one cell.
+                                  const pasted = e.clipboardData.getData('text');
+                                  const extracted = extractContacts(pasted).phones;
+                                  if (extracted.length <= 1) return;
+                                  e.preventDefault();
+                                  const updated = [...phoneContacts];
+                                  const newPhones = [...updated[rowIdx].phones];
+                                  newPhones.splice(phoneIdx, 1, ...extracted);
+                                  updated[rowIdx] = { ...updated[rowIdx], phones: newPhones };
+                                  setPhoneContacts(updated);
+                                  toast({
+                                    title: `Split into ${extracted.length} phone numbers`,
+                                    description: 'That paste had multiple numbers, so it was split into separate fields instead of landing in one cell.',
+                                  });
+                                }}
                                 placeholder={`Phone ${phoneIdx + 1}`}
                                 className={cn(
                                   "w-[150px] shrink-0 text-xs",
