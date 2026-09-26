@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, Star, Trash2, Calendar, CalendarDays, ChevronDown, Home, Building, AlertTriangle, Copy, Search, User, Mail, ClipboardPaste } from 'lucide-react';
+import { Loader2, Eye, Send, ExternalLink, MapPin, CheckCircle, Target, RotateCcw, Phone, PhoneCall, Star, Trash2, Calendar, CalendarDays, ChevronDown, Home, Building, AlertTriangle, Copy, Search, User, Mail, ClipboardPaste } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -1155,6 +1155,21 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                                 )}
                                 title={isDup ? "Also appears under another contact" : undefined}
                               />
+                              <Button
+                                asChild
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  "h-7 w-7 shrink-0 text-green-600 hover:text-green-700",
+                                  !phone.trim() && "pointer-events-none opacity-50"
+                                )}
+                              >
+                                {/* Anchor has no native `disabled` -- gate clickability via
+                                    the classes above and an absent href instead. */}
+                                <a href={phone.trim() ? `tel:${phone.replace(/\D/g, '')}` : undefined} title="Call">
+                                  <PhoneCall className="h-3.5 w-3.5" />
+                                </a>
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
