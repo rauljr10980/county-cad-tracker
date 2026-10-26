@@ -85,7 +85,14 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       // one is live; a real custom domain (not yet decided) should replace
       // the Railway one when chosen.
       'https://estate-essentials-co.lovable.app',
-      'https://public-site-production-aaf1.up.railway.app'
+      'https://public-site-production-aaf1.up.railway.app',
+      // Custom domain migration (started 2026-10-26): my360portfolio.com is
+      // replacing the GitHub Pages default URL as the frontend's home.
+      // Added ahead of the DNS/GitHub Pages cutover so CORS is already
+      // correct once it goes live -- harmless until then since nothing
+      // resolves to these origins yet.
+      'https://my360portfolio.com',
+      'https://www.my360portfolio.com'
     ];
 
 app.use(cors({
