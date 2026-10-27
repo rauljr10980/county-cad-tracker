@@ -9,15 +9,13 @@ const getApiBaseUrl = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // In production (deployed), use Railway backend
+  // In production (deployed), use the custom API domain (proxied to Railway).
   if (import.meta.env.PROD) {
-    // Railway backend URL - Update this with your actual Railway deployment URL
-    // Get it from: Railway Dashboard → Your Service → Settings → Public Domain
-    return 'https://county-cad-tracker-production.up.railway.app';
+    return 'https://api.my360portfolio.com';
   }
-  
+
   // The API is hosted on Railway in both production and local frontend development.
-  return 'https://county-cad-tracker-production.up.railway.app';
+  return 'https://api.my360portfolio.com';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
