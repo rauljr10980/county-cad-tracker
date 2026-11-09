@@ -92,7 +92,10 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       // correct once it goes live -- harmless until then since nothing
       // resolves to these origins yet.
       'https://my360portfolio.com',
-      'https://www.my360portfolio.com'
+      'https://www.my360portfolio.com',
+      // my360portfolio.com and www got reassigned to the public marketing
+      // site; the CRM itself now lives at login.my360portfolio.com instead.
+      'https://login.my360portfolio.com'
     ];
 
 app.use(cors({
