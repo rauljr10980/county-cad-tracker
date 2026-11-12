@@ -1,8 +1,8 @@
-import { LayoutDashboard, CalendarDays, List, Home, Car, Gavel, Briefcase, Building2, Inbox, Globe } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, List, Home, Car, Gavel, Briefcase, Building2, Inbox, Globe, Table2 } from 'lucide-react';
 
 export type TabType =
   | 'dashboard' | 'calendar' | 'properties' | 'tasks' | 'upload'
-  | 'files' | 'preforeclosure' | 'driving' | 'crm' | 'evictions' | 'mls' | 'inbox' | 'team' | 'management';
+  | 'files' | 'preforeclosure' | 'driving' | 'crm' | 'evictions' | 'mls' | 'inbox' | 'team' | 'management' | 'sheetsCrm';
 
 export const tabs = [
   { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard, shortLabel: 'Dash' },
@@ -10,6 +10,7 @@ export const tabs = [
   { id: 'properties' as TabType, label: 'Properties', icon: List, shortLabel: 'Props' },
   { id: 'preforeclosure' as TabType, label: 'Pre-Foreclosure', icon: Home, shortLabel: 'Pre-FC' },
   { id: 'crm' as TabType, label: 'CRM', icon: Briefcase, shortLabel: 'CRM' },
+  { id: 'sheetsCrm' as TabType, label: 'Government Hill', icon: Table2, shortLabel: 'Gov Hill' },
   { id: 'driving' as TabType, label: 'Driving 4$', icon: Car, shortLabel: 'D4$' },
   { id: 'evictions' as TabType, label: 'Eviction List', icon: Gavel, shortLabel: 'Evict' },
   { id: 'mls' as TabType, label: 'Custom MLS Leads', icon: Building2, shortLabel: 'MLS' },

@@ -46,6 +46,14 @@ describe('Sidebar', () => {
     expect(screen.getByRole('button', { name: /Dashboard/ })).toBeTruthy()
   })
 
+  it('shows Government Hill only to managers', () => {
+    const view = render(<Sidebar {...defaultProps} />)
+    expect(screen.queryByRole('button', { name: /Government Hill/ })).toBeNull()
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' } } as any)
+    view.rerender(<Sidebar {...defaultProps} />)
+    expect(screen.getByRole('button', { name: /Government Hill/ })).toBeTruthy()
+  })
+
   it('marks only the active tab with aria-current', () => {
     render(<Sidebar {...defaultProps} activeTab="properties" />)
     const current = screen.getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page')

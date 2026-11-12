@@ -45,6 +45,7 @@ const publicIntakeRoutes = require('./routes/publicIntake');
 const settingsRoutes = require('./routes/settings');
 const searchRoutes = require('./routes/search');
 const notificationsRoutes = require('./routes/notifications');
+const { createSheetsCrmRouter } = require('./routes/sheetsCrm');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -218,6 +219,7 @@ app.use('/api/public', publicIntakeRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/sheets-crm', createSheetsCrmRouter());
 
 // ============================================================================
 // ERROR HANDLING

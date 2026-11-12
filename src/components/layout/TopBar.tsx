@@ -75,7 +75,7 @@ export function TopBar({ activeTab, onTabChange, hiddenTabIds, onRefresh, isRefr
 
   // Dashboard is admin-only content (see Index.tsx's renderContent()), so it's
   // never a valid nav entry point for a non-admin regardless of hiddenTabIds.
-  const visibleTabs = getVisibleTabs(hiddenTabIds).filter((tab) => tab.id !== 'dashboard' || isAdmin)
+  const visibleTabs = getVisibleTabs(hiddenTabIds).filter((tab) => !['dashboard', 'sheetsCrm'].includes(tab.id) || isAdmin)
 
   return (
     <header className="border-b bg-card">

@@ -15,6 +15,7 @@ import MlsLeadsView from '@/components/mls/MlsLeadsView';
 import InboxView from '@/components/inbox/InboxView';
 import TeamView from '@/components/team/TeamView';
 import ManagementView from '@/components/team/ManagementView';
+import SheetsCrmView from '@/components/sheets-crm/SheetsCrmView';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { SignupModal } from '@/components/auth/SignupModal';
@@ -30,7 +31,7 @@ import { getHiddenTabs } from '@/lib/api';
 // Get initial tab from URL hash, default to dashboard
 const getInitialTab = (): TabType => {
   const hash = window.location.hash.slice(1); // Remove the #
-  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'crm', 'driving', 'evictions', 'mls', 'inbox', 'team', 'management'];
+  const validTabs: TabType[] = ['dashboard', 'calendar', 'properties', 'tasks', 'upload', 'files', 'preforeclosure', 'crm', 'driving', 'evictions', 'mls', 'inbox', 'team', 'management', 'sheetsCrm'];
   return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
 };
 
@@ -167,6 +168,8 @@ const Index = () => {
         return <PreForeclosureView />;
       case 'crm':
         return <CrmView />;
+      case 'sheetsCrm':
+        return user?.role === 'ADMIN' ? <SheetsCrmView /> : <CalendarView />;
       case 'driving':
         return <DrivingView />;
       case 'evictions':
