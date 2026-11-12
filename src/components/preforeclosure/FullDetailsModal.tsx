@@ -310,9 +310,11 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
         targetRow = emptyIdx !== -1 ? emptyIdx : updated.length;
         if (emptyIdx === -1) updated.push({ name: '', emails: [''] });
       }
+      const mergedRowEmails = [...updated[targetRow].emails.filter(e => e.includes('@')), ...newEmails];
       updated[targetRow] = {
-        name: result.name || '',
-        emails: newEmails.length > 0 ? newEmails : [''],
+        ...updated[targetRow],
+        name: result.name || updated[targetRow].name,
+        emails: mergedRowEmails.length > 0 ? mergedRowEmails : [''],
       };
       finalEmailRows = updated;
       updateEmailRecipients(updated);
@@ -1271,11 +1273,9 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   variant="outline"
                   disabled={!rawContactText.trim()}
                   onClick={() => runContactExtraction(
-                    // Emails only here -- Forewarn is the phone source (more accurate numbers).
-                    (text) => ({ ...extractContacts(text), phones: [] }),
+                    extractContacts,
                     rawContactText,
                     () => setRawContactText(''),
-                    { extractsPhones: false },
                   )}
                 >
                   Extract Contacts
@@ -1326,7 +1326,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   variant="outline"
                   disabled={!rawForewarnText.trim()}
                   onClick={() => runContactExtraction(
-                    // Phones only here -- True People Search is the email source.
+                    // Forewarn provides phones; TruePeopleSearch supports both phones and emails.
                     (text) => ({ ...extractForewarnContacts(text), emails: [] }),
                     rawForewarnText,
                     () => setRawForewarnText(''),
