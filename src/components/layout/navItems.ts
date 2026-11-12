@@ -43,12 +43,19 @@ export const manageableNavItems = [...tabs, externalNavItem];
 /**
  * Hiding only removes the visual entry point — a hidden tab still renders
  * when reached by hash (e.g. #properties), so bookmarks and links keep
- * working. `hiddenTabIds` comes from GET /api/settings/hidden-tabs, an
+ * working. MLS is an exception: its account gate also protects direct links.
+ * `hiddenTabIds` comes from GET /api/settings/hidden-tabs, an
  * account-wide setting an ADMIN controls for the whole team (see
  * ManageTabsDialog) — it is no longer a hardcoded constant here.
  */
-export function getVisibleTabs(hiddenTabIds: ReadonlySet<string>) {
-  return tabs.filter((tab) => !hiddenTabIds.has(tab.id));
+export function canAccessMls(user?: { username?: string } | null) {
+  return user?.username === 'test';
+}
+
+export function getVisibleTabs(hiddenTabIds: ReadonlySet<string>, user?: { username?: string } | null) {
+  // MLS is enabled only for the selected pilot account, even while hidden
+  // in the team's settings. Other tabs keep their existing visibility.
+  return tabs.filter((tab) => tab.id === 'mls' ? canAccessMls(user) : !hiddenTabIds.has(tab.id));
 }
 
 export function isPublicSiteVisible(hiddenTabIds: ReadonlySet<string>) {

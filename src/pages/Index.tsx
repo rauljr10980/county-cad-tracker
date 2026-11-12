@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TabType } from '@/components/layout/navItems';
+import { canAccessMls, TabType } from '@/components/layout/navItems';
 import { AppShell } from '@/components/layout/AppShell';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { PropertiesView } from '@/components/properties/PropertiesView';
@@ -175,7 +175,7 @@ const Index = () => {
       case 'evictions':
         return <EvictionLeadsView />;
       case 'mls':
-        return <MlsLeadsView />;
+        return canAccessMls(user) ? <MlsLeadsView /> : <CalendarView />;
       case 'inbox':
         return <InboxView />;
       case 'team':

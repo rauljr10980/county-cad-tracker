@@ -5,6 +5,7 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const { authenticateToken } = require('../middleware/auth');
 const { resolveViewAs } = require('../middleware/viewAs');
+const { requireMlsAccess } = require('../lib/mlsAccess');
 const { classifyOwner, searchName } = require('../lib/mlsOwner');
 const { parseSheet, dedupe } = require('../lib/mlsWorkbook');
 // Aliased: this file already has its own `normalizeNameForMatch` below (an
@@ -32,6 +33,7 @@ const {
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 router.use(authenticateToken);
+router.use(requireMlsAccess);
 router.use(resolveViewAs);
 
 // Import. Batched rather than one transaction per row: the eviction importer

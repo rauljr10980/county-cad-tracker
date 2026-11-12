@@ -21,18 +21,24 @@ const defaultProps = {
 describe('Sidebar', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it('renders every tab when nothing is hidden', () => {
+  it('renders the standard tabs when nothing is hidden', () => {
     // ADMIN, so Dashboard's role-gating (see below) doesn't shrink the count
-    // this test is actually checking: every entry in `tabs` renders.
+    // this test is checking: the standard tabs render (MLS has its own gate).
     vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' } } as any)
     render(<Sidebar {...defaultProps} />)
     expect(screen.getByRole('button', { name: /Eviction List/ })).toBeTruthy()
-    expect(screen.getAllByRole('button').length).toBeGreaterThanOrEqual(tabs.length)
+    expect(screen.getAllByRole('button').length).toBeGreaterThanOrEqual(tabs.length - 1)
   })
 
   it('hides tabs named in hiddenTabIds', () => {
     render(<Sidebar {...defaultProps} hiddenTabIds={new Set(['calendar'])} />)
     expect(screen.queryByRole('button', { name: /Calendar/ })).toBeNull()
+  })
+
+  it('shows Custom MLS Leads only for test, overriding its team-wide hidden setting', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'pilot', username: 'test', role: 'ADMIN' } } as any)
+    render(<Sidebar {...defaultProps} hiddenTabIds={new Set(['mls'])} />)
+    expect(screen.getByRole('button', { name: 'Custom MLS Leads' })).toBeTruthy()
   })
 
   it('does not render a Dashboard item for a non-ADMIN user, regardless of hiddenTabIds', () => {
