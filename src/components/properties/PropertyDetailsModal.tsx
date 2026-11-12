@@ -24,6 +24,8 @@ import { VisitedWizard, VisitedWizardResult } from '../shared/VisitedWizard';
 import { updatePropertyWorkflowStage } from '@/lib/api';
 import { SendEmailPanel, type EmailRecipient } from '@/components/email/SendEmailPanel';
 import { SendContactsToTeammate } from '@/components/email/SendContactsToTeammate';
+import { OwnerLlcButton } from '@/components/shared/OwnerLlcButton';
+import { ScheduleAppointmentDialog } from '@/components/shared/ScheduleAppointmentDialog';
 
 // Default body for the property Send Email panel. Static across properties —
 // the per-property values ({{PropertyAddress}}, {{Owner}}, etc.) are resolved
@@ -131,11 +133,13 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
   const [d4dWorkflow, setD4dWorkflow] = useState<D4dWorkflow>({});
   const [showContactedPicker, setShowContactedPicker] = useState(false);
   const [showPhoneContactedPrompt, setShowPhoneContactedPrompt] = useState(false);
+  const [schedulingKind, setSchedulingKind] = useState<'APPOINTMENT' | 'DEAL' | null>(null);
   const [openPhoneStatusKey, setOpenPhoneStatusKey] = useState<string | null>(null);
 
   // Initialize notes and phone numbers from property when modal opens or property changes
   useEffect(() => {
     if (property && isOpen) {
+      setSchedulingKind(null);
       setNotes(property.notes || '');
       setIsEditingNotes(false);
       setShowPhoneContactedPrompt(false);
@@ -537,6 +541,8 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
           </div>
         </DialogHeader>
 
+        {schedulingKind && <ScheduleAppointmentDialog kind={schedulingKind} source={isD4d ? { drivingLeadId: d4dLeadId } : { propertyId: property.id }} address={property.propertyAddress} onClose={() => setSchedulingKind(null)} />}
+
 
         <div className="space-y-4 pt-2 overflow-x-hidden">
           {/* Actions Panel */}
@@ -718,6 +724,11 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                   className="font-medium bg-transparent border-none outline-none w-full placeholder:text-muted-foreground/40 placeholder:text-sm hover:bg-muted/30 focus:bg-muted/50 rounded px-1 -ml-1"
                 />
                 <p className="text-sm text-muted-foreground">{property.mailingAddress}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <OwnerLlcButton key={property.id} target={isD4d ? { type: 'driving', id: d4dLeadId } : { type: 'property', id: property.id }} initialValue={property.ownerIsLlc} onChanged={(value) => { property.ownerIsLlc = value; }} />
+                  <Button size="sm" variant="outline" onClick={() => setSchedulingKind('APPOINTMENT')}>Schedule appointment</Button>
+                  <Button size="sm" variant="outline" onClick={() => setSchedulingKind('DEAL')}>Wants to Make a Deal</Button>
+                </div>
               </div>
             </div>
           </div>
@@ -1547,6 +1558,7 @@ export function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDeta
                       <Button key={type} size="sm" variant="outline"
                         className={`h-8 text-[11px] px-1 ${color}`}
                         onClick={async () => {
+                          if (type === 'APPOINTMENT_SET') { setSchedulingKind('APPOINTMENT'); return; }
                           await logActivity(type, { propertyId: property?.id });
                           toast({ title: label + ' logged', description: 'Saved to team stats.' });
                         }}>

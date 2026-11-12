@@ -46,6 +46,8 @@ const settingsRoutes = require('./routes/settings');
 const searchRoutes = require('./routes/search');
 const notificationsRoutes = require('./routes/notifications');
 const { createSheetsCrmRouter } = require('./routes/sheetsCrm');
+const { createAppointmentsRouter } = require('./routes/appointments');
+const { createPropertyLabelsRouter } = require('./routes/propertyLabels');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -220,6 +222,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/sheets-crm', createSheetsCrmRouter());
+app.use('/api/appointments', createAppointmentsRouter());
+app.use('/api/property-labels', createPropertyLabelsRouter());
 
 // ============================================================================
 // ERROR HANDLING

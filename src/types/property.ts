@@ -1,6 +1,7 @@
 export type PropertyStatus = 'J' | 'A' | 'P' | 'JUDGMENT' | 'ACTIVE' | 'PENDING' | 'PAID' | 'REMOVED' | 'UNKNOWN';
 
 export interface Property {
+  ownerIsLlc?: boolean;
   id: string;
   accountNumber: string;
   ownerName: string;
@@ -335,6 +336,7 @@ export const WORKFLOW_STAGES: Record<WorkflowStage, {
 };
 
 export interface PreForeclosureRecord {
+  ownerIsLlc?: boolean;
   // Immutable (from file)
   document_number: string; // Primary key
   type: PreForeclosureType;
@@ -424,6 +426,7 @@ export interface D4dWorkflow {
 }
 
 export interface DrivingLead {
+  ownerIsLlc?: boolean;
   id: string;
   rawAddress: string;
   street: string;
@@ -459,6 +462,9 @@ export interface DrivingPhoto {
 // ============================================================================
 
 export interface FollowUp {
+  isTeamAppointment?: boolean;
+  appointmentKind?: 'APPOINTMENT' | 'DEAL';
+  endAt?: string;
   id: string;
   date: string;
   note?: string;

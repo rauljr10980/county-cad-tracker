@@ -210,6 +210,7 @@ export function DrivingView() {
         const fullAddress = [lead.street, lead.city, lead.state, lead.zip].filter(Boolean).join(', ') || lead.rawAddress || '';
         setSelectedProperty({
           id: `d4d-${lead.id}`,
+          ownerIsLlc: lead.ownerIsLlc,
           accountNumber: '',
           ownerName: (lead as any).ownerName || '',
           propertyAddress: fullAddress,

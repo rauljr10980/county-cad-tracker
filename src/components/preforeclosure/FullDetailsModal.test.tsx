@@ -25,6 +25,14 @@ function mount(overrides: Partial<PreForeclosureRecord> = {}) {
 beforeEach(() => { save.mockReset(); save.mockResolvedValue({ success: true }); });
 
 describe('pre-foreclosure TruePeopleSearch extraction', () => {
+  it.each(['Appt Set', 'Wants to Make a Deal'])('opens scheduling from %s without updating the record on cancel', async (action) => {
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: action }));
+    expect(await screen.findByText(action === 'Appt Set' ? 'Schedule an appointment' : 'Schedule a deal meeting')).toBeTruthy();
+    expect(screen.getByText('Visible to all team members')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel', exact: true }));
+    expect(save).not.toHaveBeenCalled();
+  });
   it('places all unique extracted numbers in the phone number inputs and persists them with contact rows', async () => {
     mount();
     fireEvent.click(await screen.findByText('True People Search Contact Extractor'));

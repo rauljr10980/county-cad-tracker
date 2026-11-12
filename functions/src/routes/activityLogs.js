@@ -13,6 +13,7 @@ router.post('/', optionalAuth, async (req, res) => {
     if (!VALID_TYPES.includes(type)) {
       return res.status(400).json({ error: `Invalid type. Must be one of: ${VALID_TYPES.join(', ')}` });
     }
+    if (type === 'APPOINTMENT_SET') return res.status(400).json({ error: 'Choose an appointment date and time using the appointment scheduler.' });
     const log = await prisma.activityLog.create({
       data: {
         type,

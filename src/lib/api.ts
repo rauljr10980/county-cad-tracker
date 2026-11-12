@@ -1900,11 +1900,42 @@ export interface TeamMemberStats {
 }
 
 export async function logActivity(type: 'CONTACT_MADE' | 'APPOINTMENT_SET' | 'CONTRACT_SIGNED', opts?: { propertyId?: string; drivingLeadId?: string; notes?: string }): Promise<void> {
-  await fetch(`${API_BASE_URL}/api/activity-logs`, {
+  const response = await fetch(`${API_BASE_URL}/api/activity-logs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ type, ...opts }),
   });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Could not log this activity.');
+  }
+}
+
+export type PropertyLabelTarget = { type: 'property' | 'preforeclosure' | 'driving'; id: string };
+
+export async function setOwnerLlc(target: PropertyLabelTarget, ownerIsLlc: boolean): Promise<{ ownerIsLlc: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/api/property-labels/llc`, { method: 'PATCH', headers: getAuthHeaders(), body: JSON.stringify({ ...target, ownerIsLlc }) });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Could not save the LLC label.');
+  return body;
+}
+
+export interface ScheduleAppointmentInput {
+  kind: 'APPOINTMENT' | 'DEAL';
+  startAt: string;
+  endAt: string;
+  note?: string;
+  propertyId?: string;
+  documentNumber?: string;
+  drivingLeadId?: string;
+  requestId: string;
+}
+
+export async function scheduleAppointment(data: ScheduleAppointmentInput) {
+  const response = await fetch(`${API_BASE_URL}/api/appointments`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data) });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Could not save the appointment.');
+  return body;
 }
 
 export async function getTeamStats(): Promise<TeamMemberStats[]> {
@@ -1920,7 +1951,9 @@ export async function getTeamStats(): Promise<TeamMemberStats[]> {
 // ============================================================================
 
 export async function getFollowUps(month: string) {
-  const response = await fetch(`${API_BASE_URL}/api/followups?month=${encodeURIComponent(month)}`, {
+  const [year, mon] = month.split('-').map(Number);
+  const range = new URLSearchParams({ month, start: new Date(year, mon - 1, 1).toISOString(), end: new Date(year, mon, 1).toISOString() });
+  const response = await fetch(`${API_BASE_URL}/api/followups?${range}`, {
     headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error('Failed to fetch follow-ups');

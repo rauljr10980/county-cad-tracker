@@ -146,6 +146,7 @@ model Property {
 
   // Owner Information
   ownerName       String
+  ownerIsLlc      Boolean @default(false)
   propertyAddress String  @default("") // Allow empty string for properties without address
   mailingAddress  String?
 
@@ -467,6 +468,7 @@ enum FileStatus {
 // ============================================================================
 
 model PreForeclosure {
+  ownerIsLlc Boolean @default(false)
   id                      String      @id @default(cuid())
   documentNumber          String      @unique
   type                    String // "Mortgage" or "Tax"
@@ -735,6 +737,7 @@ enum ZoneType {
 // ============================================================================
 
 model DrivingLead {
+  ownerIsLlc Boolean @default(false)
   id String @id @default(cuid())
 
   // Address
@@ -813,6 +816,11 @@ model FollowUp {
   note        String?   @db.Text
   completed   Boolean   @default(false)
   completedAt DateTime?
+  // Scheduled appointments are team-visible; ordinary follow-ups retain
+  // their existing per-user visibility and all-day calendar behavior.
+  isTeamAppointment Boolean @default(false)
+  appointmentKind   String?
+  endAt             DateTime?
 
   // Polymorphic: one of these will be set
   propertyId       String?

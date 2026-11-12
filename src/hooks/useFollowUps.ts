@@ -9,6 +9,7 @@ export function useFollowUps(month: string) {
     enabled: !!month,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
+    refetchInterval: 60000,
   });
 }
 

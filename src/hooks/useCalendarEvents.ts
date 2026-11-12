@@ -6,7 +6,7 @@ import { useDrivingLeads } from '@/hooks/useDrivingLeads';
 import { useCrmStore } from '@/crm/store/useCrmStore';
 import type { FollowUp, DrivingLead } from '@/types/property';
 
-export type CalendarEventKind = 'followup' | 'd4d' | 'crm';
+export type CalendarEventKind = 'followup' | 'd4d' | 'crm' | 'appointment';
 
 export type CalendarEvent = Event & {
   id: string;
@@ -54,6 +54,16 @@ export function useCalendarEvents(monthKey: string): CalendarEvent[] {
     const list: CalendarEvent[] = [];
 
     for (const fu of followUps) {
+      if (fu.isTeamAppointment) {
+        const start = new Date(fu.date);
+        list.push({
+          id: fu.id, kind: 'appointment',
+          title: `${fu.appointmentKind === 'DEAL' ? 'Deal meeting' : 'Appointment'} · ${followUpTitle(fu)}`,
+          start, end: fu.endAt ? new Date(fu.endAt) : new Date(start.getTime() + 3600000),
+          allDay: false, completed: fu.completed, payload: fu,
+        });
+        continue;
+      }
       const day = new Date(fu.date);
       day.setHours(0, 0, 0, 0);
       const end = new Date(day);

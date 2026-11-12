@@ -20,6 +20,8 @@ import { extractCoordsFromGoogleMapsUrl } from '@/lib/geocoding';
 import { extractContacts, extractForewarnContacts, type ExtractedContact } from '@/lib/contactParser';
 import { PreForeclosureVisitWizard, PreForeclosureVisitResult } from './PreForeclosureVisitWizard';
 import { SendEmailPanel, type EmailRecipient } from '@/components/email/SendEmailPanel';
+import { OwnerLlcButton } from '@/components/shared/OwnerLlcButton';
+import { ScheduleAppointmentDialog } from '@/components/shared/ScheduleAppointmentDialog';
 
 // Mirrors EmailRecipient's shape — PreForeclosure only stores a flat
 // phoneNumbers: string[] in the database (no per-phone name), so like
@@ -74,6 +76,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   const [savingFollowUp, setSavingFollowUp] = useState(false);
   const [contactExtractorExpanded, setContactExtractorExpanded] = useState(false);
   const [rawContactText, setRawContactText] = useState('');
+  const [schedulingKind, setSchedulingKind] = useState<'APPOINTMENT' | 'DEAL' | null>(null);
   const [forewarnExtractorExpanded, setForewarnExtractorExpanded] = useState(false);
   const [rawForewarnText, setRawForewarnText] = useState('');
   const [emailRecipients, setEmailRecipients] = useState<EmailRecipient[]>([{ name: '', emails: [''] }]);
@@ -123,6 +126,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
   // Sync local state from record prop
   useEffect(() => {
     if (record) {
+      setSchedulingKind(null);
       setViewRecord({ ...record });
       setActionType(record.actionType || '');
       setPriority(record.priority || 'med');
@@ -539,6 +543,11 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
             Document #{viewRecord.document_number}
           </DialogDescription>
         </DialogHeader>
+
+        <OwnerLlcButton key={viewRecord.document_number} target={{ type: 'preforeclosure', id: viewRecord.document_number }} initialValue={viewRecord.ownerIsLlc} onChanged={(ownerIsLlc) => setViewRecord((previous) => previous ? { ...previous, ownerIsLlc } : previous)} />
+        {schedulingKind && <ScheduleAppointmentDialog kind={schedulingKind} source={{ documentNumber: viewRecord.document_number }} address={viewRecord.address} onClose={() => setSchedulingKind(null)} onScheduled={() => {
+          if (schedulingKind === 'DEAL') setViewRecord((previous) => previous ? { ...previous, internal_status: 'Wants to Make a Deal' } : previous);
+        }} />}
 
         <div className="space-y-6 overflow-x-hidden break-words">
           {/* Actions Panel */}
@@ -964,6 +973,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                   <Button key={type} size="sm" variant="outline"
                     className={`h-9 text-xs ${color}`}
                     onClick={async () => {
+                      if (type === 'APPOINTMENT_SET') { setSchedulingKind('APPOINTMENT'); return; }
                       await logActivity(type, { drivingLeadId: undefined });
                       toast({ title: label + ' logged', description: 'Saved to team stats.' });
                     }}>
@@ -992,6 +1002,7 @@ export function FullDetailsModal({ record, isOpen, onClose, recordsInRoutes }: F
                         isActive ? color : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
                       )}
                       onClick={async () => {
+                        if (value === 'Wants to Make a Deal') { setSchedulingKind('DEAL'); return; }
                         setViewRecord(prev => prev ? { ...prev, internal_status: value } : prev);
                         try {
                           await updateMutation.mutateAsync({

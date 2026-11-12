@@ -29,6 +29,7 @@ import { useCrmStore } from '@/crm/store/useCrmStore';
 import { useCalendarEvents, followUpTitle, type CalendarEvent as CalEvent } from '@/hooks/useCalendarEvents';
 import { UpcomingEventsPanel } from './UpcomingEventsPanel';
 import { KIND_COLORS } from './calendarColors';
+import { useAuth } from '@/contexts/AuthContext';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
@@ -73,6 +74,7 @@ function Toolbar({ label, onNavigate, onView, view, views }: ToolbarProps<CalEve
           <span className="flex items-center gap-1"><Building2 className="h-3 w-3 text-blue-400" /> Follow-ups</span>
           <span className="flex items-center gap-1"><Car className="h-3 w-3 text-purple-400" /> D4$</span>
           <span className="flex items-center gap-1"><Briefcase className="h-3 w-3 text-amber-400" /> CRM</span>
+          <span className="flex items-center gap-1 text-teal-500">Team appointments</span>
         </div>
         {/* View switcher */}
         <div className="flex rounded-md border border-border/70 bg-background p-0.5">
@@ -97,6 +99,7 @@ function Toolbar({ label, onNavigate, onView, view, views }: ToolbarProps<CalEve
 
 // ── Main component ─────────────────────────────────────────────────────────
 export function CalendarView() {
+  const { user } = useAuth();
   const [view, setView] = useState<View>(Views.MONTH);
   const [date, setDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null);
@@ -112,6 +115,7 @@ export function CalendarView() {
   const crmReschedule = useCrmStore((s) => s.rescheduleTask);
   const crmLeadById = useMemo(() => new Map(crmLeads.map((l) => [l.id, l])), [crmLeads]);
   const events = useCalendarEvents(monthKey);
+  const canEditTeamEvent = (event: CalEvent) => event.kind !== 'appointment' || user?.role === 'ADMIN' || (user?.role !== 'VIEWER' && (event.payload as FollowUp).createdBy?.id === user?.id);
 
   // ── Event styling ────────────────────────────────────────────────────────
   const eventStyleGetter = useCallback((event: CalEvent) => {
@@ -133,6 +137,12 @@ export function CalendarView() {
 
   // ── Drag & drop ──────────────────────────────────────────────────────────
   const onEventDrop = useCallback(({ event, start }: EventInteractionArgs<CalEvent>) => {
+    if (event.kind === 'appointment') {
+      const appointment = event.payload as FollowUp;
+      if (user?.role !== 'ADMIN' && (user?.role === 'VIEWER' || appointment.createdBy?.id !== user?.id)) return;
+      updateMutation.mutate({ id: appointment.id, date: (start as Date).toISOString() });
+      return;
+    }
     if (event.kind === 'crm') {
       const task = event.payload as any;
       crmReschedule(task.id, (start as Date).toISOString());
@@ -142,7 +152,7 @@ export function CalendarView() {
       updateMutation.mutate({ id: fu.id, date: format(start as Date, 'yyyy-MM-dd') });
       toast({ title: 'Follow-up rescheduled' });
     }
-  }, [crmReschedule, updateMutation]);
+  }, [crmReschedule, updateMutation, user]);
 
   const onEventResize = useCallback(({ event, start }: EventInteractionArgs<CalEvent>) => {
     if (event.kind === 'crm') {
@@ -255,6 +265,11 @@ export function CalendarView() {
           )}
         </div>
         <p className="font-medium">{followUpTitle(fu)}</p>
+        {kind === 'appointment' && <>
+          <Badge variant="outline" className={c.badge}>Visible to the whole team</Badge>
+          <p className="text-sm">{format(new Date(fu.date), 'EEEE, MMMM d · h:mm a')}{fu.endAt && ` – ${format(new Date(fu.endAt), 'h:mm a')}`}</p>
+          <p className="text-xs text-muted-foreground">Scheduled by {fu.createdBy?.username || 'a team member'}</p>
+        </>}
         {fu.note && <p className="text-sm italic text-muted-foreground">{fu.note}</p>}
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" variant="outline" onClick={() => handleViewDetails(selectedEvent)}>
@@ -264,12 +279,12 @@ export function CalendarView() {
             size="sm"
             variant={fu.completed ? 'outline' : 'default'}
             className={cn(!fu.completed && 'bg-green-600 hover:bg-green-700')}
-            disabled={updateMutation.isPending}
+            disabled={updateMutation.isPending || !canEditTeamEvent(selectedEvent)}
             onClick={() => handleToggleComplete(selectedEvent)}
           >
             {fu.completed ? <><Undo2 className="h-3 w-3 mr-1" />Undo</> : <><Check className="h-3 w-3 mr-1" />Complete</>}
           </Button>
-          <Button size="sm" variant="outline" className="text-destructive border-destructive/50" disabled={deleteMutation.isPending} onClick={() => handleDelete(selectedEvent)}>
+          <Button size="sm" variant="outline" className="text-destructive border-destructive/50" disabled={deleteMutation.isPending || !canEditTeamEvent(selectedEvent)} onClick={() => handleDelete(selectedEvent)}>
             <Trash2 className="h-3 w-3" />
           </Button>
         </div>
@@ -296,6 +311,8 @@ export function CalendarView() {
             onEventDrop={onEventDrop}
             onEventResize={onEventResize}
             resizable
+            resizableAccessor={(event) => event.kind === 'crm'}
+            draggableAccessor={(event) => event.kind !== 'd4d' && canEditTeamEvent(event)}
             selectable
             eventPropGetter={eventStyleGetter}
             components={{ toolbar: Toolbar }}
