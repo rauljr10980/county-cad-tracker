@@ -109,7 +109,7 @@ describe('TopBar', () => {
     screen.getByRole('button', { name: /open menu/i }).click()
     await waitFor(() => expect(screen.getByRole('button', { name: /Upload/ })).toBeTruthy())
     expect(screen.queryByRole('button', { name: /Management/ })).toBeNull()
-    expect(screen.getByRole('button', { name: /Government Hill/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Google Sheets Data/ })).toBeTruthy()
   })
 
   it('mobile sheet lists Management for an ADMIN user', async () => {
@@ -117,7 +117,7 @@ describe('TopBar', () => {
     render(<TopBar {...defaultProps} />)
     screen.getByRole('button', { name: /open menu/i }).click()
     await waitFor(() => expect(screen.getByRole('button', { name: /Management/ })).toBeTruthy())
-    expect(screen.getByRole('button', { name: /Government Hill/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Google Sheets Data/ })).toBeTruthy()
   })
 
   it('mobile sheet does not list Dashboard for a non-admin', async () => {

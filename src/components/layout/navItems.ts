@@ -10,7 +10,7 @@ export const tabs = [
   { id: 'properties' as TabType, label: 'Properties', icon: List, shortLabel: 'Props' },
   { id: 'preforeclosure' as TabType, label: 'Pre-Foreclosure', icon: Home, shortLabel: 'Pre-FC' },
   { id: 'crm' as TabType, label: 'CRM', icon: Briefcase, shortLabel: 'CRM' },
-  { id: 'sheetsCrm' as TabType, label: 'Government Hill', icon: Table2, shortLabel: 'Gov Hill' },
+  { id: 'sheetsCrm' as TabType, label: 'Google Sheets Data', icon: Table2, shortLabel: 'Sheets' },
   { id: 'driving' as TabType, label: 'Driving 4$', icon: Car, shortLabel: 'D4$' },
   { id: 'evictions' as TabType, label: 'Eviction List', icon: Gavel, shortLabel: 'Evict' },
   { id: 'mls' as TabType, label: 'Custom MLS Leads', icon: Building2, shortLabel: 'MLS' },

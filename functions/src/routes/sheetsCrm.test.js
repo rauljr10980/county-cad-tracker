@@ -5,6 +5,7 @@ import { requireTabAccess } from '../lib/tabAccess.js';
 
 const load = vi.fn().mockResolvedValue({ rows: [] });
 const update = vi.fn().mockResolvedValue({ success: true });
+const sync = vi.fn().mockResolvedValue({ busy: false, successful: 3, failed: 0 });
 let server;
 let origin;
 beforeAll(async () => {
@@ -18,6 +19,7 @@ beforeAll(async () => {
     },
     access: requireTabAccess('sheetsCrm', { appSetting: { findMany: async () => [{ key: 'tabMembers', value: JSON.stringify({ sheetsCrm: ['admin', 'operator', 'viewer'] }) }] } }),
     load, update,
+    syncService: { sync, getStatus: async () => ({ storage: 'postgresql', autoSyncMinutes: 5, worksheets: [] }) },
     status: () => ({ configured: true, serviceAccountEmail: 'service@example.test' }),
   }));
   await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
@@ -42,5 +44,18 @@ describe('Sheets CRM access', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(load).toHaveBeenCalledWith(46204754);
+  });
+  it('allows subscribed writers to import and rejects viewers and unsubscribed accounts', async () => {
+    const run = role => fetch(`${origin}/sync`, { method: 'POST', headers: { Authorization: role } });
+    expect((await run('VIEWER')).status).toBe(403);
+    expect((await run('UNSUBSCRIBED')).status).toBe(403);
+    expect((await run('OPERATOR')).status).toBe(200);
+    expect(sync).toHaveBeenCalledOnce();
+  });
+  it('reports a pending import after a successful source write instead of encouraging a duplicate save', async () => {
+    sync.mockRejectedValueOnce(new Error('Database unavailable'));
+    const response = await fetch(`${origin}/tabs/46204754/rows/2`, { method: 'PATCH', headers: { Authorization: 'ADMIN', 'Content-Type': 'application/json' }, body: '{}' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, syncPending: true });
   });
 });

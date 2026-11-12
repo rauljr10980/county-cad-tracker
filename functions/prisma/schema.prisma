@@ -75,6 +75,24 @@ model AppSetting {
   @@map("app_settings")
 }
 
+// Last complete copy of each connected worksheet, shared by subscribed users.
+// A failed import updates its error status without replacing the last good rows.
+model GoogleSheetSnapshot {
+  spreadsheetId String
+  sheetId Int
+  workbookTitle String @default("Government Hill")
+  tabTitle String
+  headers Json @default("[]")
+  rows Json @default("[]")
+  rowCount Int @default(0)
+  syncedAt DateTime?
+  lastAttemptAt DateTime?
+  lastError String? @db.Text
+
+  @@id([spreadsheetId, sheetId])
+  @@map("google_sheet_snapshots")
+}
+
 model Invite {
   id          String    @id @default(cuid())
   email       String

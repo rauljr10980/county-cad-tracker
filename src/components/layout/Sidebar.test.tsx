@@ -52,12 +52,12 @@ describe('Sidebar', () => {
     expect(screen.getByRole('button', { name: /Dashboard/ })).toBeTruthy()
   })
 
-  it('shows Government Hill according to subscriptions for any team role', () => {
+  it('shows Google Sheets Data according to subscriptions for any team role', () => {
     const view = render(<Sidebar {...defaultProps} hiddenTabIds={new Set(['sheetsCrm'])} />)
-    expect(screen.queryByRole('button', { name: /Government Hill/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Google Sheets Data/ })).toBeNull()
     vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' } } as any)
     view.rerender(<Sidebar {...defaultProps} />)
-    expect(screen.getByRole('button', { name: /Government Hill/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Google Sheets Data/ })).toBeTruthy()
   })
 
   it('marks only the active tab with aria-current', () => {

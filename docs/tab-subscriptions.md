@@ -25,6 +25,7 @@ hidden tabs. Managers use `GET`/`PUT /api/settings/tab-members` to read and save
 full assignment grid. Existing legacy `hiddenTabs` defaults only apply to tabs
 without an explicit membership list. No schema migration is needed.
 
-Government Hill reads and writes the original Google Sheet. Its records do not
-currently sync into PostgreSQL. Its connection panel reports this and shows the
-last successful worksheet read time.
+The Google Sheets Data label uses the existing `sheetsCrm` tab ID, preserving all
+member assignments. It displays Government Hill records imported into PostgreSQL
+at startup and every five minutes. Its connection panel shows imported row counts,
+timestamps, and errors. See `google-sheets-crm.md` for import behavior.

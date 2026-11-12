@@ -9,7 +9,7 @@ const TABS = [
   { sheetId: 1602785828, title: 'Research Queue', keyColumn: 1 },
   { sheetId: 2090779059, title: 'Outreach Pipeline', keyColumn: 0 },
 ];
-const MAX_ROWS = 1000;
+const MAX_ROWS = 50000;
 const MAX_COLS = 26;
 const locks = new Map();
 
@@ -144,7 +144,7 @@ async function addRow(sheetId, payload, sheets = getSheetsClient(true)) {
       const grid = await readGrid(sheetId, sheets);
       if (!payload || !Array.isArray(payload.values) || payload.values.length !== grid.headers.length || !payload.values.every((value) => typeof value === 'string')) throw new SheetsError('Supply a value for each record field.');
       if (!payload.values[grid.tab.keyColumn].trim()) throw new SheetsError(`${grid.headers[grid.tab.keyColumn]} is required.`);
-      if ((grid.rows.at(-1)?.rowNumber ?? 1) >= MAX_ROWS + 1) throw new SheetsError('This tab has reached the CRM’s 1,000-record limit. Add records in Google Sheets.', 409);
+      if ((grid.rows.at(-1)?.rowNumber ?? 1) >= MAX_ROWS + 1) throw new SheetsError('This tab has reached the CRM’s 50,000-record limit.', 409);
       const values = payload.values.map((value, index) => {
         const descriptor = grid.rows[0]?.cells[index] ?? cellDescriptor();
         if (!grid.headers[index] || !descriptor.editable) {

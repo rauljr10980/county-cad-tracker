@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAuth } from '@/contexts/AuthContext';
 import { useViewAs } from '@/contexts/ViewAsContext';
 import { toast } from '@/hooks/use-toast';
-import { addSheetsCrmRow, getSheetsCrmConnection, getSheetsCrmRows, updateSheetsCrmRow, type SheetsCrmRow } from './api';
+import { addSheetsCrmRow, getSheetsCrmConnection, getSheetsCrmRows, updateSheetsCrmRow, syncSheetsCrm, type SheetsCrmRow } from './api';
 
 const PRIMARY_COLUMNS: Record<number, string[]> = {
   46204754: ['Address', 'Owner Name', 'BCAD Appraised Value', 'Acquisition Stage', 'Contact Status', 'Next Action'],
@@ -30,8 +30,22 @@ export default function SheetsCrmView() {
   const [editor, setEditor] = useState<{ row: SheetsCrmRow | null; values: string[] } | null>(null);
   const [saveError, setSaveError] = useState('');
   const key = ['sheets-crm', user?.id, sheetId];
-  const connection = useQuery({ queryKey: ['sheets-crm-connection', user?.id], queryFn: getSheetsCrmConnection, enabled: allowed, retry: false });
-  const grid = useQuery({ queryKey: key, queryFn: () => getSheetsCrmRows(sheetId), enabled: allowed && connection.data?.configured === true, retry: false, refetchOnWindowFocus: false });
+  const connection = useQuery({ queryKey: ['sheets-crm-connection', user?.id], queryFn: getSheetsCrmConnection, enabled: allowed, retry: false, refetchInterval: 30000 });
+  const grid = useQuery({ queryKey: key, queryFn: () => getSheetsCrmRows(sheetId), enabled: allowed && Boolean(connection.data), retry: false, refetchOnWindowFocus: false, refetchInterval: 30000 });
+  const refreshImports = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['sheets-crm', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['sheets-crm-connection', user?.id] }),
+    ]);
+  };
+  const sync = useMutation({
+    mutationFn: syncSheetsCrm,
+    onSuccess: async result => {
+      toast({ title: result.busy ? 'Import already running' : result.failed ? 'Some worksheets could not be imported' : 'Google Sheets imported', description: result.busy ? 'The CRM will refresh when the current import finishes.' : `${result.successful} worksheets imported to PostgreSQL; ${result.failed} failed.`, variant: result.failed ? 'destructive' : undefined });
+      await refreshImports();
+    },
+    onError: async error => { toast({ title: 'Import failed', description: error instanceof Error ? error.message : 'The previous imported data was kept.', variant: 'destructive' }); await refreshImports(); },
+  });
   const data = grid.data;
   const statusIndex = data?.headers.findIndex((header) => ['Acquisition Stage', 'Status', 'Stage'].includes(header)) ?? -1;
   const statuses = useMemo(() => [...new Set(data?.rows.map((row) => row.cells[statusIndex]?.value).filter(Boolean) ?? [])].sort(), [data, statusIndex]);
@@ -52,13 +66,13 @@ export default function SheetsCrmView() {
   const save = useMutation({
     mutationFn: async () => {
       if (!editor) return;
-      if (editor.row) await updateSheetsCrmRow(sheetId, editor.row, editor.values);
-      else await addSheetsCrmRow(sheetId, editor.values);
+      if (editor.row) return updateSheetsCrmRow(sheetId, editor.row, editor.values);
+      return addSheetsCrmRow(sheetId, editor.values);
     },
-    onSuccess: async () => {
+    onSuccess: async result => {
       setEditor(null); setSaveError('');
-      toast({ title: 'Saved to Google Sheets' });
-      await queryClient.invalidateQueries({ queryKey: key });
+      toast({ title: result?.syncPending ? 'Saved to Google Sheets; CRM import pending' : 'Saved to Google Sheets and imported to CRM', description: result?.syncPending ? 'The source save succeeded. The automatic import will retry within five minutes.' : undefined });
+      await refreshImports();
     },
     onError: (error) => setSaveError(error instanceof Error ? error.message : 'The record was not saved.'),
   });
@@ -76,21 +90,23 @@ export default function SheetsCrmView() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground"><FileSpreadsheet className="h-4 w-4" /> Google Sheets CRM</div>
-          <h1 className="text-2xl font-semibold">Government Hill</h1>
-          <p className="text-sm text-muted-foreground">Josephine–Nika acquisitions, parcel research, and owner outreach.</p>
+          <h1 className="text-2xl font-semibold">Google Sheets Data</h1>
+          <p className="text-sm text-muted-foreground">Government Hill · Josephine–Nika acquisitions, parcel research, and owner outreach.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {connection.data && <Button asChild variant="outline"><a href={`${connection.data.spreadsheetUrl}#gid=${sheetId}`} target="_blank" rel="noopener noreferrer">Open sheet <ArrowUpRight className="ml-2 h-4 w-4" /></a></Button>}
-          <Button variant="outline" disabled={busy} onClick={() => { void connection.refetch(); if (connection.data?.configured) void grid.refetch(); }}><RefreshCw className={`mr-2 h-4 w-4 ${busy ? 'animate-spin' : ''}`} />Refresh</Button>
+          <Button variant="outline" disabled={busy} onClick={() => { void connection.refetch(); void grid.refetch(); }}><RefreshCw className={`mr-2 h-4 w-4 ${busy ? 'animate-spin' : ''}`} />Refresh</Button>
+          <Button variant="outline" disabled={!canWrite || !connection.data?.configured || sync.isPending || connection.data?.sync?.busy} onClick={() => sync.mutate()}>{sync.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}{sync.isPending ? 'Syncing…' : 'Sync now'}</Button>
           <Button disabled={!canWrite || !data || Boolean(error)} onClick={() => openEditor(null)}><Plus className="mr-2 h-4 w-4" />Add record</Button>
         </div>
       </header>
 
       <section aria-label="Data connection status" className="space-y-1 rounded-md border bg-muted/30 p-3 text-sm">
-        <p><strong>Storage:</strong> Live Google Sheets</p>
-        <p><strong>PostgreSQL transfer:</strong> Not configured. Worksheet records are not copied to PostgreSQL.</p>
-        <p><strong>Refresh:</strong> When this view opens, after saving, or when you click Refresh. No scheduled background transfer.</p>
-        <p><strong>Last successful read:</strong> {data ? new Date(data.refreshedAt).toLocaleString() : 'No successful read in this view yet.'}</p>
+        <p><strong>Storage:</strong> PostgreSQL copy of the connected Google Sheet</p>
+        <p><strong>Automatic import:</strong> Every 5 minutes while the API is running, and when it starts. Use Sync now to import immediately.</p>
+        <p><strong>Last successful import for this worksheet:</strong> {data ? new Date(data.refreshedAt).toLocaleString() : 'Not imported yet.'}</p>
+        <p className="text-xs text-muted-foreground">This view checks PostgreSQL for updates every 30 seconds. Edits save to Google Sheets first, then refresh the CRM copy. Source row changes and removals are reflected on the next successful import.</p>
+        {connection.data?.sync?.worksheets.map(tab => <p key={tab.sheetId} className="text-xs"><strong>{tab.title}:</strong> {tab.rowCount} imported records · {tab.syncedAt ? new Date(tab.syncedAt).toLocaleString() : 'Waiting for first import'}{tab.lastError && <span className="block text-destructive">Latest import failed: {tab.lastError} {tab.syncedAt ? 'Showing the last successful copy.' : ''}</span>}</p>)}
       </section>
 
       <div role="tablist" aria-label="Government Hill worksheets" className="flex gap-1 overflow-x-auto border-b">
@@ -110,7 +126,7 @@ export default function SheetsCrmView() {
           </div>
           <p className="text-xs text-muted-foreground">{filtered.length} of {data.rows.length} records · Updated {new Date(data.refreshedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
         </div>
-        {data.truncated && <p className="text-sm text-amber-700">Showing the first 1,000 sheet rows. Open Google Sheets for records beyond this range.</p>}
+        {data.lastError && <p role="alert" className="text-sm text-amber-700">The latest import failed. Showing the last successful PostgreSQL copy. {data.lastError}</p>}
         <div className="overflow-x-auto rounded-md border bg-card">
           <table className="min-w-full text-left text-sm"><thead className="bg-muted/50"><tr>{columnIndexes.map((index) => <th key={index} className="whitespace-nowrap px-4 py-3 font-medium">{data.headers[index]}</th>)}<th className="px-4 py-3"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{rows.map((row) => <tr key={row.rowNumber} className="border-t hover:bg-muted/20">{columnIndexes.map((index) => <td key={index} className="min-w-32 max-w-xs px-4 py-3 align-top"><span className={`block whitespace-pre-wrap break-words ${index === data.tab.keyColumn ? 'font-medium' : ''}`}>{row.cells[index]?.value || '—'}</span></td>)}<td className="px-4 py-3 align-top"><Button size="sm" variant="outline" onClick={() => openEditor(row)} disabled={!canWrite} aria-label={`Edit ${row.cells[data.tab.keyColumn]?.value || 'record'}`}>View / edit</Button></td></tr>)}
@@ -118,7 +134,7 @@ export default function SheetsCrmView() {
           </table>
         </div>
         {maxPage > 0 && <div className="flex items-center justify-end gap-3 text-sm"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Previous</Button><span>Page {Math.min(page, maxPage) + 1} of {maxPage + 1}</span><Button variant="outline" size="sm" disabled={page >= maxPage} onClick={() => setPage((value) => value + 1)}>Next</Button></div>}
-        <p className="text-xs text-muted-foreground">Records are stored in Google Sheets. Refresh to load changes made in the workbook.</p>
+        <p className="text-xs text-muted-foreground">Records shown here are stored in PostgreSQL. New Google Sheets rows import automatically within five minutes.</p>
       </>}
 
       <Dialog open={Boolean(editor)} onOpenChange={(open) => { if (!open && !save.isPending) setEditor(null); }}>

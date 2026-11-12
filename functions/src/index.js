@@ -48,6 +48,7 @@ const notificationsRoutes = require('./routes/notifications');
 const { createSheetsCrmRouter } = require('./routes/sheetsCrm');
 const { createAppointmentsRouter } = require('./routes/appointments');
 const { createPropertyLabelsRouter } = require('./routes/propertyLabels');
+const { startSheetsSync } = require('./lib/sheetsSync');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -296,6 +297,9 @@ async function startServer() {
     } catch (e) {
       console.log('⚠️ Migration skipped:', e.message);
     }
+
+    // Import immediately and every five minutes, even when no CRM is open.
+    startSheetsSync();
 
     // Start Express server
     app.listen(PORT, '0.0.0.0', () => {

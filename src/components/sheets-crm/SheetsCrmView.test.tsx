@@ -3,12 +3,12 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SheetsCrmView from './SheetsCrmView';
-import { getSheetsCrmConnection, getSheetsCrmRows, updateSheetsCrmRow, addSheetsCrmRow } from './api';
+import { getSheetsCrmConnection, getSheetsCrmRows, updateSheetsCrmRow, addSheetsCrmRow, syncSheetsCrm } from './api';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'manager', role: 'ADMIN' } }) }));
 vi.mock('@/contexts/ViewAsContext', () => ({ useViewAs: () => ({ viewAsUserId: null }) }));
 vi.mock('@/hooks/use-toast', () => ({ toast: vi.fn() }));
-vi.mock('./api', () => ({ getSheetsCrmConnection: vi.fn(), getSheetsCrmRows: vi.fn(), updateSheetsCrmRow: vi.fn(), addSheetsCrmRow: vi.fn() }));
+vi.mock('./api', () => ({ getSheetsCrmConnection: vi.fn(), getSheetsCrmRows: vi.fn(), updateSheetsCrmRow: vi.fn(), addSheetsCrmRow: vi.fn(), syncSheetsCrm: vi.fn() }));
 
 const cell = (value: string, editable = true) => ({ value, editable, options: null, checkbox: false, numeric: false });
 const row = { rowNumber: 2, version: 'snapshot', cells: [cell('302 Nika'), cell('City'), cell('Research'), cell('Check ownership'), cell('Computed', false)] };
@@ -27,15 +27,35 @@ beforeEach(() => {
   vi.mocked(getSheetsCrmRows).mockResolvedValue(grid);
   vi.mocked(updateSheetsCrmRow).mockResolvedValue({ success: true });
   vi.mocked(addSheetsCrmRow).mockResolvedValue({ success: true });
+  vi.mocked(syncSheetsCrm).mockResolvedValue({ busy: false, successful: 3, failed: 0 });
 });
 afterEach(cleanup);
 
 describe('Government Hill CRM view', () => {
-  it('shows the actual storage and refresh behavior without claiming a PostgreSQL transfer', async () => {
+  it('shows PostgreSQL storage, the automatic import interval and the last import time', async () => {
     mount();
     await screen.findByText('302 Nika');
-    expect(screen.getByRole('region', { name: 'Data connection status' }).textContent).toContain('Worksheet records are not copied to PostgreSQL.');
-    expect(screen.getByRole('region', { name: 'Data connection status' }).textContent).toContain('No scheduled background transfer.');
+    expect(screen.getByRole('region', { name: 'Data connection status' }).textContent).toContain('PostgreSQL copy');
+    expect(screen.getByRole('region', { name: 'Data connection status' }).textContent).toContain('Every 5 minutes');
+    expect(screen.getByRole('region', { name: 'Data connection status' }).textContent).toContain('Last successful import');
+  });
+  it('imports newly added worksheet rows when Sync now is clicked', async () => {
+    const user = userEvent.setup();
+    vi.mocked(syncSheetsCrm).mockImplementation(async () => {
+      vi.mocked(getSheetsCrmRows).mockResolvedValue({ ...grid, rows: [row, { ...row, rowNumber: 3, cells: [cell('New parcel'), ...row.cells.slice(1)] }] });
+      return { busy: false, successful: 3, failed: 0 };
+    });
+    mount();
+    await screen.findByText('302 Nika');
+    await user.click(screen.getByRole('button', { name: 'Sync now' }));
+    expect(await screen.findByText('New parcel')).toBeTruthy();
+    expect(syncSheetsCrm).toHaveBeenCalledOnce();
+  });
+  it('keeps the imported rows visible with an error when a later source import failed', async () => {
+    vi.mocked(getSheetsCrmRows).mockResolvedValue({ ...grid, lastError: 'Google is unavailable.' });
+    mount();
+    await screen.findByText('302 Nika');
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('last successful PostgreSQL copy'));
   });
   it('loads the selected worksheet, searches records, and switches to Research Queue', async () => {
     const user = userEvent.setup();
