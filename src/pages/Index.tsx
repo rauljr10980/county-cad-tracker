@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { canAccessMls, TabType } from '@/components/layout/navItems';
+import { manageableNavItems, TabType } from '@/components/layout/navItems';
 import { AppShell } from '@/components/layout/AppShell';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { PropertiesView } from '@/components/properties/PropertiesView';
@@ -17,6 +17,7 @@ import TeamView from '@/components/team/TeamView';
 import ManagementView from '@/components/team/ManagementView';
 import SheetsCrmView from '@/components/sheets-crm/SheetsCrmView';
 import { useAuth } from '@/contexts/AuthContext';
+import { useViewAs } from '@/contexts/ViewAsContext';
 import { LoginModal } from '@/components/auth/LoginModal';
 import { SignupModal } from '@/components/auth/SignupModal';
 import { ResetPasswordCard } from '@/components/auth/ResetPasswordCard';
@@ -51,6 +52,7 @@ const getSignupInviteCode = (): string | null => {
 
 const Index = () => {
   const { isAuthenticated, isLoading, user } = useAuth();
+  const { viewAsUserId } = useViewAs();
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -59,9 +61,10 @@ const Index = () => {
   const [phoneSearchResult, setPhoneSearchResult] = useState<Property | null>(null);
   const [resetToken, setResetToken] = useState<string | null>(getResetPasswordToken);
   const [signupInviteCode] = useState<string | null>(getSignupInviteCode);
-  // Seeded to match the old hardcoded HIDDEN_TABS default (navItems.ts) so
-  // the rail doesn't flash Dashboard on for the moment before this loads.
-  const [hiddenTabIds, setHiddenTabIds] = useState<Set<string>>(() => new Set(['dashboard']));
+  // Hide sections until the server resolves this member's subscriptions.
+  const [hiddenTabIds, setHiddenTabIds] = useState<Set<string>>(() => new Set(manageableNavItems.map(item => item.id)));
+  const [loadingTabAccess, setLoadingTabAccess] = useState(true);
+  const [tabAccessError, setTabAccessError] = useState(false);
 
   useEffect(() => {
     if (signupInviteCode) setIsSignupOpen(true);
@@ -69,10 +72,16 @@ const Index = () => {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    getHiddenTabs()
-      .then((ids) => setHiddenTabIds(new Set(ids)))
-      .catch((err) => console.error('Failed to load tab settings:', err));
-  }, [isAuthenticated]);
+    let cancelled = false;
+    setLoadingTabAccess(true);
+    const load = () => getHiddenTabs()
+      .then((ids) => { if (!cancelled) { setHiddenTabIds(new Set(ids)); setTabAccessError(false); } })
+      .catch((err) => { console.error('Failed to load tab settings:', err); if (!cancelled) setTabAccessError(true); })
+      .finally(() => { if (!cancelled) setLoadingTabAccess(false); });
+    void load();
+    const interval = setInterval(load, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [isAuthenticated, user?.id, viewAsUserId]);
 
   // Dashboard is admin-only (see renderContent()'s 'dashboard' case). getInitialTab()
   // runs before `user` is known, so a non-admin's fresh login still initializes
@@ -91,6 +100,12 @@ const Index = () => {
   // there is no menu entry and no password gate. It renders whenever that hash
   // is present and the user is authenticated like any other route.
   const [isCrmVisible, setIsCrmVisible] = useState(() => window.location.hash.slice(1) === 'evictions-crm');
+  useEffect(() => {
+    if (isCrmVisible && !loadingTabAccess && hiddenTabIds.has('evictions')) {
+      setIsCrmVisible(false);
+      setActiveTab('calendar');
+    }
+  }, [isCrmVisible, loadingTabAccess, hiddenTabIds]);
 
   // Route back to the (already-valid) 'evictions' tab through activeTab rather
   // than writing the hash directly — the tab-to-hash effect below is the only
@@ -149,6 +164,9 @@ const Index = () => {
   };
 
   const renderContent = () => {
+    if (loadingTabAccess) return <div className="p-6 text-muted-foreground">Loading your tabs…</div>;
+    if (tabAccessError) return <div role="alert" className="space-y-2 p-6"><h2 className="text-lg font-semibold">Could not load your tab assignments</h2><p className="text-muted-foreground">Check your connection and refresh the CRM. Your saved assignments have not changed.</p></div>;
+    if (hiddenTabIds.has(activeTab)) return <div className="space-y-2 p-6"><h2 className="text-lg font-semibold">Tab not enabled</h2><p className="text-muted-foreground">You are not subscribed to this tab. Select another section or ask a manager to enable it in Manager Settings.</p></div>;
     switch (activeTab) {
       case 'dashboard':
         return user?.role === 'ADMIN'
@@ -169,13 +187,13 @@ const Index = () => {
       case 'crm':
         return <CrmView />;
       case 'sheetsCrm':
-        return user?.role === 'ADMIN' ? <SheetsCrmView /> : <CalendarView />;
+        return <SheetsCrmView />;
       case 'driving':
         return <DrivingView />;
       case 'evictions':
         return <EvictionLeadsView />;
       case 'mls':
-        return canAccessMls(user) ? <MlsLeadsView /> : <CalendarView />;
+        return <MlsLeadsView />;
       case 'inbox':
         return <InboxView />;
       case 'team':
@@ -273,7 +291,7 @@ const Index = () => {
     );
   }
 
-  if (isCrmVisible) {
+  if (isCrmVisible && !loadingTabAccess && !hiddenTabIds.has('evictions')) {
     return <EvictionsCrmWorkspace onExit={exitEvictionsCrm} />;
   }
 

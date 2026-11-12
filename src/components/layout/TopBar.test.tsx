@@ -109,7 +109,7 @@ describe('TopBar', () => {
     screen.getByRole('button', { name: /open menu/i }).click()
     await waitFor(() => expect(screen.getByRole('button', { name: /Upload/ })).toBeTruthy())
     expect(screen.queryByRole('button', { name: /Management/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Government Hill/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Government Hill/ })).toBeTruthy()
   })
 
   it('mobile sheet lists Management for an ADMIN user', async () => {

@@ -995,6 +995,26 @@ export async function setHiddenTabs(hiddenTabs: string[]): Promise<string[]> {
   return data.hiddenTabs;
 }
 
+export interface TabAssignments {
+  hiddenTabs: string[];
+  tabMembers: Record<string, string[]>;
+  users: { id: string; username: string; role: string }[];
+}
+
+export async function getTabAssignments(): Promise<TabAssignments> {
+  const response = await fetch(`${API_BASE_URL}/api/settings/tab-members`, { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error('Could not load team tab assignments.');
+  return response.json();
+}
+
+export async function saveTabAssignments(tabMembers: Record<string, string[]>): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/settings/tab-members`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ tabMembers }) });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || 'Could not save team tab assignments.');
+  }
+}
+
 export interface SearchResult {
   type: 'property' | 'preforeclosure' | 'crmLead' | 'mlsLead'
   id: string

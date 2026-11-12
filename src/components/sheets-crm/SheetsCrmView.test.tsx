@@ -31,6 +31,12 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Government Hill CRM view', () => {
+  it('shows the actual storage and refresh behavior without claiming a PostgreSQL transfer', async () => {
+    mount();
+    await screen.findByText('302 Nika');
+    expect(screen.getByRole('region', { name: 'Data connection status' }).textContent).toContain('Worksheet records are not copied to PostgreSQL.');
+    expect(screen.getByRole('region', { name: 'Data connection status' }).textContent).toContain('No scheduled background transfer.');
+  });
   it('loads the selected worksheet, searches records, and switches to Research Queue', async () => {
     const user = userEvent.setup();
     mount();

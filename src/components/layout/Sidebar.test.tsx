@@ -27,7 +27,7 @@ describe('Sidebar', () => {
     vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' } } as any)
     render(<Sidebar {...defaultProps} />)
     expect(screen.getByRole('button', { name: /Eviction List/ })).toBeTruthy()
-    expect(screen.getAllByRole('button').length).toBeGreaterThanOrEqual(tabs.length - 1)
+    expect(screen.getAllByRole('button').length).toBeGreaterThanOrEqual(tabs.length)
   })
 
   it('hides tabs named in hiddenTabIds', () => {
@@ -35,9 +35,9 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('button', { name: /Calendar/ })).toBeNull()
   })
 
-  it('shows Custom MLS Leads only for test, overriding its team-wide hidden setting', () => {
-    vi.mocked(useAuth).mockReturnValue({ user: { id: 'pilot', username: 'test', role: 'ADMIN' } } as any)
-    render(<Sidebar {...defaultProps} hiddenTabIds={new Set(['mls'])} />)
+  it('shows Custom MLS Leads for an assigned teammate without a fixed username rule', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'member', username: 'raul', role: 'OPERATOR' } } as any)
+    render(<Sidebar {...defaultProps} hiddenTabIds={new Set()} />)
     expect(screen.getByRole('button', { name: 'Custom MLS Leads' })).toBeTruthy()
   })
 
@@ -52,8 +52,8 @@ describe('Sidebar', () => {
     expect(screen.getByRole('button', { name: /Dashboard/ })).toBeTruthy()
   })
 
-  it('shows Government Hill only to managers', () => {
-    const view = render(<Sidebar {...defaultProps} />)
+  it('shows Government Hill according to subscriptions for any team role', () => {
+    const view = render(<Sidebar {...defaultProps} hiddenTabIds={new Set(['sheetsCrm'])} />)
     expect(screen.queryByRole('button', { name: /Government Hill/ })).toBeNull()
     vi.mocked(useAuth).mockReturnValue({ user: { id: 'u2', username: 'admin', role: 'ADMIN' } } as any)
     view.rerender(<Sidebar {...defaultProps} />)

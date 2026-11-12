@@ -1,6 +1,6 @@
 # Government Hill Google Sheets CRM
 
-The manager-only **Government Hill** navigation section connects directly to
+The **Government Hill** navigation section connects directly to
 the selected acquisition workbook. Open `/login#sheetsCrm` on the public site.
 
 The three worksheets are separate views: Parcels, Research Queue, and Outreach
@@ -17,7 +17,7 @@ made in Google Sheets. The Instructions tab remains available in the workbook.
   existing `GOOGLE_APPLICATION_CREDENTIALS_JSON`. The legacy Calendar account
   variables are a final fallback when neither JSON credential is configured.
 - Credentials stay on the backend. The frontend receives only the service
-  account's email and worksheet data after manager authentication.
+  account's email and worksheet data after authentication and a tab subscription check.
 
 The workbook and worksheet IDs are fixed in
 `functions/src/lib/sheetsCrm.js`, so a client cannot query other spreadsheets
@@ -38,8 +38,13 @@ accessible to the same service account.
   Google Sheets has no atomic compare-and-set operation: simultaneous edits made
   directly in Sheets during the short final read/write interval remain possible.
 - New records append to the tab. No delete or whole-sheet replacement is exposed.
-- Every route requires the existing authenticated ADMIN role and rejects teammate
-  impersonation. Responses use `Cache-Control: no-store`.
+- Every route requires authentication and a Government Hill subscription configured
+  in Manager Settings. Admins/operators can edit; subscribed viewers can read.
+  Manager teammate view remains blocked for this shared workbook. Responses use
+  `Cache-Control: no-store`.
+- The connection panel shows the most recent successful read and explicitly says
+  PostgreSQL transfer is not configured. Reads happen when the view opens, after
+  a save, on worksheet changes, or on Refresh. There is no background transfer job.
 
 ## Verification
 

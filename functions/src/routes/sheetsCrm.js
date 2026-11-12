@@ -2,14 +2,19 @@ const express = require('express');
 const { getConnectionStatus, publicError } = require('../lib/googleSheets');
 const { SPREADSHEET_ID, TABS, loadTab, updateRow, addRow } = require('../lib/sheetsCrm');
 
-function createSheetsCrmRouter({ authenticate, admin, load = loadTab, update = updateRow, add = addRow, status = getConnectionStatus } = {}) {
-  if (!authenticate || !admin) {
-    const { authenticateToken, requireRole } = require('../middleware/auth');
+function createSheetsCrmRouter({ authenticate, access, load = loadTab, update = updateRow, add = addRow, status = getConnectionStatus } = {}) {
+  if (!authenticate || !access) {
+    const { authenticateToken } = require('../middleware/auth');
+    const { requireTabAccess } = require('../lib/tabAccess');
     authenticate ??= authenticateToken;
-    admin ??= requireRole('ADMIN');
+    access ??= requireTabAccess('sheetsCrm');
   }
   const router = express.Router();
-  router.use(authenticate, admin);
+  router.use(authenticate, access);
+  router.use((req, res, next) => {
+    if (['POST', 'PATCH'].includes(req.method) && !['ADMIN', 'OPERATOR'].includes(req.user.role)) return res.status(403).json({ error: 'Viewers cannot edit worksheet records.' });
+    next();
+  });
   router.use((req, res, next) => {
     res.set('Cache-Control', 'no-store');
     if (req.headers['x-view-as-user'] && req.headers['x-view-as-user'] !== req.user.id) return res.status(403).json({ error: 'Exit teammate view to open the Government Hill CRM.' });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { authenticateToken } = require('../middleware/auth');
+const { canAccessTab } = require('../lib/tabAccess');
 const {
   isQueryTooShort,
   mapPropertyResult,
@@ -24,6 +25,7 @@ router.get('/', async (req, res) => {
   const userId = req.user.id;
 
   try {
+    const hasMlsAccess = await canAccessTab(prisma, userId, 'mls');
     const [properties, preforeclosures, crmLeads, mlsLeads] = await Promise.all([
       prisma.property.findMany({
         where: { OR: [{ propertyAddress: contains }, { ownerName: contains }, { accountNumber: contains }] },
@@ -40,7 +42,7 @@ router.get('/', async (req, res) => {
         take: 5,
         select: { id: true, ownerName: true, businessName: true, phone: true, email: true },
       }),
-      req.user.username === 'test' ? prisma.mlsLead.findMany({
+      hasMlsAccess ? prisma.mlsLead.findMany({
         where: { userId, hidden: false, address: contains },
         take: 5,
         select: { id: true, address: true, status: true },

@@ -20,7 +20,8 @@ const selectClass = 'h-10 rounded-md border border-input bg-background px-3 text
 export default function SheetsCrmView() {
   const { user } = useAuth();
   const { viewAsUserId } = useViewAs();
-  const allowed = user?.role === 'ADMIN' && !viewAsUserId;
+  const allowed = Boolean(user) && !viewAsUserId;
+  const canWrite = user?.role === 'ADMIN' || user?.role === 'OPERATOR';
   const queryClient = useQueryClient();
   const [sheetId, setSheetId] = useState(46204754);
   const [search, setSearch] = useState('');
@@ -62,7 +63,7 @@ export default function SheetsCrmView() {
     onError: (error) => setSaveError(error instanceof Error ? error.message : 'The record was not saved.'),
   });
 
-  if (!allowed) return <div className="p-6 text-muted-foreground">{viewAsUserId ? 'Exit teammate view to open the Government Hill CRM.' : 'Government Hill is available to managers.'}</div>;
+  if (!allowed) return <div className="p-6 text-muted-foreground">{viewAsUserId ? 'Exit teammate view to open the Government Hill CRM.' : 'Sign in to open Government Hill.'}</div>;
   const error = connection.error || grid.error;
   const busy = connection.isFetching || grid.isFetching;
   const openEditor = (row: SheetsCrmRow | null) => {
@@ -81,9 +82,16 @@ export default function SheetsCrmView() {
         <div className="flex flex-wrap gap-2">
           {connection.data && <Button asChild variant="outline"><a href={`${connection.data.spreadsheetUrl}#gid=${sheetId}`} target="_blank" rel="noopener noreferrer">Open sheet <ArrowUpRight className="ml-2 h-4 w-4" /></a></Button>}
           <Button variant="outline" disabled={busy} onClick={() => { void connection.refetch(); if (connection.data?.configured) void grid.refetch(); }}><RefreshCw className={`mr-2 h-4 w-4 ${busy ? 'animate-spin' : ''}`} />Refresh</Button>
-          <Button disabled={!data || Boolean(error)} onClick={() => openEditor(null)}><Plus className="mr-2 h-4 w-4" />Add record</Button>
+          <Button disabled={!canWrite || !data || Boolean(error)} onClick={() => openEditor(null)}><Plus className="mr-2 h-4 w-4" />Add record</Button>
         </div>
       </header>
+
+      <section aria-label="Data connection status" className="space-y-1 rounded-md border bg-muted/30 p-3 text-sm">
+        <p><strong>Storage:</strong> Live Google Sheets</p>
+        <p><strong>PostgreSQL transfer:</strong> Not configured. Worksheet records are not copied to PostgreSQL.</p>
+        <p><strong>Refresh:</strong> When this view opens, after saving, or when you click Refresh. No scheduled background transfer.</p>
+        <p><strong>Last successful read:</strong> {data ? new Date(data.refreshedAt).toLocaleString() : 'No successful read in this view yet.'}</p>
+      </section>
 
       <div role="tablist" aria-label="Government Hill worksheets" className="flex gap-1 overflow-x-auto border-b">
         {(connection.data?.tabs ?? [{ sheetId: 46204754, title: 'Parcels' }, { sheetId: 1602785828, title: 'Research Queue' }, { sheetId: 2090779059, title: 'Outreach Pipeline' }]).map((tab) => <button key={tab.sheetId} role="tab" aria-selected={sheetId === tab.sheetId} className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium ${sheetId === tab.sheetId ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`} onClick={() => { setSheetId(tab.sheetId); setSearch(''); setStage('all'); }}>{tab.title}</button>)}
@@ -105,7 +113,7 @@ export default function SheetsCrmView() {
         {data.truncated && <p className="text-sm text-amber-700">Showing the first 1,000 sheet rows. Open Google Sheets for records beyond this range.</p>}
         <div className="overflow-x-auto rounded-md border bg-card">
           <table className="min-w-full text-left text-sm"><thead className="bg-muted/50"><tr>{columnIndexes.map((index) => <th key={index} className="whitespace-nowrap px-4 py-3 font-medium">{data.headers[index]}</th>)}<th className="px-4 py-3"><span className="sr-only">Actions</span></th></tr></thead>
-            <tbody>{rows.map((row) => <tr key={row.rowNumber} className="border-t hover:bg-muted/20">{columnIndexes.map((index) => <td key={index} className="min-w-32 max-w-xs px-4 py-3 align-top"><span className={`block whitespace-pre-wrap break-words ${index === data.tab.keyColumn ? 'font-medium' : ''}`}>{row.cells[index]?.value || '—'}</span></td>)}<td className="px-4 py-3 align-top"><Button size="sm" variant="outline" onClick={() => openEditor(row)} aria-label={`Edit ${row.cells[data.tab.keyColumn]?.value || 'record'}`}>View / edit</Button></td></tr>)}
+            <tbody>{rows.map((row) => <tr key={row.rowNumber} className="border-t hover:bg-muted/20">{columnIndexes.map((index) => <td key={index} className="min-w-32 max-w-xs px-4 py-3 align-top"><span className={`block whitespace-pre-wrap break-words ${index === data.tab.keyColumn ? 'font-medium' : ''}`}>{row.cells[index]?.value || '—'}</span></td>)}<td className="px-4 py-3 align-top"><Button size="sm" variant="outline" onClick={() => openEditor(row)} disabled={!canWrite} aria-label={`Edit ${row.cells[data.tab.keyColumn]?.value || 'record'}`}>View / edit</Button></td></tr>)}
             {!rows.length && <tr><td colSpan={columnIndexes.length + 1} className="px-4 py-12 text-center text-muted-foreground">{data.rows.length ? 'No records match your search.' : 'No records yet. Add a record to get started.'}</td></tr>}</tbody>
           </table>
         </div>
