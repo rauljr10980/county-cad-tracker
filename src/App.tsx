@@ -20,6 +20,9 @@ const queryClient = new QueryClient({
   },
 });
 
+// The public website also serves this app beneath /login.
+const routerBasename = /^\/login(?:\/|$)/.test(window.location.pathname) ? "/login" : "/";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -27,7 +30,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <BrowserRouter basename={routerBasename}>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
